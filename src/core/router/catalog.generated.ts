@@ -7,7 +7,7 @@
 
 import type { Price } from "./pricing.js";
 
-export const GENERATED_AT = "2026-08-23";
+export const GENERATED_AT = "2026-08-24";
 
 export type ModelRow = [string, string, string, number, number, number, number];
 
@@ -16,7 +16,7 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["~anthropic/claude-haiku-latest","Anthropic Claude Haiku Latest","~anthropic",200000,1,5,0.1],
   ["~anthropic/claude-opus-latest","Claude Opus Latest","~anthropic",1000000,5,25,0.5],
   ["~anthropic/claude-sonnet-latest","Anthropic Claude Sonnet Latest","~anthropic",1000000,2,10,0.2],
-  ["~deepseek/deepseek-v4-flash-latest","DeepSeek V4 Flash Latest","~deepseek",1310720,0.045,0.13,0.01],
+  ["~deepseek/deepseek-v4-flash-latest","DeepSeek V4 Flash Latest","~deepseek",1310720,0.04,0.08,0.008],
   ["~google/gemini-flash-latest","Google Gemini Flash Latest","~google",1048576,0.375,1.875,0.0375],
   ["~google/gemini-pro-latest","Google Gemini Pro Latest","~google",1048576,2,12,0.2],
   ["~moonshotai/kimi-latest","MoonshotAI Kimi Latest","~moonshotai",1048576,2.6,13,0.29],
@@ -88,10 +88,10 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["deepseek/deepseek-v3.1-terminus","DeepSeek V3.1 Terminus","deepseek",163840,0.27,1,0.135],
   ["deepseek/deepseek-v3.2","DeepSeek V3.2","deepseek",163840,0.26,0.38,0.13],
   ["deepseek/deepseek-v3.2-exp","DeepSeek V3.2 Exp","deepseek",163840,0.27,0.41,0],
-  ["deepseek/deepseek-v4-flash","DeepSeek V4 Flash 0423","deepseek",1048576,0.0517,0.1033,0.0103],
-  ["deepseek/deepseek-v4-flash-0731","DeepSeek V4 Flash 0731","deepseek",1310720,0.08,0.18,0.016],
+  ["deepseek/deepseek-v4-flash","DeepSeek V4 Flash 0423","deepseek",1048576,0.0574,0.1148,0.0115],
+  ["deepseek/deepseek-v4-flash-0731","DeepSeek V4 Flash 0731","deepseek",1310720,0.14,0.28,0.028],
   ["deepseek/deepseek-v4-flash-vision-exp","DeepSeek V4 Flash Vision Exp","deepseek",1048576,0.22,0.66,0.007],
-  ["deepseek/deepseek-v4-pro","DeepSeek V4 Pro 0423","deepseek",1048576,0.3969,0.7938,0.0331],
+  ["deepseek/deepseek-v4-pro","DeepSeek V4 Pro 0423","deepseek",1048576,0.5262,1.0524,0.0438],
   ["deepseek/deepseek-v4-pro-0813","DeepSeek V4 Pro 0813","deepseek",1048576,1.122,3.366,0.0374],
   ["dots-studio/dots-3-note-preview:free","Dots3-Note Preview (free)","dots-studio",512000,0,0,0],
   ["google/gemini-2.5-flash","Gemini 2.5 Flash","google",1048576,0.3,2.5,0.03],
@@ -167,7 +167,7 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["minimax/minimax-m2-her","MiniMax M2-her","minimax",65536,0.3,1.2,0.03],
   ["minimax/minimax-m2.1","MiniMax M2.1","minimax",204800,0.3,1.2,0.03],
   ["minimax/minimax-m2.5","MiniMax M2.5","minimax",204800,0.27,1.08,0.027],
-  ["minimax/minimax-m2.7","MiniMax M2.7","minimax",204800,0.3,1.2,0.06],
+  ["minimax/minimax-m2.7","MiniMax M2.7","minimax",204800,0.24,0.96,0.048],
   ["minimax/minimax-m3","MiniMax M3","minimax",1048576,0.3,1.2,0.06],
   ["minimax/minimax-m3:batch","MiniMax M3 (batch)","minimax",524288,0.3,1.2,0.06],
   ["mistralai/codestral-2508","Codestral 2508","mistralai",256000,0.3,0.9,0.03],
@@ -356,12 +356,12 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["qwen/qwen3.5-122b-a10b","Qwen3.5-122B-A10B","qwen",262144,0.26,2.08,0],
   ["qwen/qwen3.5-27b","Qwen3.5-27B","qwen",262144,0.195,1.56,0],
   ["qwen/qwen3.5-35b-a3b","Qwen3.5-35B-A3B","qwen",262144,0.25,1.25,0.25],
-  ["qwen/qwen3.5-397b-a17b","Qwen3.5 397B A17B","qwen",262144,0.39,2.34,0],
+  ["qwen/qwen3.5-397b-a17b","Qwen3.5 397B A17B","qwen",262144,0.5,3.6,0.3],
   ["qwen/qwen3.5-9b","Qwen3.5-9B","qwen",262144,0.1,0.15,0],
   ["qwen/qwen3.5-flash-02-23","Qwen3.5-Flash","qwen",1000000,0.065,0.26,0],
   ["qwen/qwen3.5-plus-02-15","Qwen3.5 Plus 2026-02-15","qwen",1000000,0.26,1.56,0],
   ["qwen/qwen3.5-plus-20260420","Qwen3.5 Plus 2026-04-20","qwen",1000000,0.3,1.8,0],
-  ["qwen/qwen3.6-27b","Qwen3.6 27B","qwen",262144,0.6,3.6,0.12],
+  ["qwen/qwen3.6-27b","Qwen3.6 27B","qwen",262144,0.32,3.2,0],
   ["qwen/qwen3.6-35b-a3b","Qwen3.6 35B A3B","qwen",262144,0.14,1,0.05],
   ["qwen/qwen3.6-flash","Qwen3.6 Flash","qwen",1000000,0.1875,1.125,0],
   ["qwen/qwen3.6-max-preview","Qwen3.6 Max Preview","qwen",262144,1.027,6.162,0],
