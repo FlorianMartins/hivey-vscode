@@ -1,13 +1,13 @@
 // GENERATED FILE — do not edit by hand.
 // Written by `npm run models` (scripts/update-models.mjs); a scheduled workflow commits the diff.
-// 410 priced models. Tuples: [id, name, vendor, context, $/M in, $/M out, $/M cached-in].
+// 408 priced models. Tuples: [id, name, vendor, context, $/M in, $/M out, $/M cached-in].
 //
 // A model that is absent from this table is reported as "unknown cost" rather than guessed: a
 // wrong price silently spends someone's budget.
 
 import type { Price } from "./pricing.js";
 
-export const GENERATED_AT = "2026-08-25";
+export const GENERATED_AT = "2026-08-26";
 
 export type ModelRow = [string, string, string, number, number, number, number];
 
@@ -16,10 +16,10 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["~anthropic/claude-haiku-latest","Anthropic Claude Haiku Latest","~anthropic",200000,1,5,0.1],
   ["~anthropic/claude-opus-latest","Claude Opus Latest","~anthropic",1000000,5,25,0.5],
   ["~anthropic/claude-sonnet-latest","Anthropic Claude Sonnet Latest","~anthropic",1000000,2,10,0.2],
-  ["~deepseek/deepseek-v4-flash-latest","DeepSeek V4 Flash Latest","~deepseek",1310720,0.035,0.1,0.008],
+  ["~deepseek/deepseek-v4-flash-latest","DeepSeek V4 Flash Latest","~deepseek",1310720,0.03,0.075,0.007],
   ["~google/gemini-flash-latest","Google Gemini Flash Latest","~google",1048576,0.375,1.875,0.0375],
   ["~google/gemini-pro-latest","Google Gemini Pro Latest","~google",1048576,2,12,0.2],
-  ["~moonshotai/kimi-latest","MoonshotAI Kimi Latest","~moonshotai",1048576,2.8,14,0.29],
+  ["~moonshotai/kimi-latest","MoonshotAI Kimi Latest","~moonshotai",1048576,2.55,12.75,0.256],
   ["~openai/gpt-latest","OpenAI GPT Latest","~openai",1050000,2,10,0.2],
   ["~openai/gpt-mini-latest","OpenAI GPT Mini Latest","~openai",400000,0.75,4.5,0.075],
   ["~x-ai/grok-latest","Grok Latest","~x-ai",500000,2,6,0.5],
@@ -89,9 +89,9 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["deepseek/deepseek-v3.2","DeepSeek V3.2","deepseek",163840,0.26,0.38,0.13],
   ["deepseek/deepseek-v3.2-exp","DeepSeek V3.2 Exp","deepseek",163840,0.27,0.41,0],
   ["deepseek/deepseek-v4-flash","DeepSeek V4 Flash 0423","deepseek",1048576,0.0886,0.1772,0.0177],
-  ["deepseek/deepseek-v4-flash-0731","DeepSeek V4 Flash 0731","deepseek",1310720,0.14,0.28,0.028],
+  ["deepseek/deepseek-v4-flash-0731","DeepSeek V4 Flash 0731","deepseek",1310720,0.06,0.12,0.012],
   ["deepseek/deepseek-v4-flash-vision-exp","DeepSeek V4 Flash Vision Exp","deepseek",1048576,0.44,1.32,0.014],
-  ["deepseek/deepseek-v4-pro","DeepSeek V4 Pro 0423","deepseek",1048576,0.7903,1.5806,0.0659],
+  ["deepseek/deepseek-v4-pro","DeepSeek V4 Pro 0423","deepseek",1048576,0.87,1.74,0.0725],
   ["deepseek/deepseek-v4-pro-0813","DeepSeek V4 Pro 0813","deepseek",1048576,1.122,3.366,0.0374],
   ["dots-studio/dots-3-note-preview:free","Dots3-Note Preview (free)","dots-studio",512000,0,0,0],
   ["google/gemini-2.5-flash","Gemini 2.5 Flash","google",1048576,0.3,2.5,0.03],
@@ -128,10 +128,9 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["google/gemma-3-12b-it","Gemma 3 12B","google",131072,0.05,0.15,0],
   ["google/gemma-3-27b-it","Gemma 3 27B","google",262144,0.08,0.45,0.04],
   ["google/gemma-3-4b-it","Gemma 3 4B","google",131072,0.05,0.1,0],
-  ["google/gemma-3n-e4b-it","Gemma 3n 4B","google",32768,0.06,0.12,0],
   ["google/gemma-4-26b-a4b-it","Gemma 4 26B A4B ","google",262144,0.07,0.34,0],
   ["google/gemma-4-26b-a4b-it:free","Gemma 4 26B A4B  (free)","google",262144,0,0,0],
-  ["google/gemma-4-31b-it","Gemma 4 31B","google",262144,0.1,0.34,0.1],
+  ["google/gemma-4-31b-it","Gemma 4 31B","google",262144,0.09,0.34,0.05],
   ["google/gemma-4-31b-it:free","Gemma 4 31B (free)","google",262144,0,0,0],
   ["gryphe/mythomax-l2-13b","MythoMax 13B","gryphe",8192,0.06,0.06,0],
   ["ibm-granite/granite-4.0-h-micro","Granite 4.0 Micro","ibm-granite",131000,0.017,0.112,0],
@@ -148,10 +147,10 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["meta-llama/llama-3.1-8b-instruct","Llama 3.1 8B Instruct","meta-llama",131072,0.05,0.08,0.025],
   ["meta-llama/llama-3.2-1b-instruct","Llama 3.2 1B Instruct","meta-llama",60000,0.027,0.201,0],
   ["meta-llama/llama-3.2-3b-instruct","Llama 3.2 3B Instruct","meta-llama",131072,0.05,0.33,0],
-  ["meta-llama/llama-3.3-70b-instruct","Llama 3.3 70B Instruct","meta-llama",131072,0.1,0.32,0],
+  ["meta-llama/llama-3.3-70b-instruct","Llama 3.3 70B Instruct","meta-llama",131072,0.71,0.71,0.71],
   ["meta-llama/llama-4-maverick","Llama 4 Maverick","meta-llama",1048576,0.2,0.8,0],
-  ["meta-llama/llama-4-scout","Llama 4 Scout","meta-llama",1310720,0.1,0.3,0],
-  ["meta-llama/llama-guard-4-12b","Llama Guard 4 12B","meta-llama",1048576,0.18,0.18,0],
+  ["meta-llama/llama-4-scout","Llama 4 Scout","meta-llama",1310720,0.11,0.34,0.055],
+  ["meta-llama/llama-guard-4-12b","Llama Guard 4 12B","meta-llama",163840,0.18,0.18,0],
   ["meta/muse-glimmer-30b","Muse Glimmer 30B","meta",131072,0.35,1.5,0.04],
   ["meta/muse-spark-1.1","Muse Spark 1.1","meta",1048576,1.25,4.25,0.15],
   ["meta/muse-spark-1.2","Muse Spark 1.2","meta",1048576,1.25,4.25,0.15],
@@ -323,8 +322,7 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["qwen/qwen-2.5-coder-32b-instruct","Qwen2.5 Coder 32B Instruct","qwen",32768,0.66,1,0],
   ["qwen/qwen-plus","Qwen-Plus","qwen",1000000,0.26,0.78,0.052],
   ["qwen/qwen-plus-2025-07-28","Qwen Plus 0728","qwen",1000000,0.26,0.78,0],
-  ["qwen/qwen-plus-2025-07-28:thinking","Qwen Plus 0728 (thinking)","qwen",1000000,0.26,0.78,0],
-  ["qwen/qwen2.5-vl-72b-instruct","Qwen2.5 VL 72B Instruct","qwen",128000,0.8,1,0.4],
+  ["qwen/qwen2.5-vl-72b-instruct","Qwen2.5 VL 72B Instruct","qwen",128000,0.25,0.75,0],
   ["qwen/qwen3-14b","Qwen3 14B","qwen",131072,0.12,0.24,0],
   ["qwen/qwen3-235b-a22b","Qwen3 235B A22B","qwen",131072,0.455,1.82,0],
   ["qwen/qwen3-235b-a22b-2507","Qwen3 235B A22B Instruct 2507","qwen",262144,0.09,0.55,0],
@@ -353,12 +351,12 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["qwen/qwen3.5-122b-a10b","Qwen3.5-122B-A10B","qwen",262144,0.26,2.08,0],
   ["qwen/qwen3.5-27b","Qwen3.5-27B","qwen",262144,0.195,1.56,0],
   ["qwen/qwen3.5-35b-a3b","Qwen3.5-35B-A3B","qwen",262144,0.25,1.25,0.25],
-  ["qwen/qwen3.5-397b-a17b","Qwen3.5 397B A17B","qwen",262144,0.5,3.6,0.3],
+  ["qwen/qwen3.5-397b-a17b","Qwen3.5 397B A17B","qwen",262144,0.39,2.34,0],
   ["qwen/qwen3.5-9b","Qwen3.5-9B","qwen",262144,0.1,0.15,0],
   ["qwen/qwen3.5-flash-02-23","Qwen3.5-Flash","qwen",1000000,0.065,0.26,0],
   ["qwen/qwen3.5-plus-02-15","Qwen3.5 Plus 2026-02-15","qwen",1000000,0.26,1.56,0],
   ["qwen/qwen3.5-plus-20260420","Qwen3.5 Plus 2026-04-20","qwen",1000000,0.3,1.8,0],
-  ["qwen/qwen3.6-27b","Qwen3.6 27B","qwen",262144,0.32,3.2,0],
+  ["qwen/qwen3.6-27b","Qwen3.6 27B","qwen",262144,0.6,3.6,0.12],
   ["qwen/qwen3.6-35b-a3b","Qwen3.6 35B A3B","qwen",262144,0.14,1,0.05],
   ["qwen/qwen3.6-flash","Qwen3.6 Flash","qwen",1000000,0.1875,1.125,0],
   ["qwen/qwen3.6-max-preview","Qwen3.6 Max Preview","qwen",262144,1.027,6.162,0],
@@ -367,7 +365,7 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["qwen/qwen3.7-max","Qwen3.7 Max","qwen",1000000,1.475,4.425,0.295],
   ["qwen/qwen3.7-plus","Qwen3.7 Plus","qwen",1000000,0.32,1.28,0.064],
   ["qwen/qwen3.8-2.4t-a95b","Qwen3.8 2.4T A95B","qwen",1048576,2,6,0.25],
-  ["qwen/qwen3.8-27b","Qwen3.8 27B","qwen",1000000,0.4,3,0.05],
+  ["qwen/qwen3.8-27b","Qwen3.8 27B","qwen",1000000,0.425,2.55,0.085],
   ["qwen/qwen3.8-max","Qwen3.8 Max","qwen",1000000,2,6,0.25],
   ["rekaai/reka-edge","Reka Edge","rekaai",16384,0.1,0.1,0],
   ["rekaai/reka-flash-3","Reka Flash 3","rekaai",65536,0.1,0.2,0],
