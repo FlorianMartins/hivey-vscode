@@ -235,7 +235,7 @@ prix n'est écrit à la main**.
 
 ## État
 
-`0.10.0` — utilisable au quotidien, prêt à publier (voir `docs/PUBLISHING.md`).
+`0.11.0` — utilisable au quotidien, prêt à publier (voir `docs/PUBLISHING.md`).
 Ce qui est fait et ce qui ne l'est pas : [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Licence

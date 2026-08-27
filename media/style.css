@@ -1925,6 +1925,8 @@ pre.code {
 /* The context meter sits above the box, right-aligned: a number you glance at, not a control you
    operate. Inside the toolbar it sat between the model name and the send button and competed with
    both for the same few pixels. */
+/* Above the box and outside its border, on the panel background: a reading about the conversation
+   rather than a control of the message being written. */
 .composer-meter {
   display: flex;
   justify-content: flex-end;

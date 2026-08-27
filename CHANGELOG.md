@@ -2,6 +2,24 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.11.0 — 2026-08-27
+
+**Both sides, at once.**
+
+- **The panel is now declared in the activity bar AND in the right-hand bar**, and both work at the
+  same time on the same conversation. Every previous attempt at this moved it: a view container
+  lives in exactly one place, so declaring one home is choosing a default rather than offering a
+  choice. Declaring it twice, with one provider serving both views, is what actually offers the
+  choice — open either, or both; the state lives in the extension and the panels only draw it.
+- **The setup screen has a visible icon** in the title bar. It was reachable by command and from the
+  model picker, and both of those are the same as unreachable for anyone who has not gone looking
+  behind a "…".
+- **The context meter is outside the box**, on the panel background above it. It was inside the
+  border, where it still read as part of the field you type into — which is precisely what it should
+  not be. It is a reading about the conversation, not a control of the message.
+- Commands that need the panel now bring forward **whichever copy is on screen**, instead of always
+  reaching for the activity bar's one and yanking you back to the left.
+
 ## 0.10.0 — 2026-08-27
 
 ### Changed

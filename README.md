@@ -338,7 +338,7 @@ no entry, so a translation cannot silently rot.
 
 ## Status
 
-`0.10.0` — usable day to day. See [`docs/ROADMAP.md`](docs/ROADMAP.md) for what is done and what is
+`0.11.0` — usable day to day. See [`docs/ROADMAP.md`](docs/ROADMAP.md) for what is done and what is
 not.
 
 ## Licence

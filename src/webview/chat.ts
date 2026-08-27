@@ -273,12 +273,6 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
     card.append(chips);
   }
 
-  const meter = el("div", "composer-meter");
-  const tokens = el("span", "composer-tokens", t("{0} tokens", formatTokens(state.contextTokens)));
-  tokens.title = t("What the next question will send, once muted exchanges are removed.");
-  meter.append(tokens);
-  card.append(meter);
-
   const area = el("textarea", "composer-input");
   area.rows = 2;
   area.placeholder =
@@ -333,7 +327,15 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
   );
   bar.append(right);
   card.append(bar);
-  wrap.append(card);
+
+  // The meter sits ABOVE the box, on the panel's own background — not inside the border. Inside it,
+  // it still read as part of the field you type into, which is exactly what it should not be: it is
+  // a reading about the conversation, not a control of the message.
+  const meter = el("div", "composer-meter");
+  const tokens = el("span", "composer-tokens", t("{0} tokens", formatTokens(state.contextTokens)));
+  tokens.title = t("What the next question will send, once muted exchanges are removed.");
+  meter.append(tokens);
+  wrap.append(meter, card);
   // Size the box to its content on first paint, not only after the first keystroke.
   requestAnimationFrame(() => autoGrow(area));
   return wrap;

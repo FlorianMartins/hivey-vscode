@@ -87,8 +87,12 @@ class MementoPermissionStore implements PermissionStore {
 
 export class ChatViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewId = "hiveyCode.chat";
+  /** The same panel, declared a second time so it can live in the right-hand bar as well. */
+  public static readonly sideViewId = "hiveyCode.chatSide";
 
   private view?: vscode.WebviewView;
+  /** Every resolved copy of the panel. There are two: the activity bar's and the right-hand bar's. */
+  private readonly views = new Set<vscode.WebviewView>();
   private session = new Session();
   private attachments: ContextItem[] = [];
   private turn?: AbortController;
@@ -180,6 +184,16 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
   resolveWebviewView(view: vscode.WebviewView): void {
     this.view = view;
+    this.views.add(view);
+    view.onDidDispose(() => {
+      this.views.delete(view);
+      if (this.view === view) this.view = [...this.views][0];
+    });
+    // Whichever one the user brings forward becomes the one commands act on. Without this, opening
+    // the right-hand copy would leave `openSearch` and friends talking to the hidden left one.
+    view.onDidChangeVisibility(() => {
+      if (view.visible) this.view = view;
+    });
     view.webview.options = {
       enableScripts: true,
       localResourceRoots: [vscode.Uri.joinPath(this.ctx.extensionUri, "media")],
@@ -200,8 +214,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
   // ── UI plumbing ────────────────────────────────────────────────────────────────────────────
 
+  /**
+   * Send to every copy of the panel.
+   *
+   * The extension holds the state; the panels only draw it. Posting to one and not the other would
+   * let the hidden copy drift, and it is not hidden for long — the whole point of declaring it
+   * twice is that the user moves between them.
+   */
   private post(message: ToPanel): void {
-    void this.view?.webview.postMessage(message);
+    for (const view of this.views) void view.webview.postMessage(message);
   }
 
   private html(webview: vscode.Webview): string {
@@ -331,8 +352,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
   /** Rebuild the panel after a change it cannot re-render on its own, such as the language. */
   reload(): void {
-    if (!this.view) return;
-    this.view.webview.html = this.html(this.view.webview);
+    for (const view of this.views) view.webview.html = this.html(view.webview);
   }
 
   /** Open the panel on a given screen — used by the palette commands and by the tests. */
@@ -808,6 +828,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     if (provider === "local") return false;
     if (provider === "openai-compatible" && !settings.endpoints["openai-compatible"]) return true;
     return !(await this.keys.get(provider));
+  }
+
+  /** Which copy of the panel the user is looking at, if either is on screen. */
+  visibleViewId(): string | undefined {
+    for (const view of this.views) if (view.visible) return view.viewType;
+    return this.view?.viewType;
   }
 
   /** Reopens the first-run screen and re-probes, from the command palette. */

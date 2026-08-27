@@ -152,7 +152,9 @@ suite("Screenshot", () => {
 
       // Tidy the window for the capture: no auxiliary chat panel, no notification toast, and a
       // sidebar wide enough to read — the width a user would actually give it.
-      await vscode.commands.executeCommand("workbench.action.closeAuxiliaryBar").then(undefined, () => {});
+      // The right-hand copy is opened deliberately: the panel is declared in both places now, and a
+      // photograph that shows only one of them would not show what shipped.
+      await vscode.commands.executeCommand("hiveyCode.chatSide.focus").then(undefined, () => {});
       await vscode.commands.executeCommand("notifications.clearAll").then(undefined, () => {});
       await vscode.commands.executeCommand("hiveyCode.chat.focus");
       // `increaseViewSize` resizes whatever part has focus. Revealing the view is not the same as
