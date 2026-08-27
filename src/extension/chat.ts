@@ -33,7 +33,7 @@ import type {
   UiPermissionRule,
   UiState,
 } from "../shared/protocol.js";
-import { endpointFor, providerFor, readSettings, routerConfig, type Keys, type Settings } from "./config.js";
+import { SECTION, endpointFor, providerFor, readSettings, routerConfig, type Keys, type Settings } from "./config.js";
 import { EgressGate, safeHost } from "./egress.js";
 import { labelFor, listModels, openFiles, supportsReasoning } from "./models.js";
 import { loadPrices } from "./prices.js";
@@ -41,9 +41,9 @@ import { buildTools } from "./tools.js";
 import { McpManager } from "./integrations/mcp.js";
 import { WorkspaceContext, relative } from "./workspace.js";
 
-const HISTORY_KEY = "forge.sessions";
-const PERMISSIONS_KEY = "forge.permissions";
-const PREFS_KEY = "forge.prefs";
+const HISTORY_KEY = "hiveyCode.sessions";
+const PERMISSIONS_KEY = "hiveyCode.permissions";
+const PREFS_KEY = "hiveyCode.prefs";
 const HISTORY_MAX = 100;
 
 interface Prefs {
@@ -62,7 +62,7 @@ class MementoPermissionStore implements PermissionStore {
 }
 
 export class ChatViewProvider implements vscode.WebviewViewProvider {
-  public static readonly viewId = "forge.chat";
+  public static readonly viewId = "hiveyCode.chat";
 
   private view?: vscode.WebviewView;
   private session = new Session();
@@ -135,7 +135,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 <meta http-equiv="Content-Security-Policy" content="${csp}">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="${uri("style.css")}">
-<title>Forge</title>
+<title>Hivey Code</title>
 </head>
 <body>
 <div id="app"></div>
@@ -236,7 +236,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
   /** Open the panel on a given screen — used by the palette commands and by the tests. */
   async show(screen: Screen): Promise<void> {
-    await vscode.commands.executeCommand("forge.chat.focus");
+    await vscode.commands.executeCommand("hiveyCode.chat.focus");
     this.screen = screen;
     this.sendState();
     if (screen === "models" && !this.models.length) void this.loadModels();
@@ -256,7 +256,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   }
 
   async focusWithPrompt(text: string, context?: ContextItem): Promise<void> {
-    await vscode.commands.executeCommand("forge.chat.focus");
+    await vscode.commands.executeCommand("hiveyCode.chat.focus");
     this.screen = "chat";
     if (context) this.attachments.push(context);
     this.sendState();
@@ -313,7 +313,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           this.sendState();
           break;
         case "setModel": {
-          const config = vscode.workspace.getConfiguration("forge");
+          const config = vscode.workspace.getConfiguration(SECTION);
           await config.update("chat.model", m.model, vscode.ConfigurationTarget.Workspace);
           if (m.provider && m.provider !== readSettings().chat.provider) {
             await config.update("chat.provider", m.provider, vscode.ConfigurationTarget.Workspace);
@@ -393,13 +393,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           this.sendState();
           break;
         case "openEgress":
-          await vscode.commands.executeCommand("forge.showEgress");
+          await vscode.commands.executeCommand("hiveyCode.showEgress");
           break;
         case "openCosts":
-          await vscode.commands.executeCommand("forge.showCosts");
+          await vscode.commands.executeCommand("hiveyCode.showCosts");
           break;
         case "openSettings":
-          await vscode.commands.executeCommand("workbench.action.openSettings", "forge");
+          await vscode.commands.executeCommand("workbench.action.openSettings", SECTION);
           break;
         case "approve": {
           const resolve = this.approvals.get(m.id);
@@ -424,7 +424,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             void vscode.window.showWarningMessage(t("Open the target file before applying."));
             break;
           }
-          const preview = ed.document.uri.with({ scheme: "forge-preview", query: String(Date.now()) });
+          const preview = ed.document.uri.with({ scheme: "hivey-code-preview", query: String(Date.now()) });
           previewContents.set(preview.toString(), m.code);
           await vscode.commands.executeCommand("vscode.diff", ed.document.uri, preview, t("{0} ↔ proposal", relative(ed.document.uri)));
           break;
@@ -508,7 +508,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   async exportSession(): Promise<void> {
     const lines: string[] = [`# ${this.session.title || t("Conversation")}`, ""];
     for (const entry of this.session.entries) {
-      lines.push(`## ${entry.role === "user" ? t("You") : "Forge"}${entry.included ? "" : ` — ${t("out of context")}`}`);
+      lines.push(`## ${entry.role === "user" ? t("You") : "Hivey Code"}${entry.included ? "" : ` — ${t("out of context")}`}`);
       if (entry.role === "assistant" && entry.model) lines.push(`*${entry.model}*`, "");
       lines.push(entry.text.trim(), "");
       for (const step of entry.steps ?? []) lines.push(`- \`${step.tool}\` — ${step.summary}`);
@@ -630,7 +630,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         if (!verdict.ok) {
           this.post({
             type: "error",
-            message: t("Budget: {0}. Adjust forge.budget or stay local.", verdict.message),
+            message: t("Budget: {0}. Adjust hiveyCode.budget or stay local.", verdict.message),
           });
           this.post({ type: "turnEnd" });
           return;
@@ -760,13 +760,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   /** Show the change as a diff before it is applied — the reviewable-edit rule. */
   private async confirmEdit(uri: vscode.Uri, next: string): Promise<boolean> {
     const original = await readOrEmpty(uri);
-    const preview = uri.with({ scheme: "forge-preview", query: Date.now().toString() });
+    const preview = uri.with({ scheme: "hivey-code-preview", query: Date.now().toString() });
     previewContents.set(preview.toString(), next);
     await vscode.commands.executeCommand(
       "vscode.diff",
       original === undefined ? vscode.Uri.parse("untitled:nouveau") : uri,
       preview,
-      t("{0} — proposed by Forge", relative(uri)),
+      t("{0} — proposed by Hivey Code", relative(uri)),
       { preview: true },
     );
     const answer = await vscode.window.showInformationMessage(

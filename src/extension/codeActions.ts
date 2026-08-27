@@ -20,10 +20,10 @@ export class ForgeCodeActions implements vscode.CodeActionProvider {
     const actions: vscode.CodeAction[] = [];
 
     for (const diagnostic of context.diagnostics.slice(0, 3)) {
-      const fix = new vscode.CodeAction(t("Fix with Forge: {0}", short(diagnostic.message)), vscode.CodeActionKind.QuickFix);
+      const fix = new vscode.CodeAction(t("Fix with Hivey Code: {0}", short(diagnostic.message)), vscode.CodeActionKind.QuickFix);
       fix.diagnostics = [diagnostic];
       fix.command = {
-        command: "forge.fixDiagnostic",
+        command: "hiveyCode.fixDiagnostic",
         title: t("Fix"),
         arguments: [document.uri, diagnostic],
       };
@@ -32,7 +32,7 @@ export class ForgeCodeActions implements vscode.CodeActionProvider {
       const explain = new vscode.CodeAction(t("Explain this problem"), vscode.CodeActionKind.QuickFix);
       explain.diagnostics = [diagnostic];
       explain.command = {
-        command: "forge.explainDiagnostic",
+        command: "hiveyCode.explainDiagnostic",
         title: t("Explain"),
         arguments: [document.uri, diagnostic],
       };
@@ -45,7 +45,7 @@ export class ForgeCodeActions implements vscode.CodeActionProvider {
         [t("Document this selection"), t("Add concise documentation above this code, in the language and style of the file.")],
       ] as const) {
         const action = new vscode.CodeAction(title, vscode.CodeActionKind.RefactorRewrite);
-        action.command = { command: "forge.askWith", title, arguments: [instruction] };
+        action.command = { command: "hiveyCode.askWith", title, arguments: [instruction] };
         actions.push(action);
       }
     }

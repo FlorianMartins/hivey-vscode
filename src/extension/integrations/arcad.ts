@@ -9,7 +9,7 @@
 //     a real, declared, versioned surface — they appear in the command palette, and they are what
 //     the ARCAD developer already uses. Calling one is exactly as capable as clicking it.
 //   • the REST half calls the server the user has already configured in `arcad.restApiServer.*`,
-//     at a path the user or their ARCAD administrator supplies. Forge does not guess paths; it
+//     at a path the user or their ARCAD administrator supplies. Hivey Code does not guess paths; it
 //     carries the request, the credentials and the redaction.
 //
 // For a deeper integration than that, an MCP server is the right shape, and this extension speaks
@@ -108,7 +108,7 @@ export interface ArcadServer {
  * Where the Elias REST server is, according to the settings the user already filled in for Elias.
  *
  * Reading another extension's configuration is a liberty, and the alternative — a second set of
- * host/port/TLS settings under `forge.*` — is worse: two places to change when the server moves,
+ * host/port/TLS settings under `hivey-code.*` — is worse: two places to change when the server moves,
  * and a support call the first time they disagree.
  */
 export function arcadServer(): ArcadServer | undefined {
@@ -170,7 +170,7 @@ export function buildArcadTools(deps: ArcadDeps): Tool[] {
     schema: {
       name: "arcad_rest",
       description:
-        "Call the ARCAD Elias REST server the user has configured, at a path they supply. Forge does not know ARCAD's endpoint catalogue: use this only with a path the user or their ARCAD administrator has given, and say so when you do.",
+        "Call the ARCAD Elias REST server the user has configured, at a path they supply. Hivey Code does not know ARCAD's endpoint catalogue: use this only with a path the user or their ARCAD administrator has given, and say so when you do.",
       parameters: {
         type: "object",
         properties: {

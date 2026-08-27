@@ -11,7 +11,7 @@ choses possibles :
 1. **Tester le comportement sans éditeur.** Le budget, l'anonymisation, la boucle d'agent, le cache
    de complétion et la dérivation du prompt sont testés en millisecondes avec `node:test`. Un test
    qui a besoin de lancer VS Code n'est pas écrit, et un comportement non testé finit par dériver.
-2. **Faire tourner le même produit dans un terminal.** `forge` (`src/cli/`) réutilise le noyau tel
+2. **Faire tourner le même produit dans un terminal.** `hivey-code` (`src/cli/`) réutilise le noyau tel
    quel. C'est aussi la vérification honnête du découpage : si une règle ne marche que dans la barre
    latérale, c'est qu'elle était au mauvais endroit.
 3. **Auditer une surface réduite.** Une équipe sécurité qui veut savoir ce qui sort lit

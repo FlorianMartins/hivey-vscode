@@ -1,4 +1,4 @@
-/* Forge — the panel.
+/* Hivey Code — the panel.
  *
  * Every colour here is a VS Code theme variable. Not one hex value, not one accent of our own:
  * the panel is docked inside the editor, next to the file tree and the terminal, and anything that
@@ -320,6 +320,7 @@ mark.hit {
 }
 
 .entry-head {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--sp-2);
@@ -332,6 +333,10 @@ mark.hit {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--muted);
+  /* A two-word product name wrapped here and broke the header in half. The name is fixed and
+     short; the model id beside it is neither, so that is the thing allowed to shrink. */
+  white-space: nowrap;
+  flex: 0 0 auto;
 }
 .entry.assistant .entry-who {
   color: var(--vscode-foreground);
@@ -343,6 +348,8 @@ mark.hit {
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 12rem;
+  min-width: 0;
+  flex: 0 1 auto;
 }
 .entry-meta.pulse {
   animation: pulse 1.5s ease-in-out infinite;
@@ -364,12 +371,24 @@ mark.hit {
   padding: 0 5px;
 }
 
+/* The row's actions overlay it on hover rather than reserving space in it. Invisible buttons were
+   still taking their width, which at the side bar's default size left the model id with room for
+   one character — and "q…" tells the reader nothing at all. The editor's own lists do the same. */
 .entry-actions {
-  margin-left: auto;
+  position: absolute;
+  right: 0;
+  top: 0;
   display: flex;
   gap: 1px;
   opacity: 0;
+  pointer-events: none;
+  padding-left: var(--sp-3);
+  background: linear-gradient(to right, transparent, var(--vscode-sideBar-background, var(--vscode-editor-background)) var(--sp-3));
   transition: opacity 100ms ease;
+}
+.entry:hover .entry-actions,
+.entry-actions:focus-within {
+  pointer-events: auto;
 }
 .entry:hover .entry-actions,
 .entry-actions:focus-within {

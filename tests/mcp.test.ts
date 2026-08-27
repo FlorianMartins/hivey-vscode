@@ -46,13 +46,13 @@ const INIT = () => ({
 
 test("the handshake announces the client, reads the server, and confirms it is ready", async () => {
   const server = fakeServer({ initialize: INIT });
-  const client = new McpClient({ transport: server.transport, clientName: "forge", clientVersion: "9.9.9" });
+  const client = new McpClient({ transport: server.transport, clientName: "hivey-code", clientVersion: "9.9.9" });
   await client.initialize();
 
   assert.equal(client.serverName, "arcad-elias");
   assert.equal(client.serverVersion, "1.2.3");
   assert.equal(server.sent[0].method, "initialize");
-  assert.equal(server.sent[0].params.clientInfo.name, "forge");
+  assert.equal(server.sent[0].params.clientInfo.name, "hivey-code");
   assert.equal(server.sent[0].params.protocolVersion, PROTOCOL_VERSION);
   // Without this notification a spec-compliant server may refuse everything that follows.
   assert.equal(server.sent[1].method, "notifications/initialized");

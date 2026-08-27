@@ -10,7 +10,7 @@ import type { Settings } from "./config.js";
 
 export function showEgressReport(gate: EgressGate, settings: Settings): void {
   const ledger = gate.ledger();
-  const panel = vscode.window.createWebviewPanel("forge.egress", t("Forge — outgoing data"), vscode.ViewColumn.Active, {
+  const panel = vscode.window.createWebviewPanel("hiveyCode.egress", t("Hivey Code — outgoing data"), vscode.ViewColumn.Active, {
     enableScripts: false,
   });
   const totals = ledger.reduce(
@@ -72,7 +72,7 @@ export function showCostReport(gate: EgressGate, settings: Settings): void {
   const daily = settings.budget.dailyUsd;
   const pct = daily > 0 ? Math.min(100, Math.round((spent / daily) * 100)) : 0;
 
-  const panel = vscode.window.createWebviewPanel("forge.costs", t("Forge — cost"), vscode.ViewColumn.Active, {
+  const panel = vscode.window.createWebviewPanel("hiveyCode.costs", t("Hivey Code — cost"), vscode.ViewColumn.Active, {
     enableScripts: false,
   });
   panel.webview.html = page(

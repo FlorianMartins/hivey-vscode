@@ -47,15 +47,15 @@ Dans `.vscode/settings.json` d'un dépôt sensible, ou par stratégie de réglag
 
 ```jsonc
 {
-  "forge.chat.provider": "local",
-  "forge.completion.provider": "local",
-  "forge.endpoints.local": "https://llm.interne.exemple/v1",
-  "forge.privacy.redaction": "strict",
-  "forge.privacy.egressPolicy": "ask-always",
-  "forge.privacy.customTerms": ["NomDuClient", "ProjetInterne"],
-  "forge.privacy.blockedGlobs": ["**/.env*", "**/*.pem", "**/secrets/**", "**/donnees-clients/**"],
-  "forge.escalation.policy": "never",
-  "forge.budget.dailyUsd": 0
+  "hiveyCode.chat.provider": "local",
+  "hiveyCode.completion.provider": "local",
+  "hiveyCode.endpoints.local": "https://llm.interne.exemple/v1",
+  "hiveyCode.privacy.redaction": "strict",
+  "hiveyCode.privacy.egressPolicy": "ask-always",
+  "hiveyCode.privacy.customTerms": ["NomDuClient", "ProjetInterne"],
+  "hiveyCode.privacy.blockedGlobs": ["**/.env*", "**/*.pem", "**/secrets/**", "**/donnees-clients/**"],
+  "hiveyCode.escalation.policy": "never",
+  "hiveyCode.budget.dailyUsd": 0
 }
 ```
 
@@ -64,8 +64,8 @@ et le journal des envois le montre : il reste vide.
 
 ## Vérifier plutôt que croire
 
-1. `Forge : Aperçu des données sortantes` — la liste des envois distants.
-2. Le canal de sortie « Forge » — chaque activation journalise le fournisseur, l'URL et le
+1. `Hivey Code : Aperçu des données sortantes` — la liste des envois distants.
+2. Le canal de sortie « Hivey Code » — chaque activation journalise le fournisseur, l'URL et le
    niveau d'anonymisation ; chaque complétion journalise sa latence et son volume.
 3. Un proxy ou `tcpdump` sur le poste : l'extension n'ouvre aucune autre connexion. Pas de serveur
    de télémétrie, pas de vérification de licence, pas de catalogue distant au démarrage (le

@@ -1,6 +1,6 @@
 {
   "extension.description": "Open-source coding assistant for VS Code — local models or OpenRouter, reversible pseudonymisation before anything leaves, zero telemetry.",
-  "container.title": "Forge",
+  "container.title": "Hivey Code",
   "view.chat.name": "Chat",
   "command.newSession.title": "New conversation",
   "command.askAboutSelection.title": "Ask about the selection",
@@ -13,7 +13,7 @@
   "command.editSelection.title": "Edit the selection with AI",
   "command.generateCommitMessage.title": "Write the commit message",
   "command.explainTerminalSelection.title": "Explain the terminal output",
-  "command.openTerminal.title": "Open Forge in the terminal",
+  "command.openTerminal.title": "Open Hivey Code in the terminal",
   "command.fixDiagnostic.title": "Fix this problem",
   "command.explainDiagnostic.title": "Explain this problem",
   "command.showHistory.title": "Conversation history",

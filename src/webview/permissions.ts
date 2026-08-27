@@ -27,7 +27,7 @@ export function permissionsScreen(state: UiState, send: (m: ToExtension) => void
   wrap.append(
     el("p", "screen-lede",
       t(
-        "By default Forge reads without asking, and asks before every write and every command. What you " +
+        "By default Hivey Code reads without asking, and asks before every write and every command. What you " +
           "allow here applies to the SHAPE of an action, never to one occurrence: allowing “npm test” " +
           "does not allow “npm publish”.",
       ),

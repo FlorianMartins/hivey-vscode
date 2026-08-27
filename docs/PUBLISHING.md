@@ -8,7 +8,7 @@ main reason this is a document rather than a workflow.
 
 1. **A publisher.** Create one at <https://marketplace.visualstudio.com/manage>. Its identifier must
    match `publisher` in `package.json` — currently `hivey`, which makes the extension id
-   `hivey.forge`. The name cannot be changed afterwards without republishing under a new id and
+   `hivey.hivey-code`. The name cannot be changed afterwards without republishing under a new id and
    losing the install count, so decide it before the first publish, not after.
 2. **An Azure DevOps token.** <https://dev.azure.com> → user menu → *Personal Access Tokens* → New:
    - **Organisation:** *All accessible organisations* (a token scoped to one organisation is
@@ -45,7 +45,7 @@ Then bump and describe the release **before** packaging, because both are shippe
 npm version minor --no-git-tag-version
 $EDITOR CHANGELOG.md
 npm run build
-npx @vscode/vsce@3 package --no-dependencies -o forge.vsix
+npx @vscode/vsce@3 package --no-dependencies -o hiveyCode.vsix
 ```
 
 `--no-dependencies` is correct here and would be wrong in most extensions: the bundle is built by
@@ -62,7 +62,7 @@ them would double the download for nothing.
 **Install it and use it for an hour before publishing.**
 
 ```bash
-code --install-extension forge.vsix
+code --install-extension hiveyCode.vsix
 ```
 
 The suite catches what it was written to catch. It does not catch a panel that feels wrong, a label
@@ -75,7 +75,7 @@ colleague testing a fix, or simply publishing from a browser because Azure DevOp
 organisation on a corporate network. So every build is attached to a GitHub release, and one tag is
 rolling:
 
-    https://github.com/FlorianMartins/forge/releases/download/build/forge.vsix
+    https://github.com/FlorianMartins/hivey-code/releases/download/build/hiveyCode.vsix
 
 That URL never changes; the asset behind it is replaced. To refresh it after a change:
 
@@ -98,7 +98,7 @@ export VSCE_PAT=…                                # or let vsce prompt for it
 npx @vscode/vsce@3 publish --no-dependencies
 
 export OVSX_PAT=…
-npx ovsx publish forge.vsix -p "$OVSX_PAT"
+npx ovsx publish hiveyCode.vsix -p "$OVSX_PAT"
 
 git tag "v$(node -p 'require("./package.json").version')"
 git push --tags
@@ -125,7 +125,7 @@ Two consequences worth knowing before the first publish:
 
 - **Images in the README must be absolute URLs.** A relative `docs/images/x.png` works on GitHub and
   renders as a broken image on the Marketplace. Use
-  `https://raw.githubusercontent.com/FlorianMartins/forge/main/docs/images/x.png`.
+  `https://raw.githubusercontent.com/FlorianMartins/hivey-code/main/docs/images/x.png`.
 - **The README is the product page.** Nobody clicks through to the docs. The first screen has to say
   what it is, who it is for, and what it does not send.
 
@@ -143,7 +143,7 @@ id and loses everything attached to it. The real remedy for a bad release is a h
 number:
 
 ```bash
-npx @vscode/vsce@3 unpublish hivey.forge   # last resort, irreversible
+npx @vscode/vsce@3 unpublish hivey.hivey-code   # last resort, irreversible
 ```
 
 ## What is deliberately not automated

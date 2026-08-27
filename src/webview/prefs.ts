@@ -30,7 +30,7 @@ const DEFAULTS: PanelPrefs = {
   providers: [],
 };
 
-const KEY = "forge.panelPrefs";
+const KEY = "hiveyCode.panelPrefs";
 
 interface Store {
   get(): unknown;

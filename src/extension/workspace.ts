@@ -121,7 +121,7 @@ export class WorkspaceContext {
   async fileContext(uri: vscode.Uri, settings: Settings, maxTokens = 4000): Promise<ContextItem | undefined> {
     const rel = relative(uri);
     if (EgressGate.isBlocked(rel, settings.privacy.blockedGlobs)) {
-      void vscode.window.showWarningMessage(t("Forge: {0} is excluded by the privacy policy and will not be attached.", rel));
+      void vscode.window.showWarningMessage(t("Hivey Code: {0} is excluded by the privacy policy and will not be attached.", rel));
       return undefined;
     }
     const doc = await vscode.workspace.openTextDocument(uri);

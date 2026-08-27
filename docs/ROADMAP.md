@@ -27,9 +27,9 @@ Honnête plutôt que flatteur : ce qui marche, ce qui manque, ce qui n'est pas v
   contexte, plus ce que le point de terminaison local sert réellement.
 - Complétion inline FIM, anti-rebond, cache « frappe à travers », préchauffage du modèle.
 - Commandes d'éditeur : `Ctrl+I`, interroger la sélection, message de commit, expliquer le terminal.
-- Client terminal `forge`, avec sortie de commande capturée et diff avant écriture.
+- Client terminal `hivey-code`, avec sortie de commande capturée et diff avant écriture.
 - Porte de sortie : globs interdits, anonymisation, refus sur secret, consentement, journal, budget.
-- Correctifs rapides sur les diagnostics de l'éditeur (« Corriger avec Forge »), commandes
+- Correctifs rapides sur les diagnostics de l'éditeur (« Corriger avec Hivey Code »), commandes
   `/` dans la barre latérale, mention `#` qui ouvre le sélecteur de fichiers de VS Code, et
   lancement du client terminal depuis l'éditeur.
 - **Tests d'intégration dans un vrai VS Code** (7, headless) : l'extension s'active, toutes les

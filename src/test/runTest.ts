@@ -15,9 +15,9 @@ async function main(): Promise<void> {
         "--disable-extensions",
         "--disable-gpu",
         "--disable-telemetry",
-        // FORGE_LOCALE=fr runs the whole suite in a French editor, which is the only way to prove
+        // HIVEY_CODE_LOCALE=fr runs the whole suite in a French editor, which is the only way to prove
         // the translation reaches a real user rather than only a unit test.
-        ...(process.env["FORGE_LOCALE"] ? ["--locale", process.env["FORGE_LOCALE"]] : []),
+        ...(process.env["HIVEY_CODE_LOCALE"] ? ["--locale", process.env["HIVEY_CODE_LOCALE"]] : []),
       ],
     });
   } catch (err) {

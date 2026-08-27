@@ -1,4 +1,4 @@
-# Forge
+# Hivey Code
 
 **A coding assistant for VS Code that does not send your code away.**
 Local models (Ollama, LM Studio, vLLM, llama.cpp) or a remote gateway (OpenRouter, Azure, LiteLLM,
@@ -9,7 +9,7 @@ Open source (Apache-2.0), **zero runtime dependencies**, **zero telemetry**.
 [Français](README.fr.md) · [Architecture](docs/ARCHITECTURE.md) · [Privacy](docs/PRIVACY.md) ·
 [Threat model](docs/THREAT-MODEL.md)
 
-![Forge's sidebar in VS Code](https://raw.githubusercontent.com/FlorianMartins/forge/main/docs/images/conversation.png)
+![Hivey Code's sidebar in VS Code](https://raw.githubusercontent.com/FlorianMartins/hivey-code/main/docs/images/conversation.png)
 
 *Real screenshots, taken from a VS Code launched by the integration suite — `node scripts/screenshots.mjs`
 takes them, so they cannot quietly stop being true. Only the model answering is a stub server; the
@@ -17,7 +17,7 @@ interface is the product, at the side bar's default width.*
 
 | Choosing a model | Conversations |
 |---|---|
-| ![The model picker](https://raw.githubusercontent.com/FlorianMartins/forge/main/docs/images/picker.png) | ![History and filters](https://raw.githubusercontent.com/FlorianMartins/forge/main/docs/images/historique.png) |
+| ![The model picker](https://raw.githubusercontent.com/FlorianMartins/hivey-code/main/docs/images/picker.png) | ![History and filters](https://raw.githubusercontent.com/FlorianMartins/hivey-code/main/docs/images/historique.png) |
 
 ---
 
@@ -30,7 +30,7 @@ GitHub Copilot is excellent, and it presents a company with two problems:
 2. **The cost is structural.** The product sends everything to one large remote model, because that
    is the product. You pay per developer, every month, for completions that are 90 % trivial.
 
-Forge inverts both: **the default is the model already running on your machine**, the remote one is
+Hivey Code inverts both: **the default is the model already running on your machine**, the remote one is
 an **escalation** that has to be justified, consented to, and paid for out of a budget; and anything
 that does leave is **reversibly pseudonymised** first.
 
@@ -44,12 +44,12 @@ that does leave is **reversibly pseudonymised** first.
 | **Agent mode** | Reads the repository, searches it, consults the **editor's diagnostics**, edits files and proposes commands — **one approval per action**, a diff before every write, everything in the undo stack. |
 | **Permissions** | Per action and per shape of action: “allow once”, “for this conversation”, “always”. Allowing `npm test` does not allow `npm publish`. A dedicated screen separates what is permanent from what expires. |
 | **Reasoning** | An adjustable thinking budget (direct / brief / standard / deep), translated per provider — `reasoning.effort` on OpenRouter, a token budget on Anthropic. The thinking is shown in a collapsed block and never sent back to the model. |
-| **Terminal** | The `forge` command: the same core in a REPL, with command output actually captured and a diff printed before every write. |
+| **Terminal** | The `hivey-code` command (short alias `hivey`): the same core in a REPL, with command output actually captured and a diff printed before every write. |
 | **In the editor** | `Ctrl+I` rewrites the selection in place · right-click → ask about the selection · commit message written from the staged diff · “explain the terminal output”. |
-| **Quick fixes** | On an error reported by your language server: “Fix with Forge” and “Explain this problem”. The compiler says **what** and **where**; the model only has to fix it — which is what makes a small local model enough for most everyday cases. |
+| **Quick fixes** | On an error reported by your language server: “Fix with Hivey Code” and “Explain this problem”. The compiler says **what** and **where**; the model only has to fix it — which is what makes a small local model enough for most everyday cases. |
 | **Context notation** | `#file:`, `#selection`, `#changes`, `#problems`, `#codebase`, `#terminal`, `#sym:` — Copilot's notation, because you should not have to learn a second one. Resolved **on your machine** before anything is sent, which is what lets `#changes` attach unreleased code to a conversation with a local model. |
 | **Participants** | `@workspace`, `@editor`, `@terminal`, `@git`, `@ibmi`, `@arcad` — a hint about where to look first, not a different personality. |
-| **House rules** | `.github/copilot-instructions.md` is read as written: a team that has one should not write it twice. `.forge/instructions.md` wins if both exist. |
+| **House rules** | `.github/copilot-instructions.md` is read as written: a team that has one should not write it twice. `.hiveycode/instructions.md` wins if both exist. |
 | **Git** | Status, diff, log, blame, show, branches, stage, commit — through the editor's own Git extension, not through a shell. It never pushes. |
 | **IBM i** | Db2 for i, CL commands, source members, object lists and the library list, over the connection Code for IBM i has already negotiated. And the part that decides whether the code compiles: **the dialect is detected from the member, and its column rules go into the prompt** — RPG III, fixed and free ILE RPG, SQLRPGLE, CL, DDS (PF/LF/DSPF/PRTF), Db2 for i, COBOL. |
 | **ARCAD Elias** | Check-out, check-in, compile, cross-references and the Transformer RPG conversion, through the `arcad.*` commands Elias itself registers — plus calls to the REST server you have already configured. |
@@ -58,8 +58,8 @@ that does leave is **reversibly pseudonymised** first.
 | **History filters** | Period, mode, “paid only”, and four sort orders (recently updated, created, longest, most expensive). |
 | **Context control** | Every exchange can be **muted** (stays on screen, stops being sent), **pinned** (survives trimming), edited or deleted. It is the most direct lever there is on both quality **and** cost. |
 | **Privacy** | Reversible pseudonymisation, blocked files, consent before the first destination, an **egress log** and a **cost report**. |
-| **Languages** | English and French, following the editor's display language — or pinned with `forge.language`, for a machine whose editor is in one language and whose user reads another. |
-| **Your theme** | Every colour in the panel is one of the editor's own variables. Not one hex value — [the same picker under a light theme](https://raw.githubusercontent.com/FlorianMartins/forge/main/docs/images/picker.light.png), captured by the same script. It follows a theme change immediately, high contrast included. |
+| **Languages** | English and French, following the editor's display language — or pinned with `hiveyCode.language`, for a machine whose editor is in one language and whose user reads another. |
+| **Your theme** | Every colour in the panel is one of the editor's own variables. Not one hex value — [the same picker under a light theme](https://raw.githubusercontent.com/FlorianMartins/hivey-code/main/docs/images/picker.light.png), captured by the same script. It follows a theme change immediately, high contrast included. |
 
 ## How the cost tends to zero
 
@@ -100,7 +100,7 @@ Four steps, in this order, on everything bound for a remote provider:
 4. **Consent.** Before the first request to a given destination: what leaves (volume, destination,
    model) and what was masked.
 
-Then, **the proof**: `Forge: Show outgoing data` lists every remote request — timestamp, host,
+Then, **the proof**: `Hivey Code: Show outgoing data` lists every remote request — timestamp, host,
 model, tokens, share served from cache, cost, redaction categories. **Never the content**: a log of
 what you were trying to keep private is not a privacy feature.
 
@@ -125,7 +125,7 @@ else; a line that runs past column 80 is not rejected, it is **truncated and com
 trained mostly on free-form code writes `if x = 1;` into a fixed-format member and the failure
 surfaces later, in a spool file, as a message id.
 
-So Forge decides the dialect from the **member itself** rather than from its name — `**FREE` in
+So Hivey Code decides the dialect from the **member itself** rather than from its name — `**FREE` in
 column 1, or a specification letter in column 6 — and puts that dialect's rules and its column ruler
 into the prompt. `.rpgle` says nothing about the format, and telling the model the wrong one is the
 single most reliable way to get code that cannot compile.
@@ -134,7 +134,7 @@ single most reliable way to get code that cannot compile.
 |---|---|
 | **Understood** | RPG III (RPG/400), ILE RPG fixed and fully free, SQLRPGLE, CL/CLLE, DDS for physical, logical, display and printer files, Db2 for i SQL, ILE COBOL, command definitions. |
 | **Mapped** | Symbols are read by column, so a repository of source members produces a real map. Before this it produced an empty one — and long members with six-character names are exactly where a map earns its keep. |
-| **Connected** | Through **Code for IBM i**, on the connection it has already negotiated: the right library list, the right CCSID, a warm SQL job. Forge opens no session of its own, because a second one would run under a different library list and get EBCDIC subtly wrong. |
+| **Connected** | Through **Code for IBM i**, on the connection it has already negotiated: the right library list, the right CCSID, a warm SQL job. Hivey Code opens no session of its own, because a second one would run under a different library list and get EBCDIC subtly wrong. |
 | **Under change management** | Through **ARCAD Elias**: check-out, check-in, compile, cross-references, and the Transformer RPG conversion — by calling the `arcad.*` commands Elias registers, so a change stays inside the process the shop already has. |
 | **Commands** | `/tofree` converts a fixed-format member, `/sql` writes Db2 for i rather than generic SQL, `/dds` explains a display file. `#member:LIB/SRCFILE(MBR)` and `#db2:select …` attach the real thing. |
 
@@ -143,16 +143,16 @@ writes**, because the check is on the statement rather than on the tool. In plan
 exists in a form that refuses a write instead of offering you a dialog — "plan mode changes nothing"
 should not have an "unless you click yes" attached to it.
 
-Forge does not invent ARCAD's REST endpoints. Its catalogue is not published, and guessing paths for
+Hivey Code does not invent ARCAD's REST endpoints. Its catalogue is not published, and guessing paths for
 a model to call produces an integration that fails at a customer site in a way nobody can debug. It
 carries requests to paths **you** supply, with credentials from the OS keychain. For anything deeper
 than that, the right shape is MCP.
 
 ## Plugging in your own systems
 
-Forge speaks the **Model Context Protocol**, so an internal service — a ticketing system, a
+Hivey Code speaks the **Model Context Protocol**, so an internal service — a ticketing system, a
 catalogue, a change-management server — can expose its own tools without either side knowing about
-the other. Declare a server in `forge.mcp.servers`, or in a `.vscode/mcp.json` the team already has:
+the other. Declare a server in `hiveyCode.mcp.servers`, or in a `.vscode/mcp.json` the team already has:
 
 ```jsonc
 {
@@ -168,7 +168,7 @@ same permissions, filtered by the mode. A server's claim that a tool "only reads
 a dialog on a local one and never enough on one that reaches out of the machine.
 
 **A stdio server is arbitrary code execution**, configured in a file that may have arrived with a
-cloned repository. Forge does not start one until you have said so in a dialog that names the
+cloned repository. Hivey Code does not start one until you have said so in a dialog that names the
 command, and the consent is tied to the command rather than to the name — the part an attacker
 controls most cheaply.
 
@@ -178,17 +178,17 @@ audit what it sends.
 
 ## Install
 
-From the VS Code Marketplace: search for **Forge** (publisher `hivey`).
+From the VS Code Marketplace: search for **Hivey Code** (publisher `hivey`).
 
 From source:
 
 ```bash
-git clone https://github.com/FlorianMartins/forge
-cd forge
+git clone https://github.com/FlorianMartins/hivey-code
+cd hivey-code
 npm ci
 npm run build
-npx @vscode/vsce package --no-dependencies   # produces forge.vsix
-code --install-extension forge.vsix
+npx @vscode/vsce package --no-dependencies   # produces hiveyCode.vsix
+code --install-extension hiveyCode.vsix
 ```
 
 For the model, the simplest setup:
@@ -200,32 +200,32 @@ ollama serve
 
 Nothing else to configure: the defaults point at `http://127.0.0.1:11434/v1`.
 
-To add a remote escalation: `Forge: Store a provider key`, then set `forge.escalation.model` (for
+To add a remote escalation: `Hivey Code: Store a provider key`, then set `hiveyCode.escalation.model` (for
 example `anthropic/claude-sonnet-4.5`).
 
 ### The terminal client
 
 ```bash
-npm link            # puts `forge` on the PATH
-forge               # REPL in the current directory
-forge "why is this test flaky?"   # one-shot question
+npm link                       # puts `hivey-code` and its short alias `hivey` on the PATH
+hivey                          # REPL in the current directory
+hivey "why is this test flaky?"   # one-shot question
 ```
 
-Configuration comes from `.forge.json` (working directory, then `~`), so a project can commit its
+Configuration comes from `.hiveycode.json` (working directory, then `~`), so a project can commit its
 team configuration without committing a key (`apiKeyEnv` names the environment variable).
 
 REPL commands: `/context` lists the exchanges, `/mute 3` takes one out of the context without
 deleting it, `/forget 3` deletes it, `/mode` switches between chat, plan and agent, `/cost` shows
-the day's spend. From the editor, `Forge: Open Forge in the terminal` starts it with the same
+the day's spend. From the editor, `Hivey Code: Open Hivey Code in the terminal` starts it with the same
 configuration as the sidebar.
 
 ## Enterprise deployment
 
 - Serve one model for everyone: **vLLM** or **Ollama** behind an internal URL, and push
-  `forge.endpoints.local` through VS Code's settings policy.
+  `hiveyCode.endpoints.local` through VS Code's settings policy.
 - Lock down what needs it: `privacy.blockedGlobs`, `privacy.customTerms` (client and project
   names), `privacy.egressPolicy: "ask-always"`, `budget.dailyUsd`.
-- `forge.*` settings are workspace-scoped: a sensitive repository can force `chat.provider: "local"`
+- `hiveyCode.*` settings are workspace-scoped: a sensitive repository can force `chat.provider: "local"`
   in its own `.vscode/settings.json`.
 - The extension ships **no runtime dependency**: what you audit is the bundle and nothing else. An
   SBOM is published on every CI run.
@@ -282,7 +282,7 @@ no entry, so a translation cannot silently rot.
 
 ## Status
 
-`0.4.0` — usable day to day. See [`docs/ROADMAP.md`](docs/ROADMAP.md) for what is done and what is
+`0.5.0` — usable day to day. See [`docs/ROADMAP.md`](docs/ROADMAP.md) for what is done and what is
 not.
 
 ## Licence

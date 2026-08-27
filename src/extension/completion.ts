@@ -122,14 +122,14 @@ export class InlineCompletionProvider implements vscode.InlineCompletionItemProv
           new vscode.Range(position, position),
           // Counting acceptances is the only telemetry here, it stays on this machine, and it is
           // what tells a team whether a small local model is good enough for them.
-          { command: "forge.completionAccepted", title: "", arguments: [] },
+          { command: "hiveyCode.completionAccepted", title: "", arguments: [] },
         ),
       ];
     } catch (err) {
       if (ctl.signal.aborted || token.isCancellationRequested) return undefined;
       const message = (err as Error).message;
       this.log.appendLine(`[completion] ${message}`);
-      this.status.text = "$(warning) Forge";
+      this.status.text = "$(warning) Hivey Code";
       this.status.tooltip = t("Completion unavailable: {0}", message);
       return undefined;
     }
@@ -159,7 +159,7 @@ export class InlineCompletionProvider implements vscode.InlineCompletionItemProv
   private async warm(settings: Settings): Promise<void> {
     const p = this.provider as (Provider & { warmup?: (m: string) => Promise<void> }) | undefined;
     if (!p?.warmup) return;
-    this.status.text = "$(loading~spin) Forge";
+    this.status.text = "$(loading~spin) Hivey Code";
     this.status.tooltip = t("Loading the local model…");
     await p.warmup(settings.completion.model);
     this.updateStatus(settings);
@@ -172,10 +172,10 @@ export class InlineCompletionProvider implements vscode.InlineCompletionItemProv
   updateStatus(settings: Settings): void {
     const on = settings.completion.enabled && settings.completion.provider !== "off";
     const local = settings.completion.provider === "local";
-    this.status.text = on ? `$(sparkle) Forge${local ? "" : " ☁"}` : "$(circle-slash) Forge";
+    this.status.text = on ? `$(sparkle) Hivey Code${local ? "" : " ☁"}` : "$(circle-slash) Hivey Code";
     this.status.tooltip = new vscode.MarkdownString(
       [
-        `**Forge** — ${on ? t("completion on") : t("completion off")}`,
+        `**Hivey Code** — ${on ? t("completion on") : t("completion off")}`,
         "",
         t("Model: `{0}` ({1})", settings.completion.model, local ? t("local, no cost") : t("remote")),
         t("Suggestions requested this session: {0} · accepted: {1}", this.requested, this.accepted),
@@ -183,7 +183,7 @@ export class InlineCompletionProvider implements vscode.InlineCompletionItemProv
         t("Click to turn it on or off."),
       ].join("\n"),
     );
-    this.status.command = "forge.toggleCompletions";
+    this.status.command = "hiveyCode.toggleCompletions";
     this.status.show();
   }
 

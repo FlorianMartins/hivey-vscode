@@ -29,7 +29,7 @@ const suffix = (args.get("suffix") ?? (locale === "en" ? "" : `.${locale}`));
 const display = ":97";
 const HOLD = Number(args.get("hold") ?? 20_000);
 const STARTUP = Number(args.get("startup") ?? 16_000);
-const marker = join(tmpdir(), `forge-shot-${process.pid}`);
+const marker = join(tmpdir(), `hivey-code-shot-${process.pid}`);
 const CROP = Number(args.get("crop") ?? 1000);
 
 mkdirSync(outDir, { recursive: true });
@@ -101,11 +101,11 @@ const editor = spawn("node", ["dist-integration/runTest.js"], {
   env: {
     ...env,
     DISPLAY: display,
-    FORGE_SCREENSHOT: endpoint,
-    FORGE_LOCALE: locale,
-    ...(args.get("theme") ? { FORGE_THEME: args.get("theme") } : {}),
-    FORGE_SCREENSHOT_HOLD: String(HOLD),
-    FORGE_SCREENSHOT_MARKER: marker,
+    HIVEY_CODE_SCREENSHOT: endpoint,
+    HIVEY_CODE_LOCALE: locale,
+    ...(args.get("theme") ? { HIVEY_CODE_THEME: args.get("theme") } : {}),
+    HIVEY_CODE_SCREENSHOT_HOLD: String(HOLD),
+    HIVEY_CODE_SCREENSHOT_MARKER: marker,
   },
   stdio: "inherit",
 });

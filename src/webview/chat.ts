@@ -58,7 +58,7 @@ function transcript(state: UiState, deps: ChatDeps): HTMLElement {
 
 function welcome(state: UiState, deps: ChatDeps): HTMLElement {
   const w = el("div", "welcome");
-  w.append(el("div", "welcome-title", "Forge"));
+  w.append(el("div", "welcome-title", "Hivey Code"));
   w.append(
     el(
       "p",
@@ -102,7 +102,7 @@ function renderEntry(entry: UiEntry, state: UiState, deps: ChatDeps): HTMLElemen
   // when an answer is long enough to scroll, the mark is what tells you at a glance whether the
   // block you have landed in is your question or its reply.
   head.append(el("span", `entry-mark ${entry.role}`, entry.role === "user" ? "\u25CF" : "\u25C6"));
-  head.append(el("span", "entry-who", entry.role === "user" ? t("You") : "Forge"));
+  head.append(el("span", "entry-who", entry.role === "user" ? t("You") : "Hivey Code"));
   if (entry.model && entry.role === "assistant") head.append(el("span", "entry-meta", entry.model));
   if (entry.usdCost) head.append(el("span", "entry-meta", `${entry.usdCost.toFixed(4)} $`));
   if (!entry.included) head.append(el("span", "entry-tag", t("out of context")));
@@ -235,7 +235,7 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
     state.mode === "agent"
       ? t("Describe the change. “#” attaches a file, “/” opens the commands.")
       : state.mode === "plan"
-        ? t("Describe what to investigate. Forge will read the repository without changing anything.")
+        ? t("Describe what to investigate. Hivey Code will read the repository without changing anything.")
         : t("Ask your question. Attach the context you need: this mode does not read the repository.");
   area.addEventListener("input", () => {
     autoGrow(area);
@@ -385,7 +385,7 @@ function modeButton(state: UiState, deps: ChatDeps): HTMLElement {
     onClick: () =>
       menu(b, (close) => {
         const panel = el("div", "menu-list");
-        panel.append(menuTitle(t("What Forge is allowed to do")));
+        panel.append(menuTitle(t("What Hivey Code is allowed to do")));
         for (const m of MODES) {
           panel.append(
             menuItem({

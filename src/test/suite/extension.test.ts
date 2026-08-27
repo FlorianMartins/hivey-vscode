@@ -4,11 +4,14 @@
 import * as assert from "node:assert/strict";
 import * as vscode from "vscode";
 import * as fs from "node:fs/promises";
+// The settings namespace has one definition; a test that repeats it as a literal is a test that
+// keeps passing after a rename has broken the product.
+import { SECTION } from "../../extension/config.js";
 import { suite, test } from "./tiny.js";
 
-const ID = "hivey.forge";
+const ID = "hivey.hivey-code";
 
-suite("Forge", () => {
+suite("Hivey Code", () => {
   test("the extension is present and activates", async () => {
     const ext = vscode.extensions.getExtension(ID);
     assert.ok(ext, "extension not found by id");
@@ -26,11 +29,11 @@ suite("Forge", () => {
   });
 
   test("the interface language can be pinned independently of the editor", async () => {
-    const config = vscode.workspace.getConfiguration("forge");
+    const config = vscode.workspace.getConfiguration(SECTION);
     await config.update("language", "fr", vscode.ConfigurationTarget.Global);
-    assert.equal(vscode.workspace.getConfiguration("forge").get("language"), "fr");
+    assert.equal(vscode.workspace.getConfiguration(SECTION).get("language"), "fr");
     await config.update("language", undefined, vscode.ConfigurationTarget.Global);
-    assert.equal(vscode.workspace.getConfiguration("forge").get("language"), "auto", "the default follows the editor");
+    assert.equal(vscode.workspace.getConfiguration(SECTION).get("language"), "auto", "the default follows the editor");
   });
 
   test("the manifest is localised: no unresolved %key% reaches the user", async () => {
@@ -53,7 +56,7 @@ suite("Forge", () => {
   });
 
   test("settings read back with the defaults the manifest declares", () => {
-    const c = vscode.workspace.getConfiguration("forge");
+    const c = vscode.workspace.getConfiguration(SECTION);
     assert.equal(c.get("chat.provider"), "local");
     assert.equal(c.get("privacy.redaction"), "strict");
     assert.equal(c.get("completion.enabled"), true);
@@ -64,7 +67,7 @@ suite("Forge", () => {
     // Point at a closed port so the failure is immediate and deterministic. This is the path a
     // user hits on their first day — before `ollama serve` — and it must produce no suggestion and
     // no error dialog, not an exception in the extension host.
-    const config = vscode.workspace.getConfiguration("forge");
+    const config = vscode.workspace.getConfiguration(SECTION);
     await config.update("endpoints.local", "http://127.0.0.1:45387/v1", vscode.ConfigurationTarget.Global);
     await config.update("completion.debounceMs", 0, vscode.ConfigurationTarget.Global);
     try {
@@ -87,13 +90,13 @@ suite("Forge", () => {
   });
 
   test("the reports open without a script and without a model", async () => {
-    await vscode.commands.executeCommand("forge.showEgress");
-    await vscode.commands.executeCommand("forge.showCosts");
+    await vscode.commands.executeCommand("hiveyCode.showEgress");
+    await vscode.commands.executeCommand("hiveyCode.showCosts");
   });
 
   test("quick fixes are offered on a diagnostic", async () => {
     const doc = await vscode.workspace.openTextDocument({ language: "plaintext", content: "ligne en erreur\n" });
-    const collection = vscode.languages.createDiagnosticCollection("forge-test");
+    const collection = vscode.languages.createDiagnosticCollection("hivey-code-test");
     const range = new vscode.Range(0, 0, 0, 5);
     collection.set(doc.uri, [new vscode.Diagnostic(range, "quelque chose ne va pas", vscode.DiagnosticSeverity.Error)]);
 
@@ -101,8 +104,8 @@ suite("Forge", () => {
     const titles = (actions ?? []).map((a) => a.title);
     // The title is translated, so match on the product name rather than on one language's wording.
     assert.ok(
-      titles.some((title) => title.includes("Forge")),
-      `no Forge quick fix among: ${titles.join(" | ")}`,
+      titles.some((title) => title.includes("Hivey Code")),
+      `no Hivey Code quick fix among: ${titles.join(" | ")}`,
     );
     collection.dispose();
   });
@@ -116,21 +119,21 @@ suite("Screenshot", () => {
   test(
     "hold the window open with a real conversation",
     async () => {
-      if (!process.env["FORGE_SCREENSHOT"]) return;
+      if (!process.env["HIVEY_CODE_SCREENSHOT"]) return;
 
-      const config = vscode.workspace.getConfiguration("forge");
-      await config.update("endpoints.local", process.env["FORGE_SCREENSHOT"], vscode.ConfigurationTarget.Global);
+      const config = vscode.workspace.getConfiguration(SECTION);
+      await config.update("endpoints.local", process.env["HIVEY_CODE_SCREENSHOT"], vscode.ConfigurationTarget.Global);
       await config.update("chat.model", "qwen2.5-coder:7b", vscode.ConfigurationTarget.Global);
-      // FORGE_LOCALE also drives the extension's own language setting, so the screenshots can show
+      // HIVEY_CODE_LOCALE also drives the extension's own language setting, so the screenshots can show
       // the translated interface without installing a VS Code language pack.
-      await config.update("language", process.env["FORGE_LOCALE"] ?? "auto", vscode.ConfigurationTarget.Global);
+      await config.update("language", process.env["HIVEY_CODE_LOCALE"] ?? "auto", vscode.ConfigurationTarget.Global);
       // The panel claims to take the user's theme. The only way to check that claim rather than
       // repeat it is to photograph the same panel under two of them, so the harness can be told
       // which one to wear.
-      if (process.env["FORGE_THEME"]) {
+      if (process.env["HIVEY_CODE_THEME"]) {
         await vscode.workspace
           .getConfiguration("workbench")
-          .update("colorTheme", process.env["FORGE_THEME"], vscode.ConfigurationTarget.Global);
+          .update("colorTheme", process.env["HIVEY_CODE_THEME"], vscode.ConfigurationTarget.Global);
         await new Promise((r) => setTimeout(r, 1200));
       }
 
@@ -151,7 +154,7 @@ suite("Screenshot", () => {
       // sidebar wide enough to read — the width a user would actually give it.
       await vscode.commands.executeCommand("workbench.action.closeAuxiliaryBar").then(undefined, () => {});
       await vscode.commands.executeCommand("notifications.clearAll").then(undefined, () => {});
-      await vscode.commands.executeCommand("forge.chat.focus");
+      await vscode.commands.executeCommand("hiveyCode.chat.focus");
       // `increaseViewSize` resizes whatever part has focus. Revealing the view is not the same as
       // focusing the side bar — the editor keeps the focus — so without this the loop below
       // silently widened the editor group instead, and every screenshot showed a 280 px panel
@@ -166,7 +169,7 @@ suite("Screenshot", () => {
       // nothing at all. The screenshots therefore show the side bar at its DEFAULT width, which is
       // the honest thing to publish anyway — it is what someone sees the minute they install this,
       // and a panel that only looks right after the user drags it wider does not look right.
-      await vscode.commands.executeCommand("forge.askWith", "Does this function round correctly? What should change?");
+      await vscode.commands.executeCommand("hiveyCode.askWith", "Does this function round correctly? What should change?");
       await new Promise((r) => setTimeout(r, 4000));
       await vscode.commands.executeCommand("notifications.clearAll").then(undefined, () => {});
 
@@ -175,8 +178,8 @@ suite("Screenshot", () => {
       // when they do the result is not an error — it is three photographs of the same frame, or a
       // photograph of an editor still starting up. So the harness ANNOUNCES which screen is on
       // display by writing its name to a file, and the script waits for the name to change.
-      const marker = process.env["FORGE_SCREENSHOT_MARKER"];
-      const hold = Number(process.env["FORGE_SCREENSHOT_HOLD"] ?? 20_000);
+      const marker = process.env["HIVEY_CODE_SCREENSHOT_MARKER"];
+      const hold = Number(process.env["HIVEY_CODE_SCREENSHOT_HOLD"] ?? 20_000);
       const announce = async (name: string) => {
         if (marker) await fs.writeFile(marker, name, "utf8");
         // Long enough for the panel to settle and for the script to photograph it.
@@ -185,10 +188,10 @@ suite("Screenshot", () => {
 
       await announce("conversation");
       for (const [command, name] of [
-        ["forge.pickModel", "picker"],
-        ["forge.showHistory", "historique"],
-        ["forge.showModels", "modeles"],
-        ["forge.showPermissions", "permissions"],
+        ["hiveyCode.pickModel", "picker"],
+        ["hiveyCode.showHistory", "historique"],
+        ["hiveyCode.showModels", "modeles"],
+        ["hiveyCode.showPermissions", "permissions"],
       ] as const) {
         await vscode.commands.executeCommand(command);
         await announce(name);

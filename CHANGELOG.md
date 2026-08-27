@@ -2,6 +2,38 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.5.0 — 2026-08-27
+
+**Renamed to Hivey Code.**
+
+The name was the only thing that changed, and it changed for a reason worth writing down: the
+Marketplace already carries six extensions with "Forge" in the name, one of them an AI coding agent
+called *Forge Code* with several thousand installs. The identifier `hivey.forge` was in fact free —
+uniqueness is per publisher — so nothing forced this. Being findable, and not being mistaken for a
+competitor, did.
+
+- Display name **Hivey Code**, identifier `hivey.hivey-code`.
+- Settings move from `forge.*` to **`hiveyCode.*`**. Nothing migrates them: nobody had installed
+  0.4.0, so the cost of a clean break is zero today and would not have been in a month.
+- Commands move from `forge.*` to `hiveyCode.*`, under the category **Hivey Code**.
+- The terminal client is `hivey-code`, with **`hivey`** as a short alias — a command typed daily
+  should be short, and a command in documentation should be unambiguous.
+- The per-project configuration file is `.hiveycode.json`, and repository rules may live in
+  `.hiveycode/instructions.md`.
+- The repository is now `FlorianMartins/hivey-code`. GitHub redirects the old address.
+
+### What the rename found
+
+A blanket search-and-replace is a bad way to rename a product, and the tests are what made it a
+tolerable one. Three integration tests failed immediately on
+`getConfiguration("hivey-code")` — the settings namespace is `hiveyCode`, so every setting silently
+read its default instead of failing. The literal was hard-coded in five places for three *different*
+meanings: the settings namespace, the MCP client's name, and a label in the terminal client. They
+now refer to the single definition, so the next rename cannot reintroduce this.
+
+The same pass turned `.forge.json` into `.hiveyCode.json` — a dotfile with a capital letter, which
+behaves differently on Linux and on macOS. It is `.hiveycode.json`.
+
 ## 0.4.0 — 2026-08-27
 
 **Speaks IBM i, plugs into the tools around it, and looks like the editor it lives in.**
@@ -26,9 +58,9 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 - **Git** through the editor's own extension: status, diff, log, blame, show, branches, stage,
   commit. Never push — publishing a branch stays the user's decision.
 - **Code for IBM i**: Db2 for i, CL commands, source members, object lists, library list — on the
-  connection it has already negotiated. Forge opens no session of its own.
+  connection it has already negotiated. Hivey Code opens no session of its own.
 - **ARCAD Elias**: ten actions through the `arcad.*` commands Elias registers, plus calls to the
-  REST server already configured in `arcad.restApiServer.*`. Forge does not invent ARCAD's
+  REST server already configured in `arcad.restApiServer.*`. Hivey Code does not invent ARCAD's
   endpoints; it carries requests to paths you supply, with credentials from the OS keychain.
 - **MCP**, stdio and HTTP, written by hand. A stdio server is arbitrary code execution configured in
   a file that may have arrived with a repository: it does not start until you have agreed in a
@@ -55,7 +87,7 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 - The credential scanner flagged thirteen of its own strings: in a codebase about language models,
   `token` means a unit of context far more often than a bearer token. Fixed in the detector — no key
   ever issued opens with `#`, `@`, `/` or `\`, or ends with a colon.
-- `forge.pickModel` was registered twice, which fails activation outright. Only a run inside a real
+- `hiveyCode.pickModel` was registered twice, which fails activation outright. Only a run inside a real
   editor shows that.
 - Screenshots are taken by `scripts/screenshots.mjs` from a real VS Code, driven by a marker file
   rather than by two clocks in two processes — the drift used to produce three photographs of the
@@ -75,14 +107,14 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
   on entries for strings the code no longer uses.
 - The system prompts no longer assume the user writes French: the assistant answers in whatever
   language the question was asked in.
-- `forge.language` pins the interface language independently of the editor's, which is also what
+- `hiveyCode.language` pins the interface language independently of the editor's, which is also what
   makes the translated interface testable without installing a VS Code language pack.
 - Command words in the terminal client stay untranslated — `/mute` and `/muet` both work, because a
   command that moves with the interface language is a command nobody can rely on.
 
 ## 0.2.0 — 2026-08-21
 
-**Renamed to Forge, and the panel rebuilt around what the assistant may do.**
+**Renamed to Hivey Code, and the panel rebuilt around what the assistant may do.**
 
 - Four screens — conversation, history, models, permissions — in the editor's own visual language.
   Not one hex colour: every value is a VS Code theme variable. Icons are inline SVG (Unicode glyphs
@@ -98,7 +130,7 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 - **Search** inside the open conversation and across the history; history filters by period, mode
   and cost, with four sort orders.
 - Context menu: active file, open tabs, disk import, VS Code's own file picker.
-- Settings, commands and storage keys moved from `hiveyForge.*` to `forge.*`.
+- Settings, commands and storage keys moved from `hiveyForge.*` to `hivey-code.*`.
 
 ### Fixed
 

@@ -23,7 +23,7 @@ export function activate(context: vscode.ExtensionContext): void {
     setLanguage(choice === "auto" ? vscode.env.language : choice);
   };
   applyLanguage();
-  const log = vscode.window.createOutputChannel("Forge");
+  const log = vscode.window.createOutputChannel("Hivey Code");
   const keys = new Keys(context.secrets);
   const disposables: vscode.Disposable[] = [];
   const workspace = new WorkspaceContext(disposables);
@@ -49,7 +49,7 @@ export function activate(context: vscode.ExtensionContext): void {
     ...disposables,
     vscode.window.registerWebviewViewProvider(ChatViewProvider.viewId, chat, { webviewOptions: { retainContextWhenHidden: true } }),
     vscode.languages.registerInlineCompletionItemProvider({ pattern: "**" }, completion),
-    vscode.workspace.registerTextDocumentContentProvider("forge-preview", new PreviewProvider()),
+    vscode.workspace.registerTextDocumentContentProvider("hivey-code-preview", new PreviewProvider()),
 
     vscode.workspace.onDidChangeConfiguration((e) => {
       if (!e.affectsConfiguration(SECTION)) return;
@@ -64,17 +64,17 @@ export function activate(context: vscode.ExtensionContext): void {
       completion.updateStatus(s);
     }),
 
-    vscode.commands.registerCommand("forge.newSession", () => chat.newSession()),
-    vscode.commands.registerCommand("forge.completionAccepted", () => completion.noteAccepted()),
+    vscode.commands.registerCommand("hiveyCode.newSession", () => chat.newSession()),
+    vscode.commands.registerCommand("hiveyCode.completionAccepted", () => completion.noteAccepted()),
 
-    vscode.commands.registerCommand("forge.toggleCompletions", async () => {
+    vscode.commands.registerCommand("hiveyCode.toggleCompletions", async () => {
       const config = vscode.workspace.getConfiguration(SECTION);
       const next = !config.get<boolean>("completion.enabled", true);
       await config.update("completion.enabled", next, vscode.ConfigurationTarget.Global);
       completion.updateStatus(readSettings());
     }),
 
-    vscode.commands.registerCommand("forge.setApiKey", async () => {
+    vscode.commands.registerCommand("hiveyCode.setApiKey", async () => {
       const provider = await vscode.window.showQuickPick(
         [
           { label: "openrouter", detail: t("Multi-model gateway") },
@@ -93,21 +93,21 @@ export function activate(context: vscode.ExtensionContext): void {
       if (!key) return;
       await keys.store(provider.label as never, key);
       completion.invalidateProvider();
-      void vscode.window.showInformationMessage(t("Forge: {0} key stored in the keychain.", provider.label));
+      void vscode.window.showInformationMessage(t("Hivey Code: {0} key stored in the keychain.", provider.label));
     }),
 
-    vscode.commands.registerCommand("forge.exportSession", () => chat.exportSession()),
+    vscode.commands.registerCommand("hiveyCode.exportSession", () => chat.exportSession()),
 
-    vscode.commands.registerCommand("forge.showMcp", async () => {
+    vscode.commands.registerCommand("hiveyCode.showMcp", async () => {
       const rows = await mcp.status();
       if (!rows.length) {
         const configure = t("Open the settings");
         const answer = await vscode.window.showInformationMessage(
           t("No MCP server is configured."),
-          { detail: t("Declare one in forge.mcp.servers, or in a .vscode/mcp.json in this workspace."), modal: false },
+          { detail: t("Declare one in hiveyCode.mcp.servers, or in a .vscode/mcp.json in this workspace."), modal: false },
           configure,
         );
-        if (answer === configure) void vscode.commands.executeCommand("workbench.action.openSettings", "forge.mcp.servers");
+        if (answer === configure) void vscode.commands.executeCommand("workbench.action.openSettings", "hiveyCode.mcp.servers");
         return;
       }
       const picked = await vscode.window.showQuickPick(
@@ -124,13 +124,13 @@ export function activate(context: vscode.ExtensionContext): void {
       void vscode.window.showInformationMessage(t("MCP servers restarted."));
     }),
 
-    vscode.commands.registerCommand("forge.restartMcp", async () => {
+    vscode.commands.registerCommand("hiveyCode.restartMcp", async () => {
       await mcp.restart();
       const running = (await mcp.status()).filter((r) => r.running).length;
       void vscode.window.showInformationMessage(t("{0} MCP server(s) connected.", running));
     }),
 
-    vscode.commands.registerCommand("forge.setArcadCredentials", async () => {
+    vscode.commands.registerCommand("hiveyCode.setArcadCredentials", async () => {
       const user = await vscode.window.showInputBox({ prompt: t("IBM i user profile for the ARCAD Elias server") });
       if (!user) return;
       const password = await vscode.window.showInputBox({ prompt: t("Password"), password: true });
@@ -139,12 +139,12 @@ export function activate(context: vscode.ExtensionContext): void {
       void vscode.window.showInformationMessage(t("ARCAD credentials stored in the system keychain."));
     }),
 
-    vscode.commands.registerCommand("forge.clearArcadCredentials", async () => {
+    vscode.commands.registerCommand("hiveyCode.clearArcadCredentials", async () => {
       await keys.clearArcad();
       void vscode.window.showInformationMessage(t("ARCAD credentials cleared."));
     }),
 
-    vscode.commands.registerCommand("forge.clearApiKey", async () => {
+    vscode.commands.registerCommand("hiveyCode.clearApiKey", async () => {
       const provider = await vscode.window.showQuickPick(["openrouter", "anthropic", "openai-compatible", "local"], {
         placeHolder: t("Which key to clear?"),
       });
@@ -158,21 +158,21 @@ export function activate(context: vscode.ExtensionContext): void {
     // command survives for muscle memory and opens that screen.
     // Opens the picker in place rather than navigating to the comparison screen: from the command
     // palette the user wants to change model, not to read a table of four hundred of them.
-    vscode.commands.registerCommand("forge.pickModel", async () => {
-      await vscode.commands.executeCommand("forge.chat.focus");
+    vscode.commands.registerCommand("hiveyCode.pickModel", async () => {
+      await vscode.commands.executeCommand("hiveyCode.chat.focus");
       chat.openModelPicker();
     }),
 
     // The completion model is a different decision — it is asked on every pause in typing — and a
     // quick pick over what the endpoint actually serves is the right shape for it.
-    vscode.commands.registerCommand("forge.pickCompletionModel", async () => {
+    vscode.commands.registerCommand("hiveyCode.pickCompletionModel", async () => {
       const s = readSettings();
       const id = s.completion.provider === "off" ? "local" : s.completion.provider;
       let models: string[] = [];
       try {
         const provider = await providerFor(s, keys, id);
         models = await vscode.window.withProgress(
-          { location: vscode.ProgressLocation.Notification, title: t("Forge: models served by {0}…", id) },
+          { location: vscode.ProgressLocation.Notification, title: t("Hivey Code: models served by {0}…", id) },
           () => provider.listModels(),
         );
       } catch (err) {
@@ -188,15 +188,15 @@ export function activate(context: vscode.ExtensionContext): void {
       completion.updateStatus(readSettings());
     }),
 
-    vscode.commands.registerCommand("forge.showHistory", () => chat.show("history")),
-    vscode.commands.registerCommand("forge.showModels", () => chat.show("models")),
-    vscode.commands.registerCommand("forge.showPermissions", () => chat.show("permissions")),
-    vscode.commands.registerCommand("forge.showEgress", () => showEgressReport(gate, readSettings())),
-    vscode.commands.registerCommand("forge.showCosts", () => showCostReport(gate, readSettings())),
+    vscode.commands.registerCommand("hiveyCode.showHistory", () => chat.show("history")),
+    vscode.commands.registerCommand("hiveyCode.showModels", () => chat.show("models")),
+    vscode.commands.registerCommand("hiveyCode.showPermissions", () => chat.show("permissions")),
+    vscode.commands.registerCommand("hiveyCode.showEgress", () => showEgressReport(gate, readSettings())),
+    vscode.commands.registerCommand("hiveyCode.showCosts", () => showCostReport(gate, readSettings())),
 
-    vscode.commands.registerCommand("forge.indexWorkspace", async () => {
+    vscode.commands.registerCommand("hiveyCode.indexWorkspace", async () => {
       await vscode.window.withProgress(
-        { location: vscode.ProgressLocation.Notification, title: t("Forge: mapping the repository…") },
+        { location: vscode.ProgressLocation.Notification, title: t("Hivey Code: mapping the repository…") },
         async () => {
           workspace.invalidate();
           const map = await workspace.repoMap(readSettings().context.maxTokens, true);
@@ -238,14 +238,14 @@ async function announce(context: vscode.ExtensionContext, log: vscode.OutputChan
     `[activation] chat=${s.chat.provider} (${chatUrl || "not configured"}, ${local ? "local" : "remote"}) ` +
       `completion=${s.completion.provider} redaction=${s.privacy.redaction} language=${vscode.env.language}`,
   );
-  const KEY = "forge.announced";
+  const KEY = "hiveyCode.announced";
   if (context.globalState.get<boolean>(KEY)) return;
   await context.globalState.update(KEY, true);
   const choice = await vscode.window.showInformationMessage(
     local
-      ? t("Forge is active. Everything stays on your machine: completion and chat talk to your local server.")
+      ? t("Hivey Code is active. Everything stays on your machine: completion and chat talk to your local server.")
       : t(
-          "Forge is active. Chat uses {0}; what leaves is pseudonymised and will be shown to you before the first request.",
+          "Hivey Code is active. Chat uses {0}; what leaves is pseudonymised and will be shown to you before the first request.",
           safeHost(chatUrl),
         ),
     t("Open the settings"),

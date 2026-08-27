@@ -14,7 +14,7 @@ import { isLocalEndpoint } from "../core/redaction/index.js";
 import type { RedactionLevel, RedactionPolicy } from "../core/redaction/types.js";
 import type { EscalationPolicy, RouterConfig } from "../core/router/route.js";
 
-export const SECTION = "forge";
+export const SECTION = "hiveyCode";
 
 export interface Settings {
   /** `auto` follows the editor; a fixed tag lets someone read the editor in one language and this
@@ -157,7 +157,7 @@ export async function providerFor(s: Settings, keys: Keys, id: ProviderId): Prom
   const local = isLocalEndpoint(baseUrl);
   const apiKey = local && id === "local" ? undefined : await keys.get(id);
   if (!local && !apiKey && id !== "openai-compatible") {
-    throw new Error(t("No API key stored for “{0}”. Run “Forge: Store a provider key”.", id));
+    throw new Error(t("No API key stored for “{0}”. Run “Hivey Code: Store a provider key”.", id));
   }
   return makeProvider({ id, baseUrl, apiKey });
 }

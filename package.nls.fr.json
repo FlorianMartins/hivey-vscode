@@ -1,6 +1,6 @@
 {
   "extension.description": "Assistant de code souverain pour VS Code — modèles locaux ou OpenRouter, anonymisation des données avant tout envoi, zéro télémétrie.",
-  "container.title": "Forge",
+  "container.title": "Hivey Code",
   "view.chat.name": "Discussion",
   "command.newSession.title": "Nouvelle discussion",
   "command.askAboutSelection.title": "Interroger la sélection",
@@ -13,7 +13,7 @@
   "command.editSelection.title": "Modifier la sélection avec l'IA",
   "command.generateCommitMessage.title": "Rédiger le message de commit",
   "command.explainTerminalSelection.title": "Expliquer la sortie du terminal",
-  "command.openTerminal.title": "Ouvrir Forge dans le terminal",
+  "command.openTerminal.title": "Ouvrir Hivey Code dans le terminal",
   "command.fixDiagnostic.title": "Corriger ce problème",
   "command.explainDiagnostic.title": "Expliquer ce problème",
   "command.showHistory.title": "Historique des conversations",

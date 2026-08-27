@@ -153,7 +153,7 @@ function header(s: UiState): HTMLElement {
             },
           }),
           menuItem({
-            label: t("Forge settings"),
+            label: t("Hivey Code settings"),
             onClick: () => {
               send({ type: "openSettings" });
               close();
@@ -178,7 +178,7 @@ function screenTitle(s: UiState): string {
     case "permissions":
       return t("Permissions");
     default:
-      return "Forge";
+      return "Hivey Code";
   }
 }
 
@@ -213,7 +213,7 @@ class LiveTurn {
   constructor(list: HTMLElement) {
     this.root = el("article", "entry assistant streaming");
     const head = el("div", "entry-head");
-    head.append(el("span", "entry-who", "Forge"));
+    head.append(el("span", "entry-who", "Hivey Code"));
     head.append(el("span", "entry-meta pulse", t("thinking…")));
     this.root.append(head);
     this.body = el("div", "entry-body");

@@ -20,6 +20,7 @@ import { t } from "../../shared/i18n.js";
 import type { Tool, ToolResult } from "../../core/agent/loop.js";
 import { LineFramer, McpClient, flattenContent, type McpTransport, type McpToolDescriptor } from "../../core/mcp/client.js";
 import { headToTokens } from "../../core/util/tokens.js";
+import { SECTION } from "../config.js";
 import { request } from "../../core/util/http.js";
 import { sseData, sseLines } from "../../core/util/sse.js";
 
@@ -74,7 +75,7 @@ export async function readMcpConfig(): Promise<McpServerConfig[]> {
     }
   }
 
-  const fromSettings = vscode.workspace.getConfiguration("forge").get<Record<string, Partial<McpServerConfig>>>("mcp.servers") ?? {};
+  const fromSettings = vscode.workspace.getConfiguration(SECTION).get<Record<string, Partial<McpServerConfig>>>("mcp.servers") ?? {};
   for (const [name, entry] of Object.entries(fromSettings)) byName.set(name, normalise(name, entry));
 
   return [...byName.values()].filter((s) => !s.disabled);
@@ -225,7 +226,7 @@ function httpTransport(config: McpServerConfig): McpTransport {
 let channel: vscode.OutputChannel | undefined;
 function log(server: string, line: string): void {
   if (!line) return;
-  channel ??= vscode.window.createOutputChannel("Forge — MCP");
+  channel ??= vscode.window.createOutputChannel("Hivey Code — MCP");
   channel.appendLine(`[${server}] ${line}`);
 }
 
@@ -252,7 +253,7 @@ export class McpManager {
    * an attacker controls most cheaply.
    */
   private trustKey(config: McpServerConfig): string {
-    return `forge.mcp.trust:${config.name}:${describeTarget(config)}`;
+    return `hiveyCode.mcp.trust:${config.name}:${describeTarget(config)}`;
   }
 
   isTrusted(config: McpServerConfig): boolean {
@@ -312,7 +313,7 @@ export class McpManager {
   private async start(config: McpServerConfig): Promise<Session | undefined> {
     try {
       const transport = config.type === "http" ? httpTransport(config) : stdioTransport(config);
-      const client = new McpClient({ transport, clientName: "forge", clientVersion: this.version });
+      const client = new McpClient({ transport, clientName: "hivey-code", clientVersion: this.version });
       await client.initialize();
       const tools = await client.listTools();
       const session: Session = { config, client, tools };

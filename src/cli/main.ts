@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// `forge` — the terminal client. Same core as the extension: same providers, same redaction, same
+// `hivey-code` — the terminal client. Same core as the extension: same providers, same redaction, same
 // budget, same agent loop, same rule that nothing is written or run without a yes.
 //
 // It exists because half the work of a coding assistant happens where the editor is not: over ssh,
@@ -7,7 +7,7 @@
 // honest test of whether the core really is editor-agnostic — if something only works in the
 // sidebar, it was in the wrong place.
 //
-// Configuration comes from `.forge.json` (working directory, then home) and from the
+// Configuration comes from `.hiveycode.json` (working directory, then home) and from the
 // environment, so a team can commit a shared configuration without committing a key.
 
 import { createInterface, type Interface } from "node:readline/promises";
@@ -44,8 +44,8 @@ interface CliConfig {
 
 const DEFAULTS: CliConfig = {
   provider: "local",
-  model: process.env["FORGE_MODEL"] ?? "qwen2.5-coder:7b",
-  baseUrl: process.env["FORGE_URL"] ?? "http://127.0.0.1:11434/v1",
+  model: process.env["HIVEY_CODE_MODEL"] ?? "qwen2.5-coder:7b",
+  baseUrl: process.env["HIVEY_CODE_URL"] ?? "http://127.0.0.1:11434/v1",
   redaction: "strict",
   customTerms: [],
   blockedGlobs: ["**/.env*", "**/*.pem", "**/*.key", "**/id_rsa*", "**/secrets/**", "**/.aws/**", "**/.ssh/**"],
@@ -64,7 +64,7 @@ const C = {
 
 async function loadConfig(cwd: string): Promise<CliConfig> {
   const merged: CliConfig = { ...DEFAULTS };
-  for (const path of [join(homedir(), ".forge.json"), join(cwd, ".forge.json")]) {
+  for (const path of [join(homedir(), ".hiveycode.json"), join(cwd, ".hiveycode.json")]) {
     try {
       Object.assign(merged, JSON.parse(await readFile(path, "utf8")));
     } catch {
@@ -98,11 +98,11 @@ class FileSpendStore implements SpendStore {
 async function main(): Promise<void> {
   const cwd = process.cwd();
   const cfg = await loadConfig(cwd);
-  const apiKey = cfg.apiKeyEnv ? process.env[cfg.apiKeyEnv] : process.env["FORGE_KEY"];
+  const apiKey = cfg.apiKeyEnv ? process.env[cfg.apiKeyEnv] : process.env["HIVEY_CODE_KEY"];
   const isLocal = isLocalEndpoint(cfg.baseUrl);
   const provider = makeProvider({ id: cfg.provider, baseUrl: cfg.baseUrl, apiKey });
 
-  const store = new FileSpendStore(join(homedir(), ".forge", "spend.json"));
+  const store = new FileSpendStore(join(homedir(), ".hiveycode", "spend.json"));
   store.load();
   const budget = new Budget(store, cfg.budget);
   const prices = makeLookup(GENERATED_PRICES);
@@ -111,7 +111,7 @@ async function main(): Promise<void> {
 
   const rl: Interface = createInterface({ input: stdin, output: stdout });
 
-  console.log(C.bold("Forge") + C.dim(t(" — sovereign coding assistant")));
+  console.log(C.bold("Hivey Code") + C.dim(t(" — sovereign coding assistant")));
   console.log(
     C.dim(
       `${cfg.model} · ${new URL(cfg.baseUrl).host} · ${t("mode")} ${cfg.mode} · ${
@@ -175,7 +175,7 @@ async function main(): Promise<void> {
       case "contexte": {
         session.entries.forEach((e, i) => {
           const flag = e.included ? " " : C.dim(t("muted"));
-          console.log(`${String(i).padStart(2)} ${e.role === "user" ? t("you") : t("forge")} ${flag} ${e.text.slice(0, 70).replace(/\n/g, " ")}`);
+          console.log(`${String(i).padStart(2)} ${e.role === "user" ? t("you") : t("hivey")} ${flag} ${e.text.slice(0, 70).replace(/\n/g, " ")}`);
         });
         return false;
       }

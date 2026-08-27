@@ -39,9 +39,9 @@ export interface EgressRecord {
   redactionSummary: string;
 }
 
-const LEDGER_KEY = "forge.egress.ledger";
-const SPEND_KEY = "forge.spend";
-const CONSENT_KEY = "forge.consent";
+const LEDGER_KEY = "hiveyCode.egress.ledger";
+const SPEND_KEY = "hiveyCode.spend";
+const CONSENT_KEY = "hiveyCode.consent";
 const LEDGER_MAX = 500;
 
 export class WorkspaceSpendStore implements SpendStore {
@@ -95,7 +95,7 @@ export class EgressGate {
     if (hasSecret) {
       const proceed = await vscode.window.showWarningMessage(
         t(
-          "Forge: what you are about to send contains {0} item(s) shaped like a credential. They were replaced by markers, but nothing replaces reading it yourself.",
+          "Hivey Code: what you are about to send contains {0} item(s) shaped like a credential. They were replaced by markers, but nothing replaces reading it yourself.",
           findings.filter((f) => f.kind === "secret").length,
         ),
         { modal: true },
@@ -127,7 +127,7 @@ export class EgressGate {
 
     const summary = summarise(findings);
     const answer = await vscode.window.showInformationMessage(
-      t("Forge is about to send ~{0} tokens to {1} ({2}).", tokens, host, target.model) +
+      t("Hivey Code is about to send ~{0} tokens to {1} ({2}).", tokens, host, target.model) +
         (summary ? t(" Pseudonymised: {0}.", summary) : t(" No sensitive data detected.")),
       { modal: true },
       t("Send"),

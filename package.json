@@ -1,13 +1,13 @@
 {
-  "name": "forge",
-  "displayName": "Forge",
+  "name": "hivey-code",
+  "displayName": "Hivey Code",
   "description": "%extension.description%",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "publisher": "hivey",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/FlorianMartins/forge.git"
+    "url": "https://github.com/FlorianMartins/hivey-code.git"
   },
   "engines": {
     "vscode": "^1.90.0",
@@ -43,16 +43,16 @@
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "forge",
+          "id": "hiveyCode",
           "title": "%container.title%",
           "icon": "media/icon.svg"
         }
       ]
     },
     "views": {
-      "forge": [
+      "hiveyCode": [
         {
-          "id": "forge.chat",
+          "id": "hiveyCode.chat",
           "name": "%view.chat.name%",
           "type": "webview"
         }
@@ -60,212 +60,212 @@
     },
     "commands": [
       {
-        "command": "forge.newSession",
+        "command": "hiveyCode.newSession",
         "title": "%command.newSession.title%",
-        "category": "Forge",
+        "category": "Hivey Code",
         "icon": "$(add)"
       },
       {
-        "command": "forge.askAboutSelection",
+        "command": "hiveyCode.askAboutSelection",
         "title": "%command.askAboutSelection.title%",
-        "category": "Forge"
+        "category": "Hivey Code"
       },
       {
-        "command": "forge.showEgress",
+        "command": "hiveyCode.showEgress",
         "title": "%command.showEgress.title%",
-        "category": "Forge"
+        "category": "Hivey Code"
       },
       {
-        "command": "forge.showCosts",
+        "command": "hiveyCode.showCosts",
         "title": "%command.showCosts.title%",
-        "category": "Forge"
+        "category": "Hivey Code"
       },
       {
-        "command": "forge.toggleCompletions",
+        "command": "hiveyCode.toggleCompletions",
         "title": "%command.toggleCompletions.title%",
-        "category": "Forge"
+        "category": "Hivey Code"
       },
       {
-        "command": "forge.setApiKey",
+        "command": "hiveyCode.setApiKey",
         "title": "%command.setApiKey.title%",
-        "category": "Forge"
+        "category": "Hivey Code"
       },
       {
-        "command": "forge.clearApiKey",
+        "command": "hiveyCode.clearApiKey",
         "title": "%command.clearApiKey.title%",
-        "category": "Forge"
+        "category": "Hivey Code"
       },
       {
-        "command": "forge.indexWorkspace",
+        "command": "hiveyCode.indexWorkspace",
         "title": "%command.indexWorkspace.title%",
-        "category": "Forge"
+        "category": "Hivey Code"
       },
       {
-        "command": "forge.editSelection",
+        "command": "hiveyCode.editSelection",
         "title": "%command.editSelection.title%",
-        "category": "Forge",
+        "category": "Hivey Code",
         "icon": "$(sparkle)"
       },
       {
-        "command": "forge.generateCommitMessage",
+        "command": "hiveyCode.generateCommitMessage",
         "title": "%command.generateCommitMessage.title%",
-        "category": "Forge",
+        "category": "Hivey Code",
         "icon": "$(sparkle)"
       },
       {
-        "command": "forge.explainTerminalSelection",
+        "command": "hiveyCode.explainTerminalSelection",
         "title": "%command.explainTerminalSelection.title%",
-        "category": "Forge"
+        "category": "Hivey Code"
       },
       {
-        "command": "forge.openTerminal",
+        "command": "hiveyCode.openTerminal",
         "title": "%command.openTerminal.title%",
-        "category": "Forge",
+        "category": "Hivey Code",
         "icon": "$(terminal)"
       },
       {
-        "command": "forge.fixDiagnostic",
+        "command": "hiveyCode.fixDiagnostic",
         "title": "%command.fixDiagnostic.title%",
-        "category": "Forge"
+        "category": "Hivey Code"
       },
       {
-        "command": "forge.explainDiagnostic",
+        "command": "hiveyCode.explainDiagnostic",
         "title": "%command.explainDiagnostic.title%",
-        "category": "Forge"
+        "category": "Hivey Code"
       },
       {
-        "command": "forge.showHistory",
+        "command": "hiveyCode.showHistory",
         "title": "%command.showHistory.title%",
-        "category": "Forge",
+        "category": "Hivey Code",
         "icon": "$(history)"
       },
       {
-        "command": "forge.showModels",
+        "command": "hiveyCode.showModels",
         "title": "%command.showModels.title%",
-        "category": "Forge",
+        "category": "Hivey Code",
         "icon": "$(sparkle)"
       },
       {
-        "command": "forge.showPermissions",
+        "command": "hiveyCode.showPermissions",
         "title": "%command.showPermissions.title%",
-        "category": "Forge",
+        "category": "Hivey Code",
         "icon": "$(shield)"
       },
       {
-        "command": "forge.pickCompletionModel",
+        "command": "hiveyCode.pickCompletionModel",
         "title": "%command.pickCompletionModel.title%",
-        "category": "Forge"
+        "category": "Hivey Code"
       },
       {
-        "command": "forge.showMcp",
+        "command": "hiveyCode.showMcp",
         "title": "%command.showMcp.title%",
-        "category": "Forge",
+        "category": "Hivey Code",
         "icon": "$(plug)"
       },
       {
-        "command": "forge.restartMcp",
+        "command": "hiveyCode.restartMcp",
         "title": "%command.restartMcp.title%",
-        "category": "Forge"
+        "category": "Hivey Code"
       },
       {
-        "command": "forge.setArcadCredentials",
+        "command": "hiveyCode.setArcadCredentials",
         "title": "%command.setArcadCredentials.title%",
-        "category": "Forge"
+        "category": "Hivey Code"
       },
       {
-        "command": "forge.clearArcadCredentials",
+        "command": "hiveyCode.clearArcadCredentials",
         "title": "%command.clearArcadCredentials.title%",
-        "category": "Forge"
+        "category": "Hivey Code"
       },
       {
-        "command": "forge.exportSession",
+        "command": "hiveyCode.exportSession",
         "title": "%command.exportSession.title%",
-        "category": "Forge",
+        "category": "Hivey Code",
         "icon": "$(save)"
       },
       {
-        "command": "forge.pickModel",
+        "command": "hiveyCode.pickModel",
         "title": "%command.pickModel.title%",
-        "category": "Forge",
+        "category": "Hivey Code",
         "icon": "$(sparkle)"
       }
     ],
     "menus": {
       "view/title": [
         {
-          "command": "forge.newSession",
-          "when": "view == forge.chat",
+          "command": "hiveyCode.newSession",
+          "when": "view == hiveyCode.chat",
           "group": "navigation@1"
         },
         {
-          "command": "forge.showHistory",
-          "when": "view == forge.chat",
+          "command": "hiveyCode.showHistory",
+          "when": "view == hiveyCode.chat",
           "group": "navigation@2"
         },
         {
-          "command": "forge.openTerminal",
-          "when": "view == forge.chat",
+          "command": "hiveyCode.openTerminal",
+          "when": "view == hiveyCode.chat",
           "group": "navigation@3"
         }
       ],
       "editor/context": [
         {
-          "command": "forge.askAboutSelection",
+          "command": "hiveyCode.askAboutSelection",
           "when": "editorHasSelection",
-          "group": "forge@1"
+          "group": "hivey-code@1"
         },
         {
-          "command": "forge.editSelection",
+          "command": "hiveyCode.editSelection",
           "when": "editorTextFocus",
-          "group": "forge@2"
+          "group": "hivey-code@2"
         }
       ],
       "scm/title": [
         {
-          "command": "forge.generateCommitMessage",
+          "command": "hiveyCode.generateCommitMessage",
           "when": "scmProvider == git",
           "group": "navigation"
         }
       ],
       "terminal/context": [
         {
-          "command": "forge.explainTerminalSelection",
-          "group": "forge@1"
+          "command": "hiveyCode.explainTerminalSelection",
+          "group": "hivey-code@1"
         }
       ],
       "commandPalette": [
         {
-          "command": "forge.fixDiagnostic",
+          "command": "hiveyCode.fixDiagnostic",
           "when": "false"
         },
         {
-          "command": "forge.explainDiagnostic",
+          "command": "hiveyCode.explainDiagnostic",
           "when": "false"
         },
         {
-          "command": "forge.askWith",
+          "command": "hiveyCode.askWith",
           "when": "false"
         }
       ]
     },
     "keybindings": [
       {
-        "command": "forge.editSelection",
+        "command": "hiveyCode.editSelection",
         "key": "ctrl+i",
         "mac": "cmd+i",
         "when": "editorTextFocus"
       },
       {
-        "command": "forge.askAboutSelection",
+        "command": "hiveyCode.askAboutSelection",
         "key": "ctrl+alt+i",
         "mac": "cmd+alt+i",
         "when": "editorTextFocus"
       }
     ],
     "configuration": {
-      "title": "Forge",
+      "title": "Hivey Code",
       "properties": {
-        "forge.language": {
+        "hiveyCode.language": {
           "type": "string",
           "enum": [
             "auto",
@@ -275,7 +275,7 @@
           "default": "auto",
           "description": "%config.language%"
         },
-        "forge.chat.provider": {
+        "hiveyCode.chat.provider": {
           "type": "string",
           "enum": [
             "local",
@@ -286,12 +286,12 @@
           "default": "local",
           "markdownDescription": "%config.chat.provider%"
         },
-        "forge.chat.model": {
+        "hiveyCode.chat.model": {
           "type": "string",
           "default": "qwen2.5-coder:7b",
           "description": "%config.chat.model%"
         },
-        "forge.completion.provider": {
+        "hiveyCode.completion.provider": {
           "type": "string",
           "enum": [
             "local",
@@ -302,52 +302,52 @@
           "default": "local",
           "markdownDescription": "%config.completion.provider%"
         },
-        "forge.completion.model": {
+        "hiveyCode.completion.model": {
           "type": "string",
           "default": "qwen2.5-coder:7b",
           "description": "%config.completion.model%"
         },
-        "forge.completion.enabled": {
+        "hiveyCode.completion.enabled": {
           "type": "boolean",
           "default": true,
           "description": "%config.completion.enabled%"
         },
-        "forge.completion.debounceMs": {
+        "hiveyCode.completion.debounceMs": {
           "type": "number",
           "default": 220,
           "description": "%config.completion.debounceMs%"
         },
-        "forge.completion.maxTokens": {
+        "hiveyCode.completion.maxTokens": {
           "type": "number",
           "default": 128,
           "description": "%config.completion.maxTokens%"
         },
-        "forge.completion.multiline": {
+        "hiveyCode.completion.multiline": {
           "type": "boolean",
           "default": true,
           "description": "%config.completion.multiline%"
         },
-        "forge.endpoints.local": {
+        "hiveyCode.endpoints.local": {
           "type": "string",
           "default": "http://127.0.0.1:11434/v1",
           "description": "%config.endpoints.local%"
         },
-        "forge.endpoints.openaiCompatible": {
+        "hiveyCode.endpoints.openaiCompatible": {
           "type": "string",
           "default": "",
           "description": "%config.endpoints.openaiCompatible%"
         },
-        "forge.endpoints.openrouter": {
+        "hiveyCode.endpoints.openrouter": {
           "type": "string",
           "default": "https://openrouter.ai/api/v1",
           "description": "%config.endpoints.openrouter%"
         },
-        "forge.endpoints.anthropic": {
+        "hiveyCode.endpoints.anthropic": {
           "type": "string",
           "default": "https://api.anthropic.com/v1",
           "description": "%config.endpoints.anthropic%"
         },
-        "forge.privacy.redaction": {
+        "hiveyCode.privacy.redaction": {
           "type": "string",
           "enum": [
             "strict",
@@ -357,12 +357,12 @@
           "default": "strict",
           "markdownDescription": "%config.privacy.redaction%"
         },
-        "forge.privacy.allowUnredacted": {
+        "hiveyCode.privacy.allowUnredacted": {
           "type": "boolean",
           "default": false,
           "description": "%config.privacy.allowUnredacted%"
         },
-        "forge.privacy.blockedGlobs": {
+        "hiveyCode.privacy.blockedGlobs": {
           "type": "array",
           "items": {
             "type": "string"
@@ -380,7 +380,7 @@
           ],
           "description": "%config.privacy.blockedGlobs%"
         },
-        "forge.privacy.egressPolicy": {
+        "hiveyCode.privacy.egressPolicy": {
           "type": "string",
           "enum": [
             "ask-once",
@@ -390,32 +390,32 @@
           "default": "ask-once",
           "description": "%config.privacy.egressPolicy%"
         },
-        "forge.privacy.auditLog": {
+        "hiveyCode.privacy.auditLog": {
           "type": "boolean",
           "default": true,
           "description": "%config.privacy.auditLog%"
         },
-        "forge.budget.perRequestUsd": {
+        "hiveyCode.budget.perRequestUsd": {
           "type": "number",
           "default": 0.25,
           "description": "%config.budget.perRequestUsd%"
         },
-        "forge.budget.dailyUsd": {
+        "hiveyCode.budget.dailyUsd": {
           "type": "number",
           "default": 2,
           "description": "%config.budget.dailyUsd%"
         },
-        "forge.context.maxTokens": {
+        "hiveyCode.context.maxTokens": {
           "type": "number",
           "default": 8000,
           "description": "%config.context.maxTokens%"
         },
-        "forge.context.repoMap": {
+        "hiveyCode.context.repoMap": {
           "type": "boolean",
           "default": true,
           "description": "%config.context.repoMap%"
         },
-        "forge.privacy.customTerms": {
+        "hiveyCode.privacy.customTerms": {
           "type": "array",
           "items": {
             "type": "string"
@@ -423,7 +423,7 @@
           "default": [],
           "description": "%config.privacy.customTerms%"
         },
-        "forge.escalation.policy": {
+        "hiveyCode.escalation.policy": {
           "type": "string",
           "enum": [
             "never",
@@ -433,7 +433,7 @@
           "default": "ask",
           "markdownDescription": "%config.escalation.policy%"
         },
-        "forge.escalation.provider": {
+        "hiveyCode.escalation.provider": {
           "type": "string",
           "enum": [
             "openrouter",
@@ -443,12 +443,12 @@
           "default": "openrouter",
           "description": "%config.escalation.provider%"
         },
-        "forge.escalation.model": {
+        "hiveyCode.escalation.model": {
           "type": "string",
           "default": "",
           "description": "%config.escalation.model%"
         },
-        "forge.mcp.servers": {
+        "hiveyCode.mcp.servers": {
           "type": "object",
           "default": {},
           "markdownDescription": "%config.mcp.servers%",
@@ -507,15 +507,15 @@
     "watch": "node esbuild.mjs --watch",
     "typecheck": "tsc --noEmit",
     "test": "node esbuild.mjs && node esbuild.mjs --tests && node --test dist-tests/",
-    "package": "npx --yes @vscode/vsce@3 package --no-dependencies -o forge.vsix",
+    "package": "npx --yes @vscode/vsce@3 package --no-dependencies -o hivey-code.vsix",
     "models": "node scripts/update-models.mjs",
     "models:check": "node scripts/update-models.mjs --check",
     "scan:secrets": "node scripts/scan-secrets.mjs",
     "test:integration": "node esbuild.mjs && node esbuild.mjs --integration && node dist-integration/runTest.js",
     "publish:vsce": "npx --yes @vscode/vsce@3 publish --no-dependencies",
-    "publish:ovsx": "npx --yes ovsx publish forge.vsix",
-    "vsix": "npm run build && npx --yes @vscode/vsce@3 package --no-dependencies -o forge.vsix",
-    "vsix:publish": "npm run vsix && gh release upload build forge.vsix --clobber"
+    "publish:ovsx": "npx --yes ovsx publish hivey-code.vsix",
+    "vsix": "npm run build && npx --yes @vscode/vsce@3 package --no-dependencies -o hivey-code.vsix",
+    "vsix:publish": "npm run vsix && gh release upload build hivey-code.vsix --clobber"
   },
   "devDependencies": {
     "@types/node": "^18.19.0",
@@ -525,22 +525,23 @@
     "typescript": "^5.9.0"
   },
   "bin": {
-    "forge": "./dist/forge.js"
+    "hivey-code": "./dist/cli.js",
+    "hivey": "./dist/cli.js"
   },
   "galleryBanner": {
     "color": "#181818",
     "theme": "dark"
   },
-  "homepage": "https://github.com/FlorianMartins/forge#readme",
+  "homepage": "https://github.com/FlorianMartins/hivey-code#readme",
   "bugs": {
-    "url": "https://github.com/FlorianMartins/forge/issues"
+    "url": "https://github.com/FlorianMartins/hivey-code/issues"
   },
-  "qna": "https://github.com/FlorianMartins/forge/issues",
+  "qna": "https://github.com/FlorianMartins/hivey-code/issues",
   "pricing": "Free",
   "badges": [
     {
-      "url": "https://github.com/FlorianMartins/forge/actions/workflows/ci.yml/badge.svg",
-      "href": "https://github.com/FlorianMartins/forge/actions/workflows/ci.yml",
+      "url": "https://github.com/FlorianMartins/hivey-code/actions/workflows/ci.yml/badge.svg",
+      "href": "https://github.com/FlorianMartins/hivey-code/actions/workflows/ci.yml",
       "description": "CI"
     }
   ]

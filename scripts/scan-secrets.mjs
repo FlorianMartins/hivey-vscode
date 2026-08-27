@@ -17,7 +17,7 @@ import { pathToFileURL } from "node:url";
 const staged = process.argv.includes("--staged");
 
 // Build the detectors from source so the scanner and the shipped extension can never disagree.
-const out = join(mkdtempSync(join(tmpdir(), "forge-scan-")), "redaction.mjs");
+const out = join(mkdtempSync(join(tmpdir(), "hivey-code-scan-")), "redaction.mjs");
 const build = spawnSync(
   process.platform === "win32" ? "npx.cmd" : "npx",
   ["esbuild", "src/core/redaction/index.ts", "--bundle", "--platform=node", "--format=esm", `--outfile=${out}`, "--log-level=error"],

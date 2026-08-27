@@ -1,13 +1,13 @@
 // Build script. Three outputs, one bundler, no plugin:
 //   dist/extension.js   — the extension host (CommonJS, `vscode` left external)
-//   dist/forge.js       — the terminal client, sharing the same core
+//   dist/cli.js       — the terminal client, sharing the same core
 //   media/webview.js    — the discussion panel (IIFE, runs in the webview sandbox)
 //   dist-tests/*.js     — the test files, so `node --test` can run TypeScript sources
 //
 // The extension ships ZERO runtime dependency: everything under src/ is our own code and the
 // bundle is auditable by an enterprise before install. esbuild/typescript are dev-only.
 import { build, context } from "esbuild";
-import { readdirSync } from "node:fs";
+import { readdirSync, rmSync } from "node:fs";
 
 const watch = process.argv.includes("--watch");
 const tests = process.argv.includes("--tests");
@@ -22,6 +22,16 @@ const common = {
 };
 
 const integration = process.argv.includes("--integration");
+
+// Wipe the output directory before writing to it. esbuild only ever ADDS files, so anything an
+// earlier build produced survives — and a renamed entry point leaves its old bundle behind, where
+// `vsce` happily packages it. That is how 168 KB of the product under its previous name ended up
+// inside the extension: not as a mistake anyone made, but as one nobody could see.
+if (!watch) {
+  for (const dir of integration ? ["dist-integration"] : tests ? ["dist-tests"] : ["dist"]) {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
 
 const targets = integration
   ? [
@@ -63,7 +73,7 @@ const targets = integration
       {
         ...common,
         entryPoints: ["src/cli/main.ts"],
-        outfile: "dist/forge.js",
+        outfile: "dist/cli.js",
         platform: "node",
         format: "cjs",
         // No shebang banner here: the entry file already carries one, and two would be a syntax error.
@@ -85,4 +95,4 @@ for (const t of targets) {
     await build(t);
   }
 }
-if (watch) console.log("[forge] veille active");
+if (watch) console.log("[hivey-code] veille active");

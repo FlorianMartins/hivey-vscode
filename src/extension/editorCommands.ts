@@ -25,7 +25,7 @@ export interface EditorDeps {
 
 export function registerEditorCommands(context: vscode.ExtensionContext, deps: EditorDeps): void {
   context.subscriptions.push(
-    vscode.commands.registerCommand("forge.askAboutSelection", async () => {
+    vscode.commands.registerCommand("hiveyCode.askAboutSelection", async () => {
       const item = deps.workspace.activeContext();
       const question = await vscode.window.showInputBox({
         prompt: t("What do you want to know about this selection?"),
@@ -36,7 +36,7 @@ export function registerEditorCommands(context: vscode.ExtensionContext, deps: E
       await deps.chat.focusWithPrompt(question, item);
     }),
 
-    vscode.commands.registerCommand("forge.editSelection", async () => {
+    vscode.commands.registerCommand("hiveyCode.editSelection", async () => {
       const editor = vscode.window.activeTextEditor;
       if (!editor) return;
       const range = editor.selection.isEmpty ? editor.document.lineAt(editor.selection.active.line).range : editor.selection;
@@ -49,7 +49,7 @@ export function registerEditorCommands(context: vscode.ExtensionContext, deps: E
       if (!instruction) return;
 
       const replacement = await vscode.window.withProgress(
-        { location: vscode.ProgressLocation.Notification, title: t("Forge: rewriting…"), cancellable: true },
+        { location: vscode.ProgressLocation.Notification, title: t("Hivey Code: rewriting…"), cancellable: true },
         (_p, token) =>
           oneShot(
             deps,
@@ -74,7 +74,7 @@ export function registerEditorCommands(context: vscode.ExtensionContext, deps: E
       });
     }),
 
-    vscode.commands.registerCommand("forge.generateCommitMessage", async () => {
+    vscode.commands.registerCommand("hiveyCode.generateCommitMessage", async () => {
       const git = vscode.extensions.getExtension<GitExtensionApi>("vscode.git")?.exports?.getAPI(1);
       const repo = git?.repositories?.[0];
       if (!repo) {
@@ -87,7 +87,7 @@ export function registerEditorCommands(context: vscode.ExtensionContext, deps: E
         return;
       }
       const message = await vscode.window.withProgress(
-        { location: vscode.ProgressLocation.SourceControl, title: t("Forge: commit message…") },
+        { location: vscode.ProgressLocation.SourceControl, title: t("Hivey Code: commit message…") },
         () => oneShot(deps, COMMIT_PROMPT, headToTokens(diff, 6000)),
       );
       if (message) repo.inputBox.value = stripFence(message).trim();
@@ -95,7 +95,7 @@ export function registerEditorCommands(context: vscode.ExtensionContext, deps: E
 
     // Quick fix on a diagnostic: the language server says what is wrong, so the model is asked a
     // precise question instead of being told to find the bug.
-    vscode.commands.registerCommand("forge.fixDiagnostic", async (uri: vscode.Uri, diagnostic: vscode.Diagnostic) => {
+    vscode.commands.registerCommand("hiveyCode.fixDiagnostic", async (uri: vscode.Uri, diagnostic: vscode.Diagnostic) => {
       const editor = await vscode.window.showTextDocument(uri);
       const doc = editor.document;
       // Widen to whole lines with a little room around them: a fix rarely fits inside the squiggle.
@@ -105,7 +105,7 @@ export function registerEditorCommands(context: vscode.ExtensionContext, deps: E
       const original = doc.getText(range);
 
       const replacement = await vscode.window.withProgress(
-        { location: vscode.ProgressLocation.Notification, title: t("Forge: fixing…"), cancellable: true },
+        { location: vscode.ProgressLocation.Notification, title: t("Hivey Code: fixing…"), cancellable: true },
         (_p, token) =>
           oneShot(
             deps,
@@ -126,7 +126,7 @@ export function registerEditorCommands(context: vscode.ExtensionContext, deps: E
       void vscode.window.showInformationMessage(t("Fix applied — Ctrl+Z to undo."));
     }),
 
-    vscode.commands.registerCommand("forge.explainDiagnostic", async (uri: vscode.Uri, diagnostic: vscode.Diagnostic) => {
+    vscode.commands.registerCommand("hiveyCode.explainDiagnostic", async (uri: vscode.Uri, diagnostic: vscode.Diagnostic) => {
       const doc = await vscode.workspace.openTextDocument(uri);
       const start = Math.max(0, diagnostic.range.start.line - 5);
       const end = Math.min(doc.lineCount - 1, diagnostic.range.end.line + 5);
@@ -138,31 +138,31 @@ export function registerEditorCommands(context: vscode.ExtensionContext, deps: E
       });
     }),
 
-    vscode.commands.registerCommand("forge.askWith", async (instruction: string) => {
+    vscode.commands.registerCommand("hiveyCode.askWith", async (instruction: string) => {
       await deps.chat.focusWithPrompt(instruction, deps.workspace.activeContext());
     }),
 
-    // `forge` in the integrated terminal — the same assistant, where the work already is.
-    vscode.commands.registerCommand("forge.openTerminal", async () => {
+    // `hivey-code` in the integrated terminal — the same assistant, where the work already is.
+    vscode.commands.registerCommand("hiveyCode.openTerminal", async () => {
       const settings = readSettings();
-      const script = vscode.Uri.joinPath(deps.extensionUri, "dist", "forge.js").fsPath;
-      const existing = vscode.window.terminals.find((t) => t.name === "Forge");
+      const script = vscode.Uri.joinPath(deps.extensionUri, "dist", "cli.js").fsPath;
+      const existing = vscode.window.terminals.find((t) => t.name === "Hivey Code");
       const terminal =
         existing ??
         vscode.window.createTerminal({
-          name: "Forge",
+          name: "Hivey Code",
           // The terminal client reads its endpoint and model from the environment, so it starts on
           // the same configuration as the sidebar instead of on its own defaults.
           env: {
-            FORGE_URL: settings.endpoints[settings.chat.provider] ?? settings.endpoints.local,
-            FORGE_MODEL: settings.chat.model,
+            HIVEY_CODE_URL: settings.endpoints[settings.chat.provider] ?? settings.endpoints.local,
+            HIVEY_CODE_MODEL: settings.chat.model,
           },
         });
       terminal.show();
       terminal.sendText(`node "${script}"`, true);
     }),
 
-    vscode.commands.registerCommand("forge.explainTerminalSelection", async () => {
+    vscode.commands.registerCommand("hiveyCode.explainTerminalSelection", async () => {
       const selection = vscode.window.activeTerminal ? await copyTerminalSelection() : undefined;
       if (!selection?.trim()) {
         void vscode.window.showWarningMessage(t("Select some text in the terminal first."));
@@ -211,7 +211,7 @@ async function oneShot(deps: EditorDeps, system: string, user: string, token?: v
   } catch (err) {
     const message = (err as Error).message;
     deps.log.appendLine(`[one-shot] ${message}`);
-    void vscode.window.showErrorMessage(`Forge : ${message}`);
+    void vscode.window.showErrorMessage(`Hivey Code : ${message}`);
     return undefined;
   }
 }

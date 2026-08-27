@@ -24,7 +24,7 @@ const MAX_TOKENS = 1200;
 
 /** In order of preference. The first that exists wins; they are not concatenated. */
 const CANDIDATES = [
-  [".forge", "instructions.md"],
+  [".hiveycode", "instructions.md"],
   [".github", "copilot-instructions.md"],
   [".github", "instructions.md"],
 ];
@@ -39,7 +39,7 @@ let cached: { key: string; value: Instructions | undefined } | undefined;
 
 /** Drops the cache when one of the candidate files changes, so an edit takes effect immediately. */
 export function watchInstructions(disposables: vscode.Disposable[]): void {
-  const watcher = vscode.workspace.createFileSystemWatcher("**/{.forge/instructions.md,.github/*instructions.md}");
+  const watcher = vscode.workspace.createFileSystemWatcher("**/{.hiveycode/instructions.md,.github/*instructions.md}");
   const clear = () => {
     cached = undefined;
   };

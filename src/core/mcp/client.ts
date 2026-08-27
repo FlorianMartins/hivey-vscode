@@ -88,7 +88,7 @@ export class McpClient {
   constructor(opts: McpClientOptions) {
     this.transport = opts.transport;
     this.timeoutMs = opts.timeoutMs ?? 30_000;
-    this.clientName = opts.clientName ?? "forge";
+    this.clientName = opts.clientName ?? "hivey-code";
     this.clientVersion = opts.clientVersion ?? "0.0.0";
     this.transport.onMessage((message) => this.receive(message));
     this.transport.onError((error) => this.failAll(error));
