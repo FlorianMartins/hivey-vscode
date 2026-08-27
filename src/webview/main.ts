@@ -13,10 +13,13 @@ import { permissionsScreen } from "./permissions.js";
 import { markdown } from "./markdown.js";
 import type { ToExtension, ToPanel, UiState } from "../shared/protocol.js";
 import { t } from "../shared/i18n.js";
+import { usePrefStore } from "./prefs.js";
 
 declare function acquireVsCodeApi(): { postMessage(m: unknown): void; getState(): unknown; setState(s: unknown): void };
 const vscode = acquireVsCodeApi();
 const send = (m: ToExtension) => vscode.postMessage(m);
+// The picker's own preferences live in the webview's state, which survives the view being hidden.
+usePrefStore({ get: () => vscode.getState(), set: (state) => vscode.setState(state) });
 
 let state: UiState | undefined;
 let searchOpen = false;

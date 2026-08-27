@@ -1199,3 +1199,287 @@ pre.code {
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+
+/* ── The model combobox ──────────────────────────────────────────────────────────────────────
+ *
+ * Carried over from the Hivey sidebar, which had to solve the same problem: four hundred models,
+ * a 300 px column, and a user who wants the answer to "which one, and what does it cost". The
+ * structure is the sidebar's — metric header, search inside the panel, grouped rows, a badge whose
+ * segments are coloured independently, a collapsible filter — and only the palette changes: every
+ * colour is one of the editor's own, so the picker reads on light, dark and high-contrast themes
+ * without being told which is on.
+ */
+
+.combo {
+  position: fixed;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  max-height: min(70vh, 560px);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--vscode-editorWidget-background, var(--vscode-menu-background));
+  color: var(--vscode-editorWidget-foreground, var(--vscode-menu-foreground));
+  box-shadow: 0 6px 20px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.36));
+  overflow: hidden;
+}
+
+.combo-header {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: var(--sp-2);
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.combo-metric {
+  font-size: var(--fs-meta);
+  padding: 2px var(--sp-2);
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+}
+.combo-metric:hover {
+  background: var(--hover);
+  color: var(--vscode-foreground);
+}
+.combo-metric.on {
+  color: var(--vscode-foreground);
+  border-color: var(--border-strong);
+  background: var(--surface);
+}
+.combo-metric:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: 1px;
+}
+
+.combo-search {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2);
+  border-bottom: 1px solid var(--border);
+}
+.combo-search .search-ico {
+  flex: 0 0 auto;
+  color: var(--muted);
+}
+.combo-search-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--vscode-input-foreground, inherit);
+  font-family: inherit;
+  font-size: var(--fs-control);
+}
+.combo-search-input::placeholder {
+  color: var(--vscode-input-placeholderForeground, var(--muted));
+}
+
+.combo-list {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: var(--sp-1) 0;
+  min-height: 0;
+}
+.combo-group {
+  font-size: var(--fs-meta);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  padding: var(--sp-2) var(--sp-3) var(--sp-1);
+  position: sticky;
+  top: 0;
+  background: var(--vscode-editorWidget-background, var(--vscode-menu-background));
+}
+.combo-item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  font-size: var(--fs-control);
+  padding: var(--sp-2) var(--sp-3);
+  cursor: pointer;
+}
+.combo-item:hover,
+.combo-item:focus-visible {
+  background: var(--vscode-list-hoverBackground, var(--hover));
+  outline: none;
+}
+.combo-item.sel {
+  background: var(--vscode-list-activeSelectionBackground);
+  color: var(--vscode-list-activeSelectionForeground);
+}
+.combo-item.sel .ci-detail,
+.combo-item.sel .ci-tag {
+  color: inherit;
+  opacity: 0.75;
+}
+.ci-main {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.ci-name {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ci-tag {
+  font-size: 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  padding: 0 5px;
+  color: var(--muted);
+  flex: 0 0 auto;
+}
+.ci-detail {
+  font-size: var(--fs-meta);
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ci-badge {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  font-size: var(--fs-meta);
+  font-family: var(--vscode-editor-font-family);
+  font-variant-numeric: tabular-nums;
+}
+.ci-sep {
+  color: var(--muted);
+}
+.combo-empty {
+  padding: var(--sp-4) var(--sp-3);
+  color: var(--muted);
+  font-size: var(--fs-control);
+  text-align: center;
+}
+
+.combo-filters {
+  border-bottom: 1px solid var(--border);
+  padding: var(--sp-2) var(--sp-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  background: var(--surface);
+}
+.combo-filter-title {
+  font-size: var(--fs-meta);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  margin-bottom: var(--sp-1);
+}
+.combo-filter-rows {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1) var(--sp-4);
+}
+.combo-filter-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-control);
+  cursor: pointer;
+}
+.combo-filter-row input {
+  accent-color: var(--vscode-checkbox-selectBackground, var(--vscode-focusBorder));
+  margin: 0;
+}
+.combo-filter-foot,
+.combo-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2);
+}
+.combo-foot {
+  border-top: 1px solid var(--border);
+}
+
+/* ── Chrome, tightened towards the editor's own chat surface ─────────────────────────────────
+ *
+ * The changes are all subtraction. Turns were separated by a rule; they are now separated by
+ * space, which is what the editor does and what stops a long transcript reading as a table. The
+ * composer gains the same inset focus ring every other input in the workbench has, so focus looks
+ * like focus rather than like a slightly different border.
+ */
+
+.entry + .entry {
+  border-top: none;
+  margin-top: var(--sp-3);
+}
+.entry {
+  padding: var(--sp-2) 0;
+}
+
+.composer-card:focus-within {
+  border-color: var(--vscode-focusBorder);
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -2px;
+}
+
+/* A code block is a document inside a document: it keeps its header visible so the language is
+   always readable, and reveals its actions on hover the way the editor's own peek views do. */
+.code-head {
+  background: var(--surface);
+}
+
+/* ── Composer, on one wrapping row ───────────────────────────────────────────────────────────
+ *
+ * The controls form two groups that stay together when the row wraps: what will answer on the
+ * left, what it will cost and the send on the right. `flex-wrap` on the row plus `margin-left:auto`
+ * on the second group gives the editor's own layout at 400 px and a readable two-line fallback at
+ * 260 px, without either being a special case in the code.
+ */
+
+.composer-toolbar {
+  flex-wrap: wrap;
+  row-gap: var(--sp-1);
+  margin-top: var(--sp-1);
+}
+.toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  min-width: 0;
+}
+.toolbar-group.end {
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+.btn.primary.send {
+  border-radius: var(--radius);
+  padding: 3px var(--sp-2);
+}
+
+/* The identity mark on each turn: a dot for the question, a diamond for the answer. Two shapes
+   rather than two colours, so it survives a high-contrast theme and colour-blind vision alike. */
+.entry-mark {
+  font-size: 8px;
+  line-height: 1;
+  flex: 0 0 auto;
+  color: var(--muted);
+}
+.entry-mark.assistant {
+  color: var(--vscode-textLink-foreground, var(--vscode-focusBorder));
+}

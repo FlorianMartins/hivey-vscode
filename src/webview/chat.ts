@@ -9,6 +9,7 @@
 import { button, closeMenu, el, formatTokens, icon, ICON, menu, menuItem, menuTitle, separator } from "./dom.js";
 import { markdown } from "./markdown.js";
 import { t } from "../shared/i18n.js";
+import { closeModelCombo, isModelComboOpen, openModelCombo } from "./modelCombo.js";
 import type { Mode, Reasoning, ToExtension, UiEntry, UiState } from "../shared/protocol.js";
 
 const MODES: Array<{ id: Mode; label: string; hint: string }> = [
@@ -97,6 +98,10 @@ function renderEntry(entry: UiEntry, state: UiState, deps: ChatDeps): HTMLElemen
   );
 
   const head = el("div", "entry-head");
+  // A small mark before the name, the way the editor's own chat does it. It is not decoration:
+  // when an answer is long enough to scroll, the mark is what tells you at a glance whether the
+  // block you have landed in is your question or its reply.
+  head.append(el("span", `entry-mark ${entry.role}`, entry.role === "user" ? "\u25CF" : "\u25C6"));
   head.append(el("span", "entry-who", entry.role === "user" ? t("You") : "Forge"));
   if (entry.model && entry.role === "assistant") head.append(el("span", "entry-meta", entry.model));
   if (entry.usdCost) head.append(el("span", "entry-meta", `${entry.usdCost.toFixed(4)} $`));
@@ -234,10 +239,9 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
         : t("Ask your question. Attach the context you need: this mode does not read the repository.");
   area.addEventListener("input", () => {
     autoGrow(area);
-    if (area.value.endsWith("#")) {
-      area.value = area.value.slice(0, -1);
-      deps.send({ type: "attach", what: "mention" });
-    }
+    // `#` used to be swallowed and replaced by a file dialog. It now stays in the text and opens
+    // the completion list, which is both what Copilot does and what lets `#changes` exist at all:
+    // a dialog can only ever offer files.
     slashHints(hints, area, deps);
   });
   area.addEventListener("keydown", (ev) => {
@@ -257,27 +261,28 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
   const hints = el("div", "slash-hints");
   card.append(hints);
 
-  // Two rows rather than one: the sidebar is often 300 px wide, and a single row of controls wraps
-  // into an unreadable staircase. Row one says WHAT is answering, row two WITH WHAT and the send.
-  const rowTop = el("div", "composer-toolbar");
-  rowTop.append(modeButton(state, deps), modelButton(state, deps));
-  if (state.reasoningAvailable) rowTop.append(reasoningButton(state, deps));
-  card.append(rowTop);
+  // One row that wraps, rather than two that always exist. On a panel docked at 400 px everything
+  // fits on a line, which is what the editor's own chat does and what stops the composer looking
+  // like a form; at 260 px the same row wraps and the send button stays pinned to the right of
+  // whatever line it lands on. Two hard-coded rows got the narrow case right and the normal one
+  // wrong.
+  const bar = el("div", "composer-toolbar");
+  const left = el("div", "toolbar-group");
+  left.append(contextButton(state, deps), modeButton(state, deps), modelButton(state, deps));
+  if (state.reasoningAvailable) left.append(reasoningButton(state, deps));
+  bar.append(left);
 
-  const rowBottom = el("div", "composer-toolbar bottom");
-  rowBottom.append(contextButton(state, deps));
-  rowBottom.append(el("div", "spacer"));
-
+  const right = el("div", "toolbar-group end");
   const tokens = el("span", "composer-tokens", t("{0} tokens", formatTokens(state.contextTokens)));
   tokens.title = t("What the next question will send, once muted exchanges are removed.");
-  rowBottom.append(tokens);
-
-  rowBottom.append(
+  right.append(tokens);
+  right.append(
     isStreaming()
-      ? button({ icon: ICON.stop, title: t("Stop the answer"), className: "btn primary", onClick: () => deps.send({ type: "stop" }) })
-      : button({ icon: ICON.send, title: t("Send (⏎)"), className: "btn primary", onClick: () => submit(area, deps) }),
+      ? button({ icon: ICON.stop, title: t("Stop the answer"), className: "btn primary send", onClick: () => deps.send({ type: "stop" }) })
+      : button({ icon: ICON.send, title: t("Send (⏎)"), className: "btn primary send", onClick: () => submit(area, deps) }),
   );
-  card.append(rowBottom);
+  bar.append(right);
+  card.append(bar);
   wrap.append(card);
   // Size the box to its content on first paint, not only after the first keystroke.
   requestAnimationFrame(() => autoGrow(area));
@@ -410,14 +415,17 @@ function modeButton(state: UiState, deps: ChatDeps): HTMLElement {
 }
 
 function modelButton(state: UiState, deps: ChatDeps): HTMLElement {
-  const b = button({
+  const b: HTMLElement = button({
     label: state.modelLabel,
     trailingIcon: ICON.chevron,
-    title: state.remote ? t("Remote model — click to compare and change") : t("Local model — click to compare and change"),
+    title: state.remote
+      ? t("Remote model — it is billed, and what you send is pseudonymised first.")
+      : t("Local model — nothing leaves this machine."),
     className: `btn ghost model${state.remote ? " remote" : " local"}`,
     onClick: () => {
       closeMenu();
-      deps.send({ type: "openScreen", screen: "models" });
+      if (isModelComboOpen()) closeModelCombo();
+      else openModelCombo(b, state, deps.send);
     },
   });
   return b;
@@ -459,21 +467,80 @@ const SLASH: Array<{ name: string; hint: string; prompt: string; attach?: boolea
   { name: t("/fix"), hint: t("find and fix the problem"), prompt: t("Find the defect in this code and fix it. Say in one sentence what was wrong."), attach: true },
   { name: t("/review"), hint: t("review: bugs, security, readability"), prompt: t("Review this code: bugs first, then security, then readability. Order by severity, cite the lines, and report nothing you are unsure of."), attach: true },
   { name: "/doc", hint: t("document"), prompt: t("Document this code: a note above it, in the language and style of the file."), attach: true },
+  { name: t("/optimise"), hint: t("make it faster, without changing what it does"), prompt: t("Make this code faster without changing its behaviour. Say what the cost was before and after, and refuse if the gain is not worth the loss of clarity."), attach: true },
+  { name: "/commit", hint: t("write the commit message"), prompt: t("Read the staged changes with git_diff and write the commit message for them. Subject line, then the why.") },
+  // IBM i. `/tofree` is the one an RPG shop reaches for daily, and the reason the dialect rules in
+  // core exist: converting fixed to free is exactly where a model that guesses columns fails.
+  { name: "/tofree", hint: t("convert fixed-format RPG to fully free"), prompt: t("Convert this member to fully free-form RPGLE. Start the result with **FREE, use dcl-f/dcl-s/dcl-ds/dcl-proc, keep every comment, and change no behaviour. Point out anything that has no free-form equivalent instead of inventing one."), attach: true },
+  { name: "/sql", hint: t("write it as Db2 for i SQL"), prompt: t("Write this as Db2 for i SQL. Qualify the objects, use FETCH FIRST rather than LIMIT, and say which library list the unqualified names would resolve against."), attach: true },
+  { name: "/dds", hint: t("explain this DDS"), prompt: t("Explain this DDS member: the record formats, the key fields, the keywords that change behaviour, and anything that would surprise someone reading it for the first time."), attach: true },
 ];
 
+/** The `#` notations, offered as the user types. Kept in step with the parser by a test. */
+const MENTIONS: Array<{ token: string; hint: string }> = [
+  { token: "#file:", hint: t("a file by path") },
+  { token: "#selection", hint: t("what is selected in the editor") },
+  { token: "#editor", hint: t("the whole active file") },
+  { token: "#openFiles", hint: t("every file open in a tab") },
+  { token: "#codebase", hint: t("the repository map") },
+  { token: "#changes", hint: t("the uncommitted diff") },
+  { token: "#problems", hint: t("the errors and warnings from the language servers") },
+  { token: "#terminal", hint: t("what is selected in the terminal") },
+  { token: "#sym:", hint: t("a symbol by name") },
+  { token: "#member:", hint: t("an IBM i source member — LIB/SRCFILE(MEMBER)") },
+  { token: "#db2:", hint: t("the result of a Db2 for i query that reads") },
+];
+
+const PARTICIPANTS: Array<{ token: string; hint: string }> = [
+  { token: "@workspace", hint: t("the repository: search it before answering") },
+  { token: "@editor", hint: t("the file on screen and the editor's state") },
+  { token: "@terminal", hint: t("the last command and what it printed") },
+  { token: "@git", hint: t("the working tree, the history, the blame") },
+  { token: "@ibmi", hint: t("the partition: Db2 for i, members, objects") },
+  { token: "@arcad", hint: t("ARCAD Elias: components, versions, cross-references") },
+];
+
+/**
+ * The completion list under the composer: `/` commands, `#` context, `@` participants.
+ *
+ * All three share one list because they share one job — telling the user what they may type — and
+ * because a panel that pops a different widget per prefix feels like three features rather than
+ * one. The word under the caret decides which set is offered, so `#` works mid-sentence, which is
+ * where people actually reach for it.
+ */
 function slashHints(container: HTMLElement, area: HTMLTextAreaElement, deps: ChatDeps): void {
   container.textContent = "";
   const value = area.value;
-  if (!value.startsWith("/")) return;
-  const typed = value.split(" ")[0] ?? "/";
-  for (const c of SLASH.filter((s) => s.name.startsWith(typed))) {
+  const caret = area.selectionStart ?? value.length;
+  const word = /(\S*)$/.exec(value.slice(0, caret))?.[1] ?? "";
+
+  let rows: Array<{ token: string; hint: string; complete: string }> = [];
+  if (value.startsWith("/") && !value.slice(0, caret).includes(" ")) {
+    rows = SLASH.filter((c) => c.name.startsWith(word)).map((c) => ({ token: c.name, hint: c.hint, complete: `${c.name} ` }));
+  } else if (word.startsWith("#")) {
+    rows = MENTIONS.filter((m) => m.token.toLowerCase().startsWith(word.toLowerCase())).map((m) => ({
+      ...m,
+      // A notation that takes an argument leaves the caret against the colon, ready for it.
+      complete: m.token.endsWith(":") ? m.token : `${m.token} `,
+    }));
+  } else if (word.startsWith("@") && value.trimStart().startsWith("@")) {
+    rows = PARTICIPANTS.filter((p) => p.token.toLowerCase().startsWith(word.toLowerCase())).map((p) => ({
+      ...p,
+      complete: `${p.token} `,
+    }));
+  }
+
+  for (const entry of rows.slice(0, 8)) {
     const row = el("button", "slash-hint");
-    row.append(el("span", "slash-name", c.name));
-    row.append(el("span", "slash-hint-text", c.hint));
+    row.append(el("span", "slash-name", entry.token));
+    row.append(el("span", "slash-hint-text", entry.hint));
     row.addEventListener("click", () => {
-      area.value = `${c.name} `;
+      const before = value.slice(0, caret - word.length);
+      area.value = before + entry.complete + value.slice(caret);
+      const at = (before + entry.complete).length;
       area.focus();
-      container.textContent = "";
+      area.setSelectionRange(at, at);
+      slashHints(container, area, deps);
     });
     container.append(row);
   }

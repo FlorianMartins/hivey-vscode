@@ -4,6 +4,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { redact, redactMessages, isLocalEndpoint, Vault, entropy, DEFAULT_POLICY } from "../src/core/redaction/index.js";
+import { scanShapes } from "../src/core/redaction/detectors.js";
 
 const strict = { ...DEFAULT_POLICY };
 const balanced = { ...DEFAULT_POLICY, level: "balanced" as const };
@@ -163,4 +164,24 @@ test("what counts as local — the question that decides whether redaction runs 
 test("entropy separates prose from keys", () => {
   assert.ok(entropy("aaaaaaaaaaaa") < 1);
   assert.ok(entropy("Zx9Kq2Lm4Np7Rt5Vw8Yb1Dg3") > 3.6);
+});
+
+test("a value that opens with a sigil is syntax, not a credential", () => {
+  // Found by running this scanner over its own repository: a panel that offers `#file:` and
+  // `@workspace` as things you may type stores them in fields called `token`, and in a codebase
+  // about language models `token` means a unit of context far more often than a bearer token.
+  for (const line of [
+    'const MENTIONS = [{ token: "#file:", hint: "a file by path" }];',
+    'const PARTICIPANTS = [{ token: "@workspace", hint: "the repository" }];',
+    'const t = { token: "/explain" };',
+  ]) {
+    assert.deepEqual(scanShapes(line).filter((s) => s.kind === "secret"), [], line);
+  }
+});
+
+test("tightening that rule did not blind it to real credentials", () => {
+  const found = (line: string) => scanShapes(line).filter((s) => s.kind === "secret").length;
+  assert.ok(found('const apiKey = "sk-proj-9f3Ab2Cd4Ef6Gh8Ij0Kl2Mn4Op6Qr8St";') > 0);
+  assert.ok(found('token: "ghp_16C7e42F292c6912E7710c838347Ae178B4a"') > 0);
+  assert.ok(found('password = "Tr0ub4dor&3xK"') > 0);
 });

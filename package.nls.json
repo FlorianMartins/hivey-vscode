@@ -50,5 +50,6 @@
   "command.restartMcp.title": "Restart MCP servers",
   "command.setArcadCredentials.title": "Store the ARCAD Elias credentials",
   "command.clearArcadCredentials.title": "Forget the ARCAD Elias credentials",
-  "config.mcp.servers": "MCP servers to connect to, as `{ \"name\": { … } }`. A `stdio` entry runs a program on this machine and is never started until you have agreed to it in a dialog that names the command; an `http` entry talks to a URL and goes through the same egress rules as any other outbound request. A `.vscode/mcp.json` in the workspace is read too, and these entries win on a name collision."
+  "config.mcp.servers": "MCP servers to connect to, as `{ \"name\": { … } }`. A `stdio` entry runs a program on this machine and is never started until you have agreed to it in a dialog that names the command; an `http` entry talks to a URL and goes through the same egress rules as any other outbound request. A `.vscode/mcp.json` in the workspace is read too, and these entries win on a name collision.",
+  "command.exportSession.title": "Export the conversation as Markdown"
 }

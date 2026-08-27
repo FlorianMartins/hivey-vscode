@@ -16,6 +16,9 @@ import { Session, type ContextItem, type Entry, type SessionData } from "../core
 import { filterHistory, searchTranscript } from "../core/session/history.js";
 import { promptForMode, toolsForMode } from "../core/session/modes.js";
 import { detectIbmiLanguage, ibmiPrompt } from "../core/ibmi/languages.js";
+import { parsePrompt, participantDirective, type Participant } from "../core/session/mentions.js";
+import { resolveMentions } from "./mentions.js";
+import { instructionsPrompt } from "./instructions.js";
 import { estimateTokens } from "../core/util/tokens.js";
 import { isLocalEndpoint, Vault } from "../core/redaction/index.js";
 import type {
@@ -488,14 +491,53 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     if (force) this.post({ type: "status", text: t("{0} models", this.models.length) });
   }
 
+  /**
+   * Write the conversation out as Markdown.
+   *
+   * Exported from the transcript rather than from the prompt, and the difference is the point: what
+   * is saved is what the user read, including the exchanges they muted — which the model never
+   * saw. A file that silently dropped them would be a record of a conversation nobody had.
+   */
+  async exportSession(): Promise<void> {
+    const lines: string[] = [`# ${this.session.title || t("Conversation")}`, ""];
+    for (const entry of this.session.entries) {
+      lines.push(`## ${entry.role === "user" ? t("You") : "Forge"}${entry.included ? "" : ` — ${t("out of context")}`}`);
+      if (entry.role === "assistant" && entry.model) lines.push(`*${entry.model}*`, "");
+      lines.push(entry.text.trim(), "");
+      for (const step of entry.steps ?? []) lines.push(`- \`${step.tool}\` — ${step.summary}`);
+      if (entry.steps?.length) lines.push("");
+    }
+    const doc = await vscode.workspace.openTextDocument({ language: "markdown", content: lines.join("\n") });
+    await vscode.window.showTextDocument(doc);
+  }
+
   private async ask(text: string): Promise<void> {
     if (!text.trim()) return;
     this.screen = "chat";
-    this.session.add({ role: "user", text, context: this.attachments.length ? this.attachments : undefined });
+
+    // `#context` and `@participant` are resolved here, on this machine, before anything is built
+    // and long before anything is sent. The mentions stay in the text the user sees — removing
+    // them would make the transcript read as though they had never asked.
+    const parsed = parsePrompt(text);
+    this.participant = parsed.participant;
+    const settings = readSettings();
+    const resolved = parsed.mentions.length
+      ? await resolveMentions(parsed.mentions, {
+          workspace: this.workspace,
+          settings,
+          repoMap: () => this.workspace.repoMap(Math.floor(settings.context.maxTokens * 0.4)),
+        })
+      : [];
+    const context = [...this.attachments, ...resolved];
+
+    this.session.add({ role: "user", text, context: context.length ? context : undefined });
     this.attachments = [];
     this.sendState();
     await this.runTurn();
   }
+
+  /** The participant of the turn being asked, if the user named one. Reset by the next question. */
+  private participant: Participant | undefined;
 
   // ── The turn ───────────────────────────────────────────────────────────────────────────────
 
@@ -509,6 +551,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
     const nonce = randomNonce();
     // Chat mode answers from what it was given: no repository map, no tools, no surprises.
+    // The repository's own rules, if it has any. They sit in the cacheable prefix, which is where
+    // text that is identical on every turn belongs.
+    const houseRules = await instructionsPrompt();
     const ambient =
       mode !== "chat" && settings.context.repoMap
         ? await this.workspace.repoMap(Math.floor(settings.context.maxTokens * 0.4))
@@ -522,7 +567,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const tools = toolsForMode(allTools, mode);
 
     const built = this.session.build({
-      systemPrompt: promptForMode(mode) + workspaceNote() + dialectNote(),
+      systemPrompt:
+        promptForMode(mode) +
+        workspaceNote() +
+        dialectNote() +
+        houseRules +
+        (this.participant ? `\n\n${participantDirective(this.participant)}` : ""),
       ambient: ambient ? `${ambient.text}\n\n(${ambient.files} files mapped, ${ambient.omitted} omitted)` : undefined,
       maxTokens: settings.context.maxTokens,
       nonce,

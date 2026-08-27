@@ -176,6 +176,12 @@
         "command": "forge.clearArcadCredentials",
         "title": "%command.clearArcadCredentials.title%",
         "category": "Forge"
+      },
+      {
+        "command": "forge.exportSession",
+        "title": "%command.exportSession.title%",
+        "category": "Forge",
+        "icon": "$(save)"
       }
     ],
     "menus": {

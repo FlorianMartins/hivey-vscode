@@ -14,6 +14,7 @@ import { registerEditorCommands } from "./editorCommands.js";
 import { showEgressReport, showCostReport } from "./reports.js";
 import { WorkspaceContext } from "./workspace.js";
 import { McpManager } from "./integrations/mcp.js";
+import { watchInstructions } from "./instructions.js";
 
 export function activate(context: vscode.ExtensionContext): void {
   // The editor knows which language the user reads, unless they said otherwise.
@@ -26,6 +27,7 @@ export function activate(context: vscode.ExtensionContext): void {
   const keys = new Keys(context.secrets);
   const disposables: vscode.Disposable[] = [];
   const workspace = new WorkspaceContext(disposables);
+  watchInstructions(disposables);
   const budget = new Budget(new WorkspaceSpendStore(context.globalState), readSettings().budget);
   const gate = new EgressGate(context.globalState, budget);
 
@@ -93,6 +95,8 @@ export function activate(context: vscode.ExtensionContext): void {
       completion.invalidateProvider();
       void vscode.window.showInformationMessage(t("Forge: {0} key stored in the keychain.", provider.label));
     }),
+
+    vscode.commands.registerCommand("forge.exportSession", () => chat.exportSession()),
 
     vscode.commands.registerCommand("forge.showMcp", async () => {
       const rows = await mcp.status();

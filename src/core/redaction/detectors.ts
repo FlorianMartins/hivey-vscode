@@ -84,6 +84,12 @@ const RULES: Rule[] = [
       // A word in block capitals is a label, an enum member or a constant name — `secret: "SECRET"`
       // is a table of category names, and this scanner found one in its own source.
       if (/^[A-Z][A-Z_]*$/.test(v)) return false;
+      // A value that opens with a sigil is syntax, not a credential. This matters more here than
+      // it looks: in a codebase about language models the word `token` means a unit of context far
+      // more often than it means a bearer token, so `{ token: "#file:" }` and `{ token: "@git" }`
+      // both match the label. No API key ever issued starts with # @ / or \, or ends with a colon
+      // — they are base64, hex or alphanumeric — so refusing those shapes costs nothing real.
+      if (/^[#@/\\]/.test(v) || v.endsWith(":")) return false;
       if (quoted) return !/^(?:process\.|os\.|env[.[])/i.test(v);
       // Unquoted: reject anything with the shape of an expression, a type or a constant name.
       if (/[.(\[<]|::|->/.test(v)) return false;

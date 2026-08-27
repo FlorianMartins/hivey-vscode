@@ -142,17 +142,20 @@ suite("Screenshot", () => {
       await vscode.commands.executeCommand("workbench.action.closeAuxiliaryBar").then(undefined, () => {});
       await vscode.commands.executeCommand("notifications.clearAll").then(undefined, () => {});
       await vscode.commands.executeCommand("forge.chat.focus");
-      for (let i = 0; i < 10; i++) await vscode.commands.executeCommand("workbench.action.increaseViewSize");
+      for (let i = 0; i < 26; i++) await vscode.commands.executeCommand("workbench.action.increaseViewSize");
       await vscode.commands.executeCommand("forge.askWith", "Does this function round correctly? What should change?");
       await new Promise((r) => setTimeout(r, 4000));
       await vscode.commands.executeCommand("notifications.clearAll").then(undefined, () => {});
 
-      const hold = Number(process.env["FORGE_SCREENSHOT_HOLD"] ?? 45_000);
-      // Sit on the conversation, then walk the other screens so each one can be captured.
+      // Each screen is held for the same span, and the capture script photographs the middle of
+      // each span. Equal windows are what makes the two clocks line up without either knowing the
+      // other's timings — an earlier version used different holds and produced three copies of the
+      // same frame, which is the sort of bug a picture does not report.
+      const hold = Number(process.env["FORGE_SCREENSHOT_HOLD"] ?? 20_000);
       await new Promise((r) => setTimeout(r, hold));
       for (const command of ["forge.showHistory", "forge.showModels", "forge.showPermissions"]) {
         await vscode.commands.executeCommand(command);
-        await new Promise((r) => setTimeout(r, 18_000));
+        await new Promise((r) => setTimeout(r, hold));
       }
     },
     200_000,
