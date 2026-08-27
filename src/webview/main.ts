@@ -5,7 +5,7 @@
 // showing a muted message as active, or a model name that changed three turns ago. The only thing
 // rendered incrementally is the answer being streamed, because that one has to be.
 
-import { button, closeMenu, el, icon, ICON, menu, menuItem, menuTitle, searchInput, separator } from "./dom.js";
+import { button, closeMenu, el, icon, ICON, searchInput } from "./dom.js";
 import { chatScreen, collapsible, isStreaming, setStreaming, type ChatDeps } from "./chat.js";
 import { historyScreen } from "./history.js";
 import { modelsScreen } from "./models.js";
@@ -129,85 +129,18 @@ function header(s: UiState): HTMLElement {
     );
   }
 
-  const right = el("div", "topbar-right");
-  if (s.screen === "chat") {
-    right.append(
-      button({
-        icon: ICON.search,
-        title: t("Search this conversation"),
-        className: `btn icon-only${searchOpen ? " active" : ""}`,
-        onClick: () => {
-          searchOpen = !searchOpen;
-          if (!searchOpen && s.searchQuery) send({ type: "search", query: "" });
-          else render();
-        },
-      }),
-    );
-  }
-  right.append(
-    button({
-      icon: ICON.history,
-      title: t("Conversation history"),
-      className: `btn icon-only${s.screen === "history" ? " active" : ""}`,
-      onClick: () => send({ type: "openScreen", screen: "history" }),
-    }),
-    button({
-      icon: ICON.add,
-      title: t("New conversation"),
-      className: "btn icon-only",
-      onClick: () => send({ type: "newSession" }),
-    }),
-  );
-
-  const more = button({
-    icon: ICON.more,
-    title: t("More"),
-    className: "btn icon-only",
-    onClick: () =>
-      menu(more, (close) => {
-        const panel = el("div", "menu-list");
-        panel.append(menuTitle(t("Privacy and cost")));
-        panel.append(
-          menuItem({
-            label: t("Outgoing data"),
-            hint: t("What left this machine, without the content"),
-            onClick: () => {
-              send({ type: "openEgress" });
-              close();
-            },
-          }),
-          menuItem({
-            label: t("Cost and budget"),
-            detail: `${s.budget.spentTodayUsd.toFixed(3)} $`,
-            hint: t("Today's spend, by model"),
-            onClick: () => {
-              send({ type: "openCosts" });
-              close();
-            },
-          }),
-          separator(),
-          menuItem({
-            label: t("Agent permissions"),
-            hint: t("What runs without asking"),
-            onClick: () => {
-              send({ type: "openScreen", screen: "permissions" });
-              close();
-            },
-          }),
-          menuItem({
-            label: t("Hivey Code settings"),
-            onClick: () => {
-              send({ type: "openSettings" });
-              close();
-            },
-          }),
-        );
-        return panel;
-      }),
-  });
-  right.append(more);
-
-  bar.append(left, right);
+  // Nothing on the right. The editor draws its own title bar one row above with exactly these
+  // buttons — new conversation, history, terminal — and drawing them again here made a second row
+  // that looked like a mistake, because it was one. What is left is the conversation's name, which
+  // the editor's row cannot show.
+  //
+  // The overflow menu stays: what is behind it (outgoing data, costs, permissions, settings) has no
+  // place in a title bar, and would be four more icons if it did.
+  // Nothing but the conversation's name. The editor draws its own title bar one row above, with
+  // exactly the actions this row used to duplicate — search, new conversation, history, terminal —
+  // and everything that was behind the overflow button now sits in the editor's own overflow, which
+  // is where a reader already looks for it. Two rows of the same buttons was not a layout.
+  bar.append(left);
   return bar;
 }
 
@@ -403,6 +336,12 @@ window.addEventListener("message", (event: MessageEvent<ToPanel>) => {
     case "error":
       ensureLive().appendError(m.message);
       setStreaming(false);
+      break;
+    case "openSearch":
+      if (state?.screen !== "chat") break;
+      searchOpen = true;
+      render();
+      document.querySelector<HTMLInputElement>(".search-input")?.focus();
       break;
     case "openModelPicker": {
       // Anchored on the composer's own model button, so the panel opens in the same place whether

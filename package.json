@@ -2,7 +2,7 @@
   "name": "hivey-code",
   "displayName": "Hivey Code",
   "description": "%extension.description%",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "publisher": "hivey",
   "license": "Apache-2.0",
   "repository": {
@@ -51,7 +51,7 @@
   ],
   "contributes": {
     "viewsContainers": {
-      "activitybar": [
+      "secondarySidebar": [
         {
           "id": "hiveyCode",
           "title": "%container.title%",
@@ -228,10 +228,27 @@
         "title": "%command.showDefinitions.title%",
         "category": "Hivey Code",
         "icon": "$(list-unordered)"
+      },
+      {
+        "command": "hiveyCode.searchConversation",
+        "title": "%command.searchConversation.title%",
+        "category": "Hivey Code",
+        "icon": "$(search)"
+      },
+      {
+        "command": "hiveyCode.openSettings",
+        "title": "%command.openSettings.title%",
+        "category": "Hivey Code",
+        "icon": "$(gear)"
       }
     ],
     "menus": {
       "view/title": [
+        {
+          "command": "hiveyCode.searchConversation",
+          "when": "view == hiveyCode.chat",
+          "group": "navigation@0"
+        },
         {
           "command": "hiveyCode.newSession",
           "when": "view == hiveyCode.chat",
@@ -250,7 +267,47 @@
         {
           "command": "hiveyCode.moveToSecondarySideBar",
           "when": "view == hiveyCode.chat",
-          "group": "1_layout@1"
+          "group": "9_layout@1"
+        },
+        {
+          "command": "hiveyCode.showEgress",
+          "when": "view == hiveyCode.chat",
+          "group": "9_more@0"
+        },
+        {
+          "command": "hiveyCode.showCosts",
+          "when": "view == hiveyCode.chat",
+          "group": "9_more@1"
+        },
+        {
+          "command": "hiveyCode.showPermissions",
+          "when": "view == hiveyCode.chat",
+          "group": "9_more@2"
+        },
+        {
+          "command": "hiveyCode.showDefinitions",
+          "when": "view == hiveyCode.chat",
+          "group": "9_more@3"
+        },
+        {
+          "command": "hiveyCode.showMcp",
+          "when": "view == hiveyCode.chat",
+          "group": "9_more@4"
+        },
+        {
+          "command": "hiveyCode.setup",
+          "when": "view == hiveyCode.chat",
+          "group": "9_more@5"
+        },
+        {
+          "command": "hiveyCode.exportSession",
+          "when": "view == hiveyCode.chat",
+          "group": "9_more@6"
+        },
+        {
+          "command": "hiveyCode.openSettings",
+          "when": "view == hiveyCode.chat",
+          "group": "9_more@7"
         }
       ],
       "editor/context": [
@@ -544,6 +601,13 @@
               }
             }
           }
+        },
+        "hiveyCode.panel.minWidth": {
+          "type": "number",
+          "default": 260,
+          "minimum": 0,
+          "maximum": 600,
+          "markdownDescription": "%config.panel.minWidth%"
         }
       }
     }

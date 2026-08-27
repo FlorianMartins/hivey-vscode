@@ -532,4 +532,5 @@ export const FR: Record<string, string> = {
   "agent {0}: {1}": "agent {0} : {1}",
   "skill: {0}": "compétence : {0}",
   "“{0}” already exists — opening it.": "« {0} » existe déjà — ouverture.",
+  "Recommended": "Recommandés",
 };

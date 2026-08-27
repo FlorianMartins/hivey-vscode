@@ -9,6 +9,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { discoverLocal, looksLikeCodeModel, modelIds, rankModels, suggestPull } from "../src/core/providers/discover.js";
+import { recommend, versionScore } from "../src/core/models/recommend.js";
 
 /** A fake network: a map of URL to answer, everything else refuses. */
 function net(answers: Record<string, unknown>, opts: { hang?: string[] } = {}) {
@@ -144,5 +145,88 @@ test("models that cannot write code are recognised as such", () => {
   }
   for (const id of ["qwen2.5-coder:7b", "deepseek-coder-v2", "codestral", "llama3.3:70b"]) {
     assert.equal(looksLikeCodeModel(id), true, id);
+  }
+});
+
+// ── Recommendations ──────────────────────────────────────────────────────────────────────────
+//
+// The design constraint these tests enforce: nothing is hard-coded to a version. A recommendation
+// that names `claude-sonnet-4` is correct today and quietly wrong the month after — and an
+// out-of-date recommendation looks exactly like a current one.
+
+test("a family's recommendation follows its newest available version, not a pinned id", () => {
+  const before = recommend([
+    { id: "anthropic/claude-sonnet-4", inUsd: 3, local: false },
+    { id: "qwen/qwen2.5-coder-32b", inUsd: 0.2, local: false },
+  ]);
+  assert.deepEqual(before.map((r) => r.id), ["anthropic/claude-sonnet-4", "qwen/qwen2.5-coder-32b"]);
+
+  // The catalogue refreshes; the families are the same, the versions are not.
+  const after = recommend([
+    { id: "anthropic/claude-sonnet-4", inUsd: 3, local: false },
+    { id: "anthropic/claude-sonnet-5", inUsd: 3, local: false },
+    { id: "qwen/qwen2.5-coder-32b", inUsd: 0.2, local: false },
+    { id: "qwen/qwen3-coder", inUsd: 0.3, local: false },
+  ]);
+  assert.deepEqual(after.map((r) => r.id), ["anthropic/claude-sonnet-5", "qwen/qwen3-coder"]);
+});
+
+test("a local model leads, whatever its family", () => {
+  // The whole argument of this extension. Burying the free one that sends nothing under a paid one
+  // would contradict the product on the screen where the choice is made.
+  const out = recommend([
+    { id: "anthropic/claude-opus-4", inUsd: 15, local: false },
+    { id: "qwen2.5-coder:7b", inUsd: 0, local: true },
+  ]);
+  assert.equal(out[0]?.id, "qwen2.5-coder:7b");
+  // The reason is about the model, not about where it runs: the row already says "local" twice.
+  assert.match(out[0]!.why, /built for code/);
+});
+
+test("one model per family, so the list is a set of choices", () => {
+  const out = recommend([
+    { id: "anthropic/claude-sonnet-5", inUsd: 3, local: false },
+    { id: "anthropic/claude-opus-5", inUsd: 15, local: false },
+    { id: "anthropic/claude-haiku-4", inUsd: 0.8, local: false },
+  ]);
+  assert.equal(out.length, 1, "three sizes of the same model is not three decisions");
+});
+
+test("a size suffix is not a version", () => {
+  // `:70b` is how big it is, not which one it is. Reading it as a version would rank a small new
+  // model below a large old one on the strength of a number that means something else.
+  assert.ok(versionScore("qwen3-coder:7b") > versionScore("qwen2.5-coder:70b"));
+  assert.ok(versionScore("llama-3.3-70b") > versionScore("llama-3.1-405b"));
+});
+
+test("a date in the id is not a version either", () => {
+  // `20250219` would otherwise dwarf every real version number and win permanently.
+  assert.equal(versionScore("claude-3-5-sonnet-20241022"), 5);
+});
+
+test("models from no known family are simply not recommended", () => {
+  assert.deepEqual(recommend([{ id: "someones-private-finetune", inUsd: 1, local: false }]), []);
+  assert.deepEqual(recommend([]), []);
+});
+
+test("the list is bounded, best first", () => {
+  const many = [
+    { id: "anthropic/claude-sonnet-5", inUsd: 3, local: false },
+    { id: "openai/gpt-5", inUsd: 5, local: false },
+    { id: "qwen/qwen3-coder", inUsd: 0.3, local: false },
+    { id: "deepseek/deepseek-v3", inUsd: 0.3, local: false },
+    { id: "mistralai/codestral", inUsd: 0.3, local: false },
+    { id: "google/gemini-3-pro", inUsd: 2, local: false },
+    { id: "z-ai/glm-5", inUsd: 0.5, local: false },
+    { id: "x-ai/grok-code", inUsd: 1, local: false },
+  ];
+  const out = recommend(many, 3);
+  assert.equal(out.length, 3);
+  assert.deepEqual(out.map((r) => r.id), ["anthropic/claude-sonnet-5", "openai/gpt-5", "qwen/qwen3-coder"]);
+});
+
+test("every recommendation says why, because a bare list is not advice", () => {
+  for (const r of recommend([{ id: "qwen/qwen3-coder", inUsd: 0.3, local: false }])) {
+    assert.ok(r.why.length > 10, r.id);
   }
 });

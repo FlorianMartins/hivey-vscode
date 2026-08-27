@@ -38,7 +38,7 @@ import type {
   UiSetup,
   UiState,
 } from "../shared/protocol.js";
-import { SECTION, endpointFor, providerFor, readSettings, routerConfig, type Keys, type Settings } from "./config.js";
+import { SECTION, endpointFor, providerFor, readSettings, routerConfig, type Keys, type Settings, writeTarget } from "./config.js";
 import { EgressGate, safeHost } from "./egress.js";
 import { labelFor, listModels, openFiles, supportsReasoning } from "./models.js";
 import { loadPrices } from "./prices.js";
@@ -214,7 +214,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 <link rel="stylesheet" href="${uri("style.css")}">
 <title>Hivey Code</title>
 </head>
-<body>
+<!-- The floor below which the panel scrolls sideways instead of rearranging itself. Dragging the
+     side bar narrow otherwise reflows every toolbar, and a layout that moves while you resize is a
+     layout nobody trusts. Set through a style attribute rather than the stylesheet because the
+     value is a setting, and the stylesheet is static. -->
+<body style="min-width:${Math.max(0, Math.round(readSettings().panel.minWidth))}px">
 <div id="app"></div>
 <script nonce="${nonce}" src="${uri("webview.js")}"></script>
 </body>
@@ -408,9 +412,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           break;
         case "setModel": {
           const config = vscode.workspace.getConfiguration(SECTION);
-          await config.update("chat.model", m.model, vscode.ConfigurationTarget.Workspace);
+          await config.update("chat.model", m.model, writeTarget());
           if (m.provider && m.provider !== readSettings().chat.provider) {
-            await config.update("chat.provider", m.provider, vscode.ConfigurationTarget.Workspace);
+            await config.update("chat.provider", m.provider, writeTarget());
           }
           this.models = this.models.map((x) => ({ ...x, current: x.id === m.model }));
           this.screen = "chat";
@@ -743,6 +747,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this.screen = "setup";
     this.sendState();
     void this.probeLocal();
+  }
+
+  /** Opens the in-conversation search, from the title bar or a keybinding. */
+  openSearch(): void {
+    this.screen = "chat";
+    this.sendState();
+    this.post({ type: "openSearch" });
   }
 
   /** Opens the model picker inside the panel, from a command or a keybinding. */

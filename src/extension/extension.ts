@@ -8,7 +8,7 @@ import { isLocalEndpoint } from "../core/redaction/index.js";
 import { ChatViewProvider, PreviewProvider } from "./chat.js";
 import { HiveyCodeActions } from "./codeActions.js";
 import { InlineCompletionProvider } from "./completion.js";
-import { Keys, endpointFor, providerFor, readSettings, SECTION } from "./config.js";
+import { Keys, endpointFor, providerFor, readSettings, SECTION, writeTarget } from "./config.js";
 import { EgressGate, WorkspaceSpendStore, safeHost } from "./egress.js";
 import { registerEditorCommands } from "./editorCommands.js";
 import { showEgressReport, showCostReport } from "./reports.js";
@@ -63,6 +63,9 @@ export function activate(context: vscode.ExtensionContext): void {
         // The panel's strings were built in the old language; rebuilding its HTML reloads it.
         chat.reload();
       }
+      // The width floor lives in a style attribute on <body>, which is written once when the HTML
+      // is built. Without this the setting appears to do nothing until the window is reloaded.
+      if (e.affectsConfiguration(`${SECTION}.panel.minWidth`)) chat.reload();
       const s = readSettings();
       budget.setLimits(s.budget);
       completion.invalidateProvider();
@@ -115,6 +118,13 @@ export function activate(context: vscode.ExtensionContext): void {
       void vscode.window.setStatusBarMessage(t("Choose “Secondary Side Bar” in the list."), 6000);
     }),
 
+    vscode.commands.registerCommand("hiveyCode.openSettings", () =>
+      vscode.commands.executeCommand("workbench.action.openSettings", SECTION),
+    ),
+    vscode.commands.registerCommand("hiveyCode.searchConversation", async () => {
+      await vscode.commands.executeCommand("hiveyCode.chat.focus");
+      chat.openSearch();
+    }),
     vscode.commands.registerCommand("hiveyCode.newSkill", () => createDefinition("skill")),
     vscode.commands.registerCommand("hiveyCode.newAgent", () => createDefinition("agent")),
     vscode.commands.registerCommand("hiveyCode.showDefinitions", async () => {
@@ -233,7 +243,7 @@ export function activate(context: vscode.ExtensionContext): void {
         placeHolder: t("Inline completion model — a code model that supports fill-in-the-middle"),
       });
       if (!picked) return;
-      await vscode.workspace.getConfiguration(SECTION).update("completion.model", picked, vscode.ConfigurationTarget.Workspace);
+      await vscode.workspace.getConfiguration(SECTION).update("completion.model", picked, writeTarget());
       completion.invalidateProvider();
       completion.updateStatus(readSettings());
     }),

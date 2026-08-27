@@ -33,6 +33,7 @@ export interface Settings {
   };
   budget: { perRequestUsd: number; dailyUsd: number };
   context: { maxTokens: number; repoMap: boolean };
+  panel: { minWidth: number };
   escalation: { policy: EscalationPolicy; provider: ProviderId; model: string };
 }
 
@@ -77,6 +78,7 @@ export function readSettings(scope?: vscode.Uri): Settings {
       maxTokens: c.get<number>("context.maxTokens", 8000),
       repoMap: c.get<boolean>("context.repoMap", true),
     },
+    panel: { minWidth: c.get<number>("panel.minWidth", 260) },
     escalation: {
       policy: c.get<EscalationPolicy>("escalation.policy", "ask"),
       provider: c.get<ProviderId>("escalation.provider", "openrouter"),
@@ -104,6 +106,24 @@ export function endpointFor(s: Settings, id: ProviderId): string {
   const url = s.endpoints[id];
   if (url) return url;
   throw new Error(t("No endpoint configured for “{0}”. Set {1}.endpoints in the settings.", id, SECTION));
+}
+
+/**
+ * Where a preference should be written.
+ *
+ * Writing the model choice to the workspace is the right default when there is one: a sensitive
+ * repository should be able to pin itself to a local model without imposing that on every other
+ * project. But `ConfigurationTarget.Workspace` THROWS when no folder is open — VS Code answers
+ * "Unable to write to workspace settings because no workspace is opened" — and a user who launched
+ * the editor on a single file, or on nothing at all, then finds that changing model does nothing
+ * except raise an error. Which is most of a first try.
+ *
+ * So the target follows reality rather than intent: the workspace when there is one, the user's own
+ * settings when there is not.
+ */
+export function writeTarget(): vscode.ConfigurationTarget {
+  const hasWorkspace = Boolean(vscode.workspace.workspaceFolders?.length || vscode.workspace.workspaceFile);
+  return hasWorkspace ? vscode.ConfigurationTarget.Workspace : vscode.ConfigurationTarget.Global;
 }
 
 export class Keys {

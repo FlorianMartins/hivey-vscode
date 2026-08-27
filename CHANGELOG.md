@@ -2,6 +2,37 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.8.0 — 2026-08-27
+
+### Fixed
+
+- **Changing model failed outright** with *"Unable to write to workspace settings because no
+  workspace is opened"*. Three preferences were written with `ConfigurationTarget.Workspace`, which
+  throws when the editor was launched on a single file or on nothing — so the picker raised an error
+  and changed nothing, which is most of a first try. The target now follows reality: the workspace
+  when there is one, the user's own settings when there is not.
+
+### Added
+
+- **A "Recommended" group** at the top of the model picker: a handful worth using, one per family,
+  each with a clause saying why. Nothing in it names a version. It holds FAMILIES with a reputation
+  for code, matched against whatever the endpoint actually serves — so when a family ships a new
+  version the recommendation follows it the next day, and when one stops being served it stops
+  appearing. A hard-coded list would be correct today and quietly wrong in two months, which is
+  worse than none, because an out-of-date recommendation looks exactly like a current one.
+- **`hiveyCode.panel.minWidth`** (default 260). Below it the panel scrolls sideways instead of
+  rearranging itself, so dragging the side bar narrow can no longer reshuffle the layout. `0` lets
+  it shrink freely.
+
+### Changed
+
+- **The panel lives in the secondary side bar**, on the right, where the editor's own chat lives.
+  `Hivey Code: Move the panel…` sends it back to the left for anyone who prefers that.
+- **The panel's own header holds only the conversation's name, centred.** Search, new conversation,
+  history and the overflow behind them are drawn by the editor one row above; drawing them again
+  produced a second row that read as a mistake, because it was one. Search moved up to join them,
+  and everything that was behind the panel's overflow button now sits in the editor's own.
+
 ## 0.7.0 — 2026-08-27
 
 **Skills and sub-agents, defined by you.**

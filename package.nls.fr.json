@@ -58,5 +58,8 @@
   "command.moveToSecondarySideBar.title": "Déplacer le panneau dans la barre latérale droite",
   "command.newSkill.title": "Créer une compétence",
   "command.newAgent.title": "Créer un sous-agent",
-  "command.showDefinitions.title": "Afficher les compétences et sous-agents"
+  "command.showDefinitions.title": "Afficher les compétences et sous-agents",
+  "command.searchConversation.title": "Rechercher dans cette conversation",
+  "command.openSettings.title": "Ouvrir les réglages",
+  "config.panel.minWidth": "Largeur minimale du panneau, en pixels. En dessous, le panneau défile horizontalement au lieu de se réorganiser : tirer la barre latérale ne peut donc plus bousculer la mise en page. `0` le laisse rétrécir librement."
 }

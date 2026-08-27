@@ -58,5 +58,8 @@
   "command.moveToSecondarySideBar.title": "Move the panel to the secondary side bar",
   "command.newSkill.title": "Create a skill",
   "command.newAgent.title": "Create a sub-agent",
-  "command.showDefinitions.title": "Show skills and sub-agents"
+  "command.showDefinitions.title": "Show skills and sub-agents",
+  "command.searchConversation.title": "Search this conversation",
+  "command.openSettings.title": "Open the settings",
+  "config.panel.minWidth": "Narrowest the panel is allowed to become, in pixels. Below this the panel scrolls sideways instead of rearranging itself, so dragging the side bar narrow cannot reshuffle the layout. `0` lets it shrink freely."
 }

@@ -30,6 +30,7 @@ import { prefs, setPrefs } from "./prefs.js";
 import { t } from "../shared/i18n.js";
 import type { ToExtension, UiModel, UiState } from "../shared/protocol.js";
 import { priceTier, PRICE_TIER_ORDER, type PriceTier } from "../core/models/tiers.js";
+import { recommend } from "../core/models/recommend.js";
 
 /** A row in the list, after the model has been priced and grouped. */
 interface ComboItem {
@@ -40,6 +41,8 @@ interface ComboItem {
   vendor: string;
   tier: PriceTier;
   local: boolean;
+  /** Set on a recommended row: why it is worth using, in one clause. */
+  why?: string;
   current: boolean;
   group: string;
   model: UiModel;
@@ -116,9 +119,22 @@ function toItems(state: UiState): ComboItem[] {
   // otherwise sit. Leaving it in both places puts the same row twice in a row whenever the current
   // model already sorts first — which, since local models lead and the local model is usually the
   // one in use, is the common case rather than the edge one. It reads as a rendering bug.
+  // A handful worth using, computed from what is actually served rather than from a list of names
+  // that would rot. One per family, local first.
+  const suggested = recommend(
+    state.models.map((m) => ({ id: m.id, inUsd: m.inUsd, local: m.local })),
+  );
+  const byId = new Map(items.map((i) => [i.model.id, i]));
+  const recommended = suggested
+    .map(({ id, why }) => {
+      const item = byId.get(id);
+      return item ? { ...item, group: t("Recommended"), why } : undefined;
+    })
+    .filter((i) => i !== undefined) as ComboItem[];
+
   const current = items.find((i) => i.current);
-  if (!current) return items;
-  return [{ ...current, group: t("Current") }, ...items.filter((i) => i !== current)];
+  const rest = current ? items.filter((i) => i !== current) : items;
+  return [...(current ? [{ ...current, group: t("Current") }] : []), ...recommended, ...rest];
 }
 
 function vendorLabel(vendor: string): string {
@@ -210,7 +226,9 @@ export function openModelCombo(anchor: HTMLElement, state: UiState, send: (m: To
     name.append(el("span", "ci-label", item.label));
     if (item.local) name.append(el("span", "ci-tag", t("local")));
     main.append(name);
-    main.append(el("div", "ci-detail", `${item.detail} · ${formatContext(item.model.context)}`));
+    main.append(
+      el("div", `ci-detail${item.why ? " why" : ""}`, item.why ?? `${item.detail} · ${formatContext(item.model.context)}`),
+    );
     node.append(main);
 
     // Each segment keeps its OWN colour: the quality estimate in its band's colour, the price in

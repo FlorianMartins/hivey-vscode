@@ -194,4 +194,6 @@ export type ToPanel =
   | { type: "approval"; id: string; tool: string; description: string; command?: string }
   | { type: "error"; message: string }
   /** Opens the model picker from outside the panel — the command palette, a keybinding. */
-  | { type: "openModelPicker" };
+  | { type: "openModelPicker" }
+  /** Opens the in-conversation search from outside the panel — the title bar, a keybinding. */
+  | { type: "openSearch" };

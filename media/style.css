@@ -39,6 +39,12 @@ html,
 body {
   height: 100%;
 }
+/* The panel scrolls sideways rather than reflowing once it hits its floor; `#app` follows the body
+   so the composer and the transcript stay on the same measure instead of the composer alone
+   overflowing. The floor itself is a setting, applied inline. */
+html {
+  overflow-x: auto;
+}
 
 body {
   margin: 0;
@@ -1792,4 +1798,22 @@ pre.code {
 }
 .setup-card-head.as-button:hover .setup-card-title {
   color: var(--vscode-textLink-foreground, var(--vscode-foreground));
+}
+
+/* On a recommended row the second line is the reason rather than the id: the row exists to be
+   chosen, and "strong at long multi-file changes" helps that choice in a way the id does not. */
+.ci-detail.why {
+  font-style: italic;
+}
+
+/* The panel's own header holds one thing: the conversation's name, centred. Everything it used to
+   carry on the right — search, new, history, and the overflow behind them — is drawn by the editor
+   one row above, and drawing it twice made a second row that read as a mistake. */
+.topbar-left {
+  flex: 1 1 auto;
+  justify-content: center;
+  min-width: 0;
+}
+.topbar-title.editable {
+  text-align: center;
 }
