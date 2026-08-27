@@ -176,6 +176,62 @@ The client is written by hand. The wire format is JSON-RPC over a stream and the
 messages; an SDK would bring a dependency tree into an extension whose whole premise is that you can
 audit what it sends.
 
+## Your own skills and sub-agents
+
+The tool is meant to be yours, so the parts that decide what it does are files in your repository
+rather than settings on your machine:
+
+```
+.hiveycode/skills/review-rpg.md      instructions you invoke, or the model reaches for
+.hiveycode/agents/db-explorer.md     a sub-agent with its own prompt, tools and model
+```
+
+A **skill** is prose with a header:
+
+```markdown
+---
+name: review-rpg
+description: Review a member against this shop's conventions
+---
+
+Check the indicators before anything else. This shop does not use %BIF forms in fixed-format
+members. A file specification that opens CUSTMAST must document why.
+```
+
+The model is told the name and the description of every skill — never their contents — and fetches
+the instructions when one applies. That is why the description matters: it is what the decision is
+made on. Type `/review-rpg` to invoke it yourself.
+
+A **sub-agent** is the same file with a few more keys:
+
+```markdown
+---
+name: db-explorer
+description: Explores Db2 for i schemas and reports what it found
+tools: ibmi_sql, ibmi_objects, read_file
+model: qwen2.5-coder:7b
+max-steps: 8
+---
+
+You explore schemas. Answer with the tables, their keys and their relationships, and nothing about
+how you found them.
+```
+
+It runs on a clean context with only the task it was handed, so a long conversation does not have to
+be re-read to answer a small question — and it can run on a cheaper model than the one you are
+talking to.
+
+**`tools:` is a request, not a grant.** A sub-agent's tools are intersected with what the current
+mode already allows, never added to it. A definition file arrives with a cloned repository; if its
+`tools:` line could grant `run_command` in plan mode, the mode would be a suggestion rather than a
+guarantee. In plan mode the sub-agent above gets `read_file` and nothing else, quietly. And whatever
+it does goes through the same approval dialogs and the same egress gate as anything else — being
+called by a sub-agent is not a way around a question.
+
+`Hivey Code: Create a skill` writes a working example and opens it. A file with a broken header is
+reported, not skipped: a skill that silently vanishes makes the assistant ignore instructions it
+never received, and leaves nobody able to find out why.
+
 ## Install
 
 From the VS Code Marketplace: search for **Hivey Code** (publisher `hivey`).
@@ -259,7 +315,7 @@ Those documents are currently written in French; translations are welcome.
 ## Development
 
 ```bash
-npm test                   # builds the bundles, then 193 tests (node:test)
+npm test                   # builds the bundles, then 232 tests (node:test)
 npm run test:integration   # loads the extension into a real VS Code (9 tests, headless)
 node scripts/screenshots.mjs  # retakes the README's images from that same editor
 npm run typecheck
@@ -282,7 +338,7 @@ no entry, so a translation cannot silently rot.
 
 ## Status
 
-`0.6.0` — usable day to day. See [`docs/ROADMAP.md`](docs/ROADMAP.md) for what is done and what is
+`0.7.0` — usable day to day. See [`docs/ROADMAP.md`](docs/ROADMAP.md) for what is done and what is
 not.
 
 ## Licence

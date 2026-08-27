@@ -15,6 +15,7 @@ import { showEgressReport, showCostReport } from "./reports.js";
 import { WorkspaceContext } from "./workspace.js";
 import { McpManager } from "./integrations/mcp.js";
 import { watchInstructions } from "./instructions.js";
+import { createDefinition, DefinitionStore } from "./definitions.js";
 
 export function activate(context: vscode.ExtensionContext): void {
   // The editor knows which language the user reads, unless they said otherwise.
@@ -41,7 +42,11 @@ export function activate(context: vscode.ExtensionContext): void {
   void mcp.startAll();
   disposables.push({ dispose: () => void mcp.stopAll() });
 
-  const chat = new ChatViewProvider(context, keys, workspace, gate, log, mcp);
+  // Skills and sub-agents the repository defines. Watched, so an edit takes effect on the next
+  // turn rather than on the next window.
+  const definitions = new DefinitionStore(disposables);
+
+  const chat = new ChatViewProvider(context, keys, workspace, gate, log, mcp, definitions);
 
   context.subscriptions.push(
     log,
@@ -108,6 +113,34 @@ export function activate(context: vscode.ExtensionContext): void {
       await vscode.commands.executeCommand("workbench.action.toggleAuxiliaryBar").then(undefined, () => {});
       await vscode.commands.executeCommand("workbench.action.moveFocusedView");
       void vscode.window.setStatusBarMessage(t("Choose “Secondary Side Bar” in the list."), 6000);
+    }),
+
+    vscode.commands.registerCommand("hiveyCode.newSkill", () => createDefinition("skill")),
+    vscode.commands.registerCommand("hiveyCode.newAgent", () => createDefinition("agent")),
+    vscode.commands.registerCommand("hiveyCode.showDefinitions", async () => {
+      const found = await definitions.load();
+      const items = [
+        ...found.skills.map((s) => ({ label: `$(sparkle) /${s.name}`, description: s.description, detail: s.source })),
+        ...found.agents.map((a) => ({ label: `$(person) ${a.name}`, description: a.description, detail: a.source })),
+        ...found.problems.map((p) => ({ label: `$(error) ${p.split(":")[0]}`, description: p, detail: p.split(":")[0] })),
+      ];
+      if (!items.length) {
+        const make = t("Create a skill");
+        const answer = await vscode.window.showInformationMessage(
+          t("This repository defines no skills or sub-agents."),
+          make,
+        );
+        if (answer === make) await createDefinition("skill");
+        return;
+      }
+      const picked = await vscode.window.showQuickPick(items, {
+        placeHolder: t("Skills and sub-agents defined in this repository. Pick one to open it."),
+        matchOnDescription: true,
+      });
+      const folder = vscode.workspace.workspaceFolders?.[0];
+      if (picked?.detail && folder) {
+        await vscode.window.showTextDocument(vscode.Uri.joinPath(folder.uri, picked.detail));
+      }
     }),
 
     vscode.commands.registerCommand("hiveyCode.setup", async () => {

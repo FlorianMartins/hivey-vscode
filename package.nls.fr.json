@@ -55,5 +55,8 @@
   "command.pickModel.title": "Choisir le modèle de conversation",
   "command.setup.title": "Configurer un modèle",
   "config.accounts": "**Comptes.** Les clés d'API ne sont jamais rangées dans les réglages — elles vont dans le trousseau de votre système, parce que ce fichier se synchronise entre machines et se retrouve committé par accident.\n\n- [Enregistrer une clé](command:hiveyCode.setApiKey) pour OpenRouter, Anthropic ou une passerelle compatible OpenAI\n- [Oublier une clé](command:hiveyCode.clearApiKey)\n- [Ouvrir l'écran de configuration](command:hiveyCode.setup) pour trouver un modèle local ou connecter un compte\n- [Enregistrer les identifiants ARCAD Elias](command:hiveyCode.setArcadCredentials)",
-  "command.moveToSecondarySideBar.title": "Déplacer le panneau dans la barre latérale droite"
+  "command.moveToSecondarySideBar.title": "Déplacer le panneau dans la barre latérale droite",
+  "command.newSkill.title": "Créer une compétence",
+  "command.newAgent.title": "Créer un sous-agent",
+  "command.showDefinitions.title": "Afficher les compétences et sous-agents"
 }

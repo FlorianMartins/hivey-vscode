@@ -19,6 +19,8 @@ import { detectIbmiLanguage, ibmiPrompt } from "../core/ibmi/languages.js";
 import { parsePrompt, participantDirective, type Participant } from "../core/session/mentions.js";
 import { resolveMentions } from "./mentions.js";
 import { instructionsPrompt } from "./instructions.js";
+import { buildDefinitionTools, DefinitionStore, type SubAgentRun } from "./definitions.js";
+import { skillsPrompt } from "../core/agent/definitions.js";
 import { discoverLocal, rankModels, suggestPull } from "../core/providers/discover.js";
 import { request } from "../core/util/http.js";
 import { estimateTokens } from "../core/util/tokens.js";
@@ -102,6 +104,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     private readonly gate: EgressGate,
     private readonly log: vscode.OutputChannel,
     private readonly mcp: McpManager,
+    private readonly definitions: DefinitionStore,
   ) {
     this.permissions = new Permissions(new MementoPermissionStore(ctx.globalState));
     const prefs = ctx.globalState.get<Prefs>(PREFS_KEY);
@@ -646,6 +649,95 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    * is saved is what the user read, including the exchanges they muted — which the model never
    * saw. A file that silently dropped them would be a record of a conversation nobody had.
    */
+  /**
+   * Run a sub-agent the repository defines.
+   *
+   * A nested turn with a narrower tool set and its own prompt — and with the SAME approver, the
+   * same egress gate and the same vault as its parent. Being called by a sub-agent is not a way
+   * around a dialog: a tool that asks before writing still asks, and what leaves the machine is
+   * pseudonymised on exactly the same path.
+   *
+   * The sub-agent sees only the task it was given. That is the point of one: it starts on a clean
+   * context, so a long conversation does not have to be re-read to answer a small question.
+   */
+  private async runSubAgent(
+    run: SubAgentRun,
+    env: {
+      settings: Settings;
+      providerId: Parameters<typeof providerFor>[2];
+      model: string;
+      baseUrl: string;
+      isLocal: boolean;
+      vault: Vault;
+      allTools: Tool[];
+      mode: Mode;
+    },
+  ): Promise<string> {
+    const { definition } = run;
+    const model = definition.model || env.model;
+    const provider = await providerFor(env.settings, this.keys, env.providerId);
+    const allowed = new Set(definition.tools);
+    const tools = toolsForMode(env.allTools, env.mode).filter((tool) => allowed.has(tool.schema.name));
+
+    const messages = [
+      { role: "system" as const, content: definition.body, cacheable: true },
+      { role: "user" as const, content: run.task },
+    ];
+    const prepared = env.isLocal
+      ? { messages }
+      : await this.gate.prepare(
+          messages,
+          env.settings,
+          { provider: env.providerId, model, baseUrl: env.baseUrl, isLocal: env.isLocal },
+          env.vault,
+        );
+    if (!prepared) return t("Refused: the sub-agent's request was not sent.");
+
+    const result = await runTurn({
+      provider,
+      model,
+      messages: prepared.messages,
+      tools,
+      maxSteps: definition.maxSteps ?? 8,
+      ...(run.signal ? { signal: run.signal } : {}),
+      approve: (req) => this.askApproval(req),
+      beforeRequest: async (msgs) => {
+        if (env.isLocal) return msgs;
+        const again = await this.gate.prepare(
+          msgs,
+          env.settings,
+          { provider: env.providerId, model, baseUrl: env.baseUrl, isLocal: env.isLocal },
+          env.vault,
+        );
+        if (!again) throw new Error(t("Request refused: the rest of the turn was not sent."));
+        return again.messages;
+      },
+      afterResponse: (text) => env.vault.restore(text),
+      report: (message) => run.report(`${definition.name}: ${message}`),
+    });
+    return result.text;
+  }
+
+  /**
+   * Tell the user about a definition file that could not be read.
+   *
+   * Skipping it silently is the worst outcome: the assistant ignores instructions it never
+   * received, and nobody can find out why.
+   */
+  private reportDefinitionProblems(problems: string[]): void {
+    const first = problems[0]!;
+    const more = problems.length > 1 ? t(" (and {0} more)", problems.length - 1) : "";
+    const open = t("Open the file");
+    void vscode.window.showWarningMessage(`${first}${more}`, open).then((choice) => {
+      if (choice !== open) return;
+      const folder = vscode.workspace.workspaceFolders?.[0];
+      const path = first.split(":")[0];
+      if (folder && path) {
+        void vscode.window.showTextDocument(vscode.Uri.joinPath(folder.uri, path));
+      }
+    });
+  }
+
   /** Reopens the first-run screen and re-probes, from the command palette. */
   openSetup(): void {
     this.screen = "setup";
@@ -728,12 +820,34 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     });
     const tools = toolsForMode(allTools, mode);
 
+    // What the repository defines. Read fresh: a skill you have to reload the window to try is a
+    // skill nobody iterates on.
+    const definitions = await this.definitions.load();
+    if (definitions.problems.length) this.reportDefinitionProblems(definitions.problems);
+    // Not in chat mode. A skill is instructions the user wrote, but it is still a file read from
+    // the repository, and chat mode's promise is that it does not read the repository. A promise
+    // with an exception in it is not one.
+    if (mode !== "chat") {
+      tools.push(
+        ...buildDefinitionTools(
+          {
+            store: this.definitions,
+            availableTools: () => tools.map((tool) => tool.schema.name),
+            runSubAgent: (run) =>
+              this.runSubAgent(run, { settings, providerId, model, baseUrl, isLocal, vault, allTools, mode }),
+          },
+          definitions,
+        ),
+      );
+    }
+
     const built = this.session.build({
       systemPrompt:
         promptForMode(mode) +
         workspaceNote() +
         dialectNote() +
         houseRules +
+        (mode === "chat" ? "" : skillsPrompt(definitions.skills)) +
         (this.participant ? `\n\n${participantDirective(this.participant)}` : ""),
       ambient: ambient ? `${ambient.text}\n\n(${ambient.files} files mapped, ${ambient.omitted} omitted)` : undefined,
       maxTokens: settings.context.maxTokens,

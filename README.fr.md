@@ -54,6 +54,8 @@ ce qui sort est **anonymisé de façon réversible** avant de partir.
 | **IBM i** | Db2 for i, commandes CL, membres source, listes d'objets et liste de bibliothèques, sur la connexion que Code for IBM i a déjà négociée. Et la partie qui décide si le code compile : **le dialecte est détecté d'après le membre, et ses règles de colonnes entrent dans le prompt** — RPG III, RPGLE fixe et libre, SQLRPGLE, CL, DDS (PF/LF/DSPF/PRTF), Db2 for i, COBOL. |
 | **ARCAD Elias** | Check-out, check-in, compilation, références croisées et la conversion Transformer RPG, par les commandes `arcad.*` qu'Elias enregistre lui-même — plus des appels au serveur REST déjà configuré. |
 | **MCP** | Branchez n'importe quel serveur Model Context Protocol, stdio ou HTTP. Ses outils rejoignent l'ensemble, sous les mêmes permissions. Un serveur local ne démarre jamais sans votre accord, dans une fenêtre qui nomme la commande. |
+| **Vos propres compétences** | Des fichiers Markdown dans `.hiveycode/skills/`, versionnés avec le code qu'ils régissent. Invoqués par `/nom`, ou choisis par le modèle quand la description correspond. |
+| **Vos propres sous-agents** | `.hiveycode/agents/` : un prompt, une liste d'outils et un modèle à eux, sur un contexte vierge. Leurs outils sont **intersectés** avec ce que le mode autorise — jamais ajoutés. |
 | **Recherche** | Dans la conversation ouverte (`Ctrl+F`, résultats surlignés) **et** dans tout l'historique — la recherche regarde à l'intérieur des messages et montre le fragment qui correspond. |
 | **Filtres d'historique** | Période, mode, « payantes seulement », tri par dernière modification / création / longueur / coût. |
 | **Contrôle du contexte** | Chaque échange peut être **rendu muet** (il reste affiché, il ne part plus), **épinglé** (il survit à la coupe), modifié ou supprimé. C'est le levier le plus direct sur la qualité **et** sur la facture. |
@@ -218,7 +220,7 @@ décisions : [`docs/adr/`](docs/adr).
 ## Développement
 
 ```bash
-npm test               # construit les bundles, puis 193 tests (node:test)
+npm test               # construit les bundles, puis 232 tests (node:test)
 npm run test:integration   # charge l'extension dans un vrai VS Code (9 tests, headless)
 node scripts/screenshots.mjs  # reprend les images du README depuis ce même éditeur
 npm audit --audit-level=high   # 0 vulnérabilité : 5 outils de dev, aucune dépendance à l'exécution
@@ -233,7 +235,7 @@ prix n'est écrit à la main**.
 
 ## État
 
-`0.6.0` — utilisable au quotidien, prêt à publier (voir `docs/PUBLISHING.md`).
+`0.7.0` — utilisable au quotidien, prêt à publier (voir `docs/PUBLISHING.md`).
 Ce qui est fait et ce qui ne l'est pas : [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Licence

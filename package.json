@@ -2,7 +2,7 @@
   "name": "hivey-code",
   "displayName": "Hivey Code",
   "description": "%extension.description%",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "publisher": "hivey",
   "license": "Apache-2.0",
   "repository": {
@@ -210,6 +210,24 @@
         "title": "%command.moveToSecondarySideBar.title%",
         "category": "Hivey Code",
         "icon": "$(layout-sidebar-right)"
+      },
+      {
+        "command": "hiveyCode.newSkill",
+        "title": "%command.newSkill.title%",
+        "category": "Hivey Code",
+        "icon": "$(sparkle)"
+      },
+      {
+        "command": "hiveyCode.newAgent",
+        "title": "%command.newAgent.title%",
+        "category": "Hivey Code",
+        "icon": "$(person-add)"
+      },
+      {
+        "command": "hiveyCode.showDefinitions",
+        "title": "%command.showDefinitions.title%",
+        "category": "Hivey Code",
+        "icon": "$(list-unordered)"
       }
     ],
     "menus": {

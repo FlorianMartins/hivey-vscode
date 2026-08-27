@@ -2,6 +2,54 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.7.0 — 2026-08-27
+
+**Skills and sub-agents, defined by you.**
+
+The request was "total control of the tool", and the shape that answers it is not a settings page:
+
+```
+.hiveycode/skills/review-rpg.md      instructions you invoke with /review-rpg
+.hiveycode/agents/db-explorer.md     a sub-agent with its own prompt, tools and model
+```
+
+Files, for three reasons that are the whole design. They are **versioned** — a team's conventions
+belong next to the code they govern, reviewed like code, arriving with a clone. They are
+**readable** — a skill is prose with a header, and someone who has never seen this extension can
+open one and know what it will do. And the **format is already known**: it is Claude Code's, so
+anyone who has written one has written all of them.
+
+The model is told each skill's name and description, never its contents — a dozen skills' full text
+in every prompt would spend the context budget before the question. It fetches the instructions when
+one applies.
+
+### The rule that is not yours to change
+
+A sub-agent's `tools:` line is a **request, not a grant**. Its tools are intersected with what the
+current mode already allows, never added to it. A definition file arrives with a cloned repository;
+if it could grant itself `run_command` in plan mode, the mode would stop being a guarantee. Listing
+a tool the mode does not offer is not an error either — it is a definition written for agent mode
+being used in plan mode, and it should quietly do less rather than refuse.
+
+Whatever a sub-agent does goes through the same approver, the same egress gate and the same
+pseudonymisation vault as its parent. Being called by a sub-agent is not a way around a dialog.
+
+Skills are absent in chat mode, along with the block naming them. A skill is instructions you wrote,
+but it is still a file read from the repository, and chat mode's promise is that it does not read
+the repository. A promise with an exception in it is not one.
+
+### Details that matter when you write one
+
+- A broken file is **reported, not skipped**. A skill silently vanishing makes the assistant ignore
+  instructions it never received, with no way to find out why.
+- The templates are **valid definitions**, not forms of blanks — a template that does not parse is a
+  trap, because the failure looks like your edit.
+- An out-of-range `max-steps` is refused rather than clamped: you asked for 500, and being given 50
+  without being told is worse than being told 500 is not on offer.
+- Two files claiming the same name is reported, because one of them would never run.
+- Edits take effect on the next turn. A definition you have to reload the window to try is one
+  nobody iterates on.
+
 ## 0.6.0 — 2026-08-27
 
 Everything here comes from Florian using the extension for the first time. That is the point of
