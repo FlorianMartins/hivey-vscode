@@ -120,7 +120,7 @@ Les points où d'autres se trompent, et qui sont traités ici :
 ## Installation
 
 ```bash
-git clone https://github.com/FlorianMartins/hivey-code
+git clone https://github.com/FlorianMartins/hivey-vscode
 cd hivey-code
 npm ci
 npm run build
@@ -233,7 +233,7 @@ prix n'est écrit à la main**.
 
 ## État
 
-`0.5.0` — utilisable au quotidien, prêt à publier (voir `docs/PUBLISHING.md`).
+`0.5.1` — utilisable au quotidien, prêt à publier (voir `docs/PUBLISHING.md`).
 Ce qui est fait et ce qui ne l'est pas : [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Licence

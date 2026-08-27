@@ -75,7 +75,7 @@ colleague testing a fix, or simply publishing from a browser because Azure DevOp
 organisation on a corporate network. So every build is attached to a GitHub release, and one tag is
 rolling:
 
-    https://github.com/FlorianMartins/hivey-code/releases/download/build/hivey-code.vsix
+    https://github.com/FlorianMartins/hivey-vscode/releases/download/build/hivey-code.vsix
 
 That URL never changes; the asset behind it is replaced. To refresh it after a change:
 
@@ -125,7 +125,7 @@ Two consequences worth knowing before the first publish:
 
 - **Images in the README must be absolute URLs.** A relative `docs/images/x.png` works on GitHub and
   renders as a broken image on the Marketplace. Use
-  `https://raw.githubusercontent.com/FlorianMartins/hivey-code/main/docs/images/x.png`.
+  `https://raw.githubusercontent.com/FlorianMartins/hivey-vscode/main/docs/images/x.png`.
 - **The README is the product page.** Nobody clicks through to the docs. The first screen has to say
   what it is, who it is for, and what it does not send.
 

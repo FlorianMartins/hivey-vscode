@@ -9,7 +9,7 @@ Open source (Apache-2.0), **zero runtime dependencies**, **zero telemetry**.
 [Français](README.fr.md) · [Architecture](docs/ARCHITECTURE.md) · [Privacy](docs/PRIVACY.md) ·
 [Threat model](docs/THREAT-MODEL.md)
 
-![Hivey Code's sidebar in VS Code](https://raw.githubusercontent.com/FlorianMartins/hivey-code/main/docs/images/conversation.png)
+![Hivey Code's sidebar in VS Code](https://raw.githubusercontent.com/FlorianMartins/hivey-vscode/main/docs/images/conversation.png)
 
 *Real screenshots, taken from a VS Code launched by the integration suite — `node scripts/screenshots.mjs`
 takes them, so they cannot quietly stop being true. Only the model answering is a stub server; the
@@ -17,7 +17,7 @@ interface is the product, at the side bar's default width.*
 
 | Choosing a model | Conversations |
 |---|---|
-| ![The model picker](https://raw.githubusercontent.com/FlorianMartins/hivey-code/main/docs/images/picker.png) | ![History and filters](https://raw.githubusercontent.com/FlorianMartins/hivey-code/main/docs/images/historique.png) |
+| ![The model picker](https://raw.githubusercontent.com/FlorianMartins/hivey-vscode/main/docs/images/picker.png) | ![History and filters](https://raw.githubusercontent.com/FlorianMartins/hivey-vscode/main/docs/images/historique.png) |
 
 ---
 
@@ -59,7 +59,7 @@ that does leave is **reversibly pseudonymised** first.
 | **Context control** | Every exchange can be **muted** (stays on screen, stops being sent), **pinned** (survives trimming), edited or deleted. It is the most direct lever there is on both quality **and** cost. |
 | **Privacy** | Reversible pseudonymisation, blocked files, consent before the first destination, an **egress log** and a **cost report**. |
 | **Languages** | English and French, following the editor's display language — or pinned with `hiveyCode.language`, for a machine whose editor is in one language and whose user reads another. |
-| **Your theme** | Every colour in the panel is one of the editor's own variables. Not one hex value — [the same picker under a light theme](https://raw.githubusercontent.com/FlorianMartins/hivey-code/main/docs/images/picker.light.png), captured by the same script. It follows a theme change immediately, high contrast included. |
+| **Your theme** | Every colour in the panel is one of the editor's own variables. Not one hex value — [the same picker under a light theme](https://raw.githubusercontent.com/FlorianMartins/hivey-vscode/main/docs/images/picker.light.png), captured by the same script. It follows a theme change immediately, high contrast included. |
 
 ## How the cost tends to zero
 
@@ -183,7 +183,7 @@ From the VS Code Marketplace: search for **Hivey Code** (publisher `hivey`).
 From source:
 
 ```bash
-git clone https://github.com/FlorianMartins/hivey-code
+git clone https://github.com/FlorianMartins/hivey-vscode
 cd hivey-code
 npm ci
 npm run build
@@ -282,7 +282,7 @@ no entry, so a translation cannot silently rot.
 
 ## Status
 
-`0.5.0` — usable day to day. See [`docs/ROADMAP.md`](docs/ROADMAP.md) for what is done and what is
+`0.5.1` — usable day to day. See [`docs/ROADMAP.md`](docs/ROADMAP.md) for what is done and what is
 not.
 
 ## Licence

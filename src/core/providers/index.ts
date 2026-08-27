@@ -19,7 +19,7 @@ export interface ProviderConfig {
 }
 
 export const ATTRIBUTION = {
-  referer: "https://github.com/FlorianMartins/hivey-code",
+  referer: "https://github.com/FlorianMartins/hivey-vscode",
   title: "Hivey Code",
 };
 

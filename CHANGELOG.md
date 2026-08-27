@@ -2,6 +2,16 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.5.1 — 2026-08-27
+
+- The repository is `FlorianMartins/hivey-vscode`. It was `hivey-code`, one hyphen away from
+  `HiveyCode` — the web IDE — which is a distinction nobody should have to make at a glance. The
+  extension itself is unchanged: still **Hivey Code**, still `hivey.hivey-code`.
+- Removed a menu entry pointing at `hiveyCode.askWith`, a command that is registered in code and
+  deliberately not declared in the manifest. Hiding an undeclared command with `when: false` hides
+  nothing — a command absent from `contributes.commands` never reaches the palette — and it put
+  *"Menu item references a command … which is not defined"* in every user's extension host log.
+
 ## 0.5.0 — 2026-08-27
 
 **Renamed to Hivey Code.**
@@ -20,7 +30,7 @@ competitor, did.
   should be short, and a command in documentation should be unambiguous.
 - The per-project configuration file is `.hiveycode.json`, and repository rules may live in
   `.hiveycode/instructions.md`.
-- The repository is now `FlorianMartins/hivey-code`. GitHub redirects the old address.
+- The repository is now `FlorianMartins/hivey-vscode`. GitHub redirects the old address.
 
 ### What the rename found
 
