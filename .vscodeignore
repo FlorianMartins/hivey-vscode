@@ -6,6 +6,10 @@ src/**
 tests/**
 scripts/**
 dist-tests/**
+# The integration harness runs the extension inside a real VS Code. It has no business inside the
+# extension the user installs: it is test code, it is dead weight in the download, and shipping the
+# runner alongside the product is how a test fixture ends up looking like a feature.
+dist-integration/**
 node_modules/**
 docs/screenshots/**
 # Screenshots belong to the README on GitHub, not in the installed package (vsce rewrites the
