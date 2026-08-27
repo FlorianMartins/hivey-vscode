@@ -771,12 +771,19 @@ pre.code {
 .composer-toolbar.bottom {
   margin-top: var(--sp-1);
 }
-/* The model name is the one label allowed to shrink: everything else is one or two words, and the
-   send button must never move. `0 1 auto` — shrink, never grow: growing was what pushed the send
-   button off the row in the first place. */
+/* The model name is the one label allowed to shrink — and, until now, allowed to shrink to nothing.
+   Being the only shrinkable item in a row that no longer wraps, it absorbed every pixel of pressure
+   and disappeared entirely on a narrow panel, which reads as the control having been removed. It
+   keeps a floor wide enough to stay recognisable; past that the row scrolls rather than eats it. */
 .composer-toolbar .btn.model {
-  min-width: 0;
   flex: 0 1 auto;
+  min-width: 9ch;
+}
+/* The mode never shrinks. It is one short word, and "Ag…" tells the reader nothing at all — worse
+   than a truncated model name, because the model's full id is one hover away and the mode's
+   meaning is the word itself. Pressure goes to the model name, which has a floor of its own. */
+.composer-toolbar .btn.mode {
+  flex: 0 0 auto;
 }
 .composer-toolbar .btn.model .lbl {
   overflow: hidden;

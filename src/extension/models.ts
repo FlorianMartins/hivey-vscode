@@ -11,6 +11,7 @@ import { GENERATED_MODELS } from "../core/router/catalog.generated.js";
 import { isLocalEndpoint } from "../core/redaction/index.js";
 import type { UiModel } from "../shared/protocol.js";
 import { endpointFor, providerFor, type Keys, type Settings } from "./config.js";
+import { shortModelName } from "../core/models/names.js";
 
 /** Models a provider is currently serving, or an empty list when it cannot be reached. */
 async function served(settings: Settings, keys: Keys, provider: Settings["chat"]["provider"]): Promise<string[]> {
@@ -90,9 +91,9 @@ export async function listModels(settings: Settings, keys: Keys, current: string
 /** A short label for the composer button: the name without the vendor, plus a price hint. */
 export function labelFor(models: UiModel[], id: string): string {
   const found = models.find((m) => m.id === id);
-  if (!found) return id;
-  return found.name;
+  return shortModelName(found?.name ?? id);
 }
+
 
 /** Reasoning is only worth offering on models that actually do it. */
 export function supportsReasoning(id: string): boolean {

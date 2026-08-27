@@ -491,9 +491,11 @@ function modelButton(state: UiState, deps: ChatDeps): HTMLElement {
   const b: HTMLElement = button({
     label: state.modelLabel,
     trailingIcon: ICON.chevron,
-    title: state.remote
-      ? t("Remote model — it is billed, and what you send is pseudonymised first.")
-      : t("Local model — nothing leaves this machine."),
+    title:
+      `${state.model}\n` +
+      (state.remote
+        ? t("Remote model — it is billed, and what you send is pseudonymised first.")
+        : t("Local model — nothing leaves this machine.")),
     className: `btn ghost model${state.remote ? " remote" : " local"}`,
     onClick: () => {
       closeMenu();

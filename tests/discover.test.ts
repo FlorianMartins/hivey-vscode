@@ -10,6 +10,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { discoverLocal, looksLikeCodeModel, modelIds, rankModels, suggestPull } from "../src/core/providers/discover.js";
 import { recommend, versionScore } from "../src/core/models/recommend.js";
+import { shortModelName } from "../src/core/models/names.js";
 
 /** A fake network: a map of URL to answer, everything else refuses. */
 function net(answers: Record<string, unknown>, opts: { hang?: string[] } = {}) {
@@ -228,5 +229,26 @@ test("the list is bounded, best first", () => {
 test("every recommendation says why, because a bare list is not advice", () => {
   for (const r of recommend([{ id: "qwen/qwen3-coder", inUsd: 0.3, local: false }])) {
     assert.ok(r.why.length > 10, r.id);
+  }
+});
+
+// ── The name shown on the composer's model button ────────────────────────────────────────────
+
+test("a model name is shortened to the part someone would say out loud", () => {
+  // The button shares a row with three other controls at the side bar's default width. The vendor
+  // is repeated in the picker and the size tag is a deployment detail; what is left is the name.
+  assert.equal(shortModelName("anthropic/claude-sonnet-4.5"), "claude-sonnet-4.5");
+  assert.equal(shortModelName("qwen2.5-coder:7b"), "qwen2.5-coder");
+  assert.equal(shortModelName("qwen/qwen3-coder:32b"), "qwen3-coder");
+  assert.equal(shortModelName("codestral"), "codestral");
+});
+
+test("shortening never returns nothing", () => {
+  // A button whose label vanished is a button the user reports as missing — which is exactly what
+  // happened when it was allowed to shrink to zero width.
+  for (const name of ["", ":7b", "a/", "x"]) {
+    const short = shortModelName(name);
+    assert.equal(typeof short, "string");
+    if (name) assert.ok(short.length > 0, JSON.stringify(name));
   }
 });

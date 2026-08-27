@@ -2,6 +2,21 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.11.1 — 2026-08-27
+
+### Fixed
+
+- **The model picker vanished from the composer** on a narrow panel. Caused by 0.10.0: the toolbar
+  stopped wrapping, and the model button was the only item allowed to shrink — so it absorbed every
+  pixel of pressure and collapsed to nothing, which reads as the control having been removed rather
+  than as a narrow row. It now keeps a floor wide enough to stay recognisable, and the mode button
+  no longer shrinks at all: "Ag…" tells the reader nothing, while a truncated model name is one
+  hover away from its full id.
+- **The model name is shortened** to the part someone would say out loud —
+  `anthropic/claude-sonnet-4.5` rather than the whole id, `qwen2.5-coder` rather than
+  `qwen2.5-coder:7b`. The vendor is repeated in the picker and the size tag is a deployment detail.
+  The full id is in the tooltip.
+
 ## 0.11.0 — 2026-08-27
 
 **Both sides, at once.**

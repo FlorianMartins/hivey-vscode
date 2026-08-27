@@ -315,7 +315,7 @@ Those documents are currently written in French; translations are welcome.
 ## Development
 
 ```bash
-npm test                   # builds the bundles, then 282 tests (node:test)
+npm test                   # builds the bundles, then 284 tests (node:test)
 npm run test:integration   # loads the extension into a real VS Code (9 tests, headless)
 node scripts/screenshots.mjs  # retakes the README's images from that same editor
 npm run typecheck
@@ -338,7 +338,7 @@ no entry, so a translation cannot silently rot.
 
 ## Status
 
-`0.11.0` — usable day to day. See [`docs/ROADMAP.md`](docs/ROADMAP.md) for what is done and what is
+`0.11.1` — usable day to day. See [`docs/ROADMAP.md`](docs/ROADMAP.md) for what is done and what is
 not.
 
 ## Licence
