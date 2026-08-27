@@ -554,4 +554,9 @@ export const FR: Record<string, string> = {
   "Nothing is denied by name.": "Rien n’est interdit nommément.",
   "{0} always allowed": "{0} toujours autorisé(s)",
   "{0} never allowed": "{0} jamais autorisé(s)",
+  "Selection": "Sélection",
+  "The file open in the editor": "Le fichier ouvert dans l’éditeur",
+  "Whole file": "Fichier entier",
+  "line": "ligne",
+  "lines": "lignes",
 };

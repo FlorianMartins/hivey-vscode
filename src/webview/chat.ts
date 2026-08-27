@@ -11,6 +11,7 @@ import { markdown } from "./markdown.js";
 import { t } from "../shared/i18n.js";
 import { closeModelCombo, isModelComboOpen, openModelCombo } from "./modelCombo.js";
 import type { Mode, Reasoning, ToExtension, UiEntry, UiState } from "../shared/protocol.js";
+import { applySuggestion, suggestionsFor, type Suggestion } from "../core/session/mentions.js";
 
 const MODES: Array<{ id: Mode; label: string; hint: string }> = [
   { id: "chat", label: t("Chat"), hint: t("Answers from what you attach. No access to the repository.") },
@@ -207,7 +208,50 @@ function startEdit(entry: UiEntry, deps: ChatDeps): void {
 
 // ── Composer ─────────────────────────────────────────────────────────────────────────────────
 
+/**
+ * What the user had typed, so a re-render does not throw it away.
+ *
+ * `render()` empties the whole panel and rebuilds it, which is the right thing for a transcript and
+ * the wrong thing for the box the user is typing in. Any message from the extension — a model list
+ * arriving, the editor's selection changing — destroyed the draft, the caret and the `#` completion
+ * list, which is why the list "disappeared" the moment you reached for it.
+ */
+export interface Draft {
+  text: string;
+  start: number;
+  end: number;
+  editing?: string;
+}
+
+let lastDeps: ChatDeps | undefined;
+
+export function captureDraft(): Draft | undefined {
+  const area = document.querySelector<HTMLTextAreaElement>(".composer-input");
+  if (!area) return undefined;
+  return {
+    text: area.value,
+    start: area.selectionStart ?? area.value.length,
+    end: area.selectionEnd ?? area.value.length,
+    ...(area.dataset["editing"] ? { editing: area.dataset["editing"] } : {}),
+  };
+}
+
+export function restoreDraft(draft: Draft | undefined): void {
+  if (!draft?.text) return;
+  const area = document.querySelector<HTMLTextAreaElement>(".composer-input");
+  const hints = document.querySelector<HTMLElement>(".slash-hints");
+  if (!area) return;
+  area.value = draft.text;
+  if (draft.editing) area.dataset["editing"] = draft.editing;
+  area.setSelectionRange(draft.start, draft.end);
+  autoGrow(area);
+  // And the completion list with it: it is derived from the caret, so restoring one without the
+  // other leaves the box looking right and the suggestions gone.
+  if (hints && lastDeps) slashHints(hints, area, lastDeps);
+}
+
 function composer(state: UiState, deps: ChatDeps): HTMLElement {
+  lastDeps = deps;
   const wrap = el("div", "composer");
   const card = el("div", "composer-card");
 
@@ -317,12 +361,31 @@ function contextButton(state: UiState, deps: ChatDeps): HTMLElement {
       menu(b, (close) => {
         const panel = el("div", "menu-list");
         panel.append(menuTitle(t("Add to the context")));
+        // Two entries where there used to be one, because "the open file" and "the selection" are
+        // two different things and the old entry silently chose between them. With three lines
+        // highlighted there was no way to attach the file they live in — the case where you most
+        // want to. Both are named after what the editor is actually showing, so neither is a guess.
+        const active = state.activeEditor;
+        if (active?.hasSelection) {
+          panel.append(
+            menuItem({
+              label: t("Selection"),
+              detail: `${active.selectedLines} ${active.selectedLines === 1 ? t("line") : t("lines")}`,
+              hint: active.path,
+              onClick: () => {
+                deps.send({ type: "attach", what: "selection" });
+                close();
+              },
+            }),
+          );
+        }
         panel.append(
           menuItem({
-            label: t("Active file"),
-            hint: t("The open file, or the selection if there is one"),
+            // `#editor` in the composer, and this in the menu: the same thing reached two ways.
+            label: t("Whole file"),
+            hint: active ? active.path : t("The file open in the editor"),
             onClick: () => {
-              deps.send({ type: "attach", what: "active" });
+              deps.send({ type: "attach", what: "editor" });
               close();
             },
           }),
@@ -482,27 +545,27 @@ const SLASH: Array<{ name: string; hint: string; prompt: string; attach?: boolea
 ];
 
 /** The `#` notations, offered as the user types. Kept in step with the parser by a test. */
-const MENTIONS: Array<{ token: string; hint: string }> = [
-  { token: "#file:", hint: t("a file by path") },
-  { token: "#selection", hint: t("what is selected in the editor") },
-  { token: "#editor", hint: t("the whole active file") },
-  { token: "#openFiles", hint: t("every file open in a tab") },
-  { token: "#codebase", hint: t("the repository map") },
-  { token: "#changes", hint: t("the uncommitted diff") },
-  { token: "#problems", hint: t("the errors and warnings from the language servers") },
-  { token: "#terminal", hint: t("what is selected in the terminal") },
-  { token: "#sym:", hint: t("a symbol by name") },
-  { token: "#member:", hint: t("an IBM i source member — LIB/SRCFILE(MEMBER)") },
-  { token: "#db2:", hint: t("the result of a Db2 for i query that reads") },
+const MENTIONS: Suggestion[] = [
+  { token: "#file:", hint: t("a file by path"), complete: "#file:" },
+  { token: "#selection", hint: t("what is selected in the editor"), complete: "#selection " },
+  { token: "#editor", hint: t("the whole active file"), complete: "#editor " },
+  { token: "#openFiles", hint: t("every file open in a tab"), complete: "#openFiles " },
+  { token: "#codebase", hint: t("the repository map"), complete: "#codebase " },
+  { token: "#changes", hint: t("the uncommitted diff"), complete: "#changes " },
+  { token: "#problems", hint: t("the errors and warnings from the language servers"), complete: "#problems " },
+  { token: "#terminal", hint: t("what is selected in the terminal"), complete: "#terminal " },
+  { token: "#sym:", hint: t("a symbol by name"), complete: "#sym:" },
+  { token: "#member:", hint: t("an IBM i source member — LIB/SRCFILE(MEMBER)"), complete: "#member:" },
+  { token: "#db2:", hint: t("the result of a Db2 for i query that reads"), complete: "#db2:" },
 ];
 
-const PARTICIPANTS: Array<{ token: string; hint: string }> = [
-  { token: "@workspace", hint: t("the repository: search it before answering") },
-  { token: "@editor", hint: t("the file on screen and the editor's state") },
-  { token: "@terminal", hint: t("the last command and what it printed") },
-  { token: "@git", hint: t("the working tree, the history, the blame") },
-  { token: "@ibmi", hint: t("the partition: Db2 for i, members, objects") },
-  { token: "@arcad", hint: t("ARCAD Elias: components, versions, cross-references") },
+const PARTICIPANTS: Suggestion[] = [
+  { token: "@workspace", hint: t("the repository: search it before answering"), complete: "@workspace " },
+  { token: "@editor", hint: t("the file on screen and the editor's state"), complete: "@editor " },
+  { token: "@terminal", hint: t("the last command and what it printed"), complete: "@terminal " },
+  { token: "@git", hint: t("the working tree, the history, the blame"), complete: "@git " },
+  { token: "@ibmi", hint: t("the partition: Db2 for i, members, objects"), complete: "@ibmi " },
+  { token: "@arcad", hint: t("ARCAD Elias: components, versions, cross-references"), complete: "@arcad " },
 ];
 
 /**
@@ -515,36 +578,26 @@ const PARTICIPANTS: Array<{ token: string; hint: string }> = [
  */
 function slashHints(container: HTMLElement, area: HTMLTextAreaElement, deps: ChatDeps): void {
   container.textContent = "";
-  const value = area.value;
-  const caret = area.selectionStart ?? value.length;
-  const word = /(\S*)$/.exec(value.slice(0, caret))?.[1] ?? "";
-
-  let rows: Array<{ token: string; hint: string; complete: string }> = [];
-  if (value.startsWith("/") && !value.slice(0, caret).includes(" ")) {
-    rows = SLASH.filter((c) => c.name.startsWith(word)).map((c) => ({ token: c.name, hint: c.hint, complete: `${c.name} ` }));
-  } else if (word.startsWith("#")) {
-    rows = MENTIONS.filter((m) => m.token.toLowerCase().startsWith(word.toLowerCase())).map((m) => ({
-      ...m,
-      // A notation that takes an argument leaves the caret against the colon, ready for it.
-      complete: m.token.endsWith(":") ? m.token : `${m.token} `,
-    }));
-  } else if (word.startsWith("@") && value.trimStart().startsWith("@")) {
-    rows = PARTICIPANTS.filter((p) => p.token.toLowerCase().startsWith(word.toLowerCase())).map((p) => ({
-      ...p,
-      complete: `${p.token} `,
-    }));
-  }
+  const query = { value: area.value, caret: area.selectionStart ?? area.value.length };
+  const rows = suggestionsFor(query, {
+    slash: SLASH.map((c) => ({ name: c.name, hint: c.hint })),
+    mentions: MENTIONS,
+    participants: PARTICIPANTS,
+  });
 
   for (const entry of rows.slice(0, 8)) {
     const row = el("button", "slash-hint");
     row.append(el("span", "slash-name", entry.token));
     row.append(el("span", "slash-hint-text", entry.hint));
-    row.addEventListener("click", () => {
-      const before = value.slice(0, caret - word.length);
-      area.value = before + entry.complete + value.slice(caret);
-      const at = (before + entry.complete).length;
+    // `mousedown`, not `click`: the click arrives after focus has moved and after anything the blur
+    // set off, by which time this row may no longer be in the document. That is why the list looked
+    // as though it vanished the moment you reached for it.
+    row.addEventListener("mousedown", (ev) => {
+      ev.preventDefault();
+      const applied = applySuggestion(query, entry);
+      area.value = applied.value;
       area.focus();
-      area.setSelectionRange(at, at);
+      area.setSelectionRange(applied.caret, applied.caret);
       slashHints(container, area, deps);
     });
     container.append(row);

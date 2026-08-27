@@ -37,6 +37,7 @@ import type {
   UiHistoryFilter,
   UiModel,
   UiPermissionRule,
+  UiActiveEditor,
   UiSetup,
   UiState,
 } from "../shared/protocol.js";
@@ -184,6 +185,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const refresh = () => this.screen === "chat" && this.sendState();
     this.ctx.subscriptions.push(
       vscode.window.onDidChangeActiveTextEditor(refresh),
+      // The menu distinguishes "the selection" from "the whole file", so it has to know whether
+      // there IS a selection. Without this the labels lag a click behind the editor.
+      vscode.window.onDidChangeTextEditorSelection(refresh),
       vscode.workspace.onDidOpenTextDocument(refresh),
       vscode.workspace.onDidCloseTextDocument(refresh),
     );
@@ -270,6 +274,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       budget: { spentTodayUsd: this.gate.budget.spentToday(), dailyUsd: s.budget.dailyUsd },
       attachments: this.attachments.map((c) => ({ kind: c.kind, label: c.label, tokens: estimateTokens(c.body) })),
       openFiles: openFiles(),
+      ...(activeEditor() ? { activeEditor: activeEditor()! } : {}),
       history: filterHistory(stored, this.historyFilter),
       historyFilter: this.historyFilter,
       models: this.models,
@@ -627,12 +632,20 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  private async attach(what: "active" | "selection" | "browse" | "openFiles" | "mention"): Promise<void> {
+  private async attach(what: "active" | "editor" | "selection" | "browse" | "openFiles" | "mention"): Promise<void> {
     const settings = readSettings();
     switch (what) {
       case "active":
       case "selection": {
         const item = this.workspace.activeContext();
+        if (item) this.attachments.push(item);
+        break;
+      }
+      case "editor": {
+        // The whole file, whatever is selected. `active` hands back the selection when there is
+        // one, so with three lines highlighted there was no way to attach the file they are in —
+        // which is the case where you most want to.
+        const item = this.workspace.activeFileContext();
         if (item) this.attachments.push(item);
         break;
       }
@@ -1227,4 +1240,16 @@ function normalise(path: string): string {
     else out.push(part);
   }
   return (path.startsWith("/") ? "/" : "") + out.join("/");
+}
+
+/** What the editor is showing, for the context menu's labels. */
+function activeEditor(): UiActiveEditor | undefined {
+  const editor = vscode.window.activeTextEditor;
+  if (!editor) return undefined;
+  const selection = editor.selection;
+  return {
+    path: relative(editor.document.uri),
+    hasSelection: !selection.isEmpty,
+    selectedLines: selection.isEmpty ? 0 : selection.end.line - selection.start.line + 1,
+  };
 }

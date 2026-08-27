@@ -2,6 +2,28 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.9.1 — 2026-08-27
+
+### Fixed
+
+- **The `#` list vanished the moment you reached for it**, so nothing could be picked. Two causes,
+  and the second is the one that mattered. The rows listened for `click`, which arrives after focus
+  has moved and after anything the blur set off — by which time the row was gone. And `render()`
+  empties the whole panel and rebuilds it, so *any* message from the extension destroyed the list.
+  It also destroyed the half-written question underneath it, which nobody had reported because it
+  looks like a slip of the hand rather than a bug. The composer's text and caret are now taken out
+  before the rebuild and put back after, and the list with them.
+- The logic behind the list moved into core, where it can be tested: which word is under the caret,
+  and what replaces it. Ten tests, including one that parses every suggestion back — a suggestion
+  the parser rejects is a trap, because the user types what was offered and nothing happens.
+
+### Added
+
+- **"Whole file" in the `+` menu**, alongside "Selection" — the same thing `#editor` attaches. The
+  single "Active file" entry silently chose between them, so with three lines highlighted there was
+  no way to attach the file they live in, which is exactly when you want to. Both entries now name
+  the file, and the selection says how many lines it covers.
+
 ## 0.9.0 — 2026-08-27
 
 ### Security

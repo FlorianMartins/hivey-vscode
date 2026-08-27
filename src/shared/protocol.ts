@@ -115,6 +115,15 @@ export interface UiApprovalPolicy {
   deniedCommands: string[];
 }
 
+/** What the editor is showing right now, so the context menu can name it rather than guess. */
+export interface UiActiveEditor {
+  path: string;
+  /** True when text is selected — which is what makes "the file" and "the selection" two things. */
+  hasSelection: boolean;
+  /** Lines the selection covers, for the label. */
+  selectedLines: number;
+}
+
 export interface UiOpenFile {
   path: string;
   active: boolean;
@@ -137,6 +146,7 @@ export interface UiState {
   budget: { spentTodayUsd: number; dailyUsd: number };
   attachments: UiContextItem[];
   openFiles: UiOpenFile[];
+  activeEditor?: UiActiveEditor;
   history: UiHistoryRow[];
   historyFilter: UiHistoryFilter;
   models: UiModel[];
@@ -170,7 +180,7 @@ export type ToExtension =
   | { type: "dropEntry"; id: string }
   | { type: "editEntry"; id: string; text: string }
   | { type: "retry" }
-  | { type: "attach"; what: "active" | "selection" | "browse" | "openFiles" | "mention" }
+  | { type: "attach"; what: "active" | "editor" | "selection" | "browse" | "openFiles" | "mention" }
   | { type: "attachPath"; path: string }
   | { type: "removeAttachment"; label: string }
   | { type: "setPermission"; tool: string; prefix?: string; level: "always" | "never" }

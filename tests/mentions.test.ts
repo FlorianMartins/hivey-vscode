@@ -8,7 +8,15 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { describeMention, mentionSuggestions, parsePrompt, participantDirective, participants } from "../src/core/session/mentions.js";
+import {
+  applySuggestion,
+  describeMention,
+  mentionSuggestions,
+  parsePrompt,
+  participantDirective,
+  participants,
+  suggestionsFor,
+} from "../src/core/session/mentions.js";
 
 const kinds = (input: string) => parsePrompt(input).mentions.map((m) => m.kind);
 
@@ -123,4 +131,93 @@ test("the suggestion list covers what the parser accepts", () => {
     assert.equal(parsePrompt(probe).mentions.length, 1, `${entry.token} is offered but not parsed`);
   }
   assert.ok(suggested.includes("selection"));
+});
+
+// ── The completion list under the composer ───────────────────────────────────────────────────
+//
+// Extracted from the panel because the panel is where it could not be tested. The reported symptom
+// was "the list disappears so you cannot pick anything", and the DOM half of that was a `click`
+// handler firing after the row had been rebuilt. This half — which word is under the caret, and
+// what replaces it — is the half that decides whether the list is right at all.
+
+const SETS = {
+  slash: [
+    { name: "/explain", hint: "explain" },
+    { name: "/tests", hint: "tests" },
+    { name: "/tofree", hint: "convert" },
+  ],
+  mentions: [
+    { token: "#file:", hint: "a file", complete: "#file:" },
+    { token: "#selection", hint: "the selection", complete: "#selection " },
+    { token: "#changes", hint: "the diff", complete: "#changes " },
+  ],
+  participants: [
+    { token: "@workspace", hint: "the repo", complete: "@workspace " },
+    { token: "@git", hint: "git", complete: "@git " },
+  ],
+};
+
+const at = (value: string) => ({ value, caret: value.length });
+
+test("`#` offers the context notations, filtered as you type", () => {
+  assert.deepEqual(suggestionsFor(at("#"), SETS).map((s) => s.token), ["#file:", "#selection", "#changes"]);
+  assert.deepEqual(suggestionsFor(at("#ch"), SETS).map((s) => s.token), ["#changes"]);
+  assert.deepEqual(suggestionsFor(at("#zzz"), SETS), []);
+});
+
+test("`#` works mid-sentence, which is where people reach for it", () => {
+  // The whole reason `#` is not restricted to the start like the other two.
+  assert.deepEqual(suggestionsFor(at("what changed in #ch"), SETS).map((s) => s.token), ["#changes"]);
+});
+
+test("the word under the caret is what counts, not the end of the text", () => {
+  // Typing into the middle of a sentence must offer suggestions for the word being typed, not for
+  // whatever happens to be last.
+  const value = "look at #ch and then stop";
+  assert.deepEqual(suggestionsFor({ value, caret: 11 }, SETS).map((s) => s.token), ["#changes"]);
+});
+
+test("a slash command is offered only as the first word", () => {
+  assert.deepEqual(suggestionsFor(at("/t"), SETS).map((s) => s.token), ["/tests", "/tofree"]);
+  assert.deepEqual(suggestionsFor(at("/te"), SETS).map((s) => s.token), ["/tests"], "/tofree starts /to");
+  assert.deepEqual(suggestionsFor(at("/explain this /te"), SETS), [], "a slash mid-sentence is prose");
+});
+
+test("a participant is offered only at the front, matching the parser", () => {
+  // Offering `@git` where `parsePrompt` would ignore it is a trap: the user picks it and nothing
+  // happens.
+  assert.deepEqual(suggestionsFor(at("@g"), SETS).map((s) => s.token), ["@git"]);
+  assert.deepEqual(suggestionsFor(at("ask @g"), SETS), []);
+});
+
+test("plain prose offers nothing", () => {
+  assert.deepEqual(suggestionsFor(at("why is this test flaky"), SETS), []);
+  assert.deepEqual(suggestionsFor(at(""), SETS), []);
+});
+
+test("picking a suggestion replaces the word, not the sentence", () => {
+  const query = { value: "what changed in #ch and why", caret: 19 };
+  const applied = applySuggestion(query, SETS.mentions[2]!);
+  assert.equal(applied.value, "what changed in #changes  and why");
+  assert.equal(applied.caret, "what changed in #changes ".length, "the caret lands after what was inserted");
+});
+
+test("a notation that takes an argument leaves the caret against its colon", () => {
+  // `#file:` then straight into typing a path. A trailing space here would put the caret one
+  // character past where the next keystroke belongs.
+  const applied = applySuggestion(at("#fi"), SETS.mentions[0]!);
+  assert.equal(applied.value, "#file:");
+  assert.equal(applied.caret, 6);
+});
+
+test("what is offered can always be parsed back", () => {
+  // The trap this closes: a suggestion the parser rejects means the user types what was offered and
+  // nothing happens.
+  for (const suggestion of SETS.mentions) {
+    const probe = suggestion.complete.trim().endsWith(":") ? `${suggestion.complete}x` : suggestion.complete;
+    assert.equal(parsePrompt(probe).mentions.length, 1, suggestion.token);
+  }
+  for (const suggestion of SETS.participants) {
+    assert.ok(parsePrompt(`${suggestion.complete}question`).participant, suggestion.token);
+  }
 });

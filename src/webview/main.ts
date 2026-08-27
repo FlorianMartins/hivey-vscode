@@ -6,7 +6,7 @@
 // rendered incrementally is the answer being streamed, because that one has to be.
 
 import { button, closeMenu, el, icon, ICON, searchInput } from "./dom.js";
-import { chatScreen, collapsible, isStreaming, setStreaming, type ChatDeps } from "./chat.js";
+import { chatScreen, collapsible, isStreaming, setStreaming, type ChatDeps, captureDraft, restoreDraft } from "./chat.js";
 import { historyScreen } from "./history.js";
 import { modelsScreen } from "./models.js";
 import { permissionsScreen } from "./permissions.js";
@@ -40,6 +40,10 @@ const deps: ChatDeps = {
 function render(): void {
   if (!state) return;
   closeMenu();
+  // Rebuilding the panel is right for the transcript and wrong for the box being typed in. Taking
+  // the draft out first and putting it back after is what stops a message arriving from the
+  // extension from erasing a half-written question.
+  const draft = captureDraft();
   app.textContent = "";
   app.append(header(state));
   if (searchOpen && state.screen === "chat") app.append(searchBar(state));
@@ -69,6 +73,7 @@ function render(): void {
   }
   live = undefined;
   scrollToEnd();
+  restoreDraft(draft);
 }
 
 function header(s: UiState): HTMLElement {

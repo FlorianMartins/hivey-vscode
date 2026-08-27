@@ -207,3 +207,64 @@ export function mentionSuggestions(): Array<{ token: string; hint: string }> {
     { token: "#db2:", hint: "the result of a Db2 for i query" },
   ];
 }
+
+export interface Suggestion {
+  token: string;
+  hint: string;
+  /** What to insert. A notation that takes an argument leaves the caret against the colon. */
+  complete: string;
+}
+
+export interface SuggestionQuery {
+  /** Everything typed so far. */
+  value: string;
+  /** Where the caret is. */
+  caret: number;
+}
+
+/**
+ * What to offer under the composer, given the text and the caret.
+ *
+ * Pulled out of the panel because the panel is where it could not be tested, and because the bug
+ * that prompted it was not in the rendering: the list is derived entirely from the word under the
+ * caret, so getting that wrong shows up as suggestions that are absent, stale, or for the wrong
+ * prefix. Everything the caller does with the result is DOM plumbing.
+ *
+ * `slash` and `participant` are only offered at the start, because that is the only place they mean
+ * anything; `#` works mid-sentence, which is where people reach for it.
+ */
+export function suggestionsFor(
+  query: SuggestionQuery,
+  sets: { slash: Array<{ name: string; hint: string }>; mentions: Suggestion[]; participants: Suggestion[] },
+): Suggestion[] {
+  const before = query.value.slice(0, query.caret);
+  const word = /(\S*)$/.exec(before)?.[1] ?? "";
+
+  if (query.value.startsWith("/") && !before.includes(" ")) {
+    return sets.slash
+      .filter((c) => c.name.startsWith(word))
+      .map((c) => ({ token: c.name, hint: c.hint, complete: `${c.name} ` }));
+  }
+
+  if (word.startsWith("#")) {
+    const needle = word.toLowerCase();
+    return sets.mentions.filter((m) => m.token.toLowerCase().startsWith(needle));
+  }
+
+  // A participant is only a participant at the front, so `@` is offered only there — matching the
+  // parser, which would ignore one anywhere else.
+  if (word.startsWith("@") && query.value.trimStart().startsWith("@")) {
+    const needle = word.toLowerCase();
+    return sets.participants.filter((p) => p.token.toLowerCase().startsWith(needle));
+  }
+
+  return [];
+}
+
+/** Apply a suggestion: the text that replaces the word under the caret, and where the caret lands. */
+export function applySuggestion(query: SuggestionQuery, suggestion: Suggestion): { value: string; caret: number } {
+  const before = query.value.slice(0, query.caret);
+  const word = /(\S*)$/.exec(before)?.[1] ?? "";
+  const head = query.value.slice(0, query.caret - word.length) + suggestion.complete;
+  return { value: head + query.value.slice(query.caret), caret: head.length };
+}

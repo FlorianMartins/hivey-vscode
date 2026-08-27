@@ -117,6 +117,24 @@ export class WorkspaceContext {
     };
   }
 
+  /**
+   * The active file in full, whatever is selected in it.
+   *
+   * `activeContext` deliberately prefers the selection, which is right when you have highlighted
+   * the thing you are asking about — and wrong the rest of the time. Attaching the file that three
+   * highlighted lines live in was not possible without first clicking somewhere to clear them.
+   */
+  activeFileContext(maxTokens = 6000): ContextItem | undefined {
+    const ed = vscode.window.activeTextEditor;
+    if (!ed) return undefined;
+    return {
+      kind: "file",
+      label: relative(ed.document.uri),
+      body: headToTokens(ed.document.getText(), maxTokens),
+      untrusted: true,
+    };
+  }
+
   /** Turn a path the user picked into a context item, refusing the ones policy forbids. */
   async fileContext(uri: vscode.Uri, settings: Settings, maxTokens = 4000): Promise<ContextItem | undefined> {
     const rel = relative(uri);
