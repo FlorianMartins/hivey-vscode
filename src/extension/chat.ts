@@ -13,12 +13,14 @@ import { Permissions, commandPrefix, type PermissionStore, type Rule } from "../
 import { costOf, makeLookup, type Price } from "../core/router/pricing.js";
 import { route } from "../core/router/route.js";
 import { Session, type ContextItem, type Entry, type SessionData } from "../core/session/session.js";
-import { filterHistory, searchTranscript } from "../core/session/history.js";
+import { filterHistory, searchTranscript, upsertSession } from "../core/session/history.js";
 import { promptForMode, toolsForMode } from "../core/session/modes.js";
 import { detectIbmiLanguage, ibmiPrompt } from "../core/ibmi/languages.js";
 import { parsePrompt, participantDirective, type Participant } from "../core/session/mentions.js";
 import { resolveMentions } from "./mentions.js";
 import { instructionsPrompt } from "./instructions.js";
+import { discoverLocal, rankModels, suggestPull } from "../core/providers/discover.js";
+import { request } from "../core/util/http.js";
 import { estimateTokens } from "../core/util/tokens.js";
 import { isLocalEndpoint, Vault } from "../core/redaction/index.js";
 import type {
@@ -31,6 +33,7 @@ import type {
   UiHistoryFilter,
   UiModel,
   UiPermissionRule,
+  UiSetup,
   UiState,
 } from "../shared/protocol.js";
 import { SECTION, endpointFor, providerFor, readSettings, routerConfig, type Keys, type Settings } from "./config.js";
@@ -43,6 +46,21 @@ import { WorkspaceContext, relative } from "./workspace.js";
 
 const HISTORY_KEY = "hiveyCode.sessions";
 const PERMISSIONS_KEY = "hiveyCode.permissions";
+/** Set once the user has been through the first-run screen, or dismissed it. */
+const SETUP_SEEN_KEY = "hiveyCode.setupSeen";
+
+/**
+ * The only addresses `openExternal` will open.
+ *
+ * The panel renders model output, so a message arriving from it is not automatically a message the
+ * user meant to send. An allow-list costs one line and removes the whole question.
+ */
+const ALLOWED_LINKS = [
+  "https://openrouter.ai/keys",
+  "https://console.anthropic.com/settings/keys",
+  "https://ollama.com/download",
+];
+
 const PREFS_KEY = "hiveyCode.prefs";
 const HISTORY_MAX = 100;
 
@@ -91,7 +109,63 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this.reasoning = prefs?.reasoning ?? "none";
   }
 
+  /**
+   * Knock on the ports local runtimes bind, and report what answered.
+   *
+   * Loopback only, and nothing but a request for a model list — a probe that reaches something
+   * unexpected has disclosed nothing except that a VS Code extension asked.
+   */
+  private async probeLocal(): Promise<void> {
+    this.setup = { ...this.setup, probing: true };
+    this.sendState();
+    const settings = readSettings();
+    // Whatever is already configured is probed too, so a custom address is confirmed rather than
+    // ignored — and so someone who is already set up sees their own server in the list.
+    const extra = settings.endpoints.local ? [{ name: t("Configured endpoint"), baseUrl: settings.endpoints.local }] : [];
+    const found = await discoverLocal({
+      extra,
+      fetchJson: async (url, timeoutMs) => {
+        const res = await request(url, { timeoutMs, label: "discovery" });
+        if (!res.ok) throw new Error(String(res.status));
+        return res.json();
+      },
+    });
+    this.setup = {
+      ...this.setup,
+      probing: false,
+      runtimes: found.map((r) => ({
+        name: r.name,
+        baseUrl: r.baseUrl,
+        models: rankModels(r.models),
+        ...(r.models.length ? {} : { suggestion: suggestPull(r.name) }),
+      })),
+    };
+    await this.refreshSetup();
+  }
+
+  /** Re-read what is configured and which keys exist, without touching the probe results. */
+  private async refreshSetup(): Promise<void> {
+    const settings = readSettings();
+    const providers = ["openrouter", "anthropic", "openai-compatible"] as const;
+    const hasKey: Record<string, boolean> = {};
+    for (const p of providers) hasKey[p] = Boolean(await this.keys.get(p));
+    this.setup = {
+      ...this.setup,
+      hasKey,
+      endpoints: { ...settings.endpoints },
+      configured: {
+        provider: settings.chat.provider,
+        model: settings.chat.model,
+        baseUrl: settings.endpoints[settings.chat.provider] ?? "",
+      },
+    };
+    this.sendState();
+  }
+
   private reasoning: Reasoning = "none";
+
+  /** What the first-run screen knows. Rebuilt by a probe, never persisted — it goes stale. */
+  private setup: UiSetup = { probing: false, runtimes: [], hasKey: {}, endpoints: {} };
 
   resolveWebviewView(view: vscode.WebviewView): void {
     this.view = view;
@@ -194,6 +268,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       permissions: this.uiPermissions(),
       matches: searchTranscript(this.session.toJSON(), this.searchQuery).map((m) => m.entryId),
       searchQuery: this.searchQuery,
+      setup: this.setup,
     };
     this.post({ type: "state", state });
   }
@@ -218,10 +293,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   }
 
   private persist(): void {
-    if (!this.session.entries.length) return;
-    const all = this.history().filter((s) => s.id !== this.session.id);
-    all.unshift(this.session.toJSON());
-    void this.ctx.workspaceState.update(HISTORY_KEY, all.slice(0, HISTORY_MAX));
+    // No early return on an empty session: emptying a conversation has to REMOVE it, not skip the
+    // write and leave the previous version — with the messages the user just deleted — in storage.
+    const all = upsertSession(this.history(), this.session.toJSON(), HISTORY_MAX);
+    void this.ctx.workspaceState.update(HISTORY_KEY, all);
   }
 
   private savePrefs(): void {
@@ -271,6 +346,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         case "ready":
           this.sendState();
           void this.loadModels();
+          // First run: open on the setup screen rather than on a chat that cannot answer. The
+          // probe starts immediately, because the useful version of this screen is the one that
+          // already knows what is running by the time it is read.
+          if (!this.ctx.globalState.get<boolean>(SETUP_SEEN_KEY)) {
+            this.screen = "setup";
+            await this.refreshSetup();
+            void this.probeLocal();
+          }
           break;
         case "send":
           await this.ask(m.text);
@@ -278,6 +361,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         case "stop":
           this.turn?.abort();
           break;
+        case "renameSession":
+          // An empty name hands the title back to the assistant's guess rather than leaving the
+          // conversation nameless, which is what someone clearing the field is asking for.
+          this.session.title = m.title;
+          this.persist();
+          this.sendState();
+          break;
+
         case "newSession":
           this.newSession();
           break;
@@ -398,6 +489,63 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         case "openCosts":
           await vscode.commands.executeCommand("hiveyCode.showCosts");
           break;
+        case "probeLocal":
+          await this.probeLocal();
+          break;
+
+        case "saveKey": {
+          const provider = m.provider as Parameters<Keys["store"]>[0];
+          await this.keys.store(provider, m.key);
+          // Storing a key is only half the intent: someone who pastes an OpenRouter key wants to
+          // use OpenRouter, and leaving the provider on `local` would make the key look ignored.
+          const config = vscode.workspace.getConfiguration(SECTION);
+          await config.update("chat.provider", provider, vscode.ConfigurationTarget.Global);
+          await this.refreshSetup();
+          void this.loadModels(true);
+          break;
+        }
+
+        case "clearKey": {
+          await this.keys.delete(m.provider as Parameters<Keys["delete"]>[0]);
+          await this.refreshSetup();
+          break;
+        }
+
+        case "setEndpoint": {
+          const config = vscode.workspace.getConfiguration(SECTION);
+          // The manifest spells this one differently from the provider id, because `openai-compatible`
+          // is not a legal settings key segment.
+          const key = m.provider === "openai-compatible" ? "endpoints.openaiCompatible" : `endpoints.${m.provider}`;
+          await config.update(key, m.url, vscode.ConfigurationTarget.Global);
+          await this.refreshSetup();
+          break;
+        }
+
+        case "useLocal": {
+          const config = vscode.workspace.getConfiguration(SECTION);
+          await config.update("endpoints.local", m.baseUrl, vscode.ConfigurationTarget.Global);
+          await config.update("chat.provider", "local", vscode.ConfigurationTarget.Global);
+          await config.update("chat.model", m.model, vscode.ConfigurationTarget.Global);
+          // Completion runs on the same machine by default: a user who has just chosen a local
+          // model has not also chosen to leave completion pointing somewhere else.
+          await config.update("completion.provider", "local", vscode.ConfigurationTarget.Global);
+          await config.update("completion.model", m.model, vscode.ConfigurationTarget.Global);
+          await this.refreshSetup();
+          break;
+        }
+
+        case "finishSetup":
+          await this.ctx.globalState.update(SETUP_SEEN_KEY, true);
+          this.screen = "chat";
+          this.sendState();
+          break;
+
+        case "openExternal":
+          // Only the addresses this extension itself offers. A URL arriving from the panel is
+          // still a URL the panel could have been made to send.
+          if (ALLOWED_LINKS.includes(m.url)) await vscode.env.openExternal(vscode.Uri.parse(m.url));
+          break;
+
         case "openSettings":
           await vscode.commands.executeCommand("workbench.action.openSettings", SECTION);
           break;
@@ -498,6 +646,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    * is saved is what the user read, including the exchanges they muted — which the model never
    * saw. A file that silently dropped them would be a record of a conversation nobody had.
    */
+  /** Reopens the first-run screen and re-probes, from the command palette. */
+  openSetup(): void {
+    this.screen = "setup";
+    this.sendState();
+    void this.probeLocal();
+  }
+
   /** Opens the model picker inside the panel, from a command or a keybinding. */
   openModelPicker(): void {
     this.screen = "chat";

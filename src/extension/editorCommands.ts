@@ -146,20 +146,32 @@ export function registerEditorCommands(context: vscode.ExtensionContext, deps: E
     vscode.commands.registerCommand("hiveyCode.openTerminal", async () => {
       const settings = readSettings();
       const script = vscode.Uri.joinPath(deps.extensionUri, "dist", "cli.js").fsPath;
-      const existing = vscode.window.terminals.find((t) => t.name === "Hivey Code");
-      const terminal =
-        existing ??
-        vscode.window.createTerminal({
-          name: "Hivey Code",
-          // The terminal client reads its endpoint and model from the environment, so it starts on
-          // the same configuration as the sidebar instead of on its own defaults.
-          env: {
-            HIVEY_CODE_URL: settings.endpoints[settings.chat.provider] ?? settings.endpoints.local,
-            HIVEY_CODE_MODEL: settings.chat.model,
-          },
-        });
+
+      // Run on the Node that VS Code itself runs on, not on whatever `node` the user's shell
+      // happens to resolve. Requiring a separate Node installation to use a VS Code extension is an
+      // unreasonable thing to ask, and it fails in the least helpful way possible: the terminal
+      // opens, prints "command not found", and looks like the feature is broken.
+      //
+      // `process.execPath` is the editor's own binary. `ELECTRON_RUN_AS_NODE` tells it to behave as
+      // a plain Node process rather than starting a window — the documented way to do this.
+      const node = process.execPath;
+
+      // A fresh terminal every time. Reusing one by name looked tidy and was wrong: the
+      // configuration travels in the environment, and the environment of a terminal is fixed when
+      // it is created — so changing model in the sidebar left the reused terminal on the old one,
+      // silently.
+      const terminal = vscode.window.createTerminal({
+        name: "Hivey Code",
+        env: {
+          ELECTRON_RUN_AS_NODE: "1",
+          HIVEY_CODE_URL: settings.endpoints[settings.chat.provider] ?? settings.endpoints.local,
+          HIVEY_CODE_MODEL: settings.chat.model,
+        },
+      });
       terminal.show();
-      terminal.sendText(`node "${script}"`, true);
+      // Windows shells split on spaces before quoting is considered, and both the editor's path and
+      // the extension's path routinely contain them ("Program Files", "Application Support").
+      terminal.sendText(`${quote(node)} ${quote(script)}`, true);
     }),
 
     vscode.commands.registerCommand("hiveyCode.explainTerminalSelection", async () => {
@@ -239,4 +251,17 @@ interface GitExtensionApi {
       inputBox: { value: string };
     }>;
   };
+}
+
+/**
+ * Quote a path for whichever shell the terminal is running.
+ *
+ * PowerShell, cmd and every POSIX shell all accept a double-quoted argument; what differs is the
+ * escape character inside it. A path containing a double quote is not something any of them handles
+ * the same way — and is not something a filesystem should contain — so it is refused rather than
+ * mangled.
+ */
+function quote(value: string): string {
+  if (value.includes('"')) throw new Error(`Refusing to run a path containing a quote: ${value}`);
+  return `"${value}"`;
 }

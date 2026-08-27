@@ -10,10 +10,6 @@
 // webview, and it is called in `main.ts`.
 
 export interface PanelPrefs {
-  /** Show the curated quality estimate on each model row. */
-  metricScore: boolean;
-  /** Show the price on each model row. */
-  metricPrice: boolean;
   /** "" leaves the natural grouping alone; desc and asc flatten the list into a ranking. */
   modelSort: "" | "desc" | "asc";
   /** Price buckets to show. An empty list means "no filter", not "show nothing". */
@@ -23,8 +19,6 @@ export interface PanelPrefs {
 }
 
 const DEFAULTS: PanelPrefs = {
-  metricScore: true,
-  metricPrice: true,
   modelSort: "",
   tiers: [],
   providers: [],

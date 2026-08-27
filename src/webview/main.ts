@@ -15,6 +15,7 @@ import type { ToExtension, ToPanel, UiState } from "../shared/protocol.js";
 import { t } from "../shared/i18n.js";
 import { usePrefStore } from "./prefs.js";
 import { openModelCombo } from "./modelCombo.js";
+import { setupScreen } from "./setup.js";
 
 declare function acquireVsCodeApi(): { postMessage(m: unknown): void; getState(): unknown; setState(s: unknown): void };
 const vscode = acquireVsCodeApi();
@@ -53,6 +54,9 @@ function render(): void {
     case "permissions":
       app.append(permissionsScreen(state, send));
       break;
+    case "setup":
+      app.append(setupScreen(state, send, render));
+      break;
     case "chat":
     default:
       app.append(chatScreen(state, deps));
@@ -77,14 +81,52 @@ function header(s: UiState): HTMLElement {
     );
     left.append(el("span", "topbar-title", screenTitle(s)));
   } else {
-    const title = el("span", "topbar-title", s.session.title || t("New conversation"));
-    title.title = s.session.title || "";
+    // The conversation's name, editable in place. A title the assistant invented from the first
+    // question is a guess, and a guess you cannot correct is worse than no title: it is what you
+    // will scroll past in the history a week from now looking for something else.
+    //
+    // The local/remote badge that used to sit here is gone. It said the same thing on every
+    // conversation for weeks at a time, and the composer already names the model — a badge that
+    // never changes is a badge nobody reads.
+    const title = el("span", "topbar-title editable", s.session.title || t("New conversation"));
+    title.title = t("Double-click to rename");
+    title.tabIndex = 0;
+
+    const rename = () => {
+      const input = el("input", "topbar-title-input");
+      input.value = s.session.title;
+      input.placeholder = t("New conversation");
+      const commit = (save: boolean) => {
+        if (input.parentElement !== left) return;
+        left.replaceChild(title, input);
+        const next = input.value.trim();
+        if (save && next !== s.session.title) send({ type: "renameSession", title: next });
+      };
+      input.addEventListener("keydown", (ev) => {
+        if (ev.key === "Enter") { ev.preventDefault(); commit(true); }
+        else if (ev.key === "Escape") { ev.preventDefault(); commit(false); }
+      });
+      // Leaving the field keeps what was typed. Discarding an edit because focus moved is the
+      // behaviour people learn to distrust.
+      input.addEventListener("blur", () => commit(true));
+      left.replaceChild(input, title);
+      input.focus();
+      input.select();
+    };
+
+    title.addEventListener("dblclick", rename);
+    title.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter" || ev.key === "F2") { ev.preventDefault(); rename(); }
+    });
     left.append(title);
-    const badge = el("span", `badge ${s.remote ? "remote" : t("local")}`, s.remote ? t("remote") : t("local"));
-    badge.title = s.remote
-      ? t("Remote provider: what leaves is pseudonymised, and an egress log is kept.")
-      : t("Local provider: nothing leaves your machine or your network.");
-    left.append(badge);
+    left.append(
+      button({
+        icon: ICON.edit,
+        title: t("Rename this conversation"),
+        className: "btn icon-only rename",
+        onClick: rename,
+      }),
+    );
   }
 
   const right = el("div", "topbar-right");
@@ -177,6 +219,8 @@ function screenTitle(s: UiState): string {
       return t("Models");
     case "permissions":
       return t("Permissions");
+    case "setup":
+      return t("Setup");
     default:
       return "Hivey Code";
   }

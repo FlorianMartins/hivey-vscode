@@ -1508,3 +1508,288 @@ pre.code {
 .entry-mark.assistant {
   color: var(--vscode-textLink-foreground, var(--vscode-focusBorder));
 }
+
+/* ── First run ───────────────────────────────────────────────────────────────────────────────
+ *
+ * One column, two cards, and no field asking for a URL. The screen's job is to turn "what is the
+ * base URL of your inference server" — a question a new user cannot answer — into "here is what is
+ * running on your machine, pick one".
+ */
+
+.setup {
+  overflow-y: auto;
+  padding: var(--sp-4) var(--sp-3) var(--sp-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+.setup-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.setup-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0;
+}
+.setup-lede {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--fs-control);
+}
+
+.setup-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--sp-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  background: var(--surface);
+}
+.setup-card-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+}
+.setup-card-title {
+  font-size: var(--fs-body);
+  font-weight: 600;
+  margin: 0;
+}
+.setup-card-hint,
+.setup-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--fs-meta);
+  line-height: 1.5;
+}
+.setup-badge {
+  font-size: 10px;
+  border-radius: 10px;
+  padding: 1px 6px;
+  border: 1px solid var(--border-strong);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.setup-badge.recommended {
+  color: var(--vscode-charts-green);
+  border-color: var(--vscode-charts-green);
+}
+.setup-badge.done {
+  color: var(--vscode-charts-blue);
+  border-color: var(--vscode-charts-blue);
+}
+.setup-status {
+  margin: 0;
+  font-size: var(--fs-control);
+}
+.setup-status.pulse {
+  color: var(--muted);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.runtime {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--sp-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  background: var(--vscode-editor-background);
+}
+.runtime.empty {
+  background: transparent;
+  border-style: dashed;
+}
+.runtime-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+.runtime-tick {
+  color: var(--vscode-charts-green);
+  flex: 0 0 auto;
+}
+.runtime-name {
+  font-weight: 600;
+  font-size: var(--fs-control);
+  flex: 0 0 auto;
+}
+.runtime-url {
+  font-family: var(--vscode-editor-font-family);
+  font-size: var(--fs-meta);
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.runtime-models {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.runtime-model {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  font-size: var(--fs-control);
+  padding: var(--sp-1) var(--sp-2);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.runtime-model:hover {
+  background: var(--vscode-list-hoverBackground, var(--hover));
+}
+.runtime-model.current {
+  background: var(--vscode-list-activeSelectionBackground);
+  color: var(--vscode-list-activeSelectionForeground);
+}
+.runtime-model-name {
+  font-family: var(--vscode-editor-font-family);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.runtime-model-action {
+  font-size: var(--fs-meta);
+  color: var(--muted);
+  opacity: 0;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+.runtime-model:hover .runtime-model-action {
+  opacity: 1;
+}
+
+.setup-field {
+  display: flex;
+  gap: var(--sp-2);
+  align-items: center;
+}
+.setup-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: var(--vscode-editor-font-family);
+  font-size: var(--fs-control);
+  padding: var(--sp-1) var(--sp-2);
+  border-radius: var(--radius);
+  border: 1px solid var(--vscode-input-border, var(--border-strong));
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+}
+.setup-input:focus {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+  border-color: var(--vscode-focusBorder);
+}
+.setup-command {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  background: var(--vscode-textCodeBlock-background, var(--surface));
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--sp-1) var(--sp-2);
+}
+.setup-command code {
+  flex: 1 1 auto;
+  font-family: var(--vscode-editor-font-family);
+  font-size: var(--fs-meta);
+  overflow-x: auto;
+  white-space: nowrap;
+}
+.setup-row,
+.setup-links,
+.setup-card-foot,
+.setup-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+}
+.setup-ready {
+  font-size: var(--fs-meta);
+  color: var(--vscode-charts-green);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+/* ── The conversation's name, edited in place ────────────────────────────────────────────────
+ *
+ * The pencil appears on hover so the header stays quiet, but the double-click works whether or not
+ * anyone discovers it — and the whole title is a focus target, so a keyboard reaches it too.
+ */
+
+.topbar-title.editable {
+  cursor: text;
+  border-radius: var(--radius);
+  padding: 1px var(--sp-1);
+  margin-left: calc(var(--sp-1) * -1);
+}
+.topbar-title.editable:hover {
+  background: var(--hover);
+}
+.topbar-title.editable:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+.topbar-title-input {
+  font-family: inherit;
+  font-size: var(--fs-control);
+  font-weight: 600;
+  min-width: 0;
+  flex: 1 1 auto;
+  padding: 1px var(--sp-1);
+  border-radius: var(--radius);
+  border: 1px solid var(--vscode-focusBorder);
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  outline: none;
+}
+.btn.icon-only.rename {
+  opacity: 0;
+  transition: opacity 100ms ease;
+}
+.topbar-left:hover .btn.icon-only.rename,
+.btn.icon-only.rename:focus-visible {
+  opacity: 1;
+}
+
+/* The metric caption replaced two toggle buttons; it labels the column rather than offering a
+   choice that no longer exists. */
+.combo-caption {
+  font-size: var(--fs-meta);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* A gateway card's header is a disclosure control: three providers, expanded one at a time, so the
+   screen stays short for the majority who only ever configure one. */
+.setup-card-head.as-button {
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
+.setup-card-head.as-button:hover .setup-card-title {
+  color: var(--vscode-textLink-foreground, var(--vscode-foreground));
+}

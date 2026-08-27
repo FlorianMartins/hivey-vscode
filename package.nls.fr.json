@@ -1,7 +1,7 @@
 {
   "extension.description": "Assistant de code souverain pour VS Code — modèles locaux ou OpenRouter, anonymisation des données avant tout envoi, zéro télémétrie.",
   "container.title": "Hivey Code",
-  "view.chat.name": "Discussion",
+  "view.chat.name": "Hivey Code",
   "command.newSession.title": "Nouvelle discussion",
   "command.askAboutSelection.title": "Interroger la sélection",
   "command.showEgress.title": "Aperçu des données sortantes",
@@ -52,5 +52,8 @@
   "command.clearArcadCredentials.title": "Oublier les identifiants ARCAD Elias",
   "config.mcp.servers": "Serveurs MCP auxquels se connecter, sous la forme `{ \"nom\": { … } }`. Une entrée `stdio` exécute un programme sur cette machine et n’est jamais démarrée avant que vous ne l’ayez accepté dans une fenêtre qui nomme la commande ; une entrée `http` s’adresse à une URL et passe par les mêmes règles de sortie que toute autre requête. Un fichier `.vscode/mcp.json` de l’espace de travail est lu aussi, et ces entrées l’emportent en cas de collision de nom.",
   "command.exportSession.title": "Exporter la conversation en Markdown",
-  "command.pickModel.title": "Choisir le modèle de conversation"
+  "command.pickModel.title": "Choisir le modèle de conversation",
+  "command.setup.title": "Configurer un modèle",
+  "config.accounts": "**Comptes.** Les clés d'API ne sont jamais rangées dans les réglages — elles vont dans le trousseau de votre système, parce que ce fichier se synchronise entre machines et se retrouve committé par accident.\n\n- [Enregistrer une clé](command:hiveyCode.setApiKey) pour OpenRouter, Anthropic ou une passerelle compatible OpenAI\n- [Oublier une clé](command:hiveyCode.clearApiKey)\n- [Ouvrir l'écran de configuration](command:hiveyCode.setup) pour trouver un modèle local ou connecter un compte\n- [Enregistrer les identifiants ARCAD Elias](command:hiveyCode.setArcadCredentials)",
+  "command.moveToSecondarySideBar.title": "Déplacer le panneau dans la barre latérale droite"
 }

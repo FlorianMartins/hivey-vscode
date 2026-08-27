@@ -97,6 +97,23 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
 
     vscode.commands.registerCommand("hiveyCode.exportSession", () => chat.exportSession()),
+    vscode.commands.registerCommand("hiveyCode.moveToSecondarySideBar", async () => {
+      // VS Code owns where a view container lives. There is no API to place one in the secondary
+      // side bar — `viewsContainers.secondarySidebar` fixes it there at install time, which would
+      // impose the choice on everyone, and no command moves a container directly. What exists is
+      // `moveFocusedView`, which opens the editor's own destination picker. So: focus the panel,
+      // open that picker, and tell the user which entry to choose. One click, and the position is
+      // remembered from then on.
+      await vscode.commands.executeCommand("hiveyCode.chat.focus");
+      await vscode.commands.executeCommand("workbench.action.toggleAuxiliaryBar").then(undefined, () => {});
+      await vscode.commands.executeCommand("workbench.action.moveFocusedView");
+      void vscode.window.setStatusBarMessage(t("Choose “Secondary Side Bar” in the list."), 6000);
+    }),
+
+    vscode.commands.registerCommand("hiveyCode.setup", async () => {
+      await vscode.commands.executeCommand("hiveyCode.chat.focus");
+      chat.openSetup();
+    }),
 
     vscode.commands.registerCommand("hiveyCode.showMcp", async () => {
       const rows = await mcp.status();

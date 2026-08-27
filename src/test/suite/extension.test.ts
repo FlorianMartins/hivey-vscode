@@ -188,6 +188,7 @@ suite("Screenshot", () => {
 
       await announce("conversation");
       for (const [command, name] of [
+        ["hiveyCode.setup", "setup"],
         ["hiveyCode.pickModel", "picker"],
         ["hiveyCode.showHistory", "historique"],
         ["hiveyCode.showModels", "modeles"],

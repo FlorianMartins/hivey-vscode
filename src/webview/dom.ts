@@ -74,8 +74,18 @@ const PATHS = {
   settings: "M8 6a2 2 0 1 0 0 4 2 2 0 0 0 0-4ZM8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M12.6 3.4l-1.4 1.4M4.8 11.2l-1.4 1.4",
   shield: "M8 2 13 4v4.2C13 11 10.8 13.3 8 14.2 5.2 13.3 3 11 3 8.2V4Z",
   attach: "M8 3v10M3 8h10",
-  more: "M3.5 8h.01M8 8h.01M12.5 8h.01",
+  more: "M4 8a1 1 0 1 0 0-.01M8 8a1 1 0 1 0 0-.01M12 8a1 1 0 1 0 0-.01",
 } as const;
+
+/**
+ * Icons drawn by filling rather than by stroking.
+ *
+ * The ellipsis was three zero-length segments with round caps, which at stroke-width 1.3 produces
+ * three dots 1.3 px across — a quarter of the ink of any other icon in the row, and it read as
+ * disabled next to them. The colour was never wrong: it is `currentColor`, the same as its
+ * neighbours. A dot has to be filled to have the weight of a line.
+ */
+const FILLED = new Set<IconName>(["more"]);
 
 export type IconName = keyof typeof PATHS;
 
@@ -89,9 +99,15 @@ export function icon(name: IconName, className = "ico"): SVGSVGElement {
   svg.setAttribute("class", className);
   const path = document.createElementNS(NS, "path");
   path.setAttribute("d", PATHS[name]);
-  path.setAttribute("fill", "none");
-  path.setAttribute("stroke", "currentColor");
-  path.setAttribute("stroke-width", "1.3");
+  if (FILLED.has(name)) {
+    path.setAttribute("fill", "currentColor");
+    path.setAttribute("stroke", "currentColor");
+    path.setAttribute("stroke-width", "1.6");
+  } else {
+    path.setAttribute("fill", "none");
+    path.setAttribute("stroke", "currentColor");
+    path.setAttribute("stroke-width", "1.3");
+  }
   path.setAttribute("stroke-linecap", "round");
   path.setAttribute("stroke-linejoin", "round");
   svg.append(path);

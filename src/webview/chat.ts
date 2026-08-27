@@ -346,10 +346,13 @@ function contextButton(state: UiState, deps: ChatDeps): HTMLElement {
 
         if (state.openFiles.length) {
           panel.append(separator(), menuTitle(t("Open tabs ({0})", state.openFiles.length)));
+          // First, and named for what it does. It was below the per-file list, where the only
+          // people who found it were the ones already scrolling past twelve file names — which is
+          // to say, the ones who no longer needed it.
           panel.append(
             menuItem({
-              label: t("Attach all"),
-              hint: t("The files currently open"),
+              label: t("Attach all {0} open files", state.openFiles.length),
+              hint: t("Everything open in a tab right now, ~{0} tokens", formatTokens(estimateOpenFiles(state))),
               onClick: () => {
                 deps.send({ type: "attach", what: "openFiles" });
                 close();
@@ -572,4 +575,16 @@ function submit(area: HTMLTextAreaElement, deps: ChatDeps): void {
     return;
   }
   deps.send({ type: "send", text });
+}
+
+/**
+ * Roughly what attaching every open tab would cost.
+ *
+ * The panel does not have the files' contents — only their paths — so this cannot be measured, only
+ * estimated: a middling source file is a few hundred lines, and four characters make a token. The
+ * number is there to separate "three small files" from "the whole codebase", which is the only
+ * distinction the user needs before clicking. It is prefixed with ~ for that reason.
+ */
+function estimateOpenFiles(state: UiState): number {
+  return state.openFiles.length * 1200;
 }

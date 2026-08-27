@@ -2,7 +2,7 @@
   "name": "hivey-code",
   "displayName": "Hivey Code",
   "description": "%extension.description%",
-  "version": "0.5.2",
+  "version": "0.6.0",
   "publisher": "hivey",
   "license": "Apache-2.0",
   "repository": {
@@ -198,6 +198,18 @@
         "title": "%command.pickModel.title%",
         "category": "Hivey Code",
         "icon": "$(sparkle)"
+      },
+      {
+        "command": "hiveyCode.setup",
+        "title": "%command.setup.title%",
+        "category": "Hivey Code",
+        "icon": "$(plug)"
+      },
+      {
+        "command": "hiveyCode.moveToSecondarySideBar",
+        "title": "%command.moveToSecondarySideBar.title%",
+        "category": "Hivey Code",
+        "icon": "$(layout-sidebar-right)"
       }
     ],
     "menus": {
@@ -216,6 +228,11 @@
           "command": "hiveyCode.openTerminal",
           "when": "view == hiveyCode.chat",
           "group": "navigation@3"
+        },
+        {
+          "command": "hiveyCode.moveToSecondarySideBar",
+          "when": "view == hiveyCode.chat",
+          "group": "1_layout@1"
         }
       ],
       "editor/context": [
@@ -271,6 +288,11 @@
     "configuration": {
       "title": "Hivey Code",
       "properties": {
+        "hiveyCode.accounts": {
+          "type": "null",
+          "default": null,
+          "markdownDescription": "%config.accounts%"
+        },
         "hiveyCode.language": {
           "type": "string",
           "enum": [

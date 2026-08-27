@@ -5,7 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { toolsForMode, promptForMode, MODES } from "../src/core/session/modes.js";
 import { Permissions, MemoryPermissionStore, commandPrefix } from "../src/core/agent/permissions.js";
-import { filterHistory, searchTranscript, excerptAround, normalise } from "../src/core/session/history.js";
+import { filterHistory, searchTranscript, excerptAround, normalise, upsertSession } from "../src/core/session/history.js";
 import { Session, type SessionData } from "../src/core/session/session.js";
 import type { Tool } from "../src/core/agent/loop.js";
 
@@ -237,4 +237,123 @@ test("an excerpt reads as a sentence, not as a word", () => {
   assert.ok(out.startsWith("…") && out.endsWith("…"));
   assert.ok(out.includes("arrondi"));
   assert.ok(out.length < 160);
+});
+
+// ── Local storage ────────────────────────────────────────────────────────────────────────────
+//
+// What "the history works" actually means, written down. Every assertion below corresponds to
+// something a user does and then expects to still be true after closing the editor.
+
+test("emptying a conversation removes it, rather than leaving the old version in storage", () => {
+  // The bug this guards: the caller used to return early when a session had no entries, on the
+  // reasoning that there was nothing to save. What it did was leave the PREVIOUS version — with
+  // the messages just deleted — untouched. Reopening the conversation brought them all back.
+  const full = session({ id: "a", entries: [{ id: "1", role: "user", at: NOW, included: true, text: "hello" }] });
+  const stored = upsertSession([], full);
+  assert.equal(stored.length, 1);
+
+  const emptied = { ...full, entries: [] };
+  assert.deepEqual(upsertSession(stored, emptied), [], "the conversation is gone, not stale");
+});
+
+test("saving a conversation replaces its earlier version and moves it to the top", () => {
+  const a = session({ id: "a", entries: [{ id: "1", role: "user", at: NOW, included: true, text: "first" }] });
+  const b = session({ id: "b", entries: [{ id: "2", role: "user", at: NOW, included: true, text: "second" }] });
+  let list = upsertSession(upsertSession([], a), b);
+  assert.deepEqual(list.map((s) => s.id), ["b", "a"]);
+
+  const updated = { ...a, entries: [...a.entries, { id: "3", role: "assistant" as const, at: NOW, included: true, text: "reply" }] };
+  list = upsertSession(list, updated);
+  assert.deepEqual(list.map((s) => s.id), ["a", "b"], "the one just touched leads");
+  assert.equal(list.filter((s) => s.id === "a").length, 1, "no duplicate");
+  assert.equal(list[0]!.entries.length, 2);
+});
+
+test("the stored list is bounded, oldest dropped first", () => {
+  let list: SessionData[] = [];
+  for (let i = 0; i < 8; i++) {
+    list = upsertSession(list, session({ id: `s${i}`, entries: [{ id: `e${i}`, role: "user", at: NOW, included: true, text: "x" }] }), 5);
+  }
+  assert.equal(list.length, 5);
+  assert.deepEqual(list.map((s) => s.id), ["s7", "s6", "s5", "s4", "s3"]);
+});
+
+test("deleting a question deletes the answer that belongs to it", () => {
+  const s = new Session({
+    entries: [
+      { id: "1", role: "user", at: NOW, included: true, text: "question" },
+      { id: "2", role: "assistant", at: NOW, included: true, text: "answer" },
+      { id: "3", role: "user", at: NOW, included: true, text: "another" },
+    ],
+  });
+  s.drop("1");
+  assert.deepEqual(s.entries.map((e) => e.id), ["3"], "an orphan answer would make no sense on its own");
+});
+
+test("deleting an answer alone leaves the question, which is a thing people do on purpose", () => {
+  const s = new Session({
+    entries: [
+      { id: "1", role: "user", at: NOW, included: true, text: "question" },
+      { id: "2", role: "assistant", at: NOW, included: true, text: "a bad answer" },
+    ],
+  });
+  s.drop("2");
+  assert.deepEqual(s.entries.map((e) => e.id), ["1"], "so the question can be asked again");
+});
+
+test("muting a question mutes its answer, and the prompt loses both", () => {
+  const s = new Session({
+    entries: [
+      { id: "1", role: "user", at: NOW, included: true, text: "old question" },
+      { id: "2", role: "assistant", at: NOW, included: true, text: "old answer" },
+      { id: "3", role: "user", at: NOW, included: true, text: "current question" },
+    ],
+  });
+  s.setIncluded("1", false);
+  assert.equal(s.get("2")?.included, false, "an answer without its question is noise");
+
+  const built = s.build({ systemPrompt: "sys", maxTokens: 8000, nonce: "n" });
+  const sent = built.messages.map((m) => m.content).join("\n");
+  assert.ok(!sent.includes("old question"));
+  assert.ok(!sent.includes("old answer"));
+  assert.ok(sent.includes("current question"), "muting is not deleting: the rest still goes");
+  assert.equal(s.entries.length, 3, "and the exchange is still on screen");
+});
+
+test("unmuting brings both back", () => {
+  const s = new Session({
+    entries: [
+      { id: "1", role: "user", at: NOW, included: true, text: "q" },
+      { id: "2", role: "assistant", at: NOW, included: true, text: "a" },
+    ],
+  });
+  s.setIncluded("2", false);
+  assert.equal(s.get("1")?.included, false, "muting the answer mutes the question too");
+  s.setIncluded("1", true);
+  assert.equal(s.get("2")?.included, true);
+});
+
+test("a conversation survives the round trip through storage with everything that matters", () => {
+  const s = new Session({
+    id: "keep",
+    title: "Renamed by hand",
+    mode: "plan",
+    entries: [
+      { id: "1", role: "user", at: NOW, included: false, pinned: true, text: "muted and pinned" },
+      { id: "2", role: "assistant", at: NOW, included: true, text: "answer", model: "qwen2.5-coder:7b", usdCost: 0.004 },
+    ],
+  });
+  const back = new Session(JSON.parse(JSON.stringify(s.toJSON())));
+  assert.equal(back.title, "Renamed by hand");
+  assert.equal(back.mode, "plan");
+  assert.equal(back.get("1")?.included, false, "a muted exchange stays muted after a restart");
+  assert.equal(back.get("1")?.pinned, true);
+  assert.equal(back.get("2")?.model, "qwen2.5-coder:7b");
+  assert.equal(back.get("2")?.usdCost, 0.004);
+});
+
+test("a conversation renamed by hand keeps its name instead of being re-guessed", () => {
+  const s = new Session({ title: "My name", entries: [] });
+  s.add({ role: "user", text: "a question whose first line would otherwise become the title" });
+  assert.equal(s.title, "My name");
 });

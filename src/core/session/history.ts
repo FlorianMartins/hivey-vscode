@@ -137,3 +137,20 @@ export function searchTranscript(session: SessionData, query: string): Match[] {
   }
   return out;
 }
+
+/**
+ * Put a conversation into the stored list, or take it out when it has become empty.
+ *
+ * Extracted from the extension so it can be tested, and because the bug it now fixes was invisible
+ * where it lived: the caller returned early when the session had no entries, which reads as "there
+ * is nothing to save". What it actually did was leave the PREVIOUS version of that conversation —
+ * the one with the messages still in it — untouched in storage. Deleting the last message and
+ * reopening the conversation brought every deleted message back.
+ *
+ * An empty conversation is not nothing to save. It is something to remove.
+ */
+export function upsertSession(list: SessionData[], session: SessionData, max = 100): SessionData[] {
+  const rest = list.filter((s) => s.id !== session.id);
+  if (!session.entries.length) return rest.slice(0, max);
+  return [session, ...rest].slice(0, max);
+}

@@ -2,6 +2,63 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.6.0 — 2026-08-27
+
+Everything here comes from Florian using the extension for the first time. That is the point of
+using it: none of the nine defects below were things the 206 tests were looking for.
+
+### A first screen that does not ask an unanswerable question
+
+Installing this used to lead to `hiveyCode.endpoints.local` and a request for a base URL. Someone
+who installed Ollama an hour ago does not know it, has no reason to know it, and guesses wrong — and
+the guess fails in a way that looks like the extension being broken.
+
+The setup screen does not ask, it reports. It knocks on the ports local runtimes actually bind —
+Ollama, LM Studio, llama.cpp, vLLM, Jan, LocalAI, text-generation-webui — **on loopback only**, and
+lists what answered with the models it serves. Pick one and you are done. A runtime that is running
+but empty gets the exact `ollama pull` line, ready to copy, because "no model found" is a dead end.
+
+Gateways get one card each — **OpenRouter, Anthropic and any OpenAI-compatible server** — with the
+address field for the last of those. Only OpenRouter was offered at first, which told everyone with
+an Anthropic account that this extension did not support them, while the code supported them all
+along. An affordance that exists in the code and not on the screen does not exist.
+
+### Fixed
+
+- **The terminal client could not start.** It was launched with `node`, which assumes Node.js is
+  installed and on the shell's PATH — an unreasonable thing to require of someone installing a VS
+  Code extension, and it fails as "command not found", which reads as a broken feature. It now runs
+  on the Node that VS Code itself runs on (`process.execPath` with `ELECTRON_RUN_AS_NODE`), so there
+  is no prerequisite at all. Paths are quoted, because "Program Files" exists.
+- **Deleting the last message of a conversation did not save.** The persistence skipped an empty
+  session on the reasoning that there was nothing to write; what it did was leave the *previous*
+  version — with the messages just deleted — in storage. Reopening brought them all back. Emptying a
+  conversation now removes it. Nine tests cover what "the history works" actually means.
+- **The settings had no way to connect an account.** Keys deliberately live in the OS keychain
+  rather than in `settings.json`, which syncs and gets committed — but nothing in the settings said
+  so or offered a way in. There is now an Accounts entry linking to each command.
+- **The ellipsis in the panel header was barely visible.** Not a colour problem: it is
+  `currentColor` like its neighbours. It was three zero-length segments at stroke-width 1.3 — a
+  quarter of the ink of every other icon. A dot has to be filled to weigh the same as a line.
+
+### Changed
+
+- **The model picker shows price and nothing else.** The curated quality index is gone, and deleted
+  rather than hidden: a hundred and fifty lines of hand-tuned numbers that no screen reads are not an
+  asset. The colours changed too, and for a reason worth recording — `--vscode-charts-*` are *fill*
+  colours, meant to sit behind a legend as a solid block. At eleven pixels of text they are muddy,
+  and `charts.orange` is a dark amber that disappears on a dark background. The badges now use the
+  tokens the editor uses for text it needs you to read.
+- **The conversation's name is editable**: double-click it, press F2, or use the pencil. A title the
+  assistant guessed from your first question is a guess, and a guess you cannot correct is what you
+  scroll past in the history a week later looking for something else. The local/remote badge beside
+  it is gone — it said the same thing for weeks at a time, and the composer already names the model.
+- **"Attach all open files" is first in the context menu** and says how many there are and roughly
+  what they cost. It used to sit below twelve file names, where the only people who found it were
+  the ones who no longer needed it.
+- **The panel header reads "Hivey Code"**, not "Hivey Code: Chat".
+- **The panel can move to the secondary side bar**, from its own overflow menu.
+
 ## 0.5.2 — 2026-08-27
 
 - Removed `copilot` from the manifest's keywords. Using a competitor's trademark as search metadata

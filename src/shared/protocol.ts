@@ -3,7 +3,7 @@
 
 export type Mode = "chat" | "plan" | "agent";
 export type Reasoning = "none" | "low" | "medium" | "high";
-export type Screen = "chat" | "history" | "models" | "permissions";
+export type Screen = "chat" | "history" | "models" | "permissions" | "setup";
 
 export interface UiContextItem {
   kind: string;
@@ -85,6 +85,27 @@ export interface UiPermissionRule {
   session?: boolean;
 }
 
+/** A model server found running on this machine. */
+export interface UiRuntime {
+  name: string;
+  baseUrl: string;
+  models: string[];
+  /** The command that would install a sensible model, when the server is running but empty. */
+  suggestion?: string;
+}
+
+export interface UiSetup {
+  probing: boolean;
+  /** Empty after a probe means nothing is listening — which is information, not a failure. */
+  runtimes: UiRuntime[];
+  /** Which providers already have a key in the OS keychain. Never the keys themselves. */
+  hasKey: Record<string, boolean>;
+  /** The configured base URL per provider, so a gateway shows the address it will actually use. */
+  endpoints: Record<string, string>;
+  /** What the extension is configured to use right now, so the screen can show it as done. */
+  configured?: { provider: string; model: string; baseUrl: string };
+}
+
 export interface UiOpenFile {
   path: string;
   active: boolean;
@@ -115,6 +136,7 @@ export interface UiState {
   /** Entry ids matching the in-conversation search, in document order. */
   matches: string[];
   searchQuery: string;
+  setup: UiSetup;
 }
 
 /** Panel → extension. */
@@ -123,6 +145,7 @@ export type ToExtension =
   | { type: "send"; text: string }
   | { type: "stop" }
   | { type: "newSession" }
+  | { type: "renameSession"; title: string }
   | { type: "openScreen"; screen: Screen }
   | { type: "openSession"; id: string }
   | { type: "deleteSession"; id: string }
@@ -149,7 +172,16 @@ export type ToExtension =
   | { type: "approve"; id: string; answer: "once" | "session" | "always" | "no" }
   | { type: "insertCode"; code: string }
   | { type: "applyCode"; code: string; language: string }
-  | { type: "copy"; text: string };
+  | { type: "copy"; text: string }
+  // ── First run ──────────────────────────────────────────────────────────────────────────────
+  | { type: "probeLocal" }
+  /** The key never travels back to the panel; it goes straight to the OS keychain. */
+  | { type: "saveKey"; provider: string; key: string }
+  | { type: "clearKey"; provider: string }
+  | { type: "setEndpoint"; provider: string; url: string }
+  | { type: "useLocal"; baseUrl: string; model: string }
+  | { type: "finishSetup" }
+  | { type: "openExternal"; url: string };
 
 /** Extension → panel. */
 export type ToPanel =

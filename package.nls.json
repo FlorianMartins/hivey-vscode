@@ -1,7 +1,7 @@
 {
   "extension.description": "Open-source coding assistant for VS Code — local models or OpenRouter, reversible pseudonymisation before anything leaves, zero telemetry.",
   "container.title": "Hivey Code",
-  "view.chat.name": "Chat",
+  "view.chat.name": "Hivey Code",
   "command.newSession.title": "New conversation",
   "command.askAboutSelection.title": "Ask about the selection",
   "command.showEgress.title": "Show outgoing data",
@@ -52,5 +52,8 @@
   "command.clearArcadCredentials.title": "Forget the ARCAD Elias credentials",
   "config.mcp.servers": "MCP servers to connect to, as `{ \"name\": { … } }`. A `stdio` entry runs a program on this machine and is never started until you have agreed to it in a dialog that names the command; an `http` entry talks to a URL and goes through the same egress rules as any other outbound request. A `.vscode/mcp.json` in the workspace is read too, and these entries win on a name collision.",
   "command.exportSession.title": "Export the conversation as Markdown",
-  "command.pickModel.title": "Choose the chat model"
+  "command.pickModel.title": "Choose the chat model",
+  "command.setup.title": "Set up a model",
+  "config.accounts": "**Accounts.** API keys are never stored in settings — they go to your operating system's keychain, because this file syncs between machines and gets committed by accident.\n\n- [Store a key](command:hiveyCode.setApiKey) for OpenRouter, Anthropic or an OpenAI-compatible gateway\n- [Forget a key](command:hiveyCode.clearApiKey)\n- [Open the setup screen](command:hiveyCode.setup) to find a local model or connect an account\n- [Store the ARCAD Elias credentials](command:hiveyCode.setArcadCredentials)",
+  "command.moveToSecondarySideBar.title": "Move the panel to the secondary side bar"
 }

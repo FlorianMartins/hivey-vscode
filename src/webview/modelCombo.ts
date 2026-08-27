@@ -29,17 +29,9 @@ import { button, el, formatContext, icon, ICON } from "./dom.js";
 import { prefs, setPrefs } from "./prefs.js";
 import { t } from "../shared/i18n.js";
 import type { ToExtension, UiModel, UiState } from "../shared/protocol.js";
-import {
-  categoryForMode,
-  modelScore,
-  priceTier,
-  PRICE_TIER_ORDER,
-  scoreBand,
-  type PriceTier,
-  type ScoreBand,
-} from "../core/models/benchmarks.js";
+import { priceTier, PRICE_TIER_ORDER, type PriceTier } from "../core/models/tiers.js";
 
-/** A row in the list, after the model has been scored, priced and grouped. */
+/** A row in the list, after the model has been priced and grouped. */
 interface ComboItem {
   value: string;
   label: string;
@@ -47,29 +39,31 @@ interface ComboItem {
   provider: string;
   vendor: string;
   tier: PriceTier;
-  score: number | undefined;
   local: boolean;
   current: boolean;
   group: string;
   model: UiModel;
 }
 
-/** Band → one of the editor's chart colours, which every theme defines. */
-const BAND_COLOUR: Record<ScoreBand, string> = {
-  strong: "var(--vscode-charts-green)",
-  good: "var(--vscode-charts-blue)",
-  fair: "var(--vscode-charts-yellow)",
-  weak: "var(--vscode-charts-orange)",
-  poor: "var(--vscode-charts-red)",
-  unknown: "var(--vscode-descriptionForeground)",
-};
-
+/**
+ * Price bucket → colour.
+ *
+ * These were `--vscode-charts-*` and that was a mistake worth naming: chart colours are FILL
+ * colours, chosen to sit behind a legend as a solid block. At eleven pixels of text they are
+ * muddy, and `charts.orange` in particular is a dark amber that disappears on a dark background.
+ * The tokens below are the ones the editor uses for TEXT it needs you to read — the same green a
+ * new file gets in the explorer, the same amber a warning gets, the same red an error gets.
+ *
+ * Only the ends are coloured. A mid-priced model gets the ordinary foreground, because colouring
+ * every row means colouring nothing: if all five buckets shout, the two that matter stop being
+ * visible.
+ */
 const TIER_COLOUR: Record<PriceTier, string> = {
-  free: "var(--vscode-charts-green)",
-  cheap: "var(--vscode-charts-green)",
-  affordable: "var(--vscode-charts-yellow)",
-  moderate: "var(--vscode-charts-orange)",
-  expensive: "var(--vscode-charts-red)",
+  free: "var(--vscode-gitDecoration-addedResourceForeground, var(--vscode-charts-green))",
+  cheap: "var(--vscode-gitDecoration-addedResourceForeground, var(--vscode-charts-green))",
+  affordable: "var(--vscode-foreground)",
+  moderate: "var(--vscode-editorWarning-foreground, var(--vscode-charts-yellow))",
+  expensive: "var(--vscode-errorForeground, var(--vscode-charts-red))",
 };
 
 function tierLabel(tier: PriceTier): string {
@@ -93,7 +87,6 @@ function priceBadge(model: UiModel): string {
 }
 
 function toItems(state: UiState): ComboItem[] {
-  const category = categoryForMode(state.mode);
   const items = state.models.map((model): ComboItem => {
     const vendor = model.vendor || (model.id.includes("/") ? model.id.split("/")[0]! : model.provider);
     return {
@@ -103,7 +96,6 @@ function toItems(state: UiState): ComboItem[] {
       provider: model.provider,
       vendor,
       tier: model.local ? "free" : priceTier(model.inUsd, model.outUsd),
-      score: modelScore(model.id, category),
       local: model.local,
       current: Boolean(model.current),
       group: model.local ? t("On your machine") : vendorLabel(vendor),
@@ -117,9 +109,7 @@ function toItems(state: UiState): ComboItem[] {
   items.sort((a, b) => {
     if (a.local !== b.local) return a.local ? -1 : 1;
     if (a.group !== b.group) return a.group.localeCompare(b.group);
-    const byScore = (b.score ?? -1) - (a.score ?? -1);
-    if (byScore) return byScore;
-    return a.model.inUsd - b.model.inUsd;
+    return a.model.inUsd - b.model.inUsd || a.label.localeCompare(b.label);
   });
 
   // The current model is pinned to the top as its own group, and REMOVED from where it would
@@ -151,15 +141,13 @@ function passes(item: ComboItem, query: string): boolean {
 }
 
 function applySort(items: ComboItem[]): ComboItem[] {
-  const { modelSort, metricScore, metricPrice } = prefs();
+  const { modelSort } = prefs();
   if (!modelSort) return items;
-  const flat = items.filter((i) => i.group !== t("Current"));
-  const byPriceOnly = !metricScore && metricPrice;
-  flat.sort(
-    byPriceOnly
-      ? (a, b) => PRICE_TIER_ORDER[a.tier] - PRICE_TIER_ORDER[b.tier] || a.model.inUsd - b.model.inUsd
-      : (a, b) => (b.score ?? -1) - (a.score ?? -1),
-  );
+  // Flattened into one ranking by price. "desc" reads as "the best deal first", which for a price
+  // means the cheapest — the label in the header says which, so there is nothing to guess.
+  const flat = items
+    .filter((i) => i.group !== t("Current"))
+    .sort((a, b) => PRICE_TIER_ORDER[a.tier] - PRICE_TIER_ORDER[b.tier] || a.model.inUsd - b.model.inUsd);
   if (modelSort === "asc") flat.reverse();
   return flat.map((i) => ({ ...i, group: t("Ranked") }));
 }
@@ -227,22 +215,11 @@ export function openModelCombo(anchor: HTMLElement, state: UiState, send: (m: To
 
     // Each segment keeps its OWN colour: the quality estimate in its band's colour, the price in
     // its bucket's. A single colour for the pair would make one of the two numbers a lie.
-    const { metricScore: showScore, metricPrice: showPrice } = prefs();
-    if (showScore || showPrice) {
-      const badge = el("div", "ci-badge");
-      if (showScore) {
-        const value = el("span", "ci-score", item.score === undefined ? "—" : `${item.score}%`);
-        value.style.color = BAND_COLOUR[scoreBand(item.score)];
-        badge.append(value);
-      }
-      if (showScore && showPrice) badge.append(el("span", "ci-sep", "·"));
-      if (showPrice) {
-        const value = el("span", "ci-price", priceBadge(item.model));
-        value.style.color = TIER_COLOUR[item.tier];
-        badge.append(value);
-      }
-      node.append(badge);
-    }
+    const badge = el("div", "ci-badge");
+    const price = el("span", "ci-price", priceBadge(item.model));
+    price.style.color = TIER_COLOUR[item.tier];
+    badge.append(price);
+    node.append(badge);
 
     node.title = item.local
       ? t("Served on your machine: nothing leaves, nothing is billed.")
@@ -258,37 +235,23 @@ export function openModelCombo(anchor: HTMLElement, state: UiState, send: (m: To
     const bar = el("div", "combo-header");
     const p = prefs();
 
-    const toggle = (label: string, on: boolean, title: string, onClick: () => void) => {
-      const b = button({
-        label,
-        className: `combo-metric${on ? " on" : ""}`,
-        title,
-        pressed: on,
-        onClick: () => {
-          onClick();
-          redraw();
-        },
-      });
-      return b;
-    };
 
-    bar.append(
-      toggle(t("Quality"), p.metricScore, t("A curated estimate for {0} work — not an official benchmark.", modeLabel(state)), () =>
-        setPrefs({ metricScore: !p.metricScore }),
-      ),
-    );
-    bar.append(toggle(t("Price"), p.metricPrice, t("Input price per million tokens."), () => setPrefs({ metricPrice: !p.metricPrice })));
-
+    // Short enough to share a line with the sort control and the filter at the side bar's default
+    // width. The long form is the tooltip: a caption that wraps and orphans the filter icon below
+    // it explains the column at the cost of the header.
+    const caption = el("span", "combo-caption", t("Price ($/M)"));
+    caption.title = t("Input price, in dollars per million tokens.");
+    bar.append(caption);
     bar.append(el("div", "spacer"));
 
     // Three states rather than two: a user who has flattened the list into a ranking needs a way
     // back to the grouping, and a second click that only reverses it is not that way.
-    const sortLabel = p.modelSort === "desc" ? t("Best first") : p.modelSort === "asc" ? t("Worst first") : t("Grouped");
+    const sortLabel = p.modelSort === "desc" ? t("Cheapest first") : p.modelSort === "asc" ? t("Dearest first") : t("Grouped");
     bar.append(
       button({
         label: sortLabel,
         className: `combo-metric${p.modelSort ? " on" : ""}`,
-        title: t("Sort: grouped by vendor, best first, or worst first."),
+        title: t("Sort: grouped by vendor, cheapest first, or dearest first."),
         onClick: () => {
           setPrefs({ modelSort: p.modelSort === "" ? "desc" : p.modelSort === "desc" ? "asc" : "" });
           redraw();
@@ -460,6 +423,3 @@ export function openModelCombo(anchor: HTMLElement, state: UiState, send: (m: To
   }, 0);
 }
 
-function modeLabel(state: UiState): string {
-  return state.mode === "agent" ? t("agent") : state.mode === "plan" ? t("analysis") : t("general");
-}
