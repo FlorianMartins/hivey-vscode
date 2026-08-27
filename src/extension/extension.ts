@@ -156,7 +156,12 @@ export function activate(context: vscode.ExtensionContext): void {
 
     // The chat model is chosen in the panel, where prices can be compared side by side; this
     // command survives for muscle memory and opens that screen.
-    vscode.commands.registerCommand("forge.pickModel", () => chat.show("models")),
+    // Opens the picker in place rather than navigating to the comparison screen: from the command
+    // palette the user wants to change model, not to read a table of four hundred of them.
+    vscode.commands.registerCommand("forge.pickModel", async () => {
+      await vscode.commands.executeCommand("forge.chat.focus");
+      chat.openModelPicker();
+    }),
 
     // The completion model is a different decision — it is asked on every pause in typing — and a
     // quick pick over what the endpoint actually serves is the right shape for it.

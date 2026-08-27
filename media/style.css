@@ -1335,9 +1335,15 @@ pre.code {
   display: flex;
   align-items: center;
   gap: var(--sp-2);
+  min-width: 0;
+}
+/* The ellipsis belongs to the label, not to the row: putting it on the row truncated the tag
+   beside it, and a badge reading "loca" looks like a rendering fault rather than a long name. */
+.ci-label {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  min-width: 0;
 }
 .ci-tag {
   font-size: 10px;

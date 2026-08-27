@@ -268,6 +268,9 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
   // wrong.
   const bar = el("div", "composer-toolbar");
   const left = el("div", "toolbar-group");
+  // `contextButton` is icon-only: at the side bar's default width every character it spends on the
+  // word "Context" is a character the model name loses, and the model name is the one label in the
+  // row that carries information the user cannot guess from the icon.
   left.append(contextButton(state, deps), modeButton(state, deps), modelButton(state, deps));
   if (state.reasoningAvailable) left.append(reasoningButton(state, deps));
   bar.append(left);
@@ -308,9 +311,8 @@ export function isStreaming(): boolean {
 function contextButton(state: UiState, deps: ChatDeps): HTMLElement {
   const b = button({
     icon: ICON.attach,
-    label: t("Context"),
     title: t("Add context to the next question"),
-    className: "btn ghost",
+    className: "btn ghost icon-only",
     onClick: () =>
       menu(b, (close) => {
         const panel = el("div", "menu-list");

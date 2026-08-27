@@ -9,14 +9,15 @@ Open source (Apache-2.0), **zero runtime dependencies**, **zero telemetry**.
 [Français](README.fr.md) · [Architecture](docs/ARCHITECTURE.md) · [Privacy](docs/PRIVACY.md) ·
 [Threat model](docs/THREAT-MODEL.md)
 
-![Forge's sidebar in VS Code](docs/images/conversation.png)
+![Forge's sidebar in VS Code](https://raw.githubusercontent.com/FlorianMartins/forge/main/docs/images/conversation.png)
 
-*Real screenshots, taken from a VS Code launched by the integration suite. Only the model answering
-is a stub server; the interface is the product.*
+*Real screenshots, taken from a VS Code launched by the integration suite — `node scripts/screenshots.mjs`
+takes them, so they cannot quietly stop being true. Only the model answering is a stub server; the
+interface is the product, at the side bar's default width.*
 
-| Conversations | Models |
+| Choosing a model | Conversations |
 |---|---|
-| ![History and filters](docs/images/historique.png) | ![Model comparison](docs/images/modeles.png) |
+| ![The model picker](https://raw.githubusercontent.com/FlorianMartins/forge/main/docs/images/picker.png) | ![History and filters](https://raw.githubusercontent.com/FlorianMartins/forge/main/docs/images/historique.png) |
 
 ---
 
@@ -46,11 +47,19 @@ that does leave is **reversibly pseudonymised** first.
 | **Terminal** | The `forge` command: the same core in a REPL, with command output actually captured and a diff printed before every write. |
 | **In the editor** | `Ctrl+I` rewrites the selection in place · right-click → ask about the selection · commit message written from the staged diff · “explain the terminal output”. |
 | **Quick fixes** | On an error reported by your language server: “Fix with Forge” and “Explain this problem”. The compiler says **what** and **where**; the model only has to fix it — which is what makes a small local model enough for most everyday cases. |
+| **Context notation** | `#file:`, `#selection`, `#changes`, `#problems`, `#codebase`, `#terminal`, `#sym:` — Copilot's notation, because you should not have to learn a second one. Resolved **on your machine** before anything is sent, which is what lets `#changes` attach unreleased code to a conversation with a local model. |
+| **Participants** | `@workspace`, `@editor`, `@terminal`, `@git`, `@ibmi`, `@arcad` — a hint about where to look first, not a different personality. |
+| **House rules** | `.github/copilot-instructions.md` is read as written: a team that has one should not write it twice. `.forge/instructions.md` wins if both exist. |
+| **Git** | Status, diff, log, blame, show, branches, stage, commit — through the editor's own Git extension, not through a shell. It never pushes. |
+| **IBM i** | Db2 for i, CL commands, source members, object lists and the library list, over the connection Code for IBM i has already negotiated. And the part that decides whether the code compiles: **the dialect is detected from the member, and its column rules go into the prompt** — RPG III, fixed and free ILE RPG, SQLRPGLE, CL, DDS (PF/LF/DSPF/PRTF), Db2 for i, COBOL. |
+| **ARCAD Elias** | Check-out, check-in, compile, cross-references and the Transformer RPG conversion, through the `arcad.*` commands Elias itself registers — plus calls to the REST server you have already configured. |
+| **MCP** | Connect any Model Context Protocol server, stdio or HTTP. Its tools join the set, under the same permissions. A local server never starts until you have said so in a dialog that names the command. |
 | **Search** | Inside the open conversation (`Ctrl+F`, matches highlighted) **and** across the whole history — the search looks inside the messages and shows the fragment that matched. |
 | **History filters** | Period, mode, “paid only”, and four sort orders (recently updated, created, longest, most expensive). |
 | **Context control** | Every exchange can be **muted** (stays on screen, stops being sent), **pinned** (survives trimming), edited or deleted. It is the most direct lever there is on both quality **and** cost. |
 | **Privacy** | Reversible pseudonymisation, blocked files, consent before the first destination, an **egress log** and a **cost report**. |
 | **Languages** | English and French, following the editor's display language — or pinned with `forge.language`, for a machine whose editor is in one language and whose user reads another. |
+| **Your theme** | Every colour in the panel is one of the editor's own variables. Not one hex value. It follows a theme change immediately, including high contrast, and the screenshots above are checked in light and dark. |
 
 ## How the cost tends to zero
 
@@ -106,6 +115,66 @@ The places where others get this wrong, and which are handled here:
   guess.
 - **Keys live in the OS keychain** (`SecretStorage`), never in `settings.json` — which syncs, and
   gets committed by accident.
+
+## For IBM i teams
+
+Every other language this extension handles shares an assumption: whitespace is decoration. On IBM i
+that assumption is false, and being wrong about it is expensive. An RPG III calculation means one
+thing in column 26 and another in column 36; a DDS record name lives in columns 19-28 and nowhere
+else; a line that runs past column 80 is not rejected, it is **truncated and compiled**. A model
+trained mostly on free-form code writes `if x = 1;` into a fixed-format member and the failure
+surfaces later, in a spool file, as a message id.
+
+So Forge decides the dialect from the **member itself** rather than from its name — `**FREE` in
+column 1, or a specification letter in column 6 — and puts that dialect's rules and its column ruler
+into the prompt. `.rpgle` says nothing about the format, and telling the model the wrong one is the
+single most reliable way to get code that cannot compile.
+
+| | |
+|---|---|
+| **Understood** | RPG III (RPG/400), ILE RPG fixed and fully free, SQLRPGLE, CL/CLLE, DDS for physical, logical, display and printer files, Db2 for i SQL, ILE COBOL, command definitions. |
+| **Mapped** | Symbols are read by column, so a repository of source members produces a real map. Before this it produced an empty one — and long members with six-character names are exactly where a map earns its keep. |
+| **Connected** | Through **Code for IBM i**, on the connection it has already negotiated: the right library list, the right CCSID, a warm SQL job. Forge opens no session of its own, because a second one would run under a different library list and get EBCDIC subtly wrong. |
+| **Under change management** | Through **ARCAD Elias**: check-out, check-in, compile, cross-references, and the Transformer RPG conversion — by calling the `arcad.*` commands Elias registers, so a change stays inside the process the shop already has. |
+| **Commands** | `/tofree` converts a fixed-format member, `/sql` writes Db2 for i rather than generic SQL, `/dds` explains a display file. `#member:LIB/SRCFILE(MBR)` and `#db2:select …` attach the real thing. |
+
+Reading is free; running a CL command is always asked; an SQL statement is asked **only if it
+writes**, because the check is on the statement rather than on the tool. In plan mode the same tool
+exists in a form that refuses a write instead of offering you a dialog — "plan mode changes nothing"
+should not have an "unless you click yes" attached to it.
+
+Forge does not invent ARCAD's REST endpoints. Its catalogue is not published, and guessing paths for
+a model to call produces an integration that fails at a customer site in a way nobody can debug. It
+carries requests to paths **you** supply, with credentials from the OS keychain. For anything deeper
+than that, the right shape is MCP.
+
+## Plugging in your own systems
+
+Forge speaks the **Model Context Protocol**, so an internal service — a ticketing system, a
+catalogue, a change-management server — can expose its own tools without either side knowing about
+the other. Declare a server in `forge.mcp.servers`, or in a `.vscode/mcp.json` the team already has:
+
+```jsonc
+{
+  "servers": {
+    "tickets":  { "type": "http", "url": "https://tools.corp.example/mcp" },
+    "internal": { "command": "node", "args": ["./tools/mcp-server.js"] }
+  }
+}
+```
+
+Its tools join the set under the same rules as every other: named for their server, governed by the
+same permissions, filtered by the mode. A server's claim that a tool "only reads" is enough to skip
+a dialog on a local one and never enough on one that reaches out of the machine.
+
+**A stdio server is arbitrary code execution**, configured in a file that may have arrived with a
+cloned repository. Forge does not start one until you have said so in a dialog that names the
+command, and the consent is tied to the command rather than to the name — the part an attacker
+controls most cheaply.
+
+The client is written by hand. The wire format is JSON-RPC over a stream and the handshake is three
+messages; an SDK would bring a dependency tree into an extension whose whole premise is that you can
+audit what it sends.
 
 ## Install
 
@@ -170,13 +239,17 @@ src/core/         no `vscode` import — testable without an editor
   router/         local first, consented escalation, prices, budget
   completion/     FIM per model family, cache, answer cleanup
   context/        repository map, symbols, imports
-  session/        the transcript, the prompt derived from it, the modes and the history
+  session/        the transcript, the prompt derived from it, the modes, the history, `#`/`@`
   agent/          the tool loop, and the permission book
+  ibmi/           dialects, column rules, symbols read by column, Db2 for i decisions
+  mcp/            the Model Context Protocol client, written by hand
+  models/         the curated quality index the picker ranks by
 src/shared/       the panel↔extension protocol, and the translation catalogue
 src/extension/    the VS Code layer (sidebar, completion, commands, egress gate)
+  integrations/   Git, Code for IBM i, ARCAD Elias, MCP servers
 src/cli/          the terminal client
-src/webview/      the panel: chat / history / models / permissions screens, hand-drawn SVG icons,
-                  and never `innerHTML` on model output
+src/webview/      the panel: chat / history / models / permissions screens, the model picker,
+                  hand-drawn SVG icons, and never `innerHTML` on model output
 ```
 
 More: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) · [`docs/PRIVACY.md`](docs/PRIVACY.md) ·
@@ -186,8 +259,9 @@ Those documents are currently written in French; translations are welcome.
 ## Development
 
 ```bash
-npm test                   # builds the bundles, then 128 tests (node:test)
-npm run test:integration   # loads the extension into a real VS Code (7 tests, headless)
+npm test                   # builds the bundles, then 193 tests (node:test)
+npm run test:integration   # loads the extension into a real VS Code (9 tests, headless)
+node scripts/screenshots.mjs  # retakes the README's images from that same editor
 npm run typecheck
 npm run scan:secrets       # scans this repository with the extension's own detectors
 npm run models             # regenerates the price catalogue from OpenRouter
@@ -208,7 +282,7 @@ no entry, so a translation cannot silently rot.
 
 ## Status
 
-`0.3.0` — usable day to day. See [`docs/ROADMAP.md`](docs/ROADMAP.md) for what is done and what is
+`0.4.0` — usable day to day. See [`docs/ROADMAP.md`](docs/ROADMAP.md) for what is done and what is
 not.
 
 ## Licence

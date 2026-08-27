@@ -10,11 +10,14 @@
 // screenshots whose content changes every time a sampler rolls differently. The interface in the
 // image is the real interface; the sentence inside it is a fixture.
 //
-// Usage: node scripts/screenshots.mjs [--locale fr] [--out docs/images]
+// Usage: node scripts/screenshots.mjs [--locale fr] [--theme "Default Light Modern"]
+//        [--suffix .light] [--out docs/images]
 
 import { spawn, spawnSync } from "node:child_process";
 import { createServer } from "node:http";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { argv, env, exit } from "node:process";
 
 const args = new Map();
@@ -22,10 +25,12 @@ for (let i = 2; i < argv.length; i += 2) args.set(argv[i]?.replace(/^--/, ""), a
 
 const locale = args.get("locale") ?? "en";
 const outDir = args.get("out") ?? "docs/images";
-const suffix = locale === "en" ? "" : `.${locale}`;
+const suffix = (args.get("suffix") ?? (locale === "en" ? "" : `.${locale}`));
 const display = ":97";
 const HOLD = Number(args.get("hold") ?? 20_000);
 const STARTUP = Number(args.get("startup") ?? 16_000);
+const marker = join(tmpdir(), `forge-shot-${process.pid}`);
+const CROP = Number(args.get("crop") ?? 1000);
 
 mkdirSync(outDir, { recursive: true });
 
@@ -98,7 +103,9 @@ const editor = spawn("node", ["dist-integration/runTest.js"], {
     DISPLAY: display,
     FORGE_SCREENSHOT: endpoint,
     FORGE_LOCALE: locale,
+    ...(args.get("theme") ? { FORGE_THEME: args.get("theme") } : {}),
     FORGE_SCREENSHOT_HOLD: String(HOLD),
+    FORGE_SCREENSHOT_MARKER: marker,
   },
   stdio: "inherit",
 });
@@ -108,24 +115,44 @@ function capture(name) {
   const path = `${outDir}/${name}${suffix}.png`;
   const shot = spawnSync("import", ["-display", display, "-window", "root", path], { stdio: "inherit" });
   if (shot.status !== 0) return false;
-  spawnSync("convert", [path, "-trim", "+repage", path]);
+  // Trim the window's own black margin, then crop away most of the empty editor. The subject of
+  // these images is the panel; a reader looking at a README does not need to see 700 px of unused
+  // background to understand where it lives.
+  spawnSync("convert", [path, "-trim", "+repage", "-crop", `${CROP}x0+0+0`, "+repage", path]);
   console.log(`captured ${path}`);
   return true;
 }
 
-// The harness holds each screen for HOLD ms in turn; we photograph the middle of each window, so
-// neither clock has to know the other's exact offsets — only that the windows are equal.
-const SCREENS = ["conversation", "historique", "modeles", "permissions"];
-
-// The editor has to download nothing on a warm machine but still has to start, activate the
-// extension and lay out the panel. STARTUP is that, generously.
-await new Promise((r) => setTimeout(r, STARTUP + HOLD / 2));
-capture(SCREENS[0]);
-for (const name of SCREENS.slice(1)) {
-  await new Promise((r) => setTimeout(r, HOLD));
-  capture(name);
+/** What the harness says is on screen right now, or undefined before it has said anything. */
+function announced() {
+  try {
+    return readFileSync(marker, "utf8").trim();
+  } catch {
+    return undefined;
+  }
 }
 
+// Wait for the harness to name a screen, photograph it once it has settled, and move on. There is
+// no clock here beyond a timeout: the editor decides when it is ready, and says so.
+const SCREENS = ["conversation", "picker", "historique", "modeles", "permissions"];
+const deadline = Date.now() + STARTUP + HOLD * (SCREENS.length + 2);
+for (const name of SCREENS) {
+  let seen = false;
+  while (Date.now() < deadline) {
+    if (announced() === name) {
+      // Half the hold in, so the panel has finished laying out and the window has repainted.
+      await new Promise((r) => setTimeout(r, HOLD / 2));
+      seen = capture(name);
+      break;
+    }
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  if (!seen) console.error(`missed ${name}: the editor never announced it`);
+  // Let the harness move on before looking for the next name.
+  while (announced() === name && Date.now() < deadline) await new Promise((r) => setTimeout(r, 400));
+}
+
+rmSync(marker, { force: true });
 editor.kill();
 xvfb.kill();
 server.close();

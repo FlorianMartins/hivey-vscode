@@ -2,6 +2,67 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.4.0 — 2026-08-27
+
+**Speaks IBM i, plugs into the tools around it, and looks like the editor it lives in.**
+
+### IBM i
+
+- The **dialect is detected from the member, not from its name** — `**FREE` in column 1, or a
+  specification letter in column 6. `.rpgle` covers both fully free and fixed-format source, and
+  telling a model the wrong one produces code the compiler cannot place.
+- Its rules and its **column ruler** go into the prompt: RPG III, ILE RPG fixed and free, SQLRPGLE,
+  CL/CLLE, DDS for physical, logical, display and printer files, Db2 for i, ILE COBOL, command
+  definitions.
+- **Symbols are read by column.** A P specification is the letter P in column 6 with the name in
+  7-21; a line-anchored regex finds nothing, so an IBM i repository used to produce an empty
+  repository map — the one codebase where a map is worth the most.
+- A local check reports the failure the compiler does not: a line past column 80 is truncated and
+  compiled, not rejected.
+- `/tofree`, `/sql` and `/dds`; `#member:LIB/SRCFILE(MBR)` and `#db2:…`.
+
+### The tools around it
+
+- **Git** through the editor's own extension: status, diff, log, blame, show, branches, stage,
+  commit. Never push — publishing a branch stays the user's decision.
+- **Code for IBM i**: Db2 for i, CL commands, source members, object lists, library list — on the
+  connection it has already negotiated. Forge opens no session of its own.
+- **ARCAD Elias**: ten actions through the `arcad.*` commands Elias registers, plus calls to the
+  REST server already configured in `arcad.restApiServer.*`. Forge does not invent ARCAD's
+  endpoints; it carries requests to paths you supply, with credentials from the OS keychain.
+- **MCP**, stdio and HTTP, written by hand. A stdio server is arbitrary code execution configured in
+  a file that may have arrived with a repository: it does not start until you have agreed in a
+  dialog that names the command, and the consent is tied to the command, not to the name.
+
+### The panel
+
+- The **model picker** in the shape the Hivey sidebar settled on: a read-only trigger opening a
+  panel with a metric header, its own search box, grouped rows, a badge whose segments are coloured
+  independently, and a collapsible price/provider filter. Colour comes from the theme rather than
+  from hex values, and the quality metric follows the **mode** — agent re-ranks by how well a model
+  drives a tool loop.
+- `#context` and `@participant`, in Copilot's notation, resolved on this machine before anything is
+  sent. `#` no longer opens a file dialog — a dialog can only ever offer files, which is why
+  `#changes` could not exist before.
+- House rules from `.github/copilot-instructions.md`.
+- Turns are separated by space rather than by a rule; the composer's two toolbar rows become one
+  that wraps; each turn carries a shape rather than a colour, so it survives high contrast.
+- Export the conversation as Markdown, including the exchanges you muted — a record of a
+  conversation nobody had would be worse than no record.
+
+### Fixed
+
+- The credential scanner flagged thirteen of its own strings: in a codebase about language models,
+  `token` means a unit of context far more often than a bearer token. Fixed in the detector — no key
+  ever issued opens with `#`, `@`, `/` or `\`, or ends with a colon.
+- `forge.pickModel` was registered twice, which fails activation outright. Only a run inside a real
+  editor shows that.
+- Screenshots are taken by `scripts/screenshots.mjs` from a real VS Code, driven by a marker file
+  rather than by two clocks in two processes — the drift used to produce three photographs of the
+  same frame.
+
+193 tests, 9 of them inside a real VS Code.
+
 ## 0.3.0 — 2026-08-21
 
 **English interface, and a translation that cannot silently rot.**

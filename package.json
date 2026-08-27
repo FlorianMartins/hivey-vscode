@@ -2,7 +2,7 @@
   "name": "forge",
   "displayName": "Forge",
   "description": "%extension.description%",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "publisher": "hivey",
   "license": "Apache-2.0",
   "repository": {
@@ -182,6 +182,12 @@
         "title": "%command.exportSession.title%",
         "category": "Forge",
         "icon": "$(save)"
+      },
+      {
+        "command": "forge.pickModel",
+        "title": "%command.pickModel.title%",
+        "category": "Forge",
+        "icon": "$(sparkle)"
       }
     ],
     "menus": {

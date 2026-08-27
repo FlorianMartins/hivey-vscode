@@ -160,4 +160,6 @@ export type ToPanel =
   | { type: "turnStart" }
   | { type: "turnEnd" }
   | { type: "approval"; id: string; tool: string; description: string; command?: string }
-  | { type: "error"; message: string };
+  | { type: "error"; message: string }
+  /** Opens the model picker from outside the panel — the command palette, a keybinding. */
+  | { type: "openModelPicker" };

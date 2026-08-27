@@ -13,9 +13,9 @@ Open source (Apache-2.0), **zéro dépendance à l'exécution**, **zéro télém
 *Captures réelles, prises dans un VS Code lancé par la suite d'intégration. Seul le modèle qui
 répond est un serveur de test ; l'interface, elle, est le produit.*
 
-| Conversations | Modèles |
+| Choisir un modèle | Conversations |
 |---|---|
-| ![Historique et filtres](docs/images/historique.png) | ![Comparateur de modèles](docs/images/modeles.png) |
+| ![Le sélecteur de modèle](docs/images/picker.fr.png) | ![Historique et filtres](docs/images/historique.fr.png) |
 
 ---
 
@@ -47,11 +47,19 @@ ce qui sort est **anonymisé de façon réversible** avant de partir.
 | **Trois modes** | **Discussion** (aucun outil), **Plan** (lit le dépôt, ne modifie rien), **Agent** (lit, modifie, propose des commandes). Le mode décide de l'outillage **dans le code** : en mode Plan, aucun outil d'écriture n'existe — ce n'est pas une consigne dans un prompt. |
 | **Raisonnement** | Budget de réflexion réglable (direct / bref / standard / approfondi), traduit pour chaque fournisseur — `reasoning.effort` chez OpenRouter, un budget de jetons chez Anthropic. Le texte de réflexion s'affiche dans un bloc repliable et n'est jamais renvoyé au modèle. |
 | **Permissions** | Par action et par forme d'action : « autoriser une fois », « pour cette conversation », « toujours ». Autoriser `npm test` n'autorise pas `npm publish`. Un écran dédié liste ce qui est permanent et ce qui expire. |
+| **Notation de contexte** | `#file:`, `#selection`, `#changes`, `#problems`, `#codebase`, `#terminal`, `#sym:` — la notation de Copilot, parce qu'on ne devrait pas avoir à en apprendre une seconde. Résolue **sur votre machine** avant tout envoi, ce qui est précisément ce qui permet à `#changes` de joindre du code non publié à une conversation avec un modèle local. |
+| **Participants** | `@workspace`, `@editor`, `@terminal`, `@git`, `@ibmi`, `@arcad` — une indication d'où regarder en premier, pas une autre personnalité. |
+| **Règles de la maison** | `.github/copilot-instructions.md` est lu tel quel : une équipe qui en a un ne devrait pas l'écrire deux fois. `.forge/instructions.md` l'emporte si les deux existent. |
+| **Git** | État, diff, journal, annotation, contenu à une révision, branches, indexation, commit — par l'API de l'extension Git intégrée, pas par un shell. Ne pousse jamais. |
+| **IBM i** | Db2 for i, commandes CL, membres source, listes d'objets et liste de bibliothèques, sur la connexion que Code for IBM i a déjà négociée. Et la partie qui décide si le code compile : **le dialecte est détecté d'après le membre, et ses règles de colonnes entrent dans le prompt** — RPG III, RPGLE fixe et libre, SQLRPGLE, CL, DDS (PF/LF/DSPF/PRTF), Db2 for i, COBOL. |
+| **ARCAD Elias** | Check-out, check-in, compilation, références croisées et la conversion Transformer RPG, par les commandes `arcad.*` qu'Elias enregistre lui-même — plus des appels au serveur REST déjà configuré. |
+| **MCP** | Branchez n'importe quel serveur Model Context Protocol, stdio ou HTTP. Ses outils rejoignent l'ensemble, sous les mêmes permissions. Un serveur local ne démarre jamais sans votre accord, dans une fenêtre qui nomme la commande. |
 | **Recherche** | Dans la conversation ouverte (`Ctrl+F`, résultats surlignés) **et** dans tout l'historique — la recherche regarde à l'intérieur des messages et montre le fragment qui correspond. |
 | **Filtres d'historique** | Période, mode, « payantes seulement », tri par dernière modification / création / longueur / coût. |
 | **Contrôle du contexte** | Chaque échange peut être **rendu muet** (il reste affiché, il ne part plus), **épinglé** (il survit à la coupe), modifié ou supprimé. C'est le levier le plus direct sur la qualité **et** sur la facture. |
 | **Confidentialité** | Anonymisation réversible, fichiers interdits, consentement avant la première destination, **journal des envois** et **rapport de coûts**. |
 | **Langues** | Anglais et français, selon la langue d'affichage de l'éditeur — ou fixée par `forge.language`, pour un poste dont l'éditeur est dans une langue et l'utilisateur dans une autre. |
+| **Votre thème** | Chaque couleur du panneau est une variable de l'éditeur. Pas une seule valeur en dur. Il suit un changement de thème immédiatement, contraste élevé compris, et les captures ci-dessus sont vérifiées en clair comme en sombre. |
 
 ## Comment le coût tend vers zéro
 
@@ -191,9 +199,13 @@ src/core/         aucun import de `vscode` — testable sans éditeur
   router/         local d'abord, escalade consentie, prix, budget
   completion/     FIM par famille de modèle, cache, nettoyage des réponses
   context/        carte du dépôt, symboles, imports
-  session/        le transcript, le prompt qui en est dérivé, les modes et l'historique
+  session/        le transcript, le prompt qui en est dérivé, les modes, l'historique, `#`/`@`
   agent/          la boucle outils, et le registre des permissions
+  ibmi/           dialectes, règles de colonnes, symboles lus par colonnes, décisions Db2 for i
+  mcp/            le client Model Context Protocol, écrit à la main
+  models/         l'indice de qualité curaté par lequel le sélecteur classe
 src/extension/    la couche VS Code (barre latérale, complétion, commandes, porte de sortie)
+  integrations/   Git, Code for IBM i, ARCAD Elias, serveurs MCP
 src/cli/          le client terminal
 src/webview/      le panneau : écrans conversation / historique / modèles / permissions,
                   icônes SVG dessinées, aucun `innerHTML` sur du texte de modèle
@@ -206,8 +218,9 @@ décisions : [`docs/adr/`](docs/adr).
 ## Développement
 
 ```bash
-npm test               # construit les bundles, puis 128 tests (node:test)
-npm run test:integration   # charge l'extension dans un vrai VS Code (7 tests, headless)
+npm test               # construit les bundles, puis 193 tests (node:test)
+npm run test:integration   # charge l'extension dans un vrai VS Code (9 tests, headless)
+node scripts/screenshots.mjs  # reprend les images du README depuis ce même éditeur
 npm audit --audit-level=high   # 0 vulnérabilité : 5 outils de dev, aucune dépendance à l'exécution
 npm run typecheck
 npm run scan:secrets   # scanne ce dépôt avec les détecteurs de l'extension elle-même
@@ -220,7 +233,7 @@ prix n'est écrit à la main**.
 
 ## État
 
-`0.3.0` — utilisable au quotidien, prêt à publier (voir `docs/PUBLISHING.md`).
+`0.4.0` — utilisable au quotidien, prêt à publier (voir `docs/PUBLISHING.md`).
 Ce qui est fait et ce qui ne l'est pas : [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Licence

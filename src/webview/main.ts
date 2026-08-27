@@ -14,6 +14,7 @@ import { markdown } from "./markdown.js";
 import type { ToExtension, ToPanel, UiState } from "../shared/protocol.js";
 import { t } from "../shared/i18n.js";
 import { usePrefStore } from "./prefs.js";
+import { openModelCombo } from "./modelCombo.js";
 
 declare function acquireVsCodeApi(): { postMessage(m: unknown): void; getState(): unknown; setState(s: unknown): void };
 const vscode = acquireVsCodeApi();
@@ -359,6 +360,14 @@ window.addEventListener("message", (event: MessageEvent<ToPanel>) => {
       ensureLive().appendError(m.message);
       setStreaming(false);
       break;
+    case "openModelPicker": {
+      // Anchored on the composer's own model button, so the panel opens in the same place whether
+      // it was reached by mouse or from the command palette. If the button is not on screen — the
+      // user is on another screen — there is nothing sensible to anchor to, so nothing happens.
+      const anchor = document.querySelector<HTMLElement>(".composer-toolbar .btn.model");
+      if (anchor && state) openModelCombo(anchor, state, send);
+      break;
+    }
   }
 });
 

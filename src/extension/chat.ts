@@ -498,6 +498,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    * is saved is what the user read, including the exchanges they muted — which the model never
    * saw. A file that silently dropped them would be a record of a conversation nobody had.
    */
+  /** Opens the model picker inside the panel, from a command or a keybinding. */
+  openModelPicker(): void {
+    this.screen = "chat";
+    this.sendState();
+    this.post({ type: "openModelPicker" });
+  }
+
   async exportSession(): Promise<void> {
     const lines: string[] = [`# ${this.session.title || t("Conversation")}`, ""];
     for (const entry of this.session.entries) {

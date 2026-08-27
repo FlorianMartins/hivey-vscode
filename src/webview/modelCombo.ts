@@ -122,11 +122,13 @@ function toItems(state: UiState): ComboItem[] {
     return a.model.inUsd - b.model.inUsd;
   });
 
-  // The current model is pinned to the top, as its own group. Without it the panel opens showing
-  // whatever happens to sort first, and the user has to hunt for what they are already using.
+  // The current model is pinned to the top as its own group, and REMOVED from where it would
+  // otherwise sit. Leaving it in both places puts the same row twice in a row whenever the current
+  // model already sorts first — which, since local models lead and the local model is usually the
+  // one in use, is the common case rather than the edge one. It reads as a rendering bug.
   const current = items.find((i) => i.current);
-  if (current) return [{ ...current, group: t("Current") }, ...items];
-  return items;
+  if (!current) return items;
+  return [{ ...current, group: t("Current") }, ...items.filter((i) => i !== current)];
 }
 
 function vendorLabel(vendor: string): string {
@@ -214,7 +216,10 @@ export function openModelCombo(anchor: HTMLElement, state: UiState, send: (m: To
   const row = (item: ComboItem): HTMLElement => {
     const node = el("button", `combo-item${item.current ? " sel" : ""}`);
     const main = el("div", "ci-main");
-    const name = el("div", "ci-name", item.label);
+    const name = el("div", "ci-name");
+    // The label is the part that may be clipped; the tag is not. Putting the ellipsis on the
+    // container instead truncated the tag — "local" rendered as "loca", which reads as damage.
+    name.append(el("span", "ci-label", item.label));
     if (item.local) name.append(el("span", "ci-tag", t("local")));
     main.append(name);
     main.append(el("div", "ci-detail", `${item.detail} · ${formatContext(item.model.context)}`));
