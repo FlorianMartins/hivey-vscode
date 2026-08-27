@@ -59,7 +59,7 @@ ce qui sort est **anonymisé de façon réversible** avant de partir.
 | **Contrôle du contexte** | Chaque échange peut être **rendu muet** (il reste affiché, il ne part plus), **épinglé** (il survit à la coupe), modifié ou supprimé. C'est le levier le plus direct sur la qualité **et** sur la facture. |
 | **Confidentialité** | Anonymisation réversible, fichiers interdits, consentement avant la première destination, **journal des envois** et **rapport de coûts**. |
 | **Langues** | Anglais et français, selon la langue d'affichage de l'éditeur — ou fixée par `forge.language`, pour un poste dont l'éditeur est dans une langue et l'utilisateur dans une autre. |
-| **Votre thème** | Chaque couleur du panneau est une variable de l'éditeur. Pas une seule valeur en dur. Il suit un changement de thème immédiatement, contraste élevé compris, et les captures ci-dessus sont vérifiées en clair comme en sombre. |
+| **Votre thème** | Chaque couleur du panneau est une variable de l'éditeur. Pas une seule valeur en dur — [le même sélecteur sous un thème clair](docs/images/picker.light.png), pris par le même script. Il suit un changement de thème immédiatement, contraste élevé compris. |
 
 ## Comment le coût tend vers zéro
 

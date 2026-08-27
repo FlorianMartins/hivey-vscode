@@ -59,7 +59,7 @@ that does leave is **reversibly pseudonymised** first.
 | **Context control** | Every exchange can be **muted** (stays on screen, stops being sent), **pinned** (survives trimming), edited or deleted. It is the most direct lever there is on both quality **and** cost. |
 | **Privacy** | Reversible pseudonymisation, blocked files, consent before the first destination, an **egress log** and a **cost report**. |
 | **Languages** | English and French, following the editor's display language — or pinned with `forge.language`, for a machine whose editor is in one language and whose user reads another. |
-| **Your theme** | Every colour in the panel is one of the editor's own variables. Not one hex value. It follows a theme change immediately, including high contrast, and the screenshots above are checked in light and dark. |
+| **Your theme** | Every colour in the panel is one of the editor's own variables. Not one hex value — [the same picker under a light theme](https://raw.githubusercontent.com/FlorianMartins/forge/main/docs/images/picker.light.png), captured by the same script. It follows a theme change immediately, high contrast included. |
 
 ## How the cost tends to zero
 
