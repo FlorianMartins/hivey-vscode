@@ -2,6 +2,17 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.5.2 — 2026-08-27
+
+- Removed `copilot` from the manifest's keywords. Using a competitor's trademark as search metadata
+  is descriptive rather than misleading, and plenty of extensions do it — but the Marketplace
+  forbids metadata that suggests affiliation, and the phrase carries no information this extension
+  needs to convey. The comparison stays in the README, where it is an argument rather than a tag.
+- The keywords now say what the thing is (`coding assistant`, `inline completion`), where the model
+  runs (`ollama`, `local llm`, `offline`), why someone is looking (`privacy`, `gdpr`,
+  `confidential`) and who nobody else is serving: `ibm i`, `as400`, `rpgle`, `sqlrpgle`,
+  `db2 for i`, `arcad`. That last group is the one that will actually find its audience.
+
 ## 0.5.1 — 2026-08-27
 
 - The repository is `FlorianMartins/hivey-vscode`. It was `hivey-code`, one hyphen away from
