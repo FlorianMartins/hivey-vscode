@@ -61,5 +61,13 @@
   "command.showDefinitions.title": "Show skills and sub-agents",
   "command.searchConversation.title": "Search this conversation",
   "command.openSettings.title": "Open the settings",
-  "config.panel.minWidth": "Narrowest the panel is allowed to become, in pixels. Below this the panel scrolls sideways instead of rearranging itself, so dragging the side bar narrow cannot reshuffle the layout. `0` lets it shrink freely."
+  "config.panel.minWidth": "Narrowest the panel is allowed to become, in pixels. Below this the panel scrolls sideways instead of rearranging itself, so dragging the side bar narrow cannot reshuffle the layout. `0` lets it shrink freely.",
+  "config.permissions.autoApprove": "How much the agent may do without asking.\n\nWhatever this is set to, `#hiveyCode.privacy.blockedGlobs#` still applies and what leaves the machine is still governed by `#hiveyCode.privacy.egressPolicy#`. This setting changes how often you are interrupted — never what the agent is allowed to touch, and never what it may send.",
+  "config.permissions.autoApprove.off": "Every change is asked for.",
+  "config.permissions.autoApprove.workspace": "Changes inside the open folder run without asking. Commands, and anything outside the folder, are still asked for.",
+  "config.permissions.autoApprove.all": "Nothing is asked. Dangerous: the agent may write anywhere and run anything.",
+  "config.permissions.allowedPaths": "Paths the agent may change without asking, as globs relative to the workspace root — `src/generated/**`, `docs/*.md`. Applies whatever the approval scope is. Paths matching `#hiveyCode.privacy.blockedGlobs#` are refused even when listed here.",
+  "config.permissions.allowedCommands": "Commands that may run without asking, matched by prefix on a word boundary: `npm test` allows `npm test -- --watch` and not `npm testpublish`. A command containing `;`, `&&`, `|`, a backtick or `$(` is never covered, however it starts.",
+  "config.permissions.deniedPaths": "Paths the agent may never change, as globs — `migrations/**`, `dist/**`. Refusals are evaluated before permissions, so a path here is refused even if `#hiveyCode.permissions.allowedPaths#` lists it and even with approvals switched off.\n\nDistinct from `#hiveyCode.privacy.blockedGlobs#`, which is about what may LEAVE the machine. This is about what may be touched on it.",
+  "config.permissions.deniedCommands": "Commands the agent may never run — `git push`, `rm`, `kubectl`. Matched anywhere in the command line, so denying `git push` also refuses `npm test && git push`: a refusal that is escaped by typing `&&` protects nobody. Word boundaries are still respected, so denying `rm` does not deny `rmdir`."
 }

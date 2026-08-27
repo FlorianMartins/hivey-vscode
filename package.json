@@ -2,7 +2,7 @@
   "name": "hivey-code",
   "displayName": "Hivey Code",
   "description": "%extension.description%",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "publisher": "hivey",
   "license": "Apache-2.0",
   "repository": {
@@ -608,6 +608,53 @@
           "minimum": 0,
           "maximum": 600,
           "markdownDescription": "%config.panel.minWidth%"
+        },
+        "hiveyCode.permissions.autoApprove": {
+          "type": "string",
+          "enum": [
+            "off",
+            "workspace",
+            "all"
+          ],
+          "default": "off",
+          "enumDescriptions": [
+            "%config.permissions.autoApprove.off%",
+            "%config.permissions.autoApprove.workspace%",
+            "%config.permissions.autoApprove.all%"
+          ],
+          "markdownDescription": "%config.permissions.autoApprove%"
+        },
+        "hiveyCode.permissions.allowedPaths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "markdownDescription": "%config.permissions.allowedPaths%"
+        },
+        "hiveyCode.permissions.allowedCommands": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "markdownDescription": "%config.permissions.allowedCommands%"
+        },
+        "hiveyCode.permissions.deniedPaths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "markdownDescription": "%config.permissions.deniedPaths%"
+        },
+        "hiveyCode.permissions.deniedCommands": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "markdownDescription": "%config.permissions.deniedCommands%"
         }
       }
     }

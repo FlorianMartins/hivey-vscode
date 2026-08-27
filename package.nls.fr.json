@@ -61,5 +61,13 @@
   "command.showDefinitions.title": "Afficher les compétences et sous-agents",
   "command.searchConversation.title": "Rechercher dans cette conversation",
   "command.openSettings.title": "Ouvrir les réglages",
-  "config.panel.minWidth": "Largeur minimale du panneau, en pixels. En dessous, le panneau défile horizontalement au lieu de se réorganiser : tirer la barre latérale ne peut donc plus bousculer la mise en page. `0` le laisse rétrécir librement."
+  "config.panel.minWidth": "Largeur minimale du panneau, en pixels. En dessous, le panneau défile horizontalement au lieu de se réorganiser : tirer la barre latérale ne peut donc plus bousculer la mise en page. `0` le laisse rétrécir librement.",
+  "config.permissions.autoApprove": "Ce que l'agent peut faire sans demander.\n\nQuelle que soit la valeur, `#hiveyCode.privacy.blockedGlobs#` s'applique toujours et ce qui quitte la machine reste régi par `#hiveyCode.privacy.egressPolicy#`. Ce réglage change la fréquence des interruptions — jamais ce à quoi l'agent a droit, ni ce qu'il peut envoyer.",
+  "config.permissions.autoApprove.off": "Chaque modification est demandée.",
+  "config.permissions.autoApprove.workspace": "Les modifications dans le dossier ouvert passent sans demander. Les commandes, et tout ce qui est hors du dossier, restent demandées.",
+  "config.permissions.autoApprove.all": "Rien n'est demandé. Dangereux : l'agent peut écrire partout et tout exécuter.",
+  "config.permissions.allowedPaths": "Chemins que l'agent peut modifier sans demander, en motifs relatifs à la racine — `src/generated/**`, `docs/*.md`. S'applique quelle que soit la portée. Un chemin correspondant à `#hiveyCode.privacy.blockedGlobs#` est refusé même s'il est listé ici.",
+  "config.permissions.allowedCommands": "Commandes autorisées sans demander, comparées par préfixe sur une frontière de mot : `npm test` autorise `npm test -- --watch` et pas `npm testpublish`. Une commande contenant `;`, `&&`, `|`, un accent grave ou `$(` n'est jamais couverte, quel que soit son début.",
+  "config.permissions.deniedPaths": "Chemins que l'agent ne peut jamais modifier, en motifs — `migrations/**`, `dist/**`. Les refus sont évalués avant les autorisations : un chemin listé ici est refusé même s'il figure dans `#hiveyCode.permissions.allowedPaths#`, et même avec les demandes désactivées.\n\nÀ distinguer de `#hiveyCode.privacy.blockedGlobs#`, qui porte sur ce qui peut QUITTER la machine. Celle-ci porte sur ce qui peut y être touché.",
+  "config.permissions.deniedCommands": "Commandes que l'agent ne peut jamais exécuter — `git push`, `rm`, `kubectl`. Repérées n'importe où dans la ligne : interdire `git push` refuse donc aussi `npm test && git push`, car un refus qu'on contourne en tapant `&&` ne protège personne. Les frontières de mot sont respectées : interdire `rm` n'interdit pas `rmdir`."
 }

@@ -34,6 +34,14 @@ export interface Settings {
   budget: { perRequestUsd: number; dailyUsd: number };
   context: { maxTokens: number; repoMap: boolean };
   panel: { minWidth: number };
+  permissions: {
+    /** How much runs without asking. `off` is the default and the right one for a first session. */
+    autoApprove: "off" | "workspace" | "all";
+    allowedPaths: string[];
+    allowedCommands: string[];
+    deniedPaths: string[];
+    deniedCommands: string[];
+  };
   escalation: { policy: EscalationPolicy; provider: ProviderId; model: string };
 }
 
@@ -79,6 +87,13 @@ export function readSettings(scope?: vscode.Uri): Settings {
       repoMap: c.get<boolean>("context.repoMap", true),
     },
     panel: { minWidth: c.get<number>("panel.minWidth", 260) },
+    permissions: {
+      autoApprove: c.get<"off" | "workspace" | "all">("permissions.autoApprove", "off"),
+      allowedPaths: c.get<string[]>("permissions.allowedPaths", []),
+      allowedCommands: c.get<string[]>("permissions.allowedCommands", []),
+      deniedPaths: c.get<string[]>("permissions.deniedPaths", []),
+      deniedCommands: c.get<string[]>("permissions.deniedCommands", []),
+    },
     escalation: {
       policy: c.get<EscalationPolicy>("escalation.policy", "ask"),
       provider: c.get<ProviderId>("escalation.provider", "openrouter"),

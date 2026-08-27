@@ -106,6 +106,15 @@ export interface UiSetup {
   configured?: { provider: string; model: string; baseUrl: string };
 }
 
+/** The standing policy: how much runs without asking, and what was listed by hand. */
+export interface UiApprovalPolicy {
+  scope: "off" | "workspace" | "all";
+  allowedPaths: string[];
+  allowedCommands: string[];
+  deniedPaths: string[];
+  deniedCommands: string[];
+}
+
 export interface UiOpenFile {
   path: string;
   active: boolean;
@@ -133,6 +142,7 @@ export interface UiState {
   models: UiModel[];
   modelsLoading: boolean;
   permissions: UiPermissionRule[];
+  policy: UiApprovalPolicy;
   /** Entry ids matching the in-conversation search, in document order. */
   matches: string[];
   searchQuery: string;
@@ -166,6 +176,7 @@ export type ToExtension =
   | { type: "setPermission"; tool: string; prefix?: string; level: "always" | "never" }
   | { type: "forgetPermission"; tool: string; prefix?: string }
   | { type: "clearSessionPermissions" }
+  | { type: "setApprovalScope"; scope: "off" | "workspace" | "all" }
   | { type: "openEgress" }
   | { type: "openCosts" }
   | { type: "openSettings" }

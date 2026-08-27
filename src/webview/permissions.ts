@@ -21,8 +21,77 @@ const TOOL_LABELS: Record<string, string> = {
 
 const GRANTABLE = ["write_file", "edit_file", "run_command"];
 
+const SCOPES: Array<{ id: "off" | "workspace" | "all"; label: string; hint: string }> = [
+  { id: "off", label: t("Ask every time"), hint: t("Every change is asked for. The default.") },
+  {
+    id: "workspace",
+    label: t("Trust this folder"),
+    hint: t("Changes inside the open folder run without asking. Commands, and anything outside it, are still asked."),
+  },
+  {
+    id: "all",
+    label: t("Ask nothing"),
+    hint: t("The agent may write anywhere and run anything. Dangerous."),
+  },
+];
+
+/**
+ * The standing policy, above the individual rules.
+ *
+ * It belongs on this screen and not only in the settings because this is where someone comes when
+ * they are tired of dialogs — and a person who cannot find the switch here will find the one in the
+ * settings that says `all` and never come back to the middle option.
+ */
+function scopeSection(state: UiState, send: (m: ToExtension) => void): HTMLElement {
+  const box = el("section", "perm-scope");
+  box.append(el("h3", "perm-scope-title", t("How often you are asked")));
+
+  for (const scope of SCOPES) {
+    const active = state.policy.scope === scope.id;
+    const row = el("button", `perm-scope-row${active ? " active" : ""}${scope.id === "all" ? " danger" : ""}`);
+    const main = el("div", "perm-scope-main");
+    main.append(el("div", "perm-scope-label", scope.label));
+    main.append(el("div", "perm-scope-hint", scope.hint));
+    row.append(main);
+    if (active) row.append(icon("check", "perm-scope-tick"));
+    row.addEventListener("click", () => send({ type: "setApprovalScope", scope: scope.id }));
+    box.append(row);
+  }
+
+  // Stated on the screen rather than only in the documentation, because it is the thing that makes
+  // the dangerous option survivable and nobody reads documentation at the moment they click it.
+  box.append(
+    el("p", "perm-scope-note",
+      t("Whatever you choose here, files excluded by the privacy policy stay excluded, and what leaves this machine is governed separately."),
+    ),
+  );
+
+  // Both lists, and the denied one first — it is the one that overrides everything else, and
+  // reading it after the allowances would suggest the opposite.
+  const denied = state.policy.deniedPaths.length + state.policy.deniedCommands.length;
+  const allowed = state.policy.allowedPaths.length + state.policy.allowedCommands.length;
+
+  const lists = el("div", "perm-scope-lists");
+  lists.append(
+    el("span", "perm-list-count denied",
+      denied ? t("{0} never allowed", denied) : t("Nothing is denied by name."),
+    ),
+  );
+  lists.append(el("span", "muted", "·"));
+  lists.append(
+    el("span", "perm-list-count allowed",
+      allowed ? t("{0} always allowed", allowed) : t("Nothing is allowed by name."),
+    ),
+  );
+  lists.append(el("div", "spacer"));
+  lists.append(button({ label: t("Edit the lists"), className: "btn tiny ghost", onClick: () => send({ type: "openSettings" }) }));
+  box.append(lists);
+  return box;
+}
+
 export function permissionsScreen(state: UiState, send: (m: ToExtension) => void): HTMLElement {
   const wrap = el("div", "screen permissions-screen");
+  wrap.append(scopeSection(state, send));
 
   wrap.append(
     el("p", "screen-lede",

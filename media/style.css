@@ -1817,3 +1817,95 @@ pre.code {
 .topbar-title.editable {
   text-align: center;
 }
+
+/* ── The standing approval policy ────────────────────────────────────────────────────────────
+ *
+ * Three mutually exclusive choices, presented as rows rather than as a dropdown: the differences
+ * between them need a sentence each, and a dropdown shows one label at a time.
+ */
+
+.perm-scope {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  padding: var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  margin-bottom: var(--sp-4);
+}
+.perm-scope-title {
+  margin: 0 0 var(--sp-1);
+  font-size: var(--fs-meta);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+.perm-scope-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  width: 100%;
+  text-align: left;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  padding: var(--sp-2);
+  cursor: pointer;
+}
+.perm-scope-row:hover {
+  background: var(--vscode-list-hoverBackground, var(--hover));
+}
+.perm-scope-row.active {
+  border-color: var(--vscode-focusBorder);
+  background: var(--vscode-list-hoverBackground, var(--hover));
+}
+.perm-scope-main {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.perm-scope-label {
+  font-size: var(--fs-control);
+  font-weight: 600;
+}
+.perm-scope-row.danger .perm-scope-label {
+  color: var(--vscode-errorForeground);
+}
+.perm-scope-hint {
+  font-size: var(--fs-meta);
+  color: var(--muted);
+  line-height: 1.5;
+}
+.perm-scope-tick {
+  flex: 0 0 auto;
+  color: var(--vscode-charts-green);
+  margin-top: 2px;
+}
+.perm-scope-note {
+  margin: var(--sp-1) 0 0;
+  font-size: var(--fs-meta);
+  color: var(--muted);
+  line-height: 1.5;
+}
+.perm-scope-lists {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+  margin-top: var(--sp-1);
+}
+
+/* Denied reads as a refusal, allowed as an ordinary fact. The denied list overrides everything
+   else, so it is the one that must not look like a footnote. */
+.perm-list-count {
+  font-size: var(--fs-meta);
+}
+.perm-list-count.denied {
+  color: var(--vscode-errorForeground);
+}
+.perm-list-count.allowed {
+  color: var(--muted);
+}

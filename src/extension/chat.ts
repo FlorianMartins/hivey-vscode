@@ -21,6 +21,8 @@ import { resolveMentions } from "./mentions.js";
 import { instructionsPrompt } from "./instructions.js";
 import { buildDefinitionTools, DefinitionStore, type SubAgentRun } from "./definitions.js";
 import { skillsPrompt } from "../core/agent/definitions.js";
+import { autoApprove } from "../core/agent/autoApprove.js";
+import { matchGlob } from "../core/util/glob.js";
 import { discoverLocal, rankModels, suggestPull } from "../core/providers/discover.js";
 import { request } from "../core/util/http.js";
 import { estimateTokens } from "../core/util/tokens.js";
@@ -276,6 +278,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       matches: searchTranscript(this.session.toJSON(), this.searchQuery).map((m) => m.entryId),
       searchQuery: this.searchQuery,
       setup: this.setup,
+      policy: {
+        scope: readSettings().permissions.autoApprove,
+        allowedPaths: readSettings().permissions.allowedPaths,
+        allowedCommands: readSettings().permissions.allowedCommands,
+        deniedPaths: readSettings().permissions.deniedPaths,
+        deniedCommands: readSettings().permissions.deniedCommands,
+      },
     };
     this.post({ type: "state", state });
   }
@@ -486,6 +495,30 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           this.permissions.forget(m.tool, m.prefix);
           this.sendState();
           break;
+        case "setApprovalScope": {
+          const config = vscode.workspace.getConfiguration(SECTION);
+          // Turning approvals off entirely is worth one confirmation. Not a moral objection — it is
+          // a legitimate choice on a scratch repository — but it is the one setting whose cost is
+          // not visible from its label until something has already happened.
+          if (m.scope === "all") {
+            const proceed = t("Switch approvals off");
+            const answer = await vscode.window.showWarningMessage(
+              t("Let the agent write anywhere and run anything, without asking?"),
+              {
+                modal: true,
+                detail: t(
+                  "Files excluded by the privacy policy stay excluded, and what leaves the machine is still governed separately. Everything else runs unattended.",
+                ),
+              },
+              proceed,
+            );
+            if (answer !== proceed) break;
+          }
+          await config.update("permissions.autoApprove", m.scope, writeTarget());
+          this.sendState();
+          break;
+        }
+
         case "clearSessionPermissions":
           this.permissions.clearSession();
           this.sendState();
@@ -1010,6 +1043,37 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    */
   private askApproval(req: { tool: string; description: string; args: Record<string, unknown> }): Promise<boolean> {
     const decision = this.permissions.decide(req.tool, req.args);
+
+    // A standing refusal comes first and is checked below; a standing ALLOWANCE and the scope
+    // policy are equivalent in effect, so either may satisfy the request. What may never happen is
+    // a scope turning a refusal into a permission, which is why this sits after `decide` rather
+    // than before it.
+    if (decision !== "never") {
+      const settings = readSettings();
+      const path = pathArgument(req.args);
+      const auto = autoApprove(
+        {
+          scope: settings.permissions.autoApprove,
+          allowedPaths: settings.permissions.allowedPaths,
+          allowedCommands: settings.permissions.allowedCommands,
+          deniedPaths: settings.permissions.deniedPaths,
+          deniedCommands: settings.permissions.deniedCommands,
+          // The privacy list is passed in rather than duplicated: one list, one place to change it.
+          blockedGlobs: settings.privacy.blockedGlobs,
+        },
+        {
+          tool: req.tool,
+          ...(path ? { path, insidePath: isInsideWorkspace(path) } : {}),
+          ...(req.tool === "run_command" ? { command: String(req.args["command"] ?? "") } : {}),
+        },
+        matchGlob,
+      );
+      if (auto.allow) {
+        this.post({ type: "status", text: t("{0} — {1}", req.description, auto.because), tool: req.tool, ok: true });
+        return Promise.resolve(true);
+      }
+    }
+
     if (decision === "always" || decision === "session") {
       this.post({ type: "status", text: t("{0} — allowed by a rule", req.description), tool: req.tool, ok: true });
       return Promise.resolve(true);
@@ -1121,3 +1185,46 @@ function randomNonce(): string {
 }
 
 export { commandPrefix };
+
+/**
+ * The path a tool call is about, if it is about one.
+ *
+ * Tools name it differently — `path` for a file, `member` for an IBM i source member — and a policy
+ * about paths that only understood one of those spellings would be a policy with a hole in it.
+ */
+function pathArgument(args: Record<string, unknown>): string | undefined {
+  for (const key of ["path", "file", "member", "uri"]) {
+    const value = args[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return undefined;
+}
+
+/**
+ * Whether a path resolves inside the open folder.
+ *
+ * Resolved against the real root rather than matched as text: `src/../../etc/passwd` is a relative
+ * path that reads as being inside the workspace and is not. A textual check is exactly the check
+ * this has to not be.
+ */
+function isInsideWorkspace(path: string): boolean {
+  const folder = vscode.workspace.workspaceFolders?.[0];
+  if (!folder) return false;
+  const root = folder.uri.fsPath.replace(/\\/g, "/").replace(/\/+$/, "");
+  const absolute = /^([a-zA-Z]:)?[/\\]/.test(path)
+    ? path.replace(/\\/g, "/")
+    : `${root}/${path.replace(/\\/g, "/")}`;
+  const resolved = normalise(absolute);
+  return resolved === root || resolved.startsWith(`${root}/`);
+}
+
+/** Collapse `.` and `..` without touching the filesystem — the path may not exist yet. */
+function normalise(path: string): string {
+  const out: string[] = [];
+  for (const part of path.split("/")) {
+    if (!part || part === ".") continue;
+    if (part === "..") out.pop();
+    else out.push(part);
+  }
+  return (path.startsWith("/") ? "/" : "") + out.join("/");
+}

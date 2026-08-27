@@ -2,6 +2,46 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.9.0 — 2026-08-27
+
+### Security
+
+- **`privacy.blockedGlobs` never blocked anything.** The glob matcher was a chain of `.replace()`
+  calls, each rewriting the output of the last: the step that expanded `**/` emitted `?` and `*`,
+  and the two later steps rewrote the characters it had just emitted. `**/.env*` compiled to
+  `^([^/]:.[^/]*/)[^/]\.env[^/]*$` — a pattern that matches nothing at all. Every shipped default
+  starts with `**/`, so `.env`, private keys, `secrets/**`, `.aws/**` and `.ssh/**` were all
+  attachable and all sendable.
+
+  There was no test on the matcher. The extension's central promise was untested and therefore
+  untrue. It is now compiled in a single pass — a replacement chain cannot be safe when the
+  replacement text is in the same alphabet as its input — with fourteen tests, including one that
+  asserts the shipped defaults against the paths they exist to stop.
+
+### Added — permissions the user controls
+
+- **`hiveyCode.permissions.autoApprove`**: `off` (the default), `workspace` (changes inside the open
+  folder run; commands and anything outside still ask) or `all` (nothing is asked). The middle one
+  is the one worth having, and `all` asks for confirmation once, because it is the setting whose
+  cost is not visible from its label until something has happened.
+- **A denied list and an allowed list**, for paths and for commands. Refusals are evaluated first
+  and cannot be overridden — a path on the denied list is refused even when the allowed list says
+  `**/*` and approvals are off. That ordering is what makes it safe to offer the dangerous scope.
+- **The two command rules pull in opposite directions, deliberately.** An allowance is narrow:
+  `npm test` covers `npm test --watch` and *not* `npm test && rm -rf /`. A refusal is broad: denying
+  `git push` also refuses `ls && git push`, because a refusal escaped by typing `&&` protects
+  nobody. Word boundaries hold in both, so denying `rm` does not deny `rmdir`. There is a test whose
+  only job is to stop a later reader merging the two functions.
+- The scope and both lists appear on the **Permissions screen**, not only in the settings. Someone
+  who cannot find the middle option here will find the one in the settings that says `all`.
+- A denied path is about what may be **touched**; `privacy.blockedGlobs` is about what may **leave**.
+  Neither is the other, and both apply.
+
+### Fixed
+
+- The model picker stayed open over whatever screen you moved to next. It is a floating element on
+  the body, so it outlived the screen that opened it.
+
 ## 0.8.0 — 2026-08-27
 
 ### Fixed
