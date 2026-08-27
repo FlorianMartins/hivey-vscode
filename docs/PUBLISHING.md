@@ -45,7 +45,7 @@ Then bump and describe the release **before** packaging, because both are shippe
 npm version minor --no-git-tag-version
 $EDITOR CHANGELOG.md
 npm run build
-npx @vscode/vsce@3 package --no-dependencies -o hiveyCode.vsix
+npx @vscode/vsce@3 package --no-dependencies -o hivey-code.vsix
 ```
 
 `--no-dependencies` is correct here and would be wrong in most extensions: the bundle is built by
@@ -62,7 +62,7 @@ them would double the download for nothing.
 **Install it and use it for an hour before publishing.**
 
 ```bash
-code --install-extension hiveyCode.vsix
+code --install-extension hivey-code.vsix
 ```
 
 The suite catches what it was written to catch. It does not catch a panel that feels wrong, a label
@@ -75,7 +75,7 @@ colleague testing a fix, or simply publishing from a browser because Azure DevOp
 organisation on a corporate network. So every build is attached to a GitHub release, and one tag is
 rolling:
 
-    https://github.com/FlorianMartins/hivey-code/releases/download/build/hiveyCode.vsix
+    https://github.com/FlorianMartins/hivey-code/releases/download/build/hivey-code.vsix
 
 That URL never changes; the asset behind it is replaced. To refresh it after a change:
 
@@ -98,7 +98,7 @@ export VSCE_PAT=…                                # or let vsce prompt for it
 npx @vscode/vsce@3 publish --no-dependencies
 
 export OVSX_PAT=…
-npx ovsx publish hiveyCode.vsix -p "$OVSX_PAT"
+npx ovsx publish hivey-code.vsix -p "$OVSX_PAT"
 
 git tag "v$(node -p 'require("./package.json").version')"
 git push --tags

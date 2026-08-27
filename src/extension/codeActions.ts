@@ -9,7 +9,7 @@
 import * as vscode from "vscode";
 import { t } from "../shared/i18n.js";
 
-export class ForgeCodeActions implements vscode.CodeActionProvider {
+export class HiveyCodeActions implements vscode.CodeActionProvider {
   static readonly kinds = [vscode.CodeActionKind.QuickFix, vscode.CodeActionKind.RefactorRewrite];
 
   provideCodeActions(

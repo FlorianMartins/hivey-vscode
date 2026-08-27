@@ -124,8 +124,8 @@ git clone https://github.com/FlorianMartins/hivey-code
 cd hivey-code
 npm ci
 npm run build
-npx @vscode/vsce package --no-dependencies   # produit hiveyCode.vsix
-code --install-extension hiveyCode.vsix
+npx @vscode/vsce package --no-dependencies   # produit hivey-code.vsix
+code --install-extension hivey-code.vsix
 ```
 
 Côté modèle, le plus simple :
