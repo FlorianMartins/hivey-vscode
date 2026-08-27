@@ -155,6 +155,27 @@
         "command": "forge.pickCompletionModel",
         "title": "%command.pickCompletionModel.title%",
         "category": "Forge"
+      },
+      {
+        "command": "forge.showMcp",
+        "title": "%command.showMcp.title%",
+        "category": "Forge",
+        "icon": "$(plug)"
+      },
+      {
+        "command": "forge.restartMcp",
+        "title": "%command.restartMcp.title%",
+        "category": "Forge"
+      },
+      {
+        "command": "forge.setArcadCredentials",
+        "title": "%command.setArcadCredentials.title%",
+        "category": "Forge"
+      },
+      {
+        "command": "forge.clearArcadCredentials",
+        "title": "%command.clearArcadCredentials.title%",
+        "category": "Forge"
       }
     ],
     "menus": {
@@ -414,6 +435,57 @@
           "type": "string",
           "default": "",
           "description": "%config.escalation.model%"
+        },
+        "forge.mcp.servers": {
+          "type": "object",
+          "default": {},
+          "markdownDescription": "%config.mcp.servers%",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "stdio",
+                  "http"
+                ],
+                "description": "stdio runs a program locally; http talks to a server."
+              },
+              "command": {
+                "type": "string",
+                "description": "The program to run (stdio)."
+              },
+              "args": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "env": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
+              "cwd": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string",
+                "description": "The server URL (http)."
+              },
+              "headers": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
+              "disabled": {
+                "type": "boolean",
+                "default": false
+              }
+            }
+          }
         }
       }
     }

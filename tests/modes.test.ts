@@ -37,6 +37,62 @@ test("agent mode keeps everything", () => {
   assert.equal(toolsForMode(ALL, "agent").length, ALL.length);
 });
 
+test("a tool that can read or write appears in plan mode only as its reading half", async () => {
+  // The alternative designs are both bad: leave such a tool out and plan mode cannot query a
+  // database, or leave it in whole and "plan mode changes nothing" becomes "…unless you click yes".
+  let ran = "";
+  const dual: Tool = {
+    schema: { name: "run_sql", description: "sql", parameters: { type: "object", properties: {} } },
+    approval: () => "run SQL",
+    run: async (args) => { ran = String(args["q"]); return { content: "ok" }; },
+    restrict() {
+      return {
+        ...dual,
+        approval: () => false,
+        run: async (args, ctx) =>
+          String(args["q"]).startsWith("select") ? dual.run(args, ctx) : { content: "Refused.", isError: true },
+      };
+    },
+  };
+
+  const planned = toolsForMode([...ALL, dual], "plan");
+  const restricted = planned.find((t) => t.schema.name === "run_sql");
+  assert.ok(restricted, "the reading half is offered");
+  assert.equal(restricted!.approval({}), false, "a read needs no dialog");
+
+  const ctx = { report: () => {} };
+  assert.equal((await restricted!.run({ q: "select 1" }, ctx)).content, "ok");
+  const refused = await restricted!.run({ q: "delete from t" }, ctx);
+  assert.equal(refused.isError, true, "plan mode refuses rather than asking");
+  assert.equal(ran, "select 1", "the write never reached the real tool");
+});
+
+test("in agent mode the same tool is whole again", () => {
+  const dual: Tool = {
+    schema: { name: "run_sql", description: "sql", parameters: { type: "object", properties: {} } },
+    approval: () => "run SQL",
+    run: async () => ({ content: "ok" }),
+    restrict() { return { ...dual, approval: () => false }; },
+  };
+  const agent = toolsForMode([dual], "agent").find((t) => t.schema.name === "run_sql");
+  assert.equal(agent!.approval({}), "run SQL");
+});
+
+test("the integrations' read-only tools are in plan mode, their writing ones are not", () => {
+  const names = [
+    "git_status", "git_diff", "git_log", "git_blame", "git_show", "git_branches",
+    "ibmi_member", "ibmi_members", "ibmi_objects", "ibmi_library_list",
+    "git_commit", "git_stage", "git_branch", "ibmi_command",
+  ].map(tool);
+  const planned = new Set(toolsForMode(names, "plan").map((t) => t.schema.name));
+  for (const allowed of ["git_status", "git_diff", "git_blame", "ibmi_member", "ibmi_objects"]) {
+    assert.ok(planned.has(allowed), `${allowed} should be readable in plan mode`);
+  }
+  for (const refused of ["git_commit", "git_stage", "git_branch", "ibmi_command"]) {
+    assert.ok(!planned.has(refused), `${refused} must not exist in plan mode`);
+  }
+});
+
 test("a tool nobody allow-listed is powerless in plan mode", () => {
   const withNewTool = [...ALL, tool("delete_everything")];
   assert.ok(!toolsForMode(withNewTool, "plan").some((t) => t.schema.name === "delete_everything"));

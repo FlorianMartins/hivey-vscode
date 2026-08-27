@@ -13,6 +13,7 @@ import { EgressGate, WorkspaceSpendStore, safeHost } from "./egress.js";
 import { registerEditorCommands } from "./editorCommands.js";
 import { showEgressReport, showCostReport } from "./reports.js";
 import { WorkspaceContext } from "./workspace.js";
+import { McpManager } from "./integrations/mcp.js";
 
 export function activate(context: vscode.ExtensionContext): void {
   // The editor knows which language the user reads, unless they said otherwise.
@@ -32,7 +33,13 @@ export function activate(context: vscode.ExtensionContext): void {
   const completion = new InlineCompletionProvider(keys, status, log);
   completion.updateStatus(readSettings());
 
-  const chat = new ChatViewProvider(context, keys, workspace, gate, log);
+  // MCP servers are started after activation, never during it: a slow or hanging server must not
+  // be able to delay the editor's startup, and a server nobody has trusted yet must not run at all.
+  const mcp = new McpManager(context, context.extension.packageJSON.version as string);
+  void mcp.startAll();
+  disposables.push({ dispose: () => void mcp.stopAll() });
+
+  const chat = new ChatViewProvider(context, keys, workspace, gate, log, mcp);
 
   context.subscriptions.push(
     log,
@@ -85,6 +92,52 @@ export function activate(context: vscode.ExtensionContext): void {
       await keys.store(provider.label as never, key);
       completion.invalidateProvider();
       void vscode.window.showInformationMessage(t("Forge: {0} key stored in the keychain.", provider.label));
+    }),
+
+    vscode.commands.registerCommand("forge.showMcp", async () => {
+      const rows = await mcp.status();
+      if (!rows.length) {
+        const configure = t("Open the settings");
+        const answer = await vscode.window.showInformationMessage(
+          t("No MCP server is configured."),
+          { detail: t("Declare one in forge.mcp.servers, or in a .vscode/mcp.json in this workspace."), modal: false },
+          configure,
+        );
+        if (answer === configure) void vscode.commands.executeCommand("workbench.action.openSettings", "forge.mcp.servers");
+        return;
+      }
+      const picked = await vscode.window.showQuickPick(
+        rows.map((r) => ({
+          label: `${r.running ? "$(pass-filled)" : r.error ? "$(error)" : "$(circle-outline)"} ${r.name}`,
+          description: r.running ? t("{0} tools", r.toolCount) : r.trusted ? t("not started") : t("waiting for your approval"),
+          detail: r.error ? `${r.target} — ${r.error}` : r.target,
+          row: r,
+        })),
+        { placeHolder: t("MCP servers. Pick one to start it or restart it."), matchOnDetail: true },
+      );
+      if (!picked) return;
+      await mcp.restart();
+      void vscode.window.showInformationMessage(t("MCP servers restarted."));
+    }),
+
+    vscode.commands.registerCommand("forge.restartMcp", async () => {
+      await mcp.restart();
+      const running = (await mcp.status()).filter((r) => r.running).length;
+      void vscode.window.showInformationMessage(t("{0} MCP server(s) connected.", running));
+    }),
+
+    vscode.commands.registerCommand("forge.setArcadCredentials", async () => {
+      const user = await vscode.window.showInputBox({ prompt: t("IBM i user profile for the ARCAD Elias server") });
+      if (!user) return;
+      const password = await vscode.window.showInputBox({ prompt: t("Password"), password: true });
+      if (!password) return;
+      await keys.storeArcad(user, password);
+      void vscode.window.showInformationMessage(t("ARCAD credentials stored in the system keychain."));
+    }),
+
+    vscode.commands.registerCommand("forge.clearArcadCredentials", async () => {
+      await keys.clearArcad();
+      void vscode.window.showInformationMessage(t("ARCAD credentials cleared."));
     }),
 
     vscode.commands.registerCommand("forge.clearApiKey", async () => {

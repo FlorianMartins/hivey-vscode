@@ -18,15 +18,43 @@ export const MODES: Array<{ id: Mode; label: string; hint: string }> = [
   { id: "agent", label: "Agent", hint: t("Reads, edits and proposes commands — with your approval.") },
 ];
 
-/** Tools that only observe. The allow-list is explicit: a new tool is powerless until named here. */
-const READ_ONLY = new Set(["read_file", "list_files", "search_text", "get_diagnostics"]);
+/**
+ * Tools that only observe. The allow-list is explicit: a new tool is powerless until named here.
+ *
+ * It lives in core, next to the mode it governs, rather than being assembled from flags the tools
+ * set on themselves — a tool that grants itself read-only status is a tool that can be wrong about
+ * it. Adding a tool to this list is a deliberate edit in the file that defines what plan mode means.
+ */
+const READ_ONLY = new Set([
+  "read_file",
+  "list_files",
+  "search_text",
+  "get_diagnostics",
+  // Git: everything that inspects history or the working tree.
+  "git_status",
+  "git_diff",
+  "git_log",
+  "git_branches",
+  "git_blame",
+  "git_show",
+  // IBM i: reading members and object lists. Running SQL or CL is not here.
+  "ibmi_member",
+  "ibmi_members",
+  "ibmi_objects",
+  "ibmi_library_list",
+]);
 
 export function toolsForMode(all: Tool[], mode: Mode): Tool[] {
   switch (mode) {
     case "chat":
       return [];
     case "plan":
-      return all.filter((t) => READ_ONLY.has(t.schema.name));
+      // Two ways in: a tool that only ever reads, or a tool that can produce a reading-only
+      // version of itself. Anything else has no representation in plan mode at all.
+      return all.flatMap((tool) => {
+        if (READ_ONLY.has(tool.schema.name)) return [tool];
+        return tool.restrict ? [tool.restrict()] : [];
+      });
     case "agent":
       return all;
   }

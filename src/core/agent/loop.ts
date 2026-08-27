@@ -43,6 +43,17 @@ export interface Tool {
    */
   approval(args: Record<string, unknown>): string | false;
   run(args: Record<string, unknown>, ctx: ToolContext): Promise<ToolResult>;
+  /**
+   * A version of this tool that cannot change anything, for plan mode.
+   *
+   * Most tools do not need one: they either only read (and plan mode lists them) or only write (and
+   * plan mode must not have them). It exists for the few whose ARGUMENTS decide which they are —
+   * `ibmi_sql` runs a SELECT or a DELETE, `arcad_rest` sends a GET or a POST. Without this those
+   * tools face a bad choice: leave them out and plan mode cannot read a table, or leave them in and
+   * "plan mode changes nothing" becomes "plan mode changes nothing unless you approve a dialog".
+   * Refusing inside the restricted tool keeps the promise absolute.
+   */
+  restrict?(): Tool;
 }
 
 export type Approver = (request: { tool: string; description: string; args: Record<string, unknown> }) => Promise<boolean>;

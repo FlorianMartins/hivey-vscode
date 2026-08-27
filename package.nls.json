@@ -45,5 +45,10 @@
   "config.escalation.policy": "When the local model is not enough (context too large, a diagnosis or architecture question): `never` refuses, `ask` offers, `auto` switches to the escalation model on its own.",
   "config.escalation.provider": "Provider used when escalating.",
   "config.escalation.model": "Escalation model (empty = escalation is impossible).",
-  "config.language": "Interface language. `auto` follows the editor's display language."
+  "config.language": "Interface language. `auto` follows the editor's display language.",
+  "command.showMcp.title": "Show MCP servers",
+  "command.restartMcp.title": "Restart MCP servers",
+  "command.setArcadCredentials.title": "Store the ARCAD Elias credentials",
+  "command.clearArcadCredentials.title": "Forget the ARCAD Elias credentials",
+  "config.mcp.servers": "MCP servers to connect to, as `{ \"name\": { … } }`. A `stdio` entry runs a program on this machine and is never started until you have agreed to it in a dialog that names the command; an `http` entry talks to a URL and goes through the same egress rules as any other outbound request. A `.vscode/mcp.json` in the workspace is read too, and these entries win on a name collision."
 }

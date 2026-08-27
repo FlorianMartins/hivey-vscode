@@ -124,6 +124,31 @@ export class Keys {
   delete(provider: ProviderId): Thenable<void> {
     return this.secrets.delete(Keys.id(provider));
   }
+
+  /**
+   * The ARCAD Elias credentials.
+   *
+   * Kept here rather than under `arcad.*` in settings.json for the reason every credential in this
+   * extension is: settings.json is synchronised between machines and committed by accident, and a
+   * password to a change-management server governs what reaches production.
+   */
+  async arcad(): Promise<{ user: string; password: string } | undefined> {
+    const raw = await this.secrets.get(`${SECTION}.arcad`);
+    if (!raw) return undefined;
+    try {
+      return JSON.parse(raw) as { user: string; password: string };
+    } catch {
+      return undefined;
+    }
+  }
+
+  storeArcad(user: string, password: string): Thenable<void> {
+    return this.secrets.store(`${SECTION}.arcad`, JSON.stringify({ user, password }));
+  }
+
+  clearArcad(): Thenable<void> {
+    return this.secrets.delete(`${SECTION}.arcad`);
+  }
 }
 
 /** Build the provider for a role, resolving its endpoint and (if remote) its key. */

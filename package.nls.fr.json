@@ -45,5 +45,10 @@
   "config.escalation.policy": "Quand le modèle local ne suffit pas (contexte trop grand, question de diagnostic ou d'architecture) : `never` refuse, `ask` propose, `auto` bascule seul vers le modèle d'escalade.",
   "config.escalation.provider": "Fournisseur utilisé lors d'une escalade.",
   "config.escalation.model": "Modèle d'escalade (vide = pas d'escalade possible).",
-  "config.language": "Langue de l'interface. `auto` suit la langue d'affichage de l'éditeur."
+  "config.language": "Langue de l'interface. `auto` suit la langue d'affichage de l'éditeur.",
+  "command.showMcp.title": "Afficher les serveurs MCP",
+  "command.restartMcp.title": "Redémarrer les serveurs MCP",
+  "command.setArcadCredentials.title": "Enregistrer les identifiants ARCAD Elias",
+  "command.clearArcadCredentials.title": "Oublier les identifiants ARCAD Elias",
+  "config.mcp.servers": "Serveurs MCP auxquels se connecter, sous la forme `{ \"nom\": { … } }`. Une entrée `stdio` exécute un programme sur cette machine et n’est jamais démarrée avant que vous ne l’ayez accepté dans une fenêtre qui nomme la commande ; une entrée `http` s’adresse à une URL et passe par les mêmes règles de sortie que toute autre requête. Un fichier `.vscode/mcp.json` de l’espace de travail est lu aussi, et ces entrées l’emportent en cas de collision de nom."
 }

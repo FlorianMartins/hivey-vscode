@@ -12,6 +12,8 @@
 // DocumentSymbolProvider — and falls back here for files no language server has opened, which is
 // most of a large repository.
 
+import { extractIbmiReferences, extractIbmiSymbols } from "../ibmi/symbols.js";
+
 export interface Sym {
   name: string;
   kind: "function" | "class" | "type" | "const" | "method" | "test";
@@ -98,6 +100,12 @@ const RULES: Array<{ ext: RegExp; rules: LangRules }> = [
 ];
 
 export function extractSymbols(path: string, text: string, maxPerFile = 40): Sym[] {
+  // IBM i source is read by column, not by line start, so it needs its own reader. It is asked
+  // first because several of its extensions (.sql, .cmd, .table) also match generic rules that
+  // would find the wrong thing, or nothing.
+  const ibmi = extractIbmiSymbols(path, text);
+  if (ibmi.length) return ibmi.slice(0, maxPerFile);
+
   const entry = RULES.find((r) => r.ext.test(path));
   if (!entry) return [];
   const out: Sym[] = [];
@@ -135,5 +143,8 @@ export function extractImports(path: string, text: string): string[] {
     let m: RegExpExecArray | null;
     while ((m = re.exec(text))) if (m[1]) out.add(m[1]);
   }
+  // On IBM i nothing is imported: a member names a file, a program or a copybook instead. Those
+  // are the same signal — "this member needs that object" — so they feed the same ranking.
+  for (const ref of extractIbmiReferences(path, text)) out.add(ref);
   return [...out];
 }

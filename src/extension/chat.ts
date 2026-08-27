@@ -15,6 +15,7 @@ import { route } from "../core/router/route.js";
 import { Session, type ContextItem, type Entry, type SessionData } from "../core/session/session.js";
 import { filterHistory, searchTranscript } from "../core/session/history.js";
 import { promptForMode, toolsForMode } from "../core/session/modes.js";
+import { detectIbmiLanguage, ibmiPrompt } from "../core/ibmi/languages.js";
 import { estimateTokens } from "../core/util/tokens.js";
 import { isLocalEndpoint, Vault } from "../core/redaction/index.js";
 import type {
@@ -34,6 +35,7 @@ import { EgressGate, safeHost } from "./egress.js";
 import { labelFor, listModels, openFiles, supportsReasoning } from "./models.js";
 import { loadPrices } from "./prices.js";
 import { buildTools } from "./tools.js";
+import { McpManager } from "./integrations/mcp.js";
 import { WorkspaceContext, relative } from "./workspace.js";
 
 const HISTORY_KEY = "forge.sessions";
@@ -78,6 +80,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     private readonly workspace: WorkspaceContext,
     private readonly gate: EgressGate,
     private readonly log: vscode.OutputChannel,
+    private readonly mcp: McpManager,
   ) {
     this.permissions = new Permissions(new MementoPermissionStore(ctx.globalState));
     const prefs = ctx.globalState.get<Prefs>(PREFS_KEY);
@@ -510,11 +513,16 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       mode !== "chat" && settings.context.repoMap
         ? await this.workspace.repoMap(Math.floor(settings.context.maxTokens * 0.4))
         : undefined;
-    const allTools: Tool[] = buildTools({ settings: () => settings, confirmEdit: (u, n) => this.confirmEdit(u, n) });
+    const allTools: Tool[] = buildTools({
+      settings: () => settings,
+      confirmEdit: (u, n) => this.confirmEdit(u, n),
+      arcad: { credentials: () => this.keys.arcad() },
+      mcp: this.mcp,
+    });
     const tools = toolsForMode(allTools, mode);
 
     const built = this.session.build({
-      systemPrompt: promptForMode(mode) + workspaceNote(),
+      systemPrompt: promptForMode(mode) + workspaceNote() + dialectNote(),
       ambient: ambient ? `${ambient.text}\n\n(${ambient.files} files mapped, ${ambient.omitted} omitted)` : undefined,
       maxTokens: settings.context.maxTokens,
       nonce,
@@ -727,6 +735,22 @@ export class PreviewProvider implements vscode.TextDocumentContentProvider {
 function workspaceNote(): string {
   const folder = vscode.workspace.workspaceFolders?.[0];
   return folder ? `\n\nWorkspace: ${folder.name}.` : "";
+}
+
+/**
+ * The rules of the dialect in the active editor, when that dialect has rules a model gets wrong.
+ *
+ * Only IBM i qualifies today, and it qualifies badly: a model that writes free-form RPG into a
+ * fixed-format member produces something that looks right, compiles into something else, and fails
+ * in a spool file. The text is appended to the SYSTEM prompt rather than to the turn, which sounds
+ * like it would break the prompt cache on every file switch — it does not, because the text depends
+ * on the dialect and not on the file. A conversation about RPG keeps the same prefix throughout.
+ */
+function dialectNote(): string {
+  const doc = vscode.window.activeTextEditor?.document;
+  if (!doc) return "";
+  const lang = detectIbmiLanguage(doc.uri.path, doc.getText().slice(0, 20_000));
+  return lang ? `\n\n${ibmiPrompt(lang)}` : "";
 }
 
 function safeUrl(s: Settings, id: Settings["chat"]["provider"]): string {

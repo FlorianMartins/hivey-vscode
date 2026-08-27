@@ -16,6 +16,10 @@ import { headToTokens } from "../core/util/tokens.js";
 import { EgressGate } from "./egress.js";
 import type { Settings } from "./config.js";
 import { relative } from "./workspace.js";
+import { buildGitTools, gitAvailable } from "./integrations/git.js";
+import { buildIbmiTools, ibmiExtensionInstalled } from "./integrations/ibmi.js";
+import { arcadInstalled, buildArcadTools, type ArcadDeps } from "./integrations/arcad.js";
+import type { McpManager } from "./integrations/mcp.js";
 
 const MAX_READ_TOKENS = 6000;
 const MAX_MATCHES = 60;
@@ -43,6 +47,10 @@ export interface ToolDeps {
   settings: () => Settings;
   /** Shows a diff and returns what the user chose. */
   confirmEdit?: (uri: vscode.Uri, next: string) => Promise<boolean>;
+  /** The Elias credentials, read from the keychain when an ARCAD call needs them. */
+  arcad?: ArcadDeps;
+  /** Running MCP servers, whose tools join the set. */
+  mcp?: McpManager;
 }
 
 export function buildTools(deps: ToolDeps): Tool[] {
@@ -253,5 +261,16 @@ export function buildTools(deps: ToolDeps): Tool[] {
     },
   };
 
-  return [readFile, listFiles, searchText, diagnostics, writeFile, editFile, runCommand];
+  // The integrations are offered only when there is something behind them. A model given
+  // `ibmi_sql` on a machine with no partition does not conclude "no IBM i here"; it calls the tool,
+  // reads the error, and calls it again — a turn spent proving something the tool list could have
+  // said for free. Absence is the clearest way to say a system is not there.
+  const integrations: Tool[] = [
+    ...(gitAvailable() ? buildGitTools() : []),
+    ...(ibmiExtensionInstalled() ? buildIbmiTools() : []),
+    ...(arcadInstalled() && deps.arcad ? buildArcadTools(deps.arcad) : []),
+    ...(deps.mcp?.tools() ?? []),
+  ];
+
+  return [readFile, listFiles, searchText, diagnostics, writeFile, editFile, runCommand, ...integrations];
 }
