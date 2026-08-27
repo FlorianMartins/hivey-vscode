@@ -513,7 +513,9 @@
     "scan:secrets": "node scripts/scan-secrets.mjs",
     "test:integration": "node esbuild.mjs && node esbuild.mjs --integration && node dist-integration/runTest.js",
     "publish:vsce": "npx --yes @vscode/vsce@3 publish --no-dependencies",
-    "publish:ovsx": "npx --yes ovsx publish forge.vsix"
+    "publish:ovsx": "npx --yes ovsx publish forge.vsix",
+    "vsix": "npm run build && npx --yes @vscode/vsce@3 package --no-dependencies -o forge.vsix",
+    "vsix:publish": "npm run vsix && gh release upload build forge.vsix --clobber"
   },
   "devDependencies": {
     "@types/node": "^18.19.0",

@@ -68,6 +68,29 @@ code --install-extension forge.vsix
 The suite catches what it was written to catch. It does not catch a panel that feels wrong, a label
 that reads badly at 260 px, or a model that is unbearably slow on the machine you actually have.
 
+## Getting the .vsix without a build environment
+
+Not everyone who needs the packaged extension can build it — a work machine behind a proxy, a
+colleague testing a fix, or simply publishing from a browser because Azure DevOps will not create an
+organisation on a corporate network. So every build is attached to a GitHub release, and one tag is
+rolling:
+
+    https://github.com/FlorianMartins/forge/releases/download/build/forge.vsix
+
+That URL never changes; the asset behind it is replaced. To refresh it after a change:
+
+```bash
+npm run vsix:publish     # packages, then replaces the asset on the `build` tag
+```
+
+`build` is marked as a pre-release, so it never becomes the "Latest release" GitHub shows on the
+repository page — a numbered tag stays the thing a stranger downloads.
+
+**This is a distribution channel, not a release process.** A rolling asset means someone who
+downloaded it yesterday and someone who downloads it today do not have the same file and have no way
+to tell. Use it for testing and for hand-carrying a build to the Marketplace form; use a numbered
+release for anything anyone will keep.
+
 ## Publishing
 
 ```bash
