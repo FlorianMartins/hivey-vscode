@@ -273,6 +273,12 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
     card.append(chips);
   }
 
+  const meter = el("div", "composer-meter");
+  const tokens = el("span", "composer-tokens", t("{0} tokens", formatTokens(state.contextTokens)));
+  tokens.title = t("What the next question will send, once muted exchanges are removed.");
+  meter.append(tokens);
+  card.append(meter);
+
   const area = el("textarea", "composer-input");
   area.rows = 2;
   area.placeholder =
@@ -320,9 +326,6 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
   bar.append(left);
 
   const right = el("div", "toolbar-group end");
-  const tokens = el("span", "composer-tokens", t("{0} tokens", formatTokens(state.contextTokens)));
-  tokens.title = t("What the next question will send, once muted exchanges are removed.");
-  right.append(tokens);
   right.append(
     isStreaming()
       ? button({ icon: ICON.stop, title: t("Stop the answer"), className: "btn primary send", onClick: () => deps.send({ type: "stop" }) })

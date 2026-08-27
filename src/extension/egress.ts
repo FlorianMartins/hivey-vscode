@@ -126,16 +126,24 @@ export class EgressGate {
     }
 
     const summary = summarise(findings);
-    const answer = await vscode.window.showInformationMessage(
-      t("Hivey Code is about to send ~{0} tokens to {1} ({2}).", tokens, host, target.model) +
-        (summary ? t(" Pseudonymised: {0}.", summary) : t(" No sensitive data detected.")),
-      { modal: true },
-      t("Send"),
-      t("See what leaves"),
-      t("Cancel"),
-    );
-    if (answer === t("See what leaves")) return false; // the preview command shows it; the user re-sends
-    if (answer !== t("Send")) return false;
+    // Asked in the conversation rather than in a modal over the editor. The consent itself is not
+    // negotiable — it is the whole privacy argument — but a modal at the moment of sending stops
+    // the world for a question about a routine action, and a question that stops the world gets
+    // dismissed rather than read. The card appears where the answer will appear.
+    const answer = this.ask
+      ? await this.ask({
+          description: t("Send ~{0} tokens to {1} ({2})?", tokens, host, target.model),
+          detail: [summary ? t("Pseudonymised: {0}.", summary) : t("No sensitive data detected.")],
+        })
+      : "no";
+    if (answer === "no") return false;
+    if (answer === "always") {
+      // "Always" means always, whatever the policy says: an explicit answer outranks a default.
+      this.consented.add(key);
+      const stored = this.state.get<string[]>(CONSENT_KEY, []);
+      if (!stored.includes(key)) void this.state.update(CONSENT_KEY, [...stored, key]);
+      return true;
+    }
 
     if (policy === "ask-once") {
       this.consented.add(key);
@@ -144,6 +152,15 @@ export class EgressGate {
     }
     return true;
   }
+
+  /**
+   * How the user is asked to consent, injected by whoever owns a surface to ask on.
+   *
+   * The gate is shared with the terminal client, which has no panel to draw a card in — so this is
+   * a callback rather than a hard-coded dialog. A gate with no asker refuses, because "nobody could
+   * be asked" must not mean "send it anyway".
+   */
+  ask?: (request: { description: string; detail: string[] }) => Promise<"once" | "always" | "no">;
 
   /** Called after a remote call completed. */
   record(entry: EgressRecord, settings: Settings): void {

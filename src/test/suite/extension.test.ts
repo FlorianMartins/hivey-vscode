@@ -169,6 +169,10 @@ suite("Screenshot", () => {
       // nothing at all. The screenshots therefore show the side bar at its DEFAULT width, which is
       // the honest thing to publish anyway — it is what someone sees the minute they install this,
       // and a panel that only looks right after the user drags it wider does not look right.
+      // A fresh profile opens on the setup screen, which is correct for a real first run and wrong
+      // for a photograph of the conversation. `newSession` is the honest way back: it is what the
+      // user clicks, not a flag that only exists for the camera.
+      await vscode.commands.executeCommand("hiveyCode.newSession");
       await vscode.commands.executeCommand("hiveyCode.askWith", "Does this function round correctly? What should change?");
       await new Promise((r) => setTimeout(r, 4000));
       await vscode.commands.executeCommand("notifications.clearAll").then(undefined, () => {});
@@ -186,6 +190,11 @@ suite("Screenshot", () => {
         await new Promise((r) => setTimeout(r, hold));
       };
 
+      // The panel's `ready` arrives after these commands and opens the setup screen on a fresh
+      // profile, so the return to the conversation has to happen after it, not before.
+      await new Promise((r) => setTimeout(r, 2500));
+      await vscode.commands.executeCommand("hiveyCode.newSession");
+      await vscode.commands.executeCommand("hiveyCode.askWith", "Does this function round correctly? What should change?");
       await announce("conversation");
       for (const [command, name] of [
         ["hiveyCode.setup", "setup"],

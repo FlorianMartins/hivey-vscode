@@ -36,7 +36,13 @@ function draft(id: string): { key: string; url: string } {
 const GATEWAYS: Gateway[] = [
   { id: "openrouter", label: "OpenRouter", placeholder: "sk-or-v1-…", keysUrl: "https://openrouter.ai/keys" },
   { id: "anthropic", label: "Anthropic", placeholder: "sk-ant-…", keysUrl: "https://console.anthropic.com/settings/keys" },
-  { id: "openai-compatible", label: "OpenAI-compatible", placeholder: "sk-…", needsUrl: true },
+  {
+    id: "openai-compatible",
+    label: "OpenAI-compatible",
+    placeholder: "sk-…",
+    keysUrl: "https://learn.microsoft.com/azure/ai-services/openai/quickstart",
+    needsUrl: true,
+  },
 ];
 
 function gatewayHint(id: string): string {

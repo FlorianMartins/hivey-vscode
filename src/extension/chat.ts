@@ -63,6 +63,7 @@ const SETUP_SEEN_KEY = "hiveyCode.setupSeen";
 const ALLOWED_LINKS = [
   "https://openrouter.ai/keys",
   "https://console.anthropic.com/settings/keys",
+  "https://learn.microsoft.com/azure/ai-services/openai/quickstart",
   "https://ollama.com/download",
 ];
 
@@ -110,6 +111,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     private readonly definitions: DefinitionStore,
   ) {
     this.permissions = new Permissions(new MementoPermissionStore(ctx.globalState));
+    // The gate asks through the panel, in the conversation, rather than through a modal over the
+    // editor. If the panel is not open there is nobody to ask, and the gate refuses — which is the
+    // right way round for a question about what leaves the machine.
+    this.gate.ask = (request) => this.askEgress(request);
     const prefs = ctx.globalState.get<Prefs>(PREFS_KEY);
     this.session.mode = prefs?.mode ?? "agent";
     this.reasoning = prefs?.reasoning ?? "none";
@@ -370,7 +375,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           // First run: open on the setup screen rather than on a chat that cannot answer. The
           // probe starts immediately, because the useful version of this screen is the one that
           // already knows what is running by the time it is read.
-          if (!this.ctx.globalState.get<boolean>(SETUP_SEEN_KEY)) {
+          if (!this.ctx.globalState.get<boolean>(SETUP_SEEN_KEY) || (await this.cannotAnswer())) {
             this.screen = "setup";
             await this.refreshSetup();
             void this.probeLocal();
@@ -788,6 +793,23 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     });
   }
 
+  /**
+   * Whether the configured model could not answer if asked.
+   *
+   * A remote provider with no key in the keychain is the case that matters: the conversation looks
+   * ready, the first question fails, and the error names a setting rather than a thing to do. Better
+   * to open on the screen that fixes it. A local endpoint is not checked here — probing takes long
+   * enough to be felt on activation, and a local endpoint that is merely not running yet is a
+   * temporary state, not a misconfiguration.
+   */
+  private async cannotAnswer(): Promise<boolean> {
+    const settings = readSettings();
+    const provider = settings.chat.provider;
+    if (provider === "local") return false;
+    if (provider === "openai-compatible" && !settings.endpoints["openai-compatible"]) return true;
+    return !(await this.keys.get(provider));
+  }
+
   /** Reopens the first-run screen and re-probes, from the command palette. */
   openSetup(): void {
     this.screen = "setup";
@@ -1054,6 +1076,27 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    * Ask, unless the permission book already answered. The book is consulted BEFORE the panel is
    * disturbed, which is what makes "toujours autoriser" worth anything.
    */
+  /** Consent to send, asked as a card in the conversation. */
+  private askEgress(request: { description: string; detail: string[] }): Promise<"once" | "always" | "no"> {
+    if (!this.view) return Promise.resolve("no");
+    const id = randomNonce();
+    this.post({
+      type: "approval",
+      id,
+      tool: "egress",
+      description: request.description,
+      detail: request.detail,
+      // No "this session": consent to a destination is per destination, and a session is not one.
+      choices: ["once", "always", "no"],
+    });
+    return new Promise((resolve) => {
+      this.approvals.set(id, (answer) => resolve(answer === "no" ? "no" : answer === "always" ? "always" : "once"));
+      this.turn?.signal.addEventListener("abort", () => {
+        if (this.approvals.delete(id)) resolve("no");
+      });
+    });
+  }
+
   private askApproval(req: { tool: string; description: string; args: Record<string, unknown> }): Promise<boolean> {
     const decision = this.permissions.decide(req.tool, req.args);
 

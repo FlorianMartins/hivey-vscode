@@ -402,6 +402,16 @@ export function openModelCombo(anchor: HTMLElement, state: UiState, send: (m: To
     );
     foot.append(el("div", "spacer"));
     foot.append(
+      button({
+        label: t("Connect a provider"),
+        className: "btn tiny ghost",
+        onClick: () => {
+          closeModelCombo();
+          send({ type: "openScreen", screen: "setup" });
+        },
+      }),
+    );
+    foot.append(
       button({ label: t("Refresh"), className: "btn tiny ghost", onClick: () => send({ type: "refreshModels" }) }),
     );
     panel.append(foot);

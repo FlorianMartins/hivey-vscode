@@ -2,6 +2,39 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.10.0 — 2026-08-27
+
+### Changed
+
+- **The consent to send is asked in the conversation, not in a modal.** The consent itself is not
+  negotiable — it is the whole privacy argument — but a modal at the moment of sending stops the
+  world for a routine action, and a question that stops the world gets dismissed rather than read.
+  It now appears as a card where the answer will appear, with **Send**, **Always to this model** and
+  **Do not send**. There is no "this conversation": consent belongs to a destination, and a
+  conversation is not one.
+
+  The one case that stays modal is a detected credential. Interrupting is right when something that
+  looks like a password is about to leave.
+- **The context meter moved above the box**, right-aligned. Inside the toolbar it sat between the
+  model name and the send button and competed with both for the same few pixels.
+- **The composer's toolbar no longer wraps.** Wrapping was a way to survive a very narrow panel and
+  it cost more than it saved: the send button dropped to a line of its own, which reads as a broken
+  layout rather than a narrow one. `hiveyCode.panel.minWidth` already stops the panel getting narrow
+  enough for the question to arise, so the row refuses to break and the model name ellipsises.
+
+### Fixed
+
+- **The panel is back in the activity bar**, on the left, where an extension's icon belongs. Moving
+  it to the secondary side bar in 0.8.0 was a mistake: a view container lives in one place at a
+  time, so declaring a home is choosing a DEFAULT — and I changed the default instead of offering
+  the choice. `Hivey Code: Move the panel` now opens the editor's own destination picker, which
+  offers every placement it supports, in its own words, and remembers what you choose.
+- **The quick-connect screen was unreachable** once dismissed. It now opens whenever the configured
+  model could not answer — a remote provider with no key in the keychain — because a conversation
+  that fails on its first question is a worse first impression than a screen that asks. It is also
+  one click from the model picker, which is where someone goes when they want a model they cannot
+  yet use. Every provider carries a link to where its key is issued.
+
 ## 0.9.1 — 2026-08-27
 
 ### Fixed

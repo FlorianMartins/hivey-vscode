@@ -121,6 +121,9 @@ body {
 .btn .lbl {
   overflow: hidden;
   text-overflow: ellipsis;
+  /* Without this a flex item refuses to shrink below its content, so the label kept a floor the
+     row could not afford and the send button wrapped to a line of its own. */
+  min-width: 0;
 }
 
 .btn.icon-only {
@@ -768,7 +771,9 @@ pre.code {
 .composer-toolbar.bottom {
   margin-top: var(--sp-1);
 }
-/* The model name is the one label allowed to shrink: everything else is one or two words. */
+/* The model name is the one label allowed to shrink: everything else is one or two words, and the
+   send button must never move. `0 1 auto` — shrink, never grow: growing was what pushed the send
+   button off the row in the first place. */
 .composer-toolbar .btn.model {
   min-width: 0;
   flex: 0 1 auto;
@@ -1483,15 +1488,22 @@ pre.code {
  * 260 px, without either being a special case in the code.
  */
 
+/* One row, always. Wrapping was an attempt to survive a very narrow panel, and it cost more than
+   it saved: the send button dropped to a line of its own, which reads as a broken layout rather
+   than as a narrow one. `hiveyCode.panel.minWidth` now stops the panel getting narrow enough for
+   the question to arise, so the row can simply refuse to break and let the model name ellipsise. */
 .composer-toolbar {
-  flex-wrap: wrap;
-  row-gap: var(--sp-1);
+  flex-wrap: nowrap;
   margin-top: var(--sp-1);
 }
 .toolbar-group {
   display: flex;
   align-items: center;
   gap: var(--sp-1);
+  /* Shrink, never grow. `1 1 auto` made this group expand to fill the row, which pushed the send
+     button onto a line of its own — the very thing it was meant to prevent. `0 1 auto` lets the
+     model name give up characters so the row keeps its single line. */
+  flex: 0 1 auto;
   min-width: 0;
 }
 .toolbar-group.end {
@@ -1908,4 +1920,25 @@ pre.code {
 }
 .perm-list-count.allowed {
   color: var(--muted);
+}
+
+/* The context meter sits above the box, right-aligned: a number you glance at, not a control you
+   operate. Inside the toolbar it sat between the model name and the send button and competed with
+   both for the same few pixels. */
+.composer-meter {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 var(--sp-1) var(--sp-1);
+  min-height: 14px;
+}
+
+/* An egress card is about what leaves the machine rather than about what the agent may do, so it
+   reads differently: the accent border says "this one is about the outside". */
+.approval.egress {
+  border-left: 2px solid var(--vscode-charts-blue, var(--vscode-focusBorder));
+}
+.approval-detail {
+  font-size: var(--fs-meta);
+  color: var(--muted);
+  padding: 0 var(--sp-3) var(--sp-1);
 }

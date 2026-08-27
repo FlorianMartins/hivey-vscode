@@ -244,36 +244,60 @@ class LiveTurn {
   }
 
   /** The approval card: four answers, because "yes" and "yes forever" are different decisions. */
-  appendApproval(id: string, tool: string, description: string, command?: string): void {
-    const card = el("div", "approval");
+  appendApproval(
+    id: string,
+    tool: string,
+    description: string,
+    command?: string,
+    choices: Array<"once" | "session" | "always" | "no"> = ["once", "session", "always", "no"],
+    detail: string[] = [],
+  ): void {
+    const egress = tool === "egress";
+    const card = el("div", `approval${egress ? " egress" : ""}`);
     const head = el("div", "approval-head");
     head.append(icon("shield", "approval-ico"));
-    head.append(el("span", undefined, t("Approval requested")));
+    head.append(el("span", undefined, egress ? t("Leaving this machine") : t("Approval requested")));
     card.append(head);
     card.append(el("div", "approval-body", description));
     if (command) card.append(el("pre", "approval-command", command));
+    for (const line of detail) card.append(el("div", "approval-detail", line));
 
     const actions = el("div", "approval-actions");
     const answer = (a: "once" | "session" | "always" | "no", label: string) => {
       send({ type: "approve", id, answer: a });
       card.replaceChildren(el("div", "approval-done", label));
     };
-    actions.append(
-      button({ label: t("Allow"), className: "btn primary", onClick: () => answer("once", t("Allowed once.")) }),
-      button({
-        label: t("Always (this conversation)"),
-        className: "btn",
-        title: t("Stop asking for {0} until the next conversation", tool),
-        onClick: () => answer("session", t("Allowed for this conversation.")),
-      }),
-      button({
-        label: t("Always"),
-        className: "btn",
-        title: t("Write a permanent rule for this action"),
-        onClick: () => answer("always", t("Permanent rule saved.")),
-      }),
-      button({ label: t("Refuse"), className: "btn danger", onClick: () => answer("no", t("Refused.")) }),
-    );
+    // Egress consent is per destination, so "this conversation" would be a promise about the wrong
+    // thing. The labels differ too: what is being agreed to is sending, not permitting an action.
+    const available: Record<string, () => HTMLElement> = {
+      once: () =>
+        button({
+          label: egress ? t("Send") : t("Allow"),
+          className: "btn primary",
+          onClick: () => answer("once", egress ? t("Sent.") : t("Allowed once.")),
+        }),
+      session: () =>
+        button({
+          label: t("Always (this conversation)"),
+          className: "btn",
+          title: t("Stop asking for {0} until the next conversation", tool),
+          onClick: () => answer("session", t("Allowed for this conversation.")),
+        }),
+      always: () =>
+        button({
+          label: egress ? t("Always to this model") : t("Always"),
+          className: "btn",
+          title: egress ? t("Stop asking before sending to this model") : t("Write a permanent rule for this action"),
+          onClick: () => answer("always", egress ? t("This model will not be asked about again.") : t("Permanent rule saved.")),
+        }),
+      no: () =>
+        button({
+          label: egress ? t("Do not send") : t("Refuse"),
+          className: "btn danger",
+          onClick: () => answer("no", egress ? t("Not sent.") : t("Refused.")),
+        }),
+    };
+    for (const choice of choices) actions.append(available[choice]!());
     card.append(actions);
     this.body.append(card);
     scrollToEnd();
@@ -341,7 +365,7 @@ window.addEventListener("message", (event: MessageEvent<ToPanel>) => {
       scrollToEnd();
       break;
     case "approval":
-      ensureLive().appendApproval(m.id, m.tool, m.description, m.command);
+      ensureLive().appendApproval(m.id, m.tool, m.description, m.command, m.choices, m.detail);
       break;
     case "error":
       ensureLive().appendError(m.message);

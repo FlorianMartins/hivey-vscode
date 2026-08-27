@@ -212,7 +212,17 @@ export type ToPanel =
   | { type: "status"; text: string; tool?: string; ok?: boolean }
   | { type: "turnStart" }
   | { type: "turnEnd" }
-  | { type: "approval"; id: string; tool: string; description: string; command?: string }
+  | {
+      type: "approval";
+      id: string;
+      tool: string;
+      description: string;
+      command?: string;
+      /** Which answers to offer. Defaults to all four; egress consent has no "this session". */
+      choices?: Array<"once" | "session" | "always" | "no">;
+      /** Extra lines under the question — what was pseudonymised, what it will cost. */
+      detail?: string[];
+    }
   | { type: "error"; message: string }
   /** Opens the model picker from outside the panel — the command palette, a keybinding. */
   | { type: "openModelPicker" }

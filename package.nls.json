@@ -55,7 +55,7 @@
   "command.pickModel.title": "Choose the chat model",
   "command.setup.title": "Set up a model",
   "config.accounts": "**Accounts.** API keys are never stored in settings — they go to your operating system's keychain, because this file syncs between machines and gets committed by accident.\n\n- [Store a key](command:hiveyCode.setApiKey) for OpenRouter, Anthropic or an OpenAI-compatible gateway\n- [Forget a key](command:hiveyCode.clearApiKey)\n- [Open the setup screen](command:hiveyCode.setup) to find a local model or connect an account\n- [Store the ARCAD Elias credentials](command:hiveyCode.setArcadCredentials)",
-  "command.moveToSecondarySideBar.title": "Move the panel to the secondary side bar",
+  "command.moveToSecondarySideBar.title": "Move the panel (left, right, or bottom)",
   "command.newSkill.title": "Create a skill",
   "command.newAgent.title": "Create a sub-agent",
   "command.showDefinitions.title": "Show skills and sub-agents",
