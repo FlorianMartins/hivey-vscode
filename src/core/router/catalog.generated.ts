@@ -7,7 +7,7 @@
 
 import type { Price } from "./pricing.js";
 
-export const GENERATED_AT = "2026-08-30";
+export const GENERATED_AT = "2026-08-31";
 
 export type ModelRow = [string, string, string, number, number, number, number];
 
@@ -16,7 +16,7 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["~anthropic/claude-haiku-latest","Anthropic Claude Haiku Latest","~anthropic",200000,1,5,0.1],
   ["~anthropic/claude-opus-latest","Claude Opus Latest","~anthropic",1000000,5,25,0.5],
   ["~anthropic/claude-sonnet-latest","Anthropic Claude Sonnet Latest","~anthropic",1000000,2,10,0.2],
-  ["~deepseek/deepseek-v4-flash-latest","DeepSeek V4 Flash Latest","~deepseek",1310720,0.03,0.16,0.01],
+  ["~deepseek/deepseek-v4-flash-latest","DeepSeek V4 Flash Latest","~deepseek",1310720,0.03,0.16,0.013],
   ["~google/gemini-flash-latest","Google Gemini Flash Latest","~google",1048576,0.75,3.75,0.075],
   ["~google/gemini-pro-latest","Google Gemini Pro Latest","~google",1048576,2,12,0.2],
   ["~moonshotai/kimi-latest","MoonshotAI Kimi Latest","~moonshotai",1048576,2.55,12.75,0.256],
@@ -86,12 +86,12 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["deepseek/deepseek-v3.1-terminus","DeepSeek V3.1 Terminus","deepseek",163840,0.27,1,0.135],
   ["deepseek/deepseek-v3.2","DeepSeek V3.2","deepseek",163840,0.269,0.4,0.1345],
   ["deepseek/deepseek-v3.2-exp","DeepSeek V3.2 Exp","deepseek",163840,0.27,0.41,0],
-  ["deepseek/deepseek-v4-flash","DeepSeek V4 Flash 0423","deepseek",1048576,0.0806,0.1613,0.0161],
+  ["deepseek/deepseek-v4-flash","DeepSeek V4 Flash 0423","deepseek",1048576,0.0886,0.1772,0.0177],
   ["deepseek/deepseek-v4-flash-0731","DeepSeek V4 Flash 0731","deepseek",1310720,0.065,0.18,0.016],
   ["deepseek/deepseek-v4-flash-0731:batch","DeepSeek V4 Flash 0731 (batch)","deepseek",1048576,0.14,0.28,0.03],
-  ["deepseek/deepseek-v4-flash-vision-exp","DeepSeek V4 Flash Vision Exp","deepseek",1048576,0.22,0.66,0.007],
-  ["deepseek/deepseek-v4-pro","DeepSeek V4 Pro 0423","deepseek",1048576,0.478,0.956,0.0398],
-  ["deepseek/deepseek-v4-pro-0813","DeepSeek V4 Pro 0813","deepseek",1048576,0.66,1.98,0.022],
+  ["deepseek/deepseek-v4-flash-vision-exp","DeepSeek V4 Flash Vision Exp","deepseek",1048576,0.44,1.32,0.014],
+  ["deepseek/deepseek-v4-pro","DeepSeek V4 Pro 0423","deepseek",1048576,1.6,3.2,0.135],
+  ["deepseek/deepseek-v4-pro-0813","DeepSeek V4 Pro 0813","deepseek",1048576,1.32,3.96,0.044],
   ["deepseek/deepseek-v4-pro-0813:batch","DeepSeek V4 Pro 0813 (batch)","deepseek",1048576,1.32,3.96,0.13],
   ["dots-studio/dots-3-note-preview:free","Dots3-Note Preview (free)","dots-studio",512000,0,0,0],
   ["google/gemini-2.5-flash","Gemini 2.5 Flash","google",1048576,0.3,2.5,0.03],
@@ -150,7 +150,7 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["meta-llama/llama-3.2-1b-instruct","Llama 3.2 1B Instruct","meta-llama",60000,0.027,0.201,0],
   ["meta-llama/llama-3.2-3b-instruct","Llama 3.2 3B Instruct","meta-llama",131072,0.05,0.33,0],
   ["meta-llama/llama-3.3-70b-instruct","Llama 3.3 70B Instruct","meta-llama",131072,0.71,0.71,0.71],
-  ["meta-llama/llama-4-maverick","Llama 4 Maverick","meta-llama",1048576,0.2,0.8,0],
+  ["meta-llama/llama-4-maverick","Llama 4 Maverick","meta-llama",1048576,0.2,0.696,0],
   ["meta-llama/llama-4-scout","Llama 4 Scout","meta-llama",1310720,0.11,0.34,0.055],
   ["meta-llama/llama-guard-4-12b","Llama Guard 4 12B","meta-llama",163840,0.18,0.18,0],
   ["meta/muse-glimmer-30b","Muse Glimmer 30B","meta",131072,0.3,1.2,0.04],
@@ -173,7 +173,7 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["minimax/minimax-m3:free","MiniMax M3 (free)","minimax",1048576,0,0,0],
   ["mistralai/codestral-2508","Codestral 2508","mistralai",256000,0.3,0.9,0.03],
   ["mistralai/codestral-2508:batch","Codestral 2508 (batch)","mistralai",256000,0.3,0.9,0.03],
-  ["mistralai/devstral-2512","Devstral 2 2512","mistralai",262144,0.44,2.2,0.044],
+  ["mistralai/devstral-2512","Devstral 2 2512","mistralai",262144,0.4,2,0.04],
   ["mistralai/ministral-14b-2512","Ministral 3 14B 2512","mistralai",262144,0.2,0.2,0.02],
   ["mistralai/ministral-3b-2512","Ministral 3 3B 2512","mistralai",131072,0.1,0.1,0.01],
   ["mistralai/ministral-8b-2512","Ministral 3 8B 2512","mistralai",262144,0.15,0.15,0.015],
@@ -199,7 +199,7 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["moonshotai/kimi-k2","Kimi K2 0711","moonshotai",131072,0.57,2.3,0],
   ["moonshotai/kimi-k2-0905","Kimi K2 0905","moonshotai",262144,0.6,2.5,0],
   ["moonshotai/kimi-k2-thinking","Kimi K2 Thinking","moonshotai",262144,0.6,2.5,0.15],
-  ["moonshotai/kimi-k2.5","Kimi K2.5","moonshotai",262144,0.6,3,0.1],
+  ["moonshotai/kimi-k2.5","Kimi K2.5","moonshotai",262144,0.45,2.25,0.07],
   ["moonshotai/kimi-k2.6","Kimi K2.6","moonshotai",262144,0.95,4,0.16],
   ["moonshotai/kimi-k2.7-code","Kimi K2.7 Code","moonshotai",262144,0.66,3.4,0.18],
   ["moonshotai/kimi-k3","Kimi K3","moonshotai",1048576,3,15,0.3],
@@ -231,7 +231,7 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["openai/gpt-4-turbo-preview","GPT-4 Turbo Preview","openai",128000,10,30,0],
   ["openai/gpt-4.1","GPT-4.1","openai",1047576,2,8,0.5],
   ["openai/gpt-4.1-mini","GPT-4.1 Mini","openai",1047576,0.4,1.6,0.1],
-  ["openai/gpt-4.1-nano","GPT-4.1 Nano","openai",1047576,0.1,0.4,0.03],
+  ["openai/gpt-4.1-nano","GPT-4.1 Nano","openai",1047576,0.1,0.4,0.025],
   ["openai/gpt-4o","GPT-4o","openai",128000,2.5,10,1.25],
   ["openai/gpt-4o-2024-05-13","GPT-4o (2024-05-13)","openai",128000,5,15,0],
   ["openai/gpt-4o-2024-08-06","GPT-4o (2024-08-06)","openai",128000,2.5,10,1.25],
