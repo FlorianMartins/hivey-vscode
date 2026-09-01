@@ -3261,3 +3261,92 @@ pre.code code {
   top: 0;
   background: var(--vscode-sideBar-background, var(--vscode-editor-background));
 }
+
+/* ── Attachments, in the editor's own shape ───────────────────────────────────────────────────
+ *
+ * The file name, then its folder in the muted colour. A full path truncated from the left is
+ * unreadable and truncated from the right is every file in the folder; the name identifies and the
+ * folder disambiguates, so only the second may be cut.
+ */
+.chip {
+  padding: 1px var(--sp-1) 1px var(--sp-2);
+  border-radius: var(--radius);
+  background: var(--vscode-editorWidget-background, var(--surface));
+  border: 1px solid var(--border);
+  color: var(--vscode-foreground);
+  max-width: 100%;
+}
+.chip-label {
+  direction: ltr;
+  flex: 0 0 auto;
+}
+.chip-dir {
+  color: var(--muted);
+  font-size: var(--fs-meta);
+  opacity: 0.75;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+/* The remove button appears on hover, so a row of attachments is a row of names rather than a row
+   of crosses. It stays reachable by keyboard. */
+.chip .btn.chip-x {
+  opacity: 0;
+  transition: opacity 100ms ease;
+}
+.chip:hover .btn.chip-x,
+.chip .btn.chip-x:focus-visible {
+  opacity: 1;
+}
+.chip.implicit .btn.chip-x {
+  /* The suggestion's control is the point of it: how you say "not this file". */
+  opacity: 1;
+}
+
+/* The empty conversation, properly centred: the mark sits on the optical middle of the transcript
+   rather than a third of the way down it. */
+.welcome {
+  min-height: 100%;
+  justify-content: center;
+  padding-bottom: 12%;
+}
+
+/* The history's first row: what you are looking for, and how it is ordered. */
+.filter-bar .filter-row:first-child {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+/* The wrapper `searchInput` builds is `.search`, not `.search-input-wrap` — a class I invented
+   while writing the rule rather than reading the function. It matched nothing, so the search box
+   kept its own width and pushed the sort onto a line of its own. */
+.filter-bar .filter-row:first-child .search {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.filter-bar .filter-row:first-child {
+  flex-wrap: nowrap;
+}
+.sort-select {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 46%;
+  /* Room for the chevron the platform draws inside the control: without it the last characters of
+     "Recently updated" sit underneath it. */
+  padding-right: var(--sp-5);
+  text-overflow: ellipsis;
+}
+
+/* The wizard's primary button: white on the accent, because the accent is a strong blue and the
+   button's own foreground token is what the workbench uses on it. */
+.wizard-foot .btn.primary,
+.btn.tiny.primary {
+  color: var(--vscode-button-foreground, #fff);
+  background: var(--vscode-button-background);
+  border-color: transparent;
+}
+.wizard-foot .btn.primary:hover,
+.btn.tiny.primary:hover {
+  background: var(--vscode-button-hoverBackground);
+}

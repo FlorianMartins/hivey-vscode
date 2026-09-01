@@ -2,6 +2,40 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.17.0 — 2026-09-01
+
+### Fixed
+
+- **"All open editors" attached nothing**, for a second and different reason. The tabs were found
+  correctly; each was then turned back into a path and re-joined onto the first workspace folder —
+  which produces a URI pointing nowhere for any file outside it, and which was skipped entirely when
+  no folder was open (`if (!folder) break`). It uses the tabs' own URIs now. And when nothing comes
+  of it, it says so: silence is what made an empty result look like a broken feature, and "empty"
+  has causes you can act on — no tabs, or a privacy rule.
+- **Attaching a file outside the workspace** failed the same way, silently. An absolute path is used
+  as it stands.
+- **The sort control sat on a line of its own** in the history, because the rule that was meant to
+  place it named `.search-input-wrap` — a class invented while writing the rule rather than read
+  from the function that builds the box. It matched nothing.
+
+### Changed
+
+- **The settings are in seven sections** — General, Model & endpoints, Skills sub-agents & MCP,
+  Privacy & budget, Permissions, Context, Inline completion — instead of thirty-nine entries under
+  one heading. They were all present, documented and translated, and could not be found.
+- **Attachments look like the editor's own**: an icon, the file name, then its folder in the muted
+  colour, and the × on hover. A full path truncated from the left is unreadable and truncated from
+  the right is every file in the folder.
+- **The skills menu returns to its first screen** after each choice instead of closing. Configuring
+  these is rarely one decision — you pick the areas, and the skills you then want are the ones that
+  just appeared.
+- **The guided start says "Next"**, in white on the accent, and closes with a cross rather than the
+  word "Skip" — which read as "skip this step" beside a Next button, and meant nothing at all on the
+  last screen.
+- **The history loses "Paid only"** and gains its sort beside the search. The "most expensive" order
+  answers the same question without a switch that has to be remembered.
+- **The empty conversation is centred** on the transcript rather than a third of the way down it.
+
 ## 0.16.2 — 2026-09-01
 
 ### Fixed

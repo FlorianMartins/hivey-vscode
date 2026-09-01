@@ -175,6 +175,22 @@ function safe<T>(fn: () => T): T | undefined {
  * them, and neither is one restored from the previous session and never clicked. `tabGroups` is
  * what the Open Editors view itself reads, so it is what "open editors" has to mean here.
  */
+export function openFileUris(): vscode.Uri[] {
+  const out: vscode.Uri[] = [];
+  const seen = new Set<string>();
+  for (const group of vscode.window.tabGroups.all) {
+    for (const tab of group.tabs) {
+      const uri = (tab.input as { uri?: vscode.Uri } | undefined)?.uri;
+      if (!uri || uri.scheme !== "file" || uri.path.endsWith(".git")) continue;
+      const key = uri.toString();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(uri);
+    }
+  }
+  return out;
+}
+
 export function openFiles(): Array<{ path: string; active: boolean; language: string; dirty: boolean }> {
   const activeUri = vscode.window.activeTextEditor?.document.uri.toString();
   const loaded = new Map(vscode.workspace.textDocuments.map((d) => [d.uri.toString(), d]));

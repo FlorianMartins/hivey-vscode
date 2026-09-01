@@ -60,7 +60,7 @@ import type {
 } from "../shared/protocol.js";
 import { SECTION, endpointFor, providerFor, readSettings, routerConfig, type Keys, type Settings, writeTarget } from "./config.js";
 import { EgressGate, safeHost } from "./egress.js";
-import { labelFor, listModels, openFiles, supportsReasoning } from "./models.js";
+import { labelFor, listModels, openFiles, openFileUris, supportsReasoning } from "./models.js";
 import { loadPrices } from "./prices.js";
 import { buildTools } from "./tools.js";
 import { McpManager } from "./integrations/mcp.js";
@@ -734,13 +734,19 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           await this.attach(m.what);
           break;
         case "attachPath": {
+          // A path that is already absolute is used as it stands. `asRelativePath` returns the
+          // absolute path for anything outside the workspace, so joining it onto the folder — which
+          // is what this did unconditionally — produced a URI pointing nowhere, and the attachment
+          // silently did not happen.
           const folder = vscode.workspace.workspaceFolders?.[0];
-          if (folder) {
-            const item = await this.workspace.fileContext(vscode.Uri.joinPath(folder.uri, m.path), readSettings());
-            if (item) {
-              this.attachments.push(item);
-              this.remember(m.path);
-            }
+          const absolute = /^([/\\]|[A-Za-z]:)/.test(m.path);
+          const uri = absolute || !folder ? vscode.Uri.file(m.path) : vscode.Uri.joinPath(folder.uri, m.path);
+          const item = await this.workspace.fileContext(uri, readSettings());
+          if (item) {
+            this.attachments.push(item);
+            this.remember(m.path);
+          } else {
+            void vscode.window.showWarningMessage(t("{0} could not be attached.", m.path));
           }
           this.sendState();
           break;
@@ -955,11 +961,31 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         break;
       }
       case "openFiles": {
-        for (const f of openFiles()) {
-          const folder = vscode.workspace.workspaceFolders?.[0];
-          if (!folder) break;
-          const item = await this.workspace.fileContext(vscode.Uri.joinPath(folder.uri, f.path), settings);
-          if (item && !this.attachments.some((a) => a.label === item.label)) this.attachments.push(item);
+        // The tabs' own URIs, not a relative path rebuilt against the first workspace folder.
+        //
+        // Two ways that failed, and both were silent. With no folder open it stopped before
+        // attaching anything at all — `if (!folder) break` — so someone working on loose files got
+        // nothing. And `asRelativePath` returns an ABSOLUTE path for a file outside the workspace,
+        // which joined onto the folder's URI produces a path pointing nowhere. The count said "12
+        // open editors" both times and the result was empty, which is exactly how this was
+        // reported, twice.
+        const uris = openFileUris();
+        let added = 0;
+        for (const uri of uris) {
+          const item = await this.workspace.fileContext(uri, settings);
+          if (item && !this.attachments.some((a) => a.label === item.label)) {
+            this.attachments.push(item);
+            added += 1;
+          }
+        }
+        // Said out loud when nothing came of it. Silence is what made this look broken rather than
+        // empty — and "empty" has causes the user can act on: no tabs, or a privacy rule.
+        if (!added) {
+          void vscode.window.showInformationMessage(
+            uris.length
+              ? t("Those {0} file(s) are already attached, or excluded by the privacy policy.", uris.length)
+              : t("No file is open in a tab."),
+          );
         }
         break;
       }
@@ -1519,7 +1545,17 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       { canPickMany: true, placeHolder: t("Which open editors to attach?"), matchOnDescription: true },
     );
     if (!picked?.length) return;
-    for (const row of picked) await this.onMessage({ type: "attachPath", path: row.path });
+    // By URI, for the same reason `openFiles` above does: a path is only re-joinable when the file
+    // is inside the workspace, and the picker offers every tab.
+    const byPath = new Map(openFileUris().map((uri) => [vscode.workspace.asRelativePath(uri, false), uri]));
+    for (const row of picked) {
+      const uri = byPath.get(row.path);
+      if (!uri) continue;
+      const item = await this.workspace.fileContext(uri, readSettings());
+      if (item && !this.attachments.some((a) => a.label === item.label)) this.attachments.push(item);
+      this.remember(row.path);
+    }
+    this.sendState();
   }
 
   /**
@@ -1561,6 +1597,21 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    * could never show.
    */
   private async toolsPicker(): Promise<void> {
+    // Loops back to the top after each choice, rather than closing.
+    //
+    // Configuring these is rarely one decision: you pick the areas, and the skills you then want to
+    // see are the ones that just appeared. Closing after each step meant reopening the menu and
+    // finding your place again, three times, to make what is really one adjustment. Escape at the
+    // top level leaves; escape inside a step comes back here, which is the same gesture meaning the
+    // same thing at both levels.
+    for (;;) {
+      const again = await this.toolsStep();
+      if (!again) return;
+    }
+  }
+
+  /** One pass of the menu. Returns true when the user should be offered it again. */
+  private async toolsStep(): Promise<boolean> {
     const settings = readSettings();
     const skills = this.uiSkills();
     const found = await this.definitions.load();
@@ -1592,7 +1643,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       ],
       { placeHolder: t("What Hivey Code may reach for") },
     );
-    if (!chosen) return;
+    // Escape at the top level is the way out.
+    if (!chosen) return false;
 
     const config = vscode.workspace.getConfiguration(SECTION);
 
@@ -1611,14 +1663,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           matchOnDetail: true,
         },
       );
-      if (!picked) return;
-      await config.update(
-        "skills.groups",
-        normaliseGroups(picked.map((row) => row.id)),
-        vscode.ConfigurationTarget.Global,
-      );
-      this.sendState();
-      return;
+      if (picked) {
+        await config.update(
+          "skills.groups",
+          normaliseGroups(picked.map((row) => row.id)),
+          vscode.ConfigurationTarget.Global,
+        );
+        this.sendState();
+      }
+      return true;
     }
 
     if (chosen.id === "skills") {
@@ -1647,26 +1700,27 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       }
       if (!rows.length) {
         void vscode.window.showInformationMessage(t("Choose an area first — the skills follow from it."));
-        return;
+        return true;
       }
       const picked = await vscode.window.showQuickPick(rows, {
         canPickMany: true,
         placeHolder: t("Which skills are offered when you type “/”"),
         matchOnDescription: true,
       });
-      if (!picked) return;
-      const listed = new Set(rows.map((row) => row.name).filter(Boolean) as string[]);
-      const on = new Set(picked.map((row) => row.name).filter(Boolean) as string[]);
-      let disabled = settings.skills.disabled;
-      for (const name of listed) disabled = toggleSkill(disabled, name, on.has(name));
-      await config.update("skills.disabled", disabled, vscode.ConfigurationTarget.Global);
-      this.sendState();
-      return;
+      if (picked) {
+        const listed = new Set(rows.map((row) => row.name).filter(Boolean) as string[]);
+        const on = new Set(picked.map((row) => row.name).filter(Boolean) as string[]);
+        let disabled = settings.skills.disabled;
+        for (const name of listed) disabled = toggleSkill(disabled, name, on.has(name));
+        await config.update("skills.disabled", disabled, vscode.ConfigurationTarget.Global);
+        this.sendState();
+      }
+      return true;
     }
 
     if (!found.agents.length) {
       void vscode.window.showInformationMessage(t("No sub-agent is defined."));
-      return;
+      return true;
     }
     const picked = await vscode.window.showQuickPick(
       found.agents.map((agent) => ({
@@ -1678,14 +1732,16 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       })),
       { canPickMany: true, placeHolder: t("Which sub-agents may be dispatched?"), matchOnDescription: true },
     );
-    if (!picked) return;
-    const on = new Set(picked.map((row) => row.name));
-    await config.update(
-      "agents.disabled",
-      found.agents.filter((a) => !on.has(a.name)).map((a) => a.name).sort(),
-      vscode.ConfigurationTarget.Global,
-    );
-    this.sendState();
+    if (picked) {
+      const on = new Set(picked.map((row) => row.name));
+      await config.update(
+        "agents.disabled",
+        found.agents.filter((a) => !on.has(a.name)).map((a) => a.name).sort(),
+        vscode.ConfigurationTarget.Global,
+      );
+      this.sendState();
+    }
+    return true;
   }
 
   private async searchAttachment(mode: "files" | "symbols" | "both" = "both"): Promise<void> {

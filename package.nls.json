@@ -78,5 +78,12 @@
   "config.agents.disabled": "Sub-agents that may not be dispatched, by name. Toggled from the skills button in the composer, alongside the skills.",
   "config.skills.groups": "Which families of skills are in play: `general`, `frontend`, `javascript`, `python`, `java`, `dotnet`, `cpp`, `go`, `rust`, `flutter`, `data`, `devops`, `design`, `security`, `rpg`, `dds`, `db2i`, `cl`. Families are **opt-in** and only `general` is on to begin with, so the `/` list holds what you chose rather than everything that exists. Set from the new-conversation screen or the composer's skills button.",
   "submenu.newConversation.label": "New conversation",
-  "command.newSpecialisedSession.title": "Specialised conversation"
+  "command.newSpecialisedSession.title": "Specialised conversation",
+  "config.section.general": "General",
+  "config.section.model": "Model & endpoints",
+  "config.section.skills": "Skills, sub-agents & MCP",
+  "config.section.privacy": "Privacy & budget",
+  "config.section.permissions": "Permissions",
+  "config.section.context": "Context",
+  "config.section.completion": "Inline completion"
 }

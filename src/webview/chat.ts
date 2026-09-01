@@ -144,11 +144,14 @@ function wizardCard(state: UiState, wizard: NonNullable<UiState["wizard"]>, deps
   const at = steps.indexOf(wizard.step);
   head.append(el("span", "wizard-step", t("Step {0} of 3", Math.min(at + 1, 3))));
   head.append(el("div", "spacer"));
+  // A cross, not the word "Skip". "Skip" reads as "skip this step" beside a Next button, when what
+  // it does is abandon the whole guided start — and on the last screen there is no step left to
+  // skip, which made it meaningless exactly where it was most likely to be pressed.
   head.append(
     button({
-      label: t("Skip"),
-      className: "btn tiny ghost",
-      title: t("Start an ordinary conversation instead"),
+      icon: ICON.close,
+      className: "btn icon-only",
+      title: t("Close and carry on in an ordinary conversation"),
       onClick: () => deps.send({ type: "wizardCancel" }),
     }),
   );
@@ -206,7 +209,7 @@ function wizardCard(state: UiState, wizard: NonNullable<UiState["wizard"]>, deps
       wizardFoot(
         deps,
         () => deps.send({ type: "wizardAnswer", step: "family", value: [...chosen] }),
-        chosen.size ? t("Show me those skills") : t("Skip the skills"),
+        t("Next"),
       ),
     );
     return wrap;
@@ -262,7 +265,7 @@ function wizardCard(state: UiState, wizard: NonNullable<UiState["wizard"]>, deps
     }
     wrap.append(list);
     wrap.append(
-      wizardFoot(deps, () => deps.send({ type: "wizardAnswer", step: "skills", value: [...on] }), t("Use these")),
+      wizardFoot(deps, () => deps.send({ type: "wizardAnswer", step: "skills", value: [...on] }), t("Next")),
     );
     return wrap;
   }
@@ -616,7 +619,9 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
     if (state.implicit) {
       const chip = el("span", `chip implicit${state.implicitOn ? "" : " off"}`);
       chip.append(icon("file", "chip-ico"));
-      chip.append(el("span", "chip-label", state.implicit.label));
+      const cut = state.implicit.label.lastIndexOf("/");
+      chip.append(el("span", "chip-label", cut >= 0 ? state.implicit.label.slice(cut + 1) : state.implicit.label));
+      if (cut > 0) chip.append(el("span", "chip-dir", state.implicit.label.slice(0, cut)));
       chip.title = state.implicitOn
         ? t("{0} — the open file, sent with your question. ~{1} tokens", state.implicit.label, formatTokens(state.implicit.tokens))
         : t("{0} — not sent. It comes back when you open another file.", state.implicit.label);
@@ -634,7 +639,13 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
     for (const a of state.attachments) {
       const chip = el("span", "chip removable");
       chip.append(icon(chipIcon(a.kind), "chip-ico"));
-      chip.append(el("span", "chip-label", a.label));
+      // The file NAME, with its folder after it in the muted colour — the editor's own shape for
+      // this, and the right one: `src/webview/chat.ts` truncated from the left is unreadable, and
+      // truncated from the right is every file in the folder. The name identifies, the folder
+      // disambiguates, and only the second is allowed to be cut.
+      const cut = a.label.lastIndexOf("/");
+      chip.append(el("span", "chip-label", cut >= 0 ? a.label.slice(cut + 1) : a.label));
+      if (cut > 0) chip.append(el("span", "chip-dir", a.label.slice(0, cut)));
       chip.title = t("{0} · ~{1} tokens", a.kind, formatTokens(a.tokens));
       chip.append(
         button({

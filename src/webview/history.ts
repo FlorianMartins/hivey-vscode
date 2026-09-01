@@ -36,13 +36,6 @@ export function historyScreen(state: UiState, send: (m: ToExtension) => void): H
   const filter = state.historyFilter;
 
   const bar = el("div", "filter-bar");
-  bar.append(
-    searchInput({
-      value: filter.query,
-      placeholder: t("Search the conversations…"),
-      onInput: (query) => send({ type: "setHistoryFilter", filter: { query } }),
-    }),
-  );
 
   // Two rows, not one. Period and mode answer different questions — "when" and "what kind" — and
   // eight chips on a shared line meant the mode filters wrapped mid-group at the side bar's normal
@@ -73,16 +66,10 @@ export function historyScreen(state: UiState, send: (m: ToExtension) => void): H
   }
   bar.append(modes);
 
-  const row2 = el("div", "filter-row");
-  row2.append(
-    button({
-      label: t("Paid only"),
-      ...(filter.paidOnly ? { icon: ICON.check } : {}),
-      className: `chip-btn${filter.paidOnly ? " selected" : ""}`,
-      title: t("Keep only conversations that cost something"),
-      onClick: () => send({ type: "setHistoryFilter", filter: { paidOnly: !filter.paidOnly } }),
-    }),
-  );
+  // The sort belongs beside the search, not on a row of its own under two rows of chips: it is the
+  // one control here that is always relevant, and it was the furthest down. "Paid only" went with
+  // it — a filter for a question people ask about a month of conversations, not about a screen of
+  // them, and the "most expensive" sort answers it without a switch that has to be remembered.
   const select = el("select", "sort-select");
   for (const s of SORTS) {
     const option = el("option", undefined, s.label);
@@ -93,8 +80,16 @@ export function historyScreen(state: UiState, send: (m: ToExtension) => void): H
   select.addEventListener("change", () =>
     send({ type: "setHistoryFilter", filter: { sort: select.value as UiHistoryFilter["sort"] } }),
   );
-  row2.append(el("div", "spacer"), el("label", "sort-label", t("Sort:")), select);
-  bar.append(row2);
+  const searchRow = el("div", "filter-row");
+  searchRow.append(
+    searchInput({
+      value: filter.query,
+      placeholder: t("Search the conversations…"),
+      onInput: (query) => send({ type: "setHistoryFilter", filter: { query } }),
+    }),
+  );
+  searchRow.append(select);
+  bar.prepend(searchRow);
   wrap.append(bar);
 
   const list = el("div", "history-list");

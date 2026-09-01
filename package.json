@@ -2,7 +2,7 @@
   "name": "hivey-code",
   "displayName": "Hivey Code",
   "description": "%extension.description%",
-  "version": "0.16.2",
+  "version": "0.17.0",
   "publisher": "hivey",
   "license": "Apache-2.0",
   "repository": {
@@ -390,361 +390,400 @@
         "when": "editorTextFocus"
       }
     ],
-    "configuration": {
-      "title": "Hivey Code",
-      "properties": {
-        "hiveyCode.accounts": {
-          "type": "null",
-          "default": null,
-          "markdownDescription": "%config.accounts%"
-        },
-        "hiveyCode.language": {
-          "type": "string",
-          "enum": [
-            "auto",
-            "en",
-            "fr"
-          ],
-          "default": "auto",
-          "description": "%config.language%"
-        },
-        "hiveyCode.chat.provider": {
-          "type": "string",
-          "enum": [
-            "local",
-            "openrouter",
-            "openai-compatible",
-            "anthropic"
-          ],
-          "default": "local",
-          "markdownDescription": "%config.chat.provider%"
-        },
-        "hiveyCode.chat.model": {
-          "type": "string",
-          "default": "qwen2.5-coder:7b",
-          "description": "%config.chat.model%"
-        },
-        "hiveyCode.completion.provider": {
-          "type": "string",
-          "enum": [
-            "local",
-            "openrouter",
-            "openai-compatible",
-            "off"
-          ],
-          "default": "local",
-          "markdownDescription": "%config.completion.provider%"
-        },
-        "hiveyCode.completion.model": {
-          "type": "string",
-          "default": "qwen2.5-coder:7b",
-          "description": "%config.completion.model%"
-        },
-        "hiveyCode.completion.enabled": {
-          "type": "boolean",
-          "default": true,
-          "description": "%config.completion.enabled%"
-        },
-        "hiveyCode.completion.debounceMs": {
-          "type": "number",
-          "default": 220,
-          "description": "%config.completion.debounceMs%"
-        },
-        "hiveyCode.completion.maxTokens": {
-          "type": "number",
-          "default": 128,
-          "description": "%config.completion.maxTokens%"
-        },
-        "hiveyCode.completion.multiline": {
-          "type": "boolean",
-          "default": true,
-          "description": "%config.completion.multiline%"
-        },
-        "hiveyCode.endpoints.local": {
-          "type": "string",
-          "default": "http://127.0.0.1:11434/v1",
-          "description": "%config.endpoints.local%"
-        },
-        "hiveyCode.endpoints.servers": {
-          "type": "array",
-          "default": [],
-          "markdownDescription": "%config.endpoints.servers%",
-          "items": {
-            "type": "object",
-            "required": [
-              "name",
-              "url"
+    "configuration": [
+      {
+        "title": "%config.section.general%",
+        "order": 1,
+        "properties": {
+          "hiveyCode.language": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "en",
+              "fr"
             ],
-            "properties": {
-              "name": {
-                "type": "string",
-                "description": "%config.endpoints.servers.name%"
-              },
-              "url": {
-                "type": "string",
-                "description": "%config.endpoints.servers.url%"
+            "default": "auto",
+            "description": "%config.language%"
+          },
+          "hiveyCode.accounts": {
+            "type": "null",
+            "default": null,
+            "markdownDescription": "%config.accounts%"
+          },
+          "hiveyCode.panel.minWidth": {
+            "type": "number",
+            "default": 260,
+            "minimum": 0,
+            "maximum": 600,
+            "markdownDescription": "%config.panel.minWidth%"
+          }
+        }
+      },
+      {
+        "title": "%config.section.model%",
+        "order": 2,
+        "properties": {
+          "hiveyCode.chat.provider": {
+            "type": "string",
+            "enum": [
+              "local",
+              "openrouter",
+              "openai-compatible",
+              "anthropic"
+            ],
+            "default": "local",
+            "markdownDescription": "%config.chat.provider%"
+          },
+          "hiveyCode.chat.model": {
+            "type": "string",
+            "default": "qwen2.5-coder:7b",
+            "description": "%config.chat.model%"
+          },
+          "hiveyCode.endpoints.local": {
+            "type": "string",
+            "default": "http://127.0.0.1:11434/v1",
+            "description": "%config.endpoints.local%"
+          },
+          "hiveyCode.endpoints.servers": {
+            "type": "array",
+            "default": [],
+            "markdownDescription": "%config.endpoints.servers%",
+            "items": {
+              "type": "object",
+              "required": [
+                "name",
+                "url"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "%config.endpoints.servers.name%"
+                },
+                "url": {
+                  "type": "string",
+                  "description": "%config.endpoints.servers.url%"
+                }
               }
             }
+          },
+          "hiveyCode.endpoints.openaiCompatible": {
+            "type": "string",
+            "default": "",
+            "description": "%config.endpoints.openaiCompatible%"
+          },
+          "hiveyCode.endpoints.openrouter": {
+            "type": "string",
+            "default": "https://openrouter.ai/api/v1",
+            "description": "%config.endpoints.openrouter%"
+          },
+          "hiveyCode.endpoints.anthropic": {
+            "type": "string",
+            "default": "https://api.anthropic.com/v1",
+            "description": "%config.endpoints.anthropic%"
+          },
+          "hiveyCode.escalation.policy": {
+            "type": "string",
+            "enum": [
+              "never",
+              "ask",
+              "auto"
+            ],
+            "default": "ask",
+            "markdownDescription": "%config.escalation.policy%"
+          },
+          "hiveyCode.escalation.provider": {
+            "type": "string",
+            "enum": [
+              "openrouter",
+              "openai-compatible",
+              "anthropic"
+            ],
+            "default": "openrouter",
+            "description": "%config.escalation.provider%"
+          },
+          "hiveyCode.escalation.model": {
+            "type": "string",
+            "default": "",
+            "description": "%config.escalation.model%"
           }
-        },
-        "hiveyCode.endpoints.openaiCompatible": {
-          "type": "string",
-          "default": "",
-          "description": "%config.endpoints.openaiCompatible%"
-        },
-        "hiveyCode.endpoints.openrouter": {
-          "type": "string",
-          "default": "https://openrouter.ai/api/v1",
-          "description": "%config.endpoints.openrouter%"
-        },
-        "hiveyCode.endpoints.anthropic": {
-          "type": "string",
-          "default": "https://api.anthropic.com/v1",
-          "description": "%config.endpoints.anthropic%"
-        },
-        "hiveyCode.privacy.redaction": {
-          "type": "string",
-          "enum": [
-            "strict",
-            "balanced",
-            "off"
-          ],
-          "default": "strict",
-          "markdownDescription": "%config.privacy.redaction%"
-        },
-        "hiveyCode.privacy.allowUnredacted": {
-          "type": "boolean",
-          "default": false,
-          "description": "%config.privacy.allowUnredacted%"
-        },
-        "hiveyCode.privacy.blockedGlobs": {
-          "type": "array",
-          "items": {
-            "type": "string"
+        }
+      },
+      {
+        "title": "%config.section.skills%",
+        "order": 3,
+        "properties": {
+          "hiveyCode.skills.groups": {
+            "type": "array",
+            "default": [
+              "general"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "markdownDescription": "%config.skills.groups%"
           },
-          "default": [
-            "**/.env*",
-            "**/*.pem",
-            "**/*.key",
-            "**/*.p12",
-            "**/id_rsa*",
-            "**/secrets/**",
-            "**/credentials*",
-            "**/.aws/**",
-            "**/.ssh/**"
-          ],
-          "description": "%config.privacy.blockedGlobs%"
-        },
-        "hiveyCode.privacy.egressPolicy": {
-          "type": "string",
-          "enum": [
-            "ask-once",
-            "ask-always",
-            "trust"
-          ],
-          "default": "ask-once",
-          "description": "%config.privacy.egressPolicy%"
-        },
-        "hiveyCode.privacy.confirmSend": {
-          "type": "string",
-          "enum": [
-            "always",
-            "never"
-          ],
-          "default": "always",
-          "markdownDescription": "%config.privacy.confirmSend%"
-        },
-        "hiveyCode.privacy.auditLog": {
-          "type": "boolean",
-          "default": true,
-          "description": "%config.privacy.auditLog%"
-        },
-        "hiveyCode.budget.perRequestUsd": {
-          "type": "number",
-          "default": 0.25,
-          "description": "%config.budget.perRequestUsd%"
-        },
-        "hiveyCode.budget.dailyUsd": {
-          "type": "number",
-          "default": 2,
-          "description": "%config.budget.dailyUsd%"
-        },
-        "hiveyCode.context.maxTokens": {
-          "type": "number",
-          "default": 8000,
-          "description": "%config.context.maxTokens%"
-        },
-        "hiveyCode.context.repoMap": {
-          "type": "boolean",
-          "default": true,
-          "description": "%config.context.repoMap%"
-        },
-        "hiveyCode.privacy.customTerms": {
-          "type": "array",
-          "items": {
-            "type": "string"
+          "hiveyCode.skills.disabled": {
+            "type": "array",
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "markdownDescription": "%config.skills.disabled%"
           },
-          "default": [],
-          "description": "%config.privacy.customTerms%"
-        },
-        "hiveyCode.escalation.policy": {
-          "type": "string",
-          "enum": [
-            "never",
-            "ask",
-            "auto"
-          ],
-          "default": "ask",
-          "markdownDescription": "%config.escalation.policy%"
-        },
-        "hiveyCode.escalation.provider": {
-          "type": "string",
-          "enum": [
-            "openrouter",
-            "openai-compatible",
-            "anthropic"
-          ],
-          "default": "openrouter",
-          "description": "%config.escalation.provider%"
-        },
-        "hiveyCode.escalation.model": {
-          "type": "string",
-          "default": "",
-          "description": "%config.escalation.model%"
-        },
-        "hiveyCode.mcp.servers": {
-          "type": "object",
-          "default": {},
-          "markdownDescription": "%config.mcp.servers%",
-          "additionalProperties": {
+          "hiveyCode.agents.disabled": {
+            "type": "array",
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "markdownDescription": "%config.agents.disabled%"
+          },
+          "hiveyCode.mcp.servers": {
             "type": "object",
-            "properties": {
-              "type": {
-                "type": "string",
-                "enum": [
-                  "stdio",
-                  "http"
-                ],
-                "description": "stdio runs a program locally; http talks to a server."
-              },
-              "command": {
-                "type": "string",
-                "description": "The program to run (stdio)."
-              },
-              "args": {
-                "type": "array",
-                "items": {
+            "default": {},
+            "markdownDescription": "%config.mcp.servers%",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "stdio",
+                    "http"
+                  ],
+                  "description": "stdio runs a program locally; http talks to a server."
+                },
+                "command": {
+                  "type": "string",
+                  "description": "The program to run (stdio)."
+                },
+                "args": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "env": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                },
+                "cwd": {
                   "type": "string"
+                },
+                "url": {
+                  "type": "string",
+                  "description": "The server URL (http)."
+                },
+                "headers": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                },
+                "disabled": {
+                  "type": "boolean",
+                  "default": false
                 }
-              },
-              "env": {
-                "type": "object",
-                "additionalProperties": {
-                  "type": "string"
-                }
-              },
-              "cwd": {
-                "type": "string"
-              },
-              "url": {
-                "type": "string",
-                "description": "The server URL (http)."
-              },
-              "headers": {
-                "type": "object",
-                "additionalProperties": {
-                  "type": "string"
-                }
-              },
-              "disabled": {
-                "type": "boolean",
-                "default": false
               }
             }
           }
-        },
-        "hiveyCode.panel.minWidth": {
-          "type": "number",
-          "default": 260,
-          "minimum": 0,
-          "maximum": 600,
-          "markdownDescription": "%config.panel.minWidth%"
-        },
-        "hiveyCode.skills.groups": {
-          "type": "array",
-          "default": [
-            "general"
-          ],
-          "items": {
-            "type": "string"
+        }
+      },
+      {
+        "title": "%config.section.privacy%",
+        "order": 4,
+        "properties": {
+          "hiveyCode.privacy.redaction": {
+            "type": "string",
+            "enum": [
+              "strict",
+              "balanced",
+              "off"
+            ],
+            "default": "strict",
+            "markdownDescription": "%config.privacy.redaction%"
           },
-          "markdownDescription": "%config.skills.groups%"
-        },
-        "hiveyCode.skills.disabled": {
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
+          "hiveyCode.privacy.allowUnredacted": {
+            "type": "boolean",
+            "default": false,
+            "description": "%config.privacy.allowUnredacted%"
           },
-          "markdownDescription": "%config.skills.disabled%"
-        },
-        "hiveyCode.agents.disabled": {
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
+          "hiveyCode.privacy.blockedGlobs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": [
+              "**/.env*",
+              "**/*.pem",
+              "**/*.key",
+              "**/*.p12",
+              "**/id_rsa*",
+              "**/secrets/**",
+              "**/credentials*",
+              "**/.aws/**",
+              "**/.ssh/**"
+            ],
+            "description": "%config.privacy.blockedGlobs%"
           },
-          "markdownDescription": "%config.agents.disabled%"
-        },
-        "hiveyCode.permissions.autoApprove": {
-          "type": "string",
-          "enum": [
-            "off",
-            "workspace",
-            "all"
-          ],
-          "default": "off",
-          "enumDescriptions": [
-            "%config.permissions.autoApprove.off%",
-            "%config.permissions.autoApprove.workspace%",
-            "%config.permissions.autoApprove.all%"
-          ],
-          "markdownDescription": "%config.permissions.autoApprove%"
-        },
-        "hiveyCode.permissions.allowedPaths": {
-          "type": "array",
-          "items": {
-            "type": "string"
+          "hiveyCode.privacy.customTerms": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": [],
+            "description": "%config.privacy.customTerms%"
           },
-          "default": [],
-          "markdownDescription": "%config.permissions.allowedPaths%"
-        },
-        "hiveyCode.permissions.allowedCommands": {
-          "type": "array",
-          "items": {
-            "type": "string"
+          "hiveyCode.privacy.egressPolicy": {
+            "type": "string",
+            "enum": [
+              "ask-once",
+              "ask-always",
+              "trust"
+            ],
+            "default": "ask-once",
+            "description": "%config.privacy.egressPolicy%"
           },
-          "default": [],
-          "markdownDescription": "%config.permissions.allowedCommands%"
-        },
-        "hiveyCode.permissions.deniedPaths": {
-          "type": "array",
-          "items": {
-            "type": "string"
+          "hiveyCode.privacy.confirmSend": {
+            "type": "string",
+            "enum": [
+              "always",
+              "never"
+            ],
+            "default": "always",
+            "markdownDescription": "%config.privacy.confirmSend%"
           },
-          "default": [],
-          "markdownDescription": "%config.permissions.deniedPaths%"
-        },
-        "hiveyCode.permissions.deniedCommands": {
-          "type": "array",
-          "items": {
-            "type": "string"
+          "hiveyCode.privacy.auditLog": {
+            "type": "boolean",
+            "default": true,
+            "description": "%config.privacy.auditLog%"
           },
-          "default": [],
-          "markdownDescription": "%config.permissions.deniedCommands%"
+          "hiveyCode.budget.perRequestUsd": {
+            "type": "number",
+            "default": 0.25,
+            "description": "%config.budget.perRequestUsd%"
+          },
+          "hiveyCode.budget.dailyUsd": {
+            "type": "number",
+            "default": 2,
+            "description": "%config.budget.dailyUsd%"
+          }
+        }
+      },
+      {
+        "title": "%config.section.permissions%",
+        "order": 5,
+        "properties": {
+          "hiveyCode.permissions.autoApprove": {
+            "type": "string",
+            "enum": [
+              "off",
+              "workspace",
+              "all"
+            ],
+            "default": "off",
+            "enumDescriptions": [
+              "%config.permissions.autoApprove.off%",
+              "%config.permissions.autoApprove.workspace%",
+              "%config.permissions.autoApprove.all%"
+            ],
+            "markdownDescription": "%config.permissions.autoApprove%"
+          },
+          "hiveyCode.permissions.allowedPaths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": [],
+            "markdownDescription": "%config.permissions.allowedPaths%"
+          },
+          "hiveyCode.permissions.allowedCommands": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": [],
+            "markdownDescription": "%config.permissions.allowedCommands%"
+          },
+          "hiveyCode.permissions.deniedPaths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": [],
+            "markdownDescription": "%config.permissions.deniedPaths%"
+          },
+          "hiveyCode.permissions.deniedCommands": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": [],
+            "markdownDescription": "%config.permissions.deniedCommands%"
+          }
+        }
+      },
+      {
+        "title": "%config.section.context%",
+        "order": 6,
+        "properties": {
+          "hiveyCode.context.maxTokens": {
+            "type": "number",
+            "default": 8000,
+            "description": "%config.context.maxTokens%"
+          },
+          "hiveyCode.context.repoMap": {
+            "type": "boolean",
+            "default": true,
+            "description": "%config.context.repoMap%"
+          }
+        }
+      },
+      {
+        "title": "%config.section.completion%",
+        "order": 7,
+        "properties": {
+          "hiveyCode.completion.provider": {
+            "type": "string",
+            "enum": [
+              "local",
+              "openrouter",
+              "openai-compatible",
+              "off"
+            ],
+            "default": "local",
+            "markdownDescription": "%config.completion.provider%"
+          },
+          "hiveyCode.completion.model": {
+            "type": "string",
+            "default": "qwen2.5-coder:7b",
+            "description": "%config.completion.model%"
+          },
+          "hiveyCode.completion.enabled": {
+            "type": "boolean",
+            "default": true,
+            "description": "%config.completion.enabled%"
+          },
+          "hiveyCode.completion.debounceMs": {
+            "type": "number",
+            "default": 220,
+            "description": "%config.completion.debounceMs%"
+          },
+          "hiveyCode.completion.maxTokens": {
+            "type": "number",
+            "default": 128,
+            "description": "%config.completion.maxTokens%"
+          },
+          "hiveyCode.completion.multiline": {
+            "type": "boolean",
+            "default": true,
+            "description": "%config.completion.multiline%"
+          }
         }
       }
-    },
+    ],
     "submenus": [
       {
         "id": "hiveyCode.newConversation",

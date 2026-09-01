@@ -982,4 +982,9 @@ export const FR: Record<string, string> = {
   "{0} chosen": "{0} choisi(s)",
   "{0} in play": "{0} en jeu",
   "Start a new conversation with this one as context": "Démarrer une nouvelle conversation avec celle-ci en contexte",
+  "Close and carry on in an ordinary conversation": "Fermer et poursuivre dans une conversation ordinaire",
+  "Next": "Suivant",
+  "No file is open in a tab.": "Aucun fichier n’est ouvert dans un onglet.",
+  "Those {0} file(s) are already attached, or excluded by the privacy policy.": "Ces {0} fichier(s) sont déjà joints, ou exclus par la politique de confidentialité.",
+  "{0} could not be attached.": "{0} n’a pas pu être joint.",
 };
