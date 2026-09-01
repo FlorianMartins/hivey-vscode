@@ -35,6 +35,8 @@ export interface Settings {
   };
   budget: { perRequestUsd: number; dailyUsd: number };
   context: { maxTokens: number; repoMap: boolean };
+  /** Which skills the user has switched off. Names, `/` included; absent means on. */
+  skills: { disabled: string[] };
   panel: { minWidth: number };
   permissions: {
     /** How much runs without asking. `off` is the default and the right one for a first session. */
@@ -94,6 +96,7 @@ export function readSettings(scope?: vscode.Uri): Settings {
       maxTokens: c.get<number>("context.maxTokens", 8000),
       repoMap: c.get<boolean>("context.repoMap", true),
     },
+    skills: { disabled: c.get<string[]>("skills.disabled", []) },
     panel: { minWidth: c.get<number>("panel.minWidth", 260) },
     permissions: {
       autoApprove: c.get<"off" | "workspace" | "all">("permissions.autoApprove", "off"),

@@ -2,6 +2,63 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.13.0 — 2026-09-01
+
+The panel moves towards the editor's own chat, in behaviour as much as in looks.
+
+### Added
+
+- **Restore checkpoint.** Every question the agent answered by editing files carries the state of
+  those files as they were before it. Restoring puts them back and rewinds the conversation to that
+  point, with the question returned to the composer — the unit people undo is "that whole idea",
+  not one keystroke across four files. It writes through a `WorkspaceEdit`, so the rollback is
+  itself undoable with Ctrl+Z; it says what it will overwrite before it does; and when a turn
+  changed something too large to record, it says the restore is partial rather than pretending.
+- **The agent's plan, as a collapsible to-do.** A new `update_plan` tool the model keeps up to
+  date; the panel shows the step happening now and a count of what is left, opening while the turn
+  runs and closing when it is done. Exactly one step may be in progress — enforced in the parser,
+  because the display has no honest way to show two.
+- **A skills control in the composer.** Switch built-in and repository skills on and off, create
+  one, or share them. Sharing does the two things that are actually useful — show the folder, or
+  copy the files as Markdown — because a skill is a file that travels with the repository, which
+  was the whole point of using files.
+- **Approvals in one click**, from the same menu: ask every time, inside this folder, never ask.
+  The icon carries the state, so a session left on "never ask" yesterday is visible today.
+- **"At the cursor"** on every code block, alongside "Replace". They are different intentions, and
+  conflating them silently deleted whatever was selected.
+- **An earlier conversation, and all open tabs**, promoted into the `+` menu. Attaching every open
+  tab already existed, buried under twelve file names — invisible and absent are the same thing.
+- **The session's cost** beside the token count, hidden entirely on a local model where it is
+  structurally zero.
+
+### Changed
+
+- **Attaching now searches.** The file picker was a fixed list of the first hundred files, which
+  cannot find anything in a repository of any size. It is a live search over the whole workspace,
+  files **and symbols** — and a symbol attaches the lines it occupies rather than its whole file.
+- **The transcript stops dragging you to the bottom.** Streaming follows the answer only while you
+  are already at the end; once you scroll up nothing moves you again, and a "Latest" button appears.
+- **Scrollbars are thin overlays** that fade when the pointer leaves, like the workbench's own. The
+  rail they replaced is where the "answers should be wider" complaint came from: the answers were
+  not narrow by design, they were narrow by a reserved gutter nobody had accounted for.
+- **Answers have room.** More space between blocks, and the user's question sits on a tinted card
+  derived from the theme's own accent — so a long transcript is scannable without reading a word.
+- **Code blocks lost a surface.** The block had a fill and its header had a different one, so code
+  sat on a band inside a box; inline code had a background AND a border AND padding, three
+  treatments for one idea. Colour alone now says "this is a name from the code".
+- **Actions and cost live under the message, on hover** — the editor's own behaviour, and what stops
+  a transcript reading as a table of controls.
+- **One ring on the composer.** Focus drew an outline outside the border while the working animation
+  drew a different weight inside it, so the box changed size depending on what it was doing. Both
+  now draw the same thickness in the same place. The box is shorter, full-width again, and its
+  placeholder is three words instead of a sentence.
+
+### Fixed
+
+- Skills and approvals were briefly two separate buttons, and the model name collapsed to `qwe…`
+  within the hour: every icon in that row is width the one label carrying real information does not
+  have. They are one menu, which is what the editor's chat does and for the same reason.
+
 ## 0.12.0 — 2026-09-01
 
 ### Added

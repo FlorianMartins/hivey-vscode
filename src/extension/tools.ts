@@ -11,6 +11,7 @@
 
 import * as vscode from "vscode";
 import { t } from "../shared/i18n.js";
+import { parsePlan, planSummary, PLAN_TOOL_DESCRIPTION, type Plan } from "../core/agent/plan.js";
 import type { Tool, ToolResult } from "../core/agent/loop.js";
 import { headToTokens } from "../core/util/tokens.js";
 import { EgressGate } from "./egress.js";
@@ -51,6 +52,8 @@ export interface ToolDeps {
   arcad?: ArcadDeps;
   /** Running MCP servers, whose tools join the set. */
   mcp?: McpManager;
+  /** Where the agent's plan goes when it updates one. Absent means the plan tool is not offered. */
+  onPlan?: (plan: Plan) => void;
 }
 
 export function buildTools(deps: ToolDeps): Tool[] {
@@ -272,5 +275,65 @@ export function buildTools(deps: ToolDeps): Tool[] {
     ...(deps.mcp?.tools() ?? []),
   ];
 
-  return [readFile, listFiles, searchText, diagnostics, writeFile, editFile, runCommand, ...integrations];
+  /**
+   * The agent's to-do list.
+   *
+   * The only tool here that changes nothing — not a file, not the repository, not the outside world.
+   * It exists so a turn that takes two minutes stops being a spinner: the panel shows what the model
+   * is doing now and how much it thinks is left. It costs one cheap call per step, which is the
+   * price of a progress bar that is honest rather than animated.
+   *
+   * Offered only when someone is watching. The terminal client and the sub-agents pass no `onPlan`,
+   * and a tool whose output nothing displays is a tool that spends tokens for nothing.
+   */
+  const updatePlan: Tool = {
+    schema: {
+      name: "update_plan",
+      description: PLAN_TOOL_DESCRIPTION,
+      parameters: {
+        type: "object",
+        properties: {
+          steps: {
+            type: "array",
+            description: "The whole plan, every time — not just what changed.",
+            items: {
+              type: "object",
+              properties: {
+                title: { type: "string", description: "Short and imperative, in the user's language." },
+                state: { type: "string", enum: ["pending", "running", "done", "skipped"] },
+              },
+              required: ["title", "state"],
+            },
+          },
+        },
+        required: ["steps"],
+      },
+    },
+    // Never asked for. It writes nothing and reads nothing — approving a progress update would be
+    // a dialog about a display, which is exactly the kind of prompt that teaches people to click
+    // through prompts.
+    approval: () => false,
+    async run(args, ctx): Promise<ToolResult> {
+      const { plan, error } = parsePlan(args["steps"]);
+      if (!plan) return { content: error ?? "Invalid plan.", isError: true };
+      deps.onPlan?.(plan);
+      const { done, total } = planSummary(plan);
+      ctx.report(t("plan: {0}/{1}", done, total));
+      // Deliberately terse: this result is re-sent on every later step of the turn, and the model
+      // already knows what it just wrote.
+      return { content: `Plan updated (${done}/${total} done).` };
+    },
+  };
+
+  return [
+    readFile,
+    listFiles,
+    searchText,
+    diagnostics,
+    writeFile,
+    editFile,
+    runCommand,
+    ...(deps.onPlan ? [updatePlan] : []),
+    ...integrations,
+  ];
 }

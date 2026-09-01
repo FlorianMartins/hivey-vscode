@@ -72,5 +72,6 @@
   "config.permissions.deniedCommands": "Commandes que l'agent ne peut jamais exécuter — `git push`, `rm`, `kubectl`. Repérées n'importe où dans la ligne : interdire `git push` refuse donc aussi `npm test && git push`, car un refus qu'on contourne en tapant `&&` ne protège personne. Les frontières de mot sont respectées : interdire `rm` n'interdit pas `rmdir`.",
   "config.endpoints.servers": "Serveurs de modèles supplémentaires, sur cette machine ou sur votre réseau. Chacun est interrogé et ses modèles apparaissent dans le sélecteur : `{ \"name\": \"Serveur GPU\", \"url\": \"http://192.168.1.50:11434/v1\" }`. Une adresse de votre propre réseau est traitée comme locale — rien n'est facturé et rien n'est pseudonymisé, puisque rien ne sort.",
   "config.endpoints.servers.name": "Le nom du serveur dans le sélecteur.",
-  "config.endpoints.servers.url": "L'URL de base compatible OpenAI, terminée par /v1."
+  "config.endpoints.servers.url": "L'URL de base compatible OpenAI, terminée par /v1.",
+  "config.skills.disabled": "Compétences qui ne sont pas proposées dans la liste `/`, par nom (`/tests`). Se règle depuis le bouton des compétences dans la zone de saisie. Enregistrer ce qui est DÉSACTIVÉ plutôt que ce qui est activé fait qu'une compétence ajoutée par une mise à jour, ou par un collègue qui livre un fichier, arrive active plutôt qu'invisible."
 }

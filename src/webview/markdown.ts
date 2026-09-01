@@ -13,7 +13,10 @@ import { highlight as highlightCode } from "../core/markdown/highlight.js";
 
 export interface CodeActions {
   onCopy(code: string): void;
+  /** Replace what is selected in the editor. */
   onInsert(code: string): void;
+  /** Drop it in at the caret, changing nothing that is already there. */
+  onInsertAtCursor(code: string): void;
   onApply(code: string, language: string): void;
 }
 
@@ -186,9 +189,18 @@ export function codeBlock(code: string, lang: string, actions?: CodeActions): HT
 
   if (actions) {
     const tools = el("div", "code-tools");
+    // Three ways to take the code, and they are genuinely three different intentions: put it where
+    // I am typing, put it over what I selected, or show me what it would change. The first was
+    // missing, and it is the one people reach for most — there is usually no selection.
     tools.append(
       button({ icon: ICON.copy, title: t("Copy this block"), className: "btn icon-only", onClick: () => actions.onCopy(code) }),
-      button({ label: t("Insert"), title: t("Replace the selection in the editor"), className: "btn tiny", onClick: () => actions.onInsert(code) }),
+      button({
+        label: t("At the cursor"),
+        title: t("Insert at the caret, changing nothing already there"),
+        className: "btn tiny",
+        onClick: () => actions.onInsertAtCursor(code),
+      }),
+      button({ label: t("Replace"), title: t("Replace what is selected in the editor"), className: "btn tiny", onClick: () => actions.onInsert(code) }),
       button({ label: t("Compare"), title: t("Open as a diff against the active file"), className: "btn tiny", onClick: () => actions.onApply(code, lang) }),
     );
     head.append(tools);

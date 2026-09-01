@@ -30,6 +30,10 @@ const READ_ONLY = new Set([
   "list_files",
   "search_text",
   "get_diagnostics",
+  // The plan is a display, not an action: it changes nothing on the machine. Plan mode is precisely
+  // where watching one being built is worth the most, so leaving it out would strip the mode of the
+  // thing it is named after.
+  "update_plan",
   // Git: everything that inspects history or the working tree.
   "git_status",
   "git_diff",

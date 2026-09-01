@@ -15,6 +15,9 @@ import { route } from "../core/router/route.js";
 import { Session, type ContextItem, type Entry, type SessionData } from "../core/session/session.js";
 import { filterHistory, searchTranscript, upsertSession } from "../core/session/history.js";
 import { compactBrief, digestEntries, sessionAsContext, shouldSuggestCompact } from "../core/session/digest.js";
+import { ALWAYS_ON, BUILTIN_SKILLS, isSkillEnabled, skillInvocation, toggleSkill } from "../core/session/skills.js";
+import { capture, describeRestore, trimCheckpoints } from "../core/session/checkpoint.js";
+import type { Plan } from "../core/agent/plan.js";
 import { promptForMode, toolsForMode } from "../core/session/modes.js";
 import { detectIbmiLanguage, ibmiPrompt } from "../core/ibmi/languages.js";
 import { parsePrompt, participantDirective, type Participant } from "../core/session/mentions.js";
@@ -40,6 +43,7 @@ import type {
   UiPermissionRule,
   UiActiveEditor,
   UiSetup,
+  UiSkill,
   UiState,
 } from "../shared/protocol.js";
 import { SECTION, endpointFor, providerFor, readSettings, routerConfig, type Keys, type Settings, writeTarget } from "./config.js";
@@ -275,6 +279,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       error: e.error,
       model: e.model,
       usdCost: e.usdCost,
+      ...(e.checkpoint?.length ? { checkpointFiles: e.checkpoint.length } : {}),
+      ...(e.checkpointPartial ? { checkpointPartial: true } : {}),
+      ...(e.plan ? { plan: e.plan } : {}),
       reasoning: e.reasoning,
       steps: e.steps,
       context: e.context?.map((c) => ({ kind: c.kind, label: c.label, tokens: estimateTokens(c.body) })),
@@ -315,6 +322,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         this.session.entries.filter((e) => e.included).length,
       ),
       budget: { spentTodayUsd: this.gate.budget.spentToday(), dailyUsd: s.budget.dailyUsd },
+      sessionCostUsd: this.session.totalCostUsd(),
+      skills: this.uiSkills(),
+      // Unfiltered, and short. The `+` menu needs "the last few conversations", not "the ones that
+      // pass whatever filter is set on a screen the user may not even have open".
+      recent: stored
+        .slice()
+        .sort((a, b) => b.updatedAt - a.updatedAt)
+        .slice(0, 10)
+        .map((x) => ({ id: x.id, title: x.title, messages: x.entries.length })),
       attachments: this.attachments.map((c) => ({ kind: c.kind, label: c.label, tokens: estimateTokens(c.body) })),
       openFiles: openFiles(),
       ...(activeEditor() ? { activeEditor: activeEditor()! } : {}),
@@ -429,6 +445,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         case "ready":
           this.sendState();
           void this.loadModels();
+          void this.refreshSkills();
           // First run: open on the setup screen rather than on a chat that cannot answer. The
           // probe starts immediately, because the useful version of this screen is the one that
           // already knows what is running by the time it is read.
@@ -495,6 +512,32 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         }
         case "compact":
           await this.compact();
+          break;
+        case "setSkillEnabled": {
+          const config = vscode.workspace.getConfiguration(SECTION);
+          const next = toggleSkill(readSettings().skills.disabled, m.name, m.enabled);
+          // Global rather than workspace: which skills a person wants offered is a preference about
+          // them, not about the repository they happen to have open. And `writeTarget()` would put
+          // it in the workspace when one exists, so someone switching a skill off would find it
+          // back on in the next project.
+          await config.update("skills.disabled", next, vscode.ConfigurationTarget.Global);
+          this.sendState();
+          break;
+        }
+        case "openSkill": {
+          const folder = vscode.workspace.workspaceFolders?.[0];
+          if (!folder) break;
+          await vscode.window.showTextDocument(vscode.Uri.joinPath(folder.uri, m.source));
+          break;
+        }
+        case "shareSkills":
+          await this.shareSkills();
+          break;
+        case "newSkill":
+          await vscode.commands.executeCommand("hiveyCode.newSkill");
+          break;
+        case "restoreCheckpoint":
+          await this.restoreCheckpoint(m.id);
           break;
         case "deleteSession": {
           const rest = this.history().filter((s) => s.id !== m.id);
@@ -723,7 +766,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             void vscode.window.showWarningMessage(t("No active editor to insert this code into."));
             break;
           }
-          await ed.edit((b) => b.replace(ed.selection, m.code));
+          // Two different intentions, and conflating them destroyed work: with a selection active,
+          // "insert" replaced it, which is right when that is what you meant and a silent deletion
+          // when it is not. `atCursor` puts the code in at the caret and touches nothing else.
+          await ed.edit((b) => (m.atCursor ? b.insert(ed.selection.active, m.code) : b.replace(ed.selection, m.code)));
+          // The caret ends after what was inserted, where typing continues — and the editor scrolls
+          // to it, so the code lands somewhere the user can see.
+          ed.revealRange(new vscode.Range(ed.selection.active, ed.selection.active));
           break;
         }
         case "applyCode": {
@@ -784,9 +833,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         break;
       }
       case "mention": {
-        const files = await this.workspace.findFiles("", 100);
-        const picked = await vscode.window.showQuickPick(files, { placeHolder: t("Which file to attach?") });
-        if (picked) await this.onMessage({ type: "attachPath", path: picked });
+        await this.searchAttachment();
         return;
       }
     }
@@ -934,6 +981,49 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     await this.focus();
   }
 
+  /**
+   * Every skill the panel may offer, with the user's switch on each.
+   *
+   * Built-ins and repository skills in one list, because from where the user stands they are one
+   * idea — a named thing `/` invokes — and the only difference that matters to them is that one
+   * kind can be opened and edited. The repository ones are loaded fresh rather than cached: a
+   * colleague's skill arriving with a `git pull` should appear without reloading the window.
+   */
+  private skillsCache: UiSkill[] = [];
+
+  private uiSkills(): UiSkill[] {
+    const disabled = readSettings().skills.disabled;
+    const builtins = BUILTIN_SKILLS.map((sk) => ({
+      name: sk.name,
+      description: sk.hint,
+      enabled: isSkillEnabled(sk.name, disabled),
+      builtin: true,
+      ...(ALWAYS_ON.has(sk.name) ? { required: true } : {}),
+    }));
+    // The repository's own, from the last load. Refreshing them is asynchronous and this is called
+    // on every state send, so the list is filled in by `refreshSkills` rather than awaited here —
+    // a panel that blocked on the file system every keystroke would be a panel that stutters.
+    const repo = this.skillsCache.map((sk) => ({ ...sk, enabled: isSkillEnabled(sk.name, disabled) }));
+    return [...builtins, ...repo];
+  }
+
+  /** Re-read the repository's skills, then redraw. Called on activation and after an edit. */
+  private async refreshSkills(): Promise<void> {
+    const found = await this.definitions.load();
+    const next = found.skills.map((sk) => ({
+      name: skillInvocation(sk.name),
+      description: sk.description,
+      enabled: true,
+      builtin: false,
+      source: sk.source,
+    }));
+    // Only redraw when something actually changed: this runs on a file watcher, and a panel that
+    // rebuilds itself every time anything under `.hiveycode/` is touched loses the caret.
+    if (JSON.stringify(next) === JSON.stringify(this.skillsCache)) return;
+    this.skillsCache = next;
+    this.sendState();
+  }
+
   /** Reopens the first-run screen and re-probes, from the command palette. */
   openSetup(): void {
     this.screen = "setup";
@@ -982,6 +1072,206 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    * discussed. It still passes the egress gate and the budget, because it is still a request that
    * leaves the machine.
    */
+  /**
+   * Handing your skills to somebody else.
+   *
+   * There is nothing to invent here, and that is the answer rather than a limitation: a skill is a
+   * Markdown file in `.hiveycode/skills/`, so sharing one is committing it — it arrives with a
+   * clone, is reviewed like code, and cannot go stale relative to the repository it describes. That
+   * was the whole argument for using files instead of settings, and a bespoke export format would
+   * quietly undo it.
+   *
+   * So this does the two things the argument leaves undone: it shows the folder, and for anyone
+   * outside the repository it copies the skills as one Markdown document that can be pasted into a
+   * message. No upload, no account, no registry — none of which this extension has any business
+   * running.
+   */
+  /**
+   * Put the files back as they were before a question, and rewind the conversation to it.
+   *
+   * Confirmed first, and the confirmation names what will happen rather than asking "are you sure":
+   * this OVERWRITES files, including any hand edits made since, which is the only part of this
+   * feature that can lose work. Stating it beforehand is the difference between a rollback and a
+   * trap.
+   *
+   * The writes go through a `WorkspaceEdit`, so restoring lands in the editor's own undo stack —
+   * undoing a rollback is Ctrl+Z, the same as undoing anything else. Doing it with `fs.writeFile`
+   * would have made the one operation designed to recover from a mistake the one operation you
+   * cannot take back.
+   */
+  /**
+   * Search the workspace for something to attach.
+   *
+   * This is the nearest thing to the editor's own "add context" picker that an extension can build.
+   * That picker is internal to the built-in chat — there is no API to open it, and the command it
+   * hides behind takes undocumented arguments that change between releases — so reusing it is not
+   * on offer. Matching its BEHAVIOUR is, and it turns out to be the part that matters.
+   *
+   * What it replaces was a `showQuickPick` over the first hundred files, sorted however the
+   * filesystem felt: a fixed list that could not find the file you wanted in a repository of any
+   * size, because the file you wanted was usually not in the hundred. This searches as you type,
+   * across every file, and looks for symbols at the same time — the editor's own index answers
+   * both, so a class name finds its file without you knowing where it lives.
+   */
+  private async searchAttachment(): Promise<void> {
+    const picker = vscode.window.createQuickPick<vscode.QuickPickItem & { path?: string; symbol?: vscode.SymbolInformation }>();
+    picker.placeholder = t("Search files and symbols to attach…");
+    picker.matchOnDescription = true;
+    // The editor has already filtered by the time items arrive, and filtering again on a fuzzy
+    // query written for a path removes matches the query was aimed at.
+    picker.matchOnDetail = false;
+
+    const load = async (query: string) => {
+      picker.busy = true;
+      try {
+        const [files, symbols] = await Promise.all([
+          this.workspace.findFiles(query, 40),
+          // Symbols only once there is something to look for: an empty workspace-symbol query asks
+          // every language server for its entire index, which on a large repository is seconds.
+          query.trim().length >= 2
+            ? (vscode.commands.executeCommand<vscode.SymbolInformation[]>("vscode.executeWorkspaceSymbolProvider", query) ??
+              Promise.resolve([]))
+            : Promise.resolve([]),
+        ]);
+        picker.items = [
+          ...files.map((path) => ({ label: `$(file) ${path}`, path })),
+          ...(symbols ?? []).slice(0, 20).map((symbol) => ({
+            label: `$(symbol-method) ${symbol.name}`,
+            description: vscode.workspace.asRelativePath(symbol.location.uri, false),
+            symbol,
+          })),
+        ];
+      } catch {
+        // A language server that is starting, or a query it dislikes. The file half still works,
+        // and an empty picker would be a worse answer than a partial one.
+      } finally {
+        picker.busy = false;
+      }
+    };
+
+    picker.onDidChangeValue((value) => void load(value));
+    picker.onDidAccept(async () => {
+      const picked = picker.selectedItems[0];
+      picker.hide();
+      if (!picked) return;
+      if (picked.path) {
+        await this.onMessage({ type: "attachPath", path: picked.path });
+        return;
+      }
+      if (picked.symbol) {
+        // A symbol attaches the lines it occupies rather than the whole file: a 3 000-line module
+        // attached to answer a question about one method is most of a context window spent on
+        // material nobody asked about.
+        const item = await this.workspace.rangeContext(picked.symbol.location.uri, picked.symbol.location.range, readSettings());
+        if (item) {
+          this.attachments.push(item);
+          this.sendState();
+        }
+      }
+    });
+    picker.onDidHide(() => picker.dispose());
+    picker.show();
+    await load("");
+  }
+
+  private async restoreCheckpoint(id: string): Promise<void> {
+    const entry = this.session.get(id);
+    if (!entry?.checkpoint?.length) return;
+    const folder = vscode.workspace.workspaceFolders?.[0];
+    if (!folder) {
+      void vscode.window.showWarningMessage(t("Restoring needs the folder these files belong to open."));
+      return;
+    }
+
+    const detail = describeRestore(entry.checkpoint, Boolean(entry.checkpointPartial), {
+      files: (n) => t("{0} file(s) go back to how they were.", n),
+      created: (n) => t("{0} file(s) created by that turn are deleted.", n),
+      partial: t("Some changes were too large to record and will NOT be undone."),
+    });
+    const go = t("Restore");
+    const answer = await vscode.window.showWarningMessage(
+      t("Go back to before “{0}”?", entry.text.trim().split("\n")[0]!.slice(0, 60)),
+      { modal: true, detail: `${detail}\n\n${t("Anything you changed by hand in those files since is overwritten. Ctrl+Z undoes this.")}` },
+      go,
+    );
+    if (answer !== go) return;
+
+    const edit = new vscode.WorkspaceEdit();
+    for (const snap of entry.checkpoint) {
+      const uri = vscode.Uri.joinPath(folder.uri, snap.path);
+      if (snap.before === undefined) {
+        // The turn created it, so going back means it is not there. `ignoreIfNotExists` covers the
+        // file having already been deleted by hand, which must not fail the whole restore.
+        edit.deleteFile(uri, { ignoreIfNotExists: true });
+      } else {
+        const doc = await vscode.workspace.openTextDocument(uri).then(
+          (d) => d,
+          () => undefined,
+        );
+        if (doc) {
+          edit.replace(uri, new vscode.Range(0, 0, doc.lineCount, 0), snap.before);
+        } else {
+          // Deleted since. Recreating it is still "back to how it was".
+          edit.createFile(uri, { overwrite: true, contents: new TextEncoder().encode(snap.before) });
+        }
+      }
+    }
+
+    if (!(await vscode.workspace.applyEdit(edit))) {
+      void vscode.window.showErrorMessage(t("The files could not be restored; the conversation is unchanged."));
+      return;
+    }
+
+    const restoredFiles = entry.checkpoint.length;
+    // The question comes back to the composer. Restoring is a rewind, not a deletion: the thing you
+    // most often want next is the same question, asked differently.
+    const text = this.session.rewindTo(id);
+    this.screen = "chat";
+    this.persist();
+    this.sendState();
+    if (text) this.post({ type: "restoreDraft", text });
+    this.post({ type: "status", text: t("{0} file(s) restored. The conversation is back to that point.", restoredFiles) });
+  }
+
+  private async shareSkills(): Promise<void> {
+    const found = await this.definitions.load();
+    if (!found.skills.length) {
+      const create = t("Create a skill");
+      const answer = await vscode.window.showInformationMessage(
+        t("This repository defines no skills yet."),
+        { modal: false, detail: t("A skill is a Markdown file in .hiveycode/skills/. Committing it is how it reaches your team.") },
+        create,
+      );
+      if (answer === create) await vscode.commands.executeCommand("hiveyCode.newSkill");
+      return;
+    }
+
+    const reveal = t("Show the folder");
+    const copy = t("Copy them as Markdown");
+    const answer = await vscode.window.showInformationMessage(
+      t("{0} skill(s) in .hiveycode/skills/.", found.skills.length),
+      { modal: false, detail: t("They travel with the repository: commit the folder and your team has them. To send them to somebody outside it, copy them.") },
+      reveal,
+      copy,
+    );
+
+    const folder = vscode.workspace.workspaceFolders?.[0];
+    if (answer === reveal && folder) {
+      await vscode.commands.executeCommand("revealInExplorer", vscode.Uri.joinPath(folder.uri, ".hiveycode", "skills"));
+      return;
+    }
+    if (answer === copy) {
+      // Each file reproduced whole, frontmatter included, under a heading naming its path. Anyone
+      // receiving this can put the files back exactly where they came from — which is the only
+      // thing a paste-able format has to get right.
+      const doc = found.skills
+        .map((sk) => `<!-- ${sk.source} -->\n\n${sk.body.trim()}\n`)
+        .join("\n---\n\n");
+      await vscode.env.clipboard.writeText(doc);
+      void vscode.window.showInformationMessage(t("{0} skill(s) copied. Paste them into .hiveycode/skills/ on the other side.", found.skills.length));
+    }
+  }
+
   private async compact(): Promise<void> {
     const settings = readSettings();
     const covered = this.session.entries.filter((e) => e.included && !e.error && e.text.trim());
@@ -1140,6 +1430,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private async runTurn(): Promise<void> {
     const settings = readSettings();
     const mode = this.session.mode;
+    // Every file this turn is about to change gets snapshotted against the question that asked for
+    // it. Set here rather than passed down: `confirmEdit` sits several layers of tool machinery
+    // away, and threading an id through all of them would put a checkpoint concern in files that
+    // have nothing to do with checkpoints.
+    this.checkpointFor = [...this.session.entries].reverse().find((e) => e.role === "user")?.id;
+    this.plan = undefined;
     this.turn?.abort();
     const ctl = new AbortController();
     this.turn = ctl;
@@ -1157,6 +1453,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const allTools: Tool[] = buildTools({
       settings: () => settings,
       confirmEdit: (u, n) => this.confirmEdit(u, n),
+      // The plan goes to the panel as it is written and onto the answer when the turn ends, so it
+      // is both a live progress display and part of the record.
+      onPlan: (plan) => {
+        this.plan = plan;
+        this.post({ type: "plan", plan });
+      },
       arcad: { credentials: () => this.keys.arcad() },
       mcp: this.mcp,
     });
@@ -1189,7 +1491,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         workspaceNote() +
         dialectNote() +
         houseRules +
-        (mode === "chat" ? "" : skillsPrompt(definitions.skills)) +
+        (mode === "chat"
+          ? ""
+          : skillsPrompt(
+              // A switched-off skill is not described to the model either. Filtering it out of the
+              // `/` list alone would leave the model announcing a skill the user cannot invoke.
+              definitions.skills.filter((sk) => isSkillEnabled(skillInvocation(sk.name), settings.skills.disabled)),
+            )) +
         (this.participant ? `\n\n${participantDirective(this.participant)}` : ""),
       ambient: ambient ? `${ambient.text}\n\n(${ambient.files} files mapped, ${ambient.omitted} omitted)` : undefined,
       maxTokens: settings.context.maxTokens,
@@ -1294,6 +1602,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       });
 
       answer.text = result.text || streamed;
+      if (this.plan) answer.plan = this.plan;
       answer.usdCost = 0;
       if (thought) answer.reasoning = thought;
       if (steps.length) answer.steps = steps;
@@ -1330,6 +1639,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       this.log.appendLine(`[turn] ${message}`);
     } finally {
       this.turn = undefined;
+      this.checkpointFor = undefined;
+      // Old checkpoints give up their file contents here rather than at write time: the cap is
+      // about what is STORED, and this is the moment just before the conversation is stored.
+      this.session.entries = trimCheckpoints(this.session.entries);
+      this.persist();
       this.post({ type: "turnEnd" });
       this.sendState();
     }
@@ -1421,6 +1735,38 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   }
 
   /** Show the change as a diff before it is applied — the reviewable-edit rule. */
+  /**
+   * The question the current turn belongs to.
+   *
+   * Set when a turn starts and cleared when it ends, so `confirmEdit` — which is several layers of
+   * tool machinery away — knows which entry a snapshot belongs to without every layer between
+   * having to carry it.
+   */
+  private checkpointFor: string | undefined;
+
+  /** The plan the current turn is keeping, if it started one. Reset at the top of every turn. */
+  private plan: Plan | undefined;
+
+  /**
+   * Take a file's prior state, once per turn.
+   *
+   * Called from `confirmEdit` only after the user has said Apply, which is the right moment twice
+   * over: the content read there is the state immediately before the change, and a refused edit
+   * leaves nothing to roll back.
+   */
+  private snapshot(uri: vscode.Uri, before: string | undefined): void {
+    if (!this.checkpointFor) return;
+    const entry = this.session.get(this.checkpointFor);
+    if (!entry) return;
+    entry.checkpoint ??= [];
+    const result = capture(entry.checkpoint, relative(uri), before);
+    if (result.kind === "captured") entry.checkpoint.push(result.snapshot);
+    // A file too large to hold, or a turn that changed more than a checkpoint can carry. Recorded
+    // rather than hidden: restoring would then put the repository into a state it was never in, and
+    // the user has to be told before they press the button, not after.
+    else if (result.kind !== "already") entry.checkpointPartial = true;
+  }
+
   private async confirmEdit(uri: vscode.Uri, next: string): Promise<boolean> {
     const original = await readOrEmpty(uri);
     const preview = uri.with({ scheme: "hivey-code-preview", query: Date.now().toString() });
@@ -1439,7 +1785,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       t("Refuse"),
     );
     previewContents.delete(preview.toString());
-    return answer === t("Apply");
+    const apply = answer === t("Apply");
+    if (apply) this.snapshot(uri, original);
+    return apply;
   }
 }
 

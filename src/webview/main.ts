@@ -6,12 +6,13 @@
 // rendered incrementally is the answer being streamed, because that one has to be.
 
 import { button, closeMenu, el, icon, ICON, searchInput } from "./dom.js";
-import { chatScreen, collapsible, isStreaming, setStreaming, type ChatDeps, captureDraft, restoreDraft } from "./chat.js";
+import { chatScreen, collapsible, isStreaming, planBlock, setStreaming, type ChatDeps, captureDraft, restoreDraft } from "./chat.js";
 import { historyScreen } from "./history.js";
 import { modelsScreen } from "./models.js";
 import { permissionsScreen } from "./permissions.js";
 import { markdown } from "./markdown.js";
 import type { ToExtension, ToPanel, UiState } from "../shared/protocol.js";
+import type { Plan } from "../core/agent/plan.js";
 import { t } from "../shared/i18n.js";
 import { usePrefStore } from "./prefs.js";
 import { closeModelCombo, openModelCombo } from "./modelCombo.js";
@@ -72,7 +73,9 @@ function render(): void {
       break;
   }
   live = undefined;
-  scrollToEnd();
+  // A rebuilt screen starts at the end, which is where a conversation is read from. The button is
+  // dropped with the old DOM and comes back the moment the reader scrolls away again.
+  scrollToEnd(true);
   restoreDraft(draft);
 }
 
@@ -264,6 +267,23 @@ class LiveTurn {
     this.thinking.body.textContent = (this.thinking.body.textContent ?? "") + chunk;
   }
 
+  /**
+   * The plan, redrawn in place.
+   *
+   * Replaced rather than appended: the model sends the WHOLE plan on every update, so appending
+   * would stack five copies of the same list down the answer. It is pinned to the top of the turn
+   * because that is where it stays useful — under the tool lines it scrolls away exactly when the
+   * turn gets long enough to need it.
+   */
+  private planNode?: HTMLElement;
+
+  setPlan(plan: Plan): void {
+    const next = planBlock(plan, true);
+    if (this.planNode) this.planNode.replaceWith(next);
+    else this.body.prepend(next);
+    this.planNode = next;
+  }
+
   appendStatus(text: string, tool?: string, ok?: boolean): void {
     const row = el("div", `step${ok === false ? " failed" : ""}`);
     if (tool) {
@@ -346,6 +366,7 @@ class LiveTurn {
       const rendered = markdown(this.buffer, {
         onCopy: (code) => send({ type: "copy", text: code }),
         onInsert: (code) => send({ type: "insertCode", code }),
+        onInsertAtCursor: (code) => send({ type: "insertCode", code, atCursor: true }),
         onApply: (code, language) => send({ type: "applyCode", code, language }),
       });
       this.text.replaceWith(rendered);
@@ -380,12 +401,76 @@ function ensureLive(): LiveTurn {
   return live;
 }
 
-function scrollToEnd(): void {
+/**
+ * Follow the answer — unless the reader has gone somewhere else.
+ *
+ * Scrolling to the end on every token is right exactly while the reader is AT the end. The moment
+ * they scroll up — to re-read the question, to copy a line out of an earlier block — every further
+ * token yanked them back down, which makes reading a long answer while it is being written
+ * impossible. It is the single most irritating thing a streaming transcript can do.
+ *
+ * So the rule is "stick to the bottom while you are already at the bottom", with a tolerance of a
+ * couple of lines because a scroll position is rarely exactly zero from the end. Once the reader
+ * has left, nothing moves them again until they ask — and the button below is how they ask.
+ */
+const STICK_TOLERANCE_PX = 48;
+
+function atBottom(list: Element): boolean {
+  return list.scrollHeight - list.scrollTop - list.clientHeight <= STICK_TOLERANCE_PX;
+}
+
+function scrollToEnd(force = false): void {
   requestAnimationFrame(() => {
     const list = document.querySelector(".transcript");
-    if (list) list.scrollTop = list.scrollHeight;
+    if (!list) return;
+    if (!force && !atBottom(list)) {
+      showJumpButton(true);
+      return;
+    }
+    list.scrollTop = list.scrollHeight;
+    showJumpButton(false);
   });
 }
+
+/**
+ * The way back down.
+ *
+ * It only exists while it is needed. A permanent button in the corner of a transcript that is
+ * already at its end is a button that means nothing, and after a week nobody sees it — which is
+ * exactly when it would have been useful.
+ */
+function showJumpButton(show: boolean): void {
+  const existing = document.querySelector<HTMLElement>(".jump-to-end");
+  if (!show) {
+    existing?.remove();
+    return;
+  }
+  if (existing) return;
+  const host = document.querySelector<HTMLElement>(".chat-screen");
+  if (!host) return;
+  const jump = button({
+    icon: ICON.chevron,
+    label: isStreaming() ? t("Answering…") : t("Latest"),
+    className: "btn jump-to-end",
+    title: t("Go to the end of the conversation"),
+    onClick: () => scrollToEnd(true),
+  });
+  host.append(jump);
+}
+
+/** Watch the reader's own scrolling, so the button appears and disappears on its own. */
+function watchScrolling(): void {
+  document.addEventListener(
+    "scroll",
+    (ev) => {
+      const list = ev.target as HTMLElement | null;
+      if (!list?.classList?.contains("transcript")) return;
+      showJumpButton(!atBottom(list));
+    },
+    true,
+  );
+}
+watchScrolling();
 
 // ── Messages from the extension ──────────────────────────────────────────────────────────────
 
@@ -412,6 +497,9 @@ window.addEventListener("message", (event: MessageEvent<ToPanel>) => {
     case "reasoning":
       ensureLive().appendReasoning(m.text);
       break;
+    case "plan":
+      ensureLive().setPlan(m.plan);
+      break;
     case "status":
       ensureLive().appendStatus(m.text, m.tool, m.ok);
       scrollToEnd();
@@ -423,6 +511,18 @@ window.addEventListener("message", (event: MessageEvent<ToPanel>) => {
       ensureLive().appendError(m.message);
       setStreaming(false);
       break;
+    case "restoreDraft": {
+      // A rewind puts the question back where it was typed. Focused and selected, because the
+      // reason to roll back is almost always to ask the same thing differently.
+      const area = document.querySelector<HTMLTextAreaElement>(".composer-input");
+      if (area) {
+        area.value = m.text;
+        area.focus();
+        area.setSelectionRange(m.text.length, m.text.length);
+        area.dispatchEvent(new Event("input"));
+      }
+      break;
+    }
     case "openSearch":
       if (state?.screen !== "chat") break;
       searchOpen = true;

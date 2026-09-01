@@ -72,5 +72,6 @@
   "config.permissions.deniedCommands": "Commands the agent may never run — `git push`, `rm`, `kubectl`. Matched anywhere in the command line, so denying `git push` also refuses `npm test && git push`: a refusal that is escaped by typing `&&` protects nobody. Word boundaries are still respected, so denying `rm` does not deny `rmdir`.",
   "config.endpoints.servers": "Extra model servers, on this machine or on your network. Each one is probed and its models appear in the picker: `{ \"name\": \"GPU box\", \"url\": \"http://192.168.1.50:11434/v1\" }`. An address on your own network is treated as local — nothing is billed and nothing is pseudonymised, because nothing leaves.",
   "config.endpoints.servers.name": "How the server is named in the picker.",
-  "config.endpoints.servers.url": "The OpenAI-compatible base URL, ending in /v1."
+  "config.endpoints.servers.url": "The OpenAI-compatible base URL, ending in /v1.",
+  "config.skills.disabled": "Skills that are not offered in the `/` list, by name (`/tests`). Toggled from the skills button in the composer. Storing what is OFF rather than what is on means a skill added by an update, or by a colleague committing a file, arrives switched on rather than invisible."
 }

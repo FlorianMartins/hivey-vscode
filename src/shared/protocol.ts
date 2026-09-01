@@ -28,6 +28,12 @@ export interface UiEntry {
   error?: string;
   model?: string;
   usdCost?: number;
+  /** Number of files this question's checkpoint can put back. Zero means there is nothing to restore. */
+  checkpointFiles?: number;
+  /** True when the checkpoint could not hold everything the turn changed. */
+  checkpointPartial?: boolean;
+  /** The to-do list the agent kept while answering this turn. */
+  plan?: Plan;
   /** What the model thought before answering, when a reasoning effort was asked for. */
   reasoning?: string;
   context?: UiContextItem[];
@@ -95,6 +101,22 @@ export interface UiPermissionRule {
 }
 
 /** A model server found running on this machine. */
+import type { Plan } from "../core/agent/plan.js";
+
+/** A skill in the panel's own terms: what to call it, and whether it is on. */
+export interface UiSkill {
+  /** The invocation, `/` included — the join key between the toggle, the setting and the prompt. */
+  name: string;
+  description: string;
+  enabled: boolean;
+  /** False for one the repository defines, which is also the one that can be opened and shared. */
+  builtin: boolean;
+  /** Where a repository skill lives, relative to the workspace. */
+  source?: string;
+  /** True for a control that cannot be switched off, such as compacting. */
+  required?: boolean;
+}
+
 export interface UiRuntime {
   name: string;
   baseUrl: string;
@@ -153,6 +175,18 @@ export interface UiState {
   remote: boolean;
   contextTokens: number;
   budget: { spentTodayUsd: number; dailyUsd: number };
+  /** What THIS conversation has cost so far. Distinct from the day's spend, which spans all of them. */
+  sessionCostUsd: number;
+  /** Every skill the panel may offer, and whether the user has left it switched on. */
+  skills: UiSkill[];
+  /**
+   * The most recent conversations, unfiltered.
+   *
+   * Distinct from `history`, which the history screen's own filters narrow. A menu elsewhere in
+   * the panel that quietly inherited those filters would show a short list with no explanation of
+   * why the conversation being looked for is missing.
+   */
+  recent: Array<{ id: string; title: string; messages: number }>;
   attachments: UiContextItem[];
   openFiles: UiOpenFile[];
   activeEditor?: UiActiveEditor;
@@ -191,6 +225,13 @@ export type ToExtension =
   | { type: "deleteSession"; id: string }
   /** Replace the conversation so far with a summary the model writes. */
   | { type: "compact" }
+  | { type: "setSkillEnabled"; name: string; enabled: boolean }
+  /** Put the repository's skills where a colleague can be given them. */
+  | { type: "shareSkills" }
+  | { type: "openSkill"; source: string }
+  | { type: "newSkill" }
+  /** Put the files back as they were before this question, and rewind the conversation to it. */
+  | { type: "restoreCheckpoint"; id: string }
   | { type: "setMode"; mode: Mode }
   | { type: "setReasoning"; reasoning: Reasoning }
   /** `baseUrl` accompanies a model served by a machine other than the configured one. */
@@ -214,7 +255,8 @@ export type ToExtension =
   | { type: "openCosts" }
   | { type: "openSettings" }
   | { type: "approve"; id: string; answer: "once" | "session" | "always" | "no" }
-  | { type: "insertCode"; code: string }
+  /** `atCursor` inserts at the caret; without it the selection is replaced. */
+  | { type: "insertCode"; code: string; atCursor?: boolean }
   | { type: "applyCode"; code: string; language: string }
   | { type: "copy"; text: string }
   // ── First run ──────────────────────────────────────────────────────────────────────────────
@@ -252,4 +294,8 @@ export type ToPanel =
   /** Opens the model picker from outside the panel — the command palette, a keybinding. */
   | { type: "openModelPicker" }
   /** Opens the in-conversation search from outside the panel — the title bar, a keybinding. */
-  | { type: "openSearch" };
+  | { type: "openSearch" }
+  /** Put text back into the composer — a restored question, ready to be asked differently. */
+  | { type: "restoreDraft"; text: string }
+  /** The agent's plan, as it is written. Redrawn in place rather than appended. */
+  | { type: "plan"; plan: Plan };

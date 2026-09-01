@@ -152,6 +152,34 @@ export class WorkspaceContext {
     };
   }
 
+  /**
+   * A range of a file, as a context item.
+   *
+   * Attaching a symbol attaches the lines it occupies, not the module it lives in: a 3 000-line
+   * file sent to answer a question about one method is most of a context window spent on material
+   * nobody asked about. The label carries the line numbers, so the model — and the user reading the
+   * chip — knows this is an excerpt rather than the file.
+   */
+  async rangeContext(uri: vscode.Uri, range: vscode.Range, settings: Settings, maxTokens = 4000): Promise<ContextItem | undefined> {
+    const rel = relative(uri);
+    if (EgressGate.isBlocked(rel, settings.privacy.blockedGlobs)) {
+      void vscode.window.showWarningMessage(t("Hivey Code: {0} is excluded by the privacy policy and will not be attached.", rel));
+      return undefined;
+    }
+    const doc = await vscode.workspace.openTextDocument(uri);
+    // Whole lines. Half of the first line of a function is not a smaller attachment, it is an
+    // unreadable one.
+    const from = range.start.line;
+    const to = Math.min(doc.lineCount - 1, range.end.line);
+    const text = doc.getText(new vscode.Range(from, 0, to, doc.lineAt(to).text.length));
+    return {
+      kind: "symbol",
+      label: `${rel}:${from + 1}-${to + 1}`,
+      body: headToTokens(text, maxTokens),
+      untrusted: true,
+    };
+  }
+
   /** Files whose names match a query — what `#` completion in the chat box offers. */
   async findFiles(query: string, limit = 20): Promise<string[]> {
     const pattern = query ? `**/*${query}*` : "**/*";

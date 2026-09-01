@@ -2,7 +2,7 @@
   "name": "hivey-code",
   "displayName": "Hivey Code",
   "description": "%extension.description%",
-  "version": "0.12.0",
+  "version": "0.13.0",
   "publisher": "hivey",
   "license": "Apache-2.0",
   "repository": {
@@ -644,6 +644,14 @@
           "minimum": 0,
           "maximum": 600,
           "markdownDescription": "%config.panel.minWidth%"
+        },
+        "hiveyCode.skills.disabled": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "markdownDescription": "%config.skills.disabled%"
         },
         "hiveyCode.permissions.autoApprove": {
           "type": "string",

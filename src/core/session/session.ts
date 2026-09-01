@@ -15,6 +15,8 @@
 // quality and the price of the next turn.
 
 import type { ChatMessage } from "../providers/types.js";
+import type { FileSnapshot } from "./checkpoint.js";
+import type { Plan } from "../agent/plan.js";
 import type { Mode } from "./modes.js";
 import { estimateTokens } from "../util/tokens.js";
 
@@ -50,6 +52,17 @@ export interface Entry {
   steps?: Array<{ tool: string; summary: string; ok: boolean }>;
   /** Set on an assistant entry that failed, so it is never replayed as if it were an answer. */
   error?: string;
+  /**
+   * The files as they stood before this question was answered.
+   *
+   * Carried on the USER entry rather than on the answer, because the unit people roll back is "that
+   * whole idea", and the idea starts with what they asked. See `checkpoint.ts`.
+   */
+  checkpoint?: FileSnapshot[];
+  /** True when the turn changed something too large to hold. Restoring is then incomplete, and says so. */
+  checkpointPartial?: boolean;
+  /** The to-do list the agent kept while answering. Never sent back to the model. */
+  plan?: Plan;
 }
 
 export interface SessionData {
@@ -157,6 +170,23 @@ export class Session {
     this.entries[i]!.text = text;
     this.entries.splice(i + 1);
     this.updatedAt = Date.now();
+  }
+
+  /**
+   * Rewind to just before a question, returning its text.
+   *
+   * Everything from that question onward leaves the transcript: the answers that followed were
+   * about a state of the repository that no longer exists, and keeping them would leave the model
+   * reasoning from a history the files contradict. The question itself comes back as text so the
+   * caller can put it in the composer — which is what makes this a rewind rather than a deletion.
+   */
+  rewindTo(id: string): string | undefined {
+    const i = this.entries.findIndex((e) => e.id === id);
+    if (i < 0) return undefined;
+    const text = this.entries[i]!.text;
+    this.entries.splice(i);
+    this.updatedAt = Date.now();
+    return text;
   }
 
   /** Drop the last answer so the same question can be asked again. */
