@@ -85,5 +85,6 @@
   "config.section.privacy": "Privacy & budget",
   "config.section.permissions": "Permissions",
   "config.section.context": "Context",
-  "config.section.completion": "Inline completion"
+  "config.section.completion": "Inline completion",
+  "command.attachOpenEditors.title": "Attach all open editors to the conversation"
 }

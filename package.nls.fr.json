@@ -85,5 +85,6 @@
   "config.section.privacy": "Confidentialité et budget",
   "config.section.permissions": "Permissions",
   "config.section.context": "Contexte",
-  "config.section.completion": "Complétion en ligne"
+  "config.section.completion": "Complétion en ligne",
+  "command.attachOpenEditors.title": "Joindre tous les éditeurs ouverts à la conversation"
 }

@@ -6,7 +6,7 @@
 // trusting a permission dialog.
 
 import { button, el, icon, ICON } from "./dom.js";
-import type { ToExtension, UiPermissionRule, UiState } from "../shared/protocol.js";
+import type { PolicyList, ToExtension, UiPermissionRule, UiState } from "../shared/protocol.js";
 import { t } from "../shared/i18n.js";
 
 const TOOL_LABELS: Record<string, string> = {
@@ -127,6 +127,33 @@ export function permissionsScreen(state: UiState, send: (m: ToExtension) => void
   }
   wrap.append(temp);
 
+  // ── The four lists ──────────────────────────────────────────────────────────────────────────
+  //
+  // They existed as settings and as two numbers on this screen — "3 allowed, 1 refused" — and to
+  // change one you had to know they were settings, find them among thirty-nine, and edit JSON. A
+  // list you can see the length of and not the contents of is a list nobody trusts.
+  //
+  // Refusals first, and visibly separated: the order is the rule. A denied path beats an allowed
+  // one whatever was written first, and a screen that put the permissions above the refusals would
+  // read as though the last word went to the wrong list.
+  wrap.append(
+    sectionTitle(
+      t("Never touch these"),
+      t("Whatever the scope above, and whatever is allowed below. A refusal always wins."),
+    ),
+  );
+  wrap.append(policyList(t("Paths"), "deniedPaths", state.policy.deniedPaths, send, true));
+  wrap.append(policyList(t("Commands"), "deniedCommands", state.policy.deniedCommands, send, true));
+
+  wrap.append(
+    sectionTitle(
+      t("Run these without asking"),
+      t("Named by hand, whatever the scope above says."),
+    ),
+  );
+  wrap.append(policyList(t("Paths"), "allowedPaths", state.policy.allowedPaths, send, false));
+  wrap.append(policyList(t("Commands"), "allowedCommands", state.policy.allowedCommands, send, false));
+
   wrap.append(
     sectionTitle(
       t("Add a permanent rule"),
@@ -166,6 +193,56 @@ export function permissionsScreen(state: UiState, send: (m: ToExtension) => void
       ),
     ),
   );
+  return wrap;
+}
+
+/**
+ * One list, with its entries and a way to add another.
+ *
+ * The entries carry their own remove button rather than an edit field: these are short strings that
+ * are easier to retype than to correct, and an inline editor over a list that governs what an agent
+ * may touch is a place for a typo to become a permission.
+ */
+function policyList(
+  label: string,
+  list: PolicyList,
+  entries: string[],
+  send: (m: ToExtension) => void,
+  denied: boolean,
+): HTMLElement {
+  const wrap = el("div", `policy-list${denied ? " denied" : ""}`);
+  const head = el("div", "policy-head");
+  head.append(el("span", "policy-label", label));
+  head.append(el("div", "spacer"));
+  head.append(
+    button({
+      icon: ICON.add,
+      label: t("Add"),
+      className: "btn tiny ghost",
+      title: denied ? t("Add something the agent may never touch") : t("Add something that runs without asking"),
+      onClick: () => send({ type: "addPolicyEntry", list }),
+    }),
+  );
+  wrap.append(head);
+
+  if (!entries.length) {
+    wrap.append(el("div", "policy-empty", t("Nothing listed.")));
+    return wrap;
+  }
+  for (const value of entries) {
+    const row = el("div", "policy-row");
+    row.append(el("code", "policy-value", value));
+    row.append(el("div", "spacer"));
+    row.append(
+      button({
+        icon: ICON.close,
+        title: t("Remove “{0}”", value),
+        className: "btn icon-only",
+        onClick: () => send({ type: "removePolicyEntry", list, value }),
+      }),
+    );
+    wrap.append(row);
+  }
   return wrap;
 }
 

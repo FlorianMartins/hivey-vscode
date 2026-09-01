@@ -3383,3 +3383,107 @@ pre.code code {
 .entry-actions .btn.icon-only.danger:hover {
   color: var(--vscode-errorForeground, var(--vscode-foreground));
 }
+
+/* ── A pinned exchange ────────────────────────────────────────────────────────────────────────
+ *
+ * An edge you can see down a transcript without reading anything, and a mark that does not fade.
+ * It used to say "pinned" in the muted colour inside the header row — which fades to nothing when
+ * the pointer leaves, so the one visible consequence of the button vanished a second after it was
+ * pressed. That is why the button "did nothing": it did, invisibly.
+ */
+.entry.pinned {
+  border-left: 2px solid var(--vscode-textLink-foreground, var(--vscode-focusBorder));
+  padding-left: var(--sp-2);
+  margin-left: -2px;
+}
+.entry-pin {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: var(--fs-meta);
+  color: var(--vscode-textLink-foreground, var(--vscode-foreground));
+  /* Never faded with the receipt: this one is a state of the message, not a reading about it. */
+  opacity: 1;
+}
+.entry-pin-ico {
+  width: 11px;
+  height: 11px;
+}
+.entry-actions .btn.icon-only.active {
+  color: var(--vscode-textLink-foreground, var(--vscode-foreground));
+  background: var(--hover);
+}
+
+/* ── The permission lists ─────────────────────────────────────────────────────────────────── */
+
+.policy-list {
+  margin: var(--sp-1) 0 var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+/* A refusal is the list that wins, so it is the list that carries the colour. */
+.policy-list.denied {
+  border-left: 2px solid var(--vscode-errorForeground, var(--border-strong));
+}
+.policy-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-1) var(--sp-2);
+  background: var(--surface);
+}
+.policy-label {
+  font-size: var(--fs-meta);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+.policy-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 2px var(--sp-2);
+}
+.policy-row + .policy-row {
+  border-top: 1px solid var(--border);
+}
+.policy-value {
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: var(--fs-meta);
+  color: var(--vscode-textPreformat-foreground, var(--vscode-foreground));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.policy-empty {
+  padding: var(--sp-1) var(--sp-2);
+  font-size: var(--fs-meta);
+  color: var(--muted);
+}
+
+/* ── Margins, narrower again ──────────────────────────────────────────────────────────────────
+ *
+ * The content runs almost to the panel's edge, which is what the editor's own chat does. The inset
+ * that remains is the one the composer's border needs to not sit on the frame; everything else is
+ * given back to the line.
+ */
+.transcript {
+  padding-left: var(--sp-1);
+  padding-right: var(--sp-1);
+}
+.composer {
+  padding-left: 2px;
+  padding-right: 2px;
+}
+.screen-lede,
+.screen-note {
+  padding-left: var(--sp-2);
+  padding-right: var(--sp-2);
+}
+.filter-bar,
+.history-list,
+.history-footer {
+  padding-left: var(--sp-1);
+  padding-right: var(--sp-1);
+}

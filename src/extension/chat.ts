@@ -54,6 +54,7 @@ import type {
   UiActiveEditor,
   UiSetup,
   UiSkill,
+  PolicyList,
   UiSkillGroup,
   UiWizard,
   UiState,
@@ -775,6 +776,25 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           this.permissions.forget(m.tool, m.prefix);
           this.sendState();
           break;
+        case "addPolicyEntry": {
+          const paths = m.list.endsWith("Paths");
+          const value = await vscode.window.showInputBox({
+            prompt: paths
+              ? t("A path or a glob, relative to the workspace — “src/generated/**”")
+              : t("The start of a command — “npm test”"),
+            placeHolder: paths ? "src/generated/**" : "npm test",
+            ignoreFocusOut: true,
+            validateInput: (text) => (text.trim() ? undefined : t("Empty.")),
+          });
+          if (!value?.trim()) break;
+          await this.updatePolicyList(m.list, (list) => [...new Set([...list, value.trim()])].sort());
+          break;
+        }
+
+        case "removePolicyEntry":
+          await this.updatePolicyList(m.list, (list) => list.filter((x) => x !== m.value));
+          break;
+
         case "setApprovalScope": {
           const config = vscode.workspace.getConfiguration(SECTION);
           // Turning approvals off entirely is worth one confirmation. Not a moral objection — it is
@@ -1136,6 +1156,37 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    */
   async reveal(): Promise<void> {
     await this.focus();
+  }
+
+  /**
+   * Attach every open tab, and say how many landed.
+   *
+   * A command as well as a menu row, for two reasons. It is worth having on a keybinding — it is
+   * the commonest bulk attachment there is. And it is the only way this path could be tested end to
+   * end: the menu row is a closure inside a quick pick, and a quick pick cannot be driven from a
+   * test, which is why three separate failures in this one feature were each found by a person
+   * rather than by the suite.
+   */
+  async attachOpenEditors(): Promise<number> {
+    const before = this.attachments.length;
+    await this.attach("openFiles");
+    return this.attachments.length - before;
+  }
+
+  /**
+   * One of the four lists, rewritten.
+   *
+   * Written to the WORKSPACE when there is one, because a denied path is usually about this
+   * repository — `migrations/**` means nothing in the next project — while the scope above it is a
+   * habit and stays global. Falling back to global when no folder is open, since the alternative is
+   * a write that throws.
+   */
+  private async updatePolicyList(list: PolicyList, change: (current: string[]) => string[]): Promise<void> {
+    const config = vscode.workspace.getConfiguration(SECTION);
+    const key = `permissions.${list}`;
+    const current = config.get<string[]>(key, []);
+    await config.update(key, change(current), writeTarget());
+    this.sendState();
   }
 
   /** Begin the guided start, from the title bar's `+`. */

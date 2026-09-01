@@ -2,7 +2,7 @@
   "name": "hivey-code",
   "displayName": "Hivey Code",
   "description": "%extension.description%",
-  "version": "0.17.0",
+  "version": "0.17.1",
   "publisher": "hivey",
   "license": "Apache-2.0",
   "repository": {
@@ -260,6 +260,12 @@
         "title": "%command.newSpecialisedSession.title%",
         "category": "Hivey Code",
         "icon": "$(list-selection)"
+      },
+      {
+        "command": "hiveyCode.attachOpenEditors",
+        "title": "%command.attachOpenEditors.title%",
+        "category": "Hivey Code",
+        "icon": "$(files)"
       }
     ],
     "menus": {

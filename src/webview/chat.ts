@@ -306,7 +306,7 @@ function wizardFoot(deps: ChatDeps, onNext: (() => void) | undefined, label: str
 function renderEntry(entry: UiEntry, state: UiState, deps: ChatDeps): HTMLElement {
   const wrap = el(
     "article",
-    `entry ${entry.role}${entry.included ? "" : " muted"}${entry.error ? " failed" : ""}`,
+    `entry ${entry.role}${entry.included ? "" : " muted"}${entry.error ? " failed" : ""}${entry.pinned ? " pinned" : ""}`,
   );
 
   // The way back to before this question: a rule across the transcript with the action on it,
@@ -330,7 +330,20 @@ function renderEntry(entry: UiEntry, state: UiState, deps: ChatDeps): HTMLElemen
   // and they were read on every turn by nobody. They now appear with the buttons, on hover, at the
   // far end of the row — the last thing on the line, which is where a total goes.
   if (!entry.included) head.append(el("span", "entry-tag", t("out of context")));
-  if (entry.pinned) head.append(el("span", "entry-tag", t("pinned")));
+  if (entry.pinned) {
+    // A mark, not a word, and never faded.
+    //
+    // Pinning worked and looked as though it did not: it printed "pinned" in the muted colour, in
+    // the row that fades to nothing when the pointer leaves — so the one visible consequence of the
+    // button disappeared a second after it was pressed. What a pinned message needs is what a
+    // pinned message has everywhere else: a mark that stays, and an edge you can see down the
+    // transcript without reading anything.
+    const tag = el("span", "entry-pin");
+    tag.append(icon("pin", "entry-pin-ico"));
+    tag.append(el("span", undefined, t("pinned")));
+    tag.title = t("Kept in the context when older exchanges are trimmed away.");
+    head.append(tag);
+  }
 
   // Under the message, not beside the name. In the header they competed with the model name and the
   // cost for a row that is already tight at a docked width, and they were the only thing there that
@@ -623,7 +636,11 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
     // chips beside it — outlined instead of filled — because it behaves differently: it follows the
     // active tab and disappears when you switch away, while a real attachment is something you
     // chose and that stays. A suggestion drawn as a decision is a suggestion people stop trusting.
-    if (state.implicit) {
+    // Not when the same file is already attached by hand. The capture that proved attaching works
+    // also showed `totals.ts` twice — once as the suggestion, once as the attachment — which reads
+    // as the panel having lost count.
+    const implicitAttached = state.implicit && state.attachments.some((a) => a.label === state.implicit!.label);
+    if (state.implicit && !implicitAttached) {
       const chip = el("span", `chip implicit${state.implicitOn ? "" : " off"}`);
       chip.append(icon("file", "chip-ico"));
       const cut = state.implicit.label.lastIndexOf("/");

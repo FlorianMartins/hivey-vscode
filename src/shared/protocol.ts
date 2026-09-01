@@ -178,6 +178,8 @@ export interface UiSetup {
   configured?: { provider: string; model: string; baseUrl: string };
 }
 
+export type PolicyList = "allowedPaths" | "allowedCommands" | "deniedPaths" | "deniedCommands";
+
 /** The standing policy: how much runs without asking, and what was listed by hand. */
 export interface UiApprovalPolicy {
   scope: "off" | "workspace" | "all";
@@ -325,6 +327,9 @@ export type ToExtension =
   | { type: "forgetPermission"; tool: string; prefix?: string }
   | { type: "clearSessionPermissions" }
   | { type: "setApprovalScope"; scope: "off" | "workspace" | "all" }
+  /** Add to, or remove from, one of the four path/command lists. */
+  | { type: "addPolicyEntry"; list: PolicyList }
+  | { type: "removePolicyEntry"; list: PolicyList; value: string }
   | { type: "openEgress" }
   | { type: "openCosts" }
   | { type: "openSettings" }

@@ -7,6 +7,9 @@ import * as fs from "node:fs/promises";
 // The settings namespace has one definition; a test that repeats it as a literal is a test that
 // keeps passing after a rename has broken the product.
 import { SECTION } from "../../extension/config.js";
+import { openFileUris } from "../../extension/models.js";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { suite, test } from "./tiny.js";
 
 const ID = "hivey.hivey-code";
@@ -26,6 +29,66 @@ suite("Hivey Code", () => {
     const registered = await vscode.commands.getCommands(true);
     const missing = declared.filter((c) => !registered.includes(c));
     assert.deepEqual(missing, [], `commands declared but not registered: ${missing.join(", ")}`);
+  });
+
+  /**
+   * "Attach all open editors" attached nothing, three times running.
+   *
+   * Each time the cause was different and each time I reasoned about it from the code instead of
+   * running it, which is how a fix can be correct, shipped, and still leave the feature broken.
+   * This opens real tabs in a real editor and asserts on what comes back — the only thing that
+   * could have settled it, and the thing that should have been written after the first report.
+   */
+  test("the open tabs are found, and they are the tabs and not the visible editors", async () => {
+    const ext = vscode.extensions.getExtension(ID)!;
+    await ext.activate();
+
+    const dir = await fs.mkdtemp(join(tmpdir(), "hivey-tabs-"));
+    const made: vscode.Uri[] = [];
+    for (const name of ["alpha.ts", "beta.ts", "gamma.ts"]) {
+      const file = vscode.Uri.file(join(dir, name));
+      await fs.writeFile(file.fsPath, `export const ${name.split(".")[0]} = 1;\n`, "utf8");
+      made.push(file);
+      // `preview: false` gives each its own tab; without it the editor reuses one and the third
+      // file closes the second, which would make this test pass for the wrong reason.
+      await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(file), { preview: false });
+    }
+
+    try {
+      const found = openFileUris().map((u) => u.fsPath);
+      for (const file of made) {
+        assert.ok(found.includes(file.fsPath), `${file.fsPath} is open in a tab and was not found`);
+      }
+
+      // The distinction that broke it the first time: only one of these is on screen, and all
+      // three are open.
+      assert.ok(
+        vscode.window.visibleTextEditors.length < made.length,
+        "this assertion is only meaningful while fewer editors are visible than tabs are open",
+      );
+
+      // And the one that broke it the second time: these files are outside any workspace folder,
+      // so a path rebuilt against the first folder would point nowhere.
+      assert.equal(vscode.workspace.workspaceFolders, undefined, "the harness opens no folder");
+      for (const uri of openFileUris()) {
+        const doc = await vscode.workspace.openTextDocument(uri);
+        assert.ok(doc.getText().length > 0, `${uri.fsPath} resolved to an empty document`);
+      }
+
+      // The whole path, not its first link. Finding the tabs was already proven above and the
+      // feature was still broken, twice — because everything after it (turning a tab into a
+      // context item, and the privacy check on the way) was never exercised by anything but a
+      // person clicking. This runs it.
+      const attached = (await vscode.commands.executeCommand<number>("hiveyCode.attachOpenEditors")) ?? 0;
+      assert.equal(attached, made.length, `attached ${attached} of ${made.length} open tabs`);
+
+      // Twice in a row attaches nothing new rather than duplicating the lot.
+      const again = (await vscode.commands.executeCommand<number>("hiveyCode.attachOpenEditors")) ?? 0;
+      assert.equal(again, 0, "the second pass duplicated attachments");
+    } finally {
+      await vscode.commands.executeCommand("workbench.action.closeAllEditors");
+      await fs.rm(dir, { recursive: true, force: true });
+    }
   });
 
   test("the interface language can be pinned independently of the editor", async () => {
@@ -202,6 +265,19 @@ suite("Screenshot", () => {
       await vscode.commands.executeCommand("hiveyCode.newSession");
       await vscode.commands.executeCommand("hiveyCode.askWith", "Does this function round correctly? What should change?");
       await announce("conversation");
+
+      // A screen showing what an attachment actually looks like. Three separate fixes to "attach
+      // all open editors" were verified by reasoning about the code, and the feature stayed broken
+      // for the person using it — because nothing in the suite ever LOOKED at the result. This
+      // opens real tabs and photographs the composer with them attached.
+      const dir = await fs.mkdtemp(join(tmpdir(), "hivey-ctx-"));
+      for (const name of ["invoice.ts", "rounding.ts", "totals.ts"]) {
+        const file = vscode.Uri.file(join(dir, name));
+        await fs.writeFile(file.fsPath, `export const ${name.split(".")[0]} = 1;\n`, "utf8");
+        await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(file), { preview: false });
+      }
+      await vscode.commands.executeCommand("hiveyCode.attachOpenEditors");
+      await announce("contexte");
       for (const [command, name] of [
         ["hiveyCode.setup", "setup"],
         ["hiveyCode.pickModel", "picker"],

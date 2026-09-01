@@ -138,7 +138,7 @@ function announced() {
 
 // Wait for the harness to name a screen, photograph it once it has settled, and move on. There is
 // no clock here beyond a timeout: the editor decides when it is ready, and says so.
-const SCREENS = ["conversation", "setup", "picker", "historique", "modeles", "permissions"];
+const SCREENS = ["conversation", "contexte", "setup", "picker", "historique", "modeles", "permissions"];
 const deadline = Date.now() + STARTUP + HOLD * (SCREENS.length + 2);
 for (const name of SCREENS) {
   let seen = false;

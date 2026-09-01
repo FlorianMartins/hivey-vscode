@@ -2,6 +2,42 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.17.1 — 2026-09-01
+
+### Added
+
+- **The permission lists can be edited from the panel.** Allowed and denied paths and commands were
+  settings, shown here as two numbers — "3 allowed, 1 refused" — and changing one meant knowing they
+  were settings, finding them among thirty-nine, and editing JSON. A list whose length you can see
+  and whose contents you cannot is a list nobody trusts. Refusals come first, because that is the
+  rule: a denied path beats an allowed one whatever was written first.
+- **"Attach all open editors" is a command** (`Hivey Code: Attach all open editors`), so it can go
+  on a keybinding — and so the path could be tested end to end. The menu row was a closure inside a
+  quick pick, which no test can drive, which is why three separate failures in this one feature were
+  each found by a person rather than by the suite.
+
+### Fixed
+
+- **Pinning looked as though it did nothing.** It worked: the state round-tripped and survived
+  trimming. What it showed for it was the word "pinned" in the muted colour, inside the header row
+  that fades to nothing when the pointer leaves — so the only visible consequence of the button
+  disappeared a second after it was pressed. A pinned exchange now carries a mark that does not
+  fade and an accented edge you can find down a transcript without reading anything.
+- **The open file appeared twice** when it had also been attached by hand — once as the suggestion,
+  once as the attachment. Found on a screenshot taken to prove attaching works, which it did.
+
+### Changed
+
+- **Narrower margins again**: the content runs almost to the panel's edge. What is left is the inset
+  the composer's border needs so as not to sit on the frame.
+
+### Verified
+
+- Three separate reports that "all open editors" attaches nothing. It is now covered by an
+  integration test that opens three real tabs in a real editor with no workspace folder, asserts
+  every one is found, runs the whole attach path through the new command, and asserts three
+  attachments arrive and a second pass adds none — and by a screenshot of the composer holding them.
+
 ## 0.17.0 — 2026-09-01
 
 ### Fixed

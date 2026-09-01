@@ -90,6 +90,11 @@ export function activate(context: vscode.ExtensionContext): void {
      * a modal list in the middle of the screen in answer to a click in the corner of a side bar:
      * the right list, in the wrong place, and one keystroke further from what was wanted.
      */
+    vscode.commands.registerCommand("hiveyCode.attachOpenEditors", async () => {
+      await chat.reveal();
+      return chat.attachOpenEditors();
+    }),
+
     vscode.commands.registerCommand("hiveyCode.newSpecialisedSession", async () => {
       await chat.reveal();
       chat.startWizard();
