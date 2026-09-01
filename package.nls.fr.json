@@ -77,5 +77,6 @@
   "command.setLanguage.title": "Langue du panneau",
   "config.agents.disabled": "Sous-agents qui ne peuvent pas être sollicités, par nom. Se règle depuis le bouton des compétences dans la zone de saisie, à côté des compétences.",
   "config.skills.groups": "Quelles familles de compétences sont en jeu : `general`, `frontend`, `javascript`, `python`, `java`, `dotnet`, `cpp`, `go`, `rust`, `flutter`, `data`, `devops`, `design`, `security`, `rpg`, `dds`, `db2i`, `cl`. Les familles sont **à activer** et seule `general` l'est au départ, pour que la liste `/` contienne ce que vous avez choisi plutôt que tout ce qui existe. Se règle depuis l'écran de nouvelle conversation ou le bouton des compétences.",
-  "command.newConversationMenu.title": "Nouvelle conversation…"
+  "submenu.newConversation.label": "Nouvelle conversation",
+  "command.newSpecialisedSession.title": "Conversation spécialisée"
 }

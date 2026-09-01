@@ -2,7 +2,7 @@
   "name": "hivey-code",
   "displayName": "Hivey Code",
   "description": "%extension.description%",
-  "version": "0.16.0",
+  "version": "0.16.1",
   "publisher": "hivey",
   "license": "Apache-2.0",
   "repository": {
@@ -256,10 +256,10 @@
         "icon": "$(globe)"
       },
       {
-        "command": "hiveyCode.newConversationMenu",
-        "title": "%command.newConversationMenu.title%",
+        "command": "hiveyCode.newSpecialisedSession",
+        "title": "%command.newSpecialisedSession.title%",
         "category": "Hivey Code",
-        "icon": "$(add)"
+        "icon": "$(list-selection)"
       }
     ],
     "menus": {
@@ -270,7 +270,7 @@
           "group": "navigation@0"
         },
         {
-          "command": "hiveyCode.newConversationMenu",
+          "submenu": "hiveyCode.newConversation",
           "when": "view == hiveyCode.chat || view == hiveyCode.chatSide",
           "group": "navigation@1"
         },
@@ -363,6 +363,16 @@
         {
           "command": "hiveyCode.explainDiagnostic",
           "when": "false"
+        }
+      ],
+      "hiveyCode.newConversation": [
+        {
+          "command": "hiveyCode.newSession",
+          "group": "1_new@0"
+        },
+        {
+          "command": "hiveyCode.newSpecialisedSession",
+          "group": "1_new@1"
         }
       ]
     },
@@ -734,7 +744,14 @@
           "markdownDescription": "%config.permissions.deniedCommands%"
         }
       }
-    }
+    },
+    "submenus": [
+      {
+        "id": "hiveyCode.newConversation",
+        "label": "%submenu.newConversation.label%",
+        "icon": "$(add)"
+      }
+    ]
   },
   "scripts": {
     "build": "node esbuild.mjs",

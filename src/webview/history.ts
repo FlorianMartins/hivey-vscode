@@ -154,7 +154,7 @@ function historyRow(row: UiHistoryRow, state: UiState, send: (m: ToExtension) =>
   if (row.id !== state.session.id) {
     tools.append(
       button({
-        icon: ICON.bringIn,
+        icon: ICON.forward,
         title: t("Use as context in the current conversation — attached, not opened"),
         className: "btn icon-only",
         onClick: (ev) => {

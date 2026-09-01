@@ -955,4 +955,8 @@ export const FR: Record<string, string> = {
   "The lines I have selected": "Les lignes que j’ai sélectionnées",
   "Tick the ones you want": "Cochez ceux que vous voulez",
   "Which open editors to attach?": "Quels éditeurs ouverts joindre ?",
+  "All open editors": "Tous les éditeurs ouverts",
+  "No editor is open": "Aucun éditeur ouvert",
+  "Open editors ({0})": "Éditeurs ouverts ({0})",
+  "What this answer cost.": "Ce que cette réponse a coûté.",
 };

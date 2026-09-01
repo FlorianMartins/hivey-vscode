@@ -81,6 +81,10 @@ const PATHS = {
   // plus sign — next to a wastebasket in the history, a plus reads as "new", which is the opposite
   // of what the button does.
   bringIn: "M8 2v7M5.2 6.2 8 9.2l2.8-3M3 11.5v2h10v-2",
+  // A forward arrow curving into a new line: "send this over there". The tray-with-a-down-arrow it
+  // replaces says "download", which is what people read it as — the direction was right and the
+  // destination was wrong.
+  forward: "M9.5 3 13.5 7 9.5 11M13 7H6.5A3.5 3.5 0 0 0 3 10.5V13",
   // An arrow turning back on itself: the workbench's own shape for "undo this", used here for
   // going back to before a question.
   restore: "M3.5 7.5a5 5 0 1 1 1.6 4.4M3.5 4v3.5H7",
@@ -139,7 +143,7 @@ export function icon(name: IconName, className = "ico"): SVGSVGElement {
 export const ICON: Record<
   | "send" | "stop" | "add" | "history" | "search" | "close" | "chevron" | "chevronLeft" | "file"
   | "check" | "cross" | "mute" | "unmute" | "pin" | "edit" | "copy" | "trash" | "settings"
-  | "shield" | "attach" | "sparkle" | "bringIn" | "restore" | "tools" | "chip" | "more" | "back",
+  | "shield" | "attach" | "sparkle" | "bringIn" | "forward" | "restore" | "tools" | "chip" | "more" | "back",
   IconName
 > = {
   send: "send",
@@ -165,6 +169,7 @@ export const ICON: Record<
   attach: "attach",
   sparkle: "sparkle",
   bringIn: "bringIn",
+  forward: "forward",
   restore: "restore",
   tools: "tools",
   chip: "chip",

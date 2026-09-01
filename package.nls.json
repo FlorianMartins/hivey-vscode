@@ -77,5 +77,6 @@
   "command.setLanguage.title": "Language of the panel",
   "config.agents.disabled": "Sub-agents that may not be dispatched, by name. Toggled from the skills button in the composer, alongside the skills.",
   "config.skills.groups": "Which families of skills are in play: `general`, `frontend`, `javascript`, `python`, `java`, `dotnet`, `cpp`, `go`, `rust`, `flutter`, `data`, `devops`, `design`, `security`, `rpg`, `dds`, `db2i`, `cl`. Families are **opt-in** and only `general` is on to begin with, so the `/` list holds what you chose rather than everything that exists. Set from the new-conversation screen or the composer's skills button.",
-  "command.newConversationMenu.title": "New conversation…"
+  "submenu.newConversation.label": "New conversation",
+  "command.newSpecialisedSession.title": "Specialised conversation"
 }

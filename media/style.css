@@ -2544,11 +2544,9 @@ pre.code::-webkit-scrollbar-track {
   background: transparent;
 }
 
-/* The way back to the end of the conversation. Floats over the transcript, above the composer,
-   and exists only while the reader is somewhere else. */
-.chat-screen {
-  position: relative;
-}
+/* The way back to the end of the conversation. Positioned against the TRANSCRIPT's box — see
+   `.transcript-wrap` — so it lands in the strip between the last answer and the composer rather
+   than against the whole screen, whose bottom edge is below the composer. */
 .jump-to-end {
   position: absolute;
   left: 50%;
@@ -3051,4 +3049,135 @@ pre.code code {
   direction: rtl;
   text-align: left;
   unicode-bidi: plaintext;
+}
+
+/* ── The answer, legible ──────────────────────────────────────────────────────────────────────
+ *
+ * Inline code gets its surface back, and this time it is safe to give it one. It was removed
+ * because a paragraph mentioning four symbols read as four highlighted chips — but the real
+ * offender was the block below, where VS Code's injected `code { background }` painted a band per
+ * line. With that gone, a tint on an identifier inside a sentence is what makes `;` read as a
+ * character from the code rather than as punctuation the writer forgot to remove.
+ *
+ * The rule that keeps it from shouting: a background and a colour, no border and almost no padding.
+ * Three treatments was what made it a chip; one and a half makes it a word set differently.
+ */
+.md-code {
+  background: var(--vscode-textCodeBlock-background, rgba(128, 128, 128, 0.16));
+  color: var(--vscode-textPreformat-foreground, var(--vscode-foreground));
+  border-radius: 4px;
+  padding: 0.5px 4px;
+  border: none;
+}
+
+/* The block gets its surface back too, for the same reason and with the same care: one fill on the
+   block, none on its header, and the `code` inside it explicitly cleared — that clear is what makes
+   this possible at all. */
+.code-block {
+  background: var(--vscode-textCodeBlock-background, rgba(128, 128, 128, 0.08));
+  border-color: var(--border-strong);
+}
+.code-head {
+  background: none;
+}
+.code-lang {
+  color: var(--vscode-descriptionForeground, var(--muted));
+  letter-spacing: 0.08em;
+}
+
+/* More air. The blocks of an answer were a step closer together than the turns around them, which
+   made a long reply read as one paragraph with headings in it. */
+.md > * + * {
+  margin-top: 18px;
+}
+.md > .md-h + * {
+  margin-top: var(--sp-3);
+}
+.md p {
+  line-height: 1.65;
+}
+.md-list {
+  line-height: 1.65;
+}
+.md-list li + li {
+  margin-top: var(--sp-2);
+}
+
+/* Colour, where it carries meaning rather than decorates.
+ *
+ * Four places, and each is a thing the eye should be able to find without reading: the marker that
+ * says "this is a list", the rule down a quotation, the identifier inside a sentence, and the link.
+ * Everything else stays the ordinary foreground — a page where six things are coloured has nothing
+ * coloured. */
+.md-list li::marker {
+  color: var(--vscode-textLink-foreground, var(--muted));
+  font-weight: 600;
+}
+.md-quote {
+  border-left-color: var(--vscode-textLink-foreground, var(--border-strong));
+  background: color-mix(in srgb, var(--vscode-textLink-foreground, var(--vscode-focusBorder)) 6%, transparent);
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+/* A top-level heading earns a hairline: it is the one break in an answer that means "new subject",
+   and at 1.35em alone it is easy to scroll past. */
+.md h3.md-h {
+  padding-bottom: var(--sp-1);
+  border-bottom: 1px solid var(--border);
+}
+.md h4.md-h {
+  color: var(--vscode-textLink-foreground, var(--vscode-foreground));
+}
+
+/* The receipt at the end of the button row: which model answered, and what it cost. Revealed with
+   the buttons, and pushed to the far end — a total goes at the end of a line, not at its start. */
+.entry-receipt {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-meta);
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+}
+.entry-receipt .entry-meta {
+  /* Already revealed by the row it sits in; a second opacity rule would fade it twice. */
+  opacity: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.entry-receipt .cost {
+  font-variant-numeric: tabular-nums;
+}
+.entry-actions {
+  /* The buttons at one end, the receipt at the other. */
+  width: 100%;
+}
+
+/* The empty conversation: a mark, a name, one line. Everything it used to ask is a click away in
+   the composer below or behind the `+`, which is what that second entry exists for. */
+.welcome {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  min-height: 55%;
+  text-align: center;
+  padding: var(--sp-5) var(--sp-4);
+}
+.welcome-mark {
+  color: var(--vscode-textLink-foreground, var(--vscode-focusBorder));
+  opacity: 0.9;
+}
+.welcome-title {
+  font-size: 1.15em;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+.welcome-lede {
+  margin: 0;
+  max-width: 34ch;
+  font-size: var(--fs-control);
+  color: var(--muted);
+  line-height: 1.55;
 }

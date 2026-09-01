@@ -71,8 +71,19 @@ function transcript(state: UiState, deps: ChatDeps): HTMLElement {
   return list;
 }
 
+/**
+ * An empty conversation.
+ *
+ * It held three mode cards, a family chooser and a list of tips — a screen of decisions in answer
+ * to someone who has just pressed "new conversation" and wants to type. Every one of those choices
+ * is still available: the mode and the model are in the composer below, and the families are behind
+ * the `+`'s other entry, which exists precisely so this screen does not have to ask.
+ *
+ * What is left is the mark and the one line that changes: whether anything will leave the machine.
+ */
 function welcome(state: UiState, deps: ChatDeps): HTMLElement {
   const w = el("div", "welcome");
+  w.append(hiveyMark());
   w.append(el("div", "welcome-title", "Hivey Code"));
   w.append(
     el(
@@ -83,63 +94,38 @@ function welcome(state: UiState, deps: ChatDeps): HTMLElement {
         : t("The model runs on your machine. Nothing you write here leaves the network."),
     ),
   );
-
-  const cards = el("div", "welcome-cards");
-  for (const m of MODES) {
-    const card = el("button", `welcome-card${state.mode === m.id ? " selected" : ""}`);
-    card.append(el("span", "welcome-card-title", m.label));
-    card.append(el("span", "welcome-card-hint", m.hint));
-    card.addEventListener("click", () => deps.send({ type: "setMode", mode: m.id }));
-    cards.append(card);
-  }
-  w.append(cards);
-
-  // ── What are you working on? ─────────────────────────────────────────────────────────────────
-  //
-  // Asked once, at the top of a new conversation, and answered locally — nothing is sent to compute
-  // it and nothing is sent to record it. It is the cheapest precision there is: choosing "Web"
-  // narrows thirty skills to the eight that apply, so the `/` list is the one for today's work and
-  // an answer arrives without a round trip spent establishing what kind of code this is.
-  //
-  // Chips rather than a dropdown, and multi-select rather than one: it is one click per family
-  // instead of two, several families are the normal case (a web app with a database), and every
-  // option is visible without opening anything. What the editor has open is pre-ticked, so for most
-  // people the correct answer is already given and the question is a confirmation.
-  const groups = el("div", "welcome-groups");
-  const head = el("div", "welcome-groups-head");
-  head.append(el("span", "welcome-groups-title", t("What are you working on?")));
-  head.append(el("span", "welcome-groups-hint", t("It picks the skills. Nothing is sent.")));
-  groups.append(head);
-
-  const chips = el("div", "welcome-chips");
-  const chosen = new Set(state.skillGroups.filter((g) => g.active && g.id !== "general").map((g) => g.id));
-  for (const group of state.skillGroups) {
-    // The general family is not offered: it applies whatever you are doing, and a checkbox that
-    // cannot usefully be unticked is a checkbox that teaches people to distrust the others.
-    if (group.id === "general") continue;
-    const chip = el("button", `welcome-chip${chosen.has(group.id) ? " on" : ""}${group.suggested ? " suggested" : ""}`);
-    chip.append(el("span", "welcome-chip-label", group.label));
-    chip.title = group.suggested ? t("{0} — looks like what you have open", group.hint) : group.hint;
-    chip.addEventListener("click", () => {
-      if (chosen.has(group.id)) chosen.delete(group.id);
-      else chosen.add(group.id);
-      deps.send({ type: "setSkillGroups", groups: [...chosen] });
-    });
-    chips.append(chip);
-  }
-  groups.append(chips);
-  w.append(groups);
-
-  const tips = el("ul", "welcome-tips");
-  for (const tip of [
-    t("“#” attaches a file · “/” opens the commands · ⏎ sends."),
-    t("A bad answer can leave the context without leaving the screen."),
-    t("Agent mode asks for your approval before every write and every command."),
-  ]) {
-    tips.append(el("li", undefined, tip));
-  }
-  w.append(tips);
   return w;
+}
+
+/**
+ * The hexagon, drawn rather than shipped as an image.
+ *
+ * A `<img>` would need a source in the panel's content policy, which forbids remote origins for
+ * good reasons and would have to be widened for a decoration. An inline path costs nothing, scales,
+ * and takes the theme's own foreground.
+ */
+function hiveyMark(): SVGSVGElement {
+  const NS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(NS, "svg");
+  svg.setAttribute("viewBox", "0 0 48 48");
+  svg.setAttribute("width", "44");
+  svg.setAttribute("height", "44");
+  svg.setAttribute("aria-hidden", "true");
+  svg.setAttribute("class", "welcome-mark");
+  for (const [d, width, opacity] of [
+    ["M24 4 41 14v20L24 44 7 34V14Z", "2", "1"],
+    ["M24 16 32 20.5v9L24 34l-8-4.5v-9Z", "1.6", "0.55"],
+  ] as const) {
+    const path = document.createElementNS(NS, "path");
+    path.setAttribute("d", d);
+    path.setAttribute("fill", "none");
+    path.setAttribute("stroke", "currentColor");
+    path.setAttribute("stroke-width", width);
+    path.setAttribute("stroke-linejoin", "round");
+    path.setAttribute("opacity", opacity);
+    svg.append(path);
+  }
+  return svg;
 }
 
 /**
@@ -290,8 +276,10 @@ function renderEntry(entry: UiEntry, state: UiState, deps: ChatDeps): HTMLElemen
   // block you have landed in is your question or its reply.
   head.append(el("span", `entry-mark ${entry.role}`, entry.role === "user" ? "\u25CF" : "\u25C6"));
   head.append(el("span", "entry-who", entry.role === "user" ? t("You") : "Hivey Code"));
-  if (entry.model && entry.role === "assistant") head.append(el("span", "entry-meta", entry.model));
-  if (entry.usdCost) head.append(el("span", "entry-meta", `${entry.usdCost.toFixed(4)} $`));
+  // The model and the cost are a receipt, and a receipt belongs at the bottom. In the header they
+  // sat between the name and the tags, competing for a row that is already tight at a docked width,
+  // and they were read on every turn by nobody. They now appear with the buttons, on hover, at the
+  // far end of the row — the last thing on the line, which is where a total goes.
   if (!entry.included) head.append(el("span", "entry-tag", t("out of context")));
   if (entry.pinned) head.append(el("span", "entry-tag", t("pinned")));
 
@@ -326,7 +314,7 @@ function renderEntry(entry: UiEntry, state: UiState, deps: ChatDeps): HTMLElemen
     // thing this replaces, and that loses what it was — an answer, from a model, at a moment —
     // and arrives as text the next conversation cannot tell from the user's own words.
     button({
-      icon: ICON.bringIn,
+      icon: ICON.forward,
       title: t("Use in another conversation"),
       className: "btn icon-only",
       onClick: () => deps.send({ type: "shareEntry", id: entry.id }),
@@ -370,6 +358,18 @@ function renderEntry(entry: UiEntry, state: UiState, deps: ChatDeps): HTMLElemen
       ),
     );
   }
+  const receipt = el("div", "entry-receipt");
+  if (entry.model && entry.role === "assistant") receipt.append(el("span", "entry-meta", entry.model));
+  if (entry.usdCost) {
+    const cost = el("span", "entry-meta cost", formatCost(entry.usdCost));
+    cost.title = t("What this answer cost.");
+    receipt.append(cost);
+  }
+  if (receipt.childElementCount) {
+    actions.append(el("div", "spacer"));
+    actions.append(receipt);
+  }
+
   wrap.append(actions);
   // And under the answer, where the reader is when they decide the whole direction was wrong.
   if (entry.role === "assistant" && entry.restoreId) {

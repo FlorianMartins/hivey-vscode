@@ -446,7 +446,11 @@ function showJumpButton(show: boolean): void {
     return;
   }
   if (existing) return;
-  const host = document.querySelector<HTMLElement>(".chat-screen");
+  // The transcript's own box, not the screen. I added that box for exactly this and then went on
+  // appending to `.chat-screen`, whose bottom edge is BELOW the composer — so the button was
+  // positioned against the wrong element and sat under the input. Two fixes ago the symptom was
+  // the same and the cause was different, which is why it kept looking unfixed.
+  const host = document.querySelector<HTMLElement>(".transcript-wrap");
   if (!host) return;
   const jump = button({
     icon: ICON.chevron,

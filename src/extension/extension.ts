@@ -83,31 +83,16 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("hiveyCode.newSession", () => chat.newSession()),
 
     /**
-     * Two ways to start, offered where the `+` already is.
+     * The guided start, as its own command.
      *
-     * The ordinary one stays first, because it is what almost every conversation wants: the base
-     * skills, no questions. The guided one exists for the conversation worth setting up — a mode, a
-     * subject, and the handful of skills that go with it — and asking those three questions costs
-     * nothing, since none of it is sent anywhere.
+     * The two ways to begin are a SUBMENU on the `+` in the title bar, declared in the manifest —
+     * so the choice opens under the button that was pressed. It was briefly a quick pick, which put
+     * a modal list in the middle of the screen in answer to a click in the corner of a side bar:
+     * the right list, in the wrong place, and one keystroke further from what was wanted.
      */
-    vscode.commands.registerCommand("hiveyCode.newConversationMenu", async () => {
-      const plain = {
-        label: "$(add) " + t("New conversation"),
-        detail: t("The base skills, nothing to answer."),
-        guided: false,
-      };
-      const guided = {
-        label: "$(list-selection) " + t("Specialised conversation…"),
-        detail: t("Choose what it may do, what it is about, and which skills — then ask."),
-        guided: true,
-      };
-      const picked = await vscode.window.showQuickPick([plain, guided], {
-        placeHolder: t("How should this conversation start?"),
-      });
-      if (!picked) return;
+    vscode.commands.registerCommand("hiveyCode.newSpecialisedSession", async () => {
       await chat.reveal();
-      if (picked.guided) chat.startWizard();
-      else chat.newSession();
+      chat.startWizard();
     }),
 
     vscode.commands.registerCommand("hiveyCode.completionAccepted", () => completion.noteAccepted()),

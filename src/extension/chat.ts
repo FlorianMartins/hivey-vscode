@@ -442,6 +442,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   }
 
   newSession(): void {
+    this.wizard = undefined;
     this.persist();
     const mode = this.session.mode;
     this.session = new Session();
@@ -503,6 +504,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           if (m.screen === "models" && !this.models.length) void this.loadModels();
           break;
         case "openSession": {
+          // Leaving cancels the guided start. It was setting up THIS conversation; carried into
+          // another one it would go on asking questions about a conversation that already exists,
+          // and its answers would land on the wrong session.
+          this.wizard = undefined;
           this.persist();
           const found = this.history().find((s) => s.id === m.id);
           if (found) this.session = new Session(found);
@@ -1331,87 +1336,123 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    */
   private async contextPicker(): Promise<void> {
     type Row = vscode.QuickPickItem & { run?: () => Promise<void> | void };
+    const rows: Row[] = [];
+    const sep = (label: string): Row => ({ label, kind: vscode.QuickPickItemKind.Separator });
+
+    // Each group is built in its own try. One of them reads the file system, another asks a
+    // language server, another lists tabs — and a failure in any of those used to take the whole
+    // picker with it, which is what "half the options have gone" looks like from the outside. A
+    // group that cannot be built is missing; the rest still opens.
+    const group = (build: () => void) => {
+      try {
+        build();
+      } catch (err) {
+        this.log.appendLine(`[context] ${(err as Error).message}`);
+      }
+    };
+
     const active = activeEditor();
     const files = openFiles();
-    const rows: Row[] = [];
 
-    const separator = (label: string): Row => ({ label, kind: vscode.QuickPickItemKind.Separator });
-
-    rows.push(separator(t("The editor")));
-    if (active?.hasSelection) {
+    group(() => {
+      rows.push(sep(t("The editor")));
+      if (active?.hasSelection) {
+        rows.push({
+          label: "$(selection) " + t("The lines I have selected"),
+          description: `${active.path} · ${active.selectedLines} ${active.selectedLines === 1 ? t("line") : t("lines")}`,
+          run: () => this.attach("selection"),
+        });
+      }
+      if (active) {
+        rows.push({
+          label: "$(file-code) " + t("The file I am looking at"),
+          description: active.path,
+          run: () => this.attach("editor"),
+        });
+      }
+      // Always offered, and empty is said rather than hidden: a row that vanishes when there is
+      // nothing to attach is indistinguishable from a feature that has been removed, which is
+      // exactly how this was reported.
       rows.push({
-        label: "$(selection) " + t("The lines I have selected"),
-        description: `${active.path} · ${active.selectedLines} ${active.selectedLines === 1 ? t("line") : t("lines")}`,
-        run: () => this.attach("selection"),
+        label: "$(files) " + (files.length ? t("All {0} open editors", files.length) : t("All open editors")),
+        description: files.length ? t("~{0} tokens", Math.round(files.length * 1200)) : t("No editor is open"),
+        ...(files.length ? { run: () => this.attach("openFiles") } : {}),
       });
-    }
-    if (active) {
-      // Named for what it is rather than for how much of it. "Whole file" answers a question about
-      // granularity that nobody has asked yet; what the reader wants to know is WHICH file, and the
-      // answer is "the one in front of you".
-      rows.push({
-        label: "$(file-code) " + t("The file I am looking at"),
-        description: active.path,
-        run: () => this.attach("editor"),
-      });
-    }
-    if (files.length) {
-      rows.push({
-        label: "$(files) " + t("All {0} open editors", files.length),
-        description: t("~{0} tokens", Math.round(files.length * 1200)),
-        run: () => this.attach("openFiles"),
-      });
-      rows.push({
-        label: "$(list-selection) " + t("Choose from the open editors…"),
-        description: t("Tick the ones you want"),
-        run: () => this.pickOpenEditors(),
-      });
-    }
-
-    rows.push(separator(t("Files & folders")));
-    rows.push({
-      label: "$(search) " + t("Files…"),
-      description: t("Search the whole workspace"),
-      run: () => this.searchAttachment("files"),
-    });
-    rows.push({
-      label: "$(symbol-method) " + t("Symbols…"),
-      description: t("A class, a function, a procedure — its lines, not its file"),
-      run: () => this.searchAttachment("symbols"),
-    });
-    rows.push({
-      label: "$(folder-opened) " + t("Import from disk…"),
-      description: t("Even outside the workspace"),
-      run: () => this.attach("browse"),
+      if (files.length > 1) {
+        rows.push({
+          label: "$(list-selection) " + t("Choose from the open editors…"),
+          description: t("Tick the ones you want"),
+          run: () => this.pickOpenEditors(),
+        });
+      }
     });
 
-    // Files attached earlier in this session. The editor's "recently opened" list is behind an
-    // internal command, and what is wanted here is narrower anyway: the handful of files this
-    // conversation keeps coming back to, which is a list we already have.
-    const recentFiles = this.recentAttachments.filter((path) => !files.some((f) => f.path === path)).slice(0, 6);
-    if (recentFiles.length) {
-      rows.push(separator(t("Recent")));
+    // The tabs themselves, right here. Two clicks to attach one open file was one more than the
+    // old webview menu needed, and that menu listed them inline for a reason: picking the file you
+    // are switching between is the commonest thing anyone does with this.
+    group(() => {
+      if (!files.length) return;
+      rows.push(sep(t("Open editors ({0})", files.length)));
+      for (const f of files.slice(0, 15)) {
+        rows.push({
+          label: "$(file) " + f.path,
+          description: f.active ? t("active") : f.dirty ? t("edited") : "",
+          run: () => this.onMessage({ type: "attachPath", path: f.path }),
+        });
+      }
+    });
+
+    group(() => {
+      rows.push(sep(t("Files & folders")));
+      rows.push({
+        label: "$(search) " + t("Files…"),
+        description: t("Search the whole workspace"),
+        run: () => this.searchAttachment("files"),
+      });
+      rows.push({
+        label: "$(symbol-method) " + t("Symbols…"),
+        description: t("A class, a function, a procedure — its lines, not its file"),
+        run: () => this.searchAttachment("symbols"),
+      });
+      rows.push({
+        label: "$(folder-opened) " + t("Import from disk…"),
+        description: t("Even outside the workspace"),
+        run: () => this.attach("browse"),
+      });
+    });
+
+    group(() => {
+      const recentFiles = this.recentAttachments.filter((path) => !files.some((f) => f.path === path)).slice(0, 6);
+      if (!recentFiles.length) return;
+      rows.push(sep(t("Recent")));
       for (const path of recentFiles) {
         rows.push({ label: "$(history) " + path, run: () => this.onMessage({ type: "attachPath", path }) });
       }
-    }
+    });
 
-    rows.push(separator(t("The repository")));
-    for (const [icon, label, kind] of [
-      ["$(list-tree)", t("Codebase"), "codebase"],
-      ["$(git-compare)", t("Changes"), "changes"],
-      ["$(warning)", t("Problems"), "problems"],
-      ["$(terminal)", t("Terminal selection"), "terminal"],
-    ] as const) {
-      rows.push({ label: `${icon} ${label}`, run: () => this.attachMention(kind) });
-    }
+    group(() => {
+      rows.push(sep(t("The repository")));
+      for (const [icon, label, kind] of [
+        ["$(list-tree)", t("Codebase"), "codebase"],
+        ["$(git-compare)", t("Changes"), "changes"],
+        ["$(warning)", t("Problems"), "problems"],
+        ["$(terminal)", t("Terminal selection"), "terminal"],
+      ] as const) {
+        rows.push({ label: `${icon} ${label}`, run: () => this.attachMention(kind) });
+      }
+    });
 
-    // The rules the repository sets for the assistant. Worth attaching explicitly when a question
-    // is ABOUT them — "why did you format it that way" — since otherwise they are only ever in the
-    // cacheable prefix where the user cannot see them.
-    const instructions = await instructionFiles();
-    if (instructions.length) {
-      rows.push(separator(t("Instructions")));
+    // Asynchronous, so it is resolved before the loop rather than inside it — a `group` callback
+    // that returned a promise would be a group whose failures nothing catches.
+    let instructions: string[] = [];
+    try {
+      instructions = await instructionFiles();
+    } catch {
+      /* no folder, or unreadable: the group simply does not appear */
+    }
+    group(() => {
+      if (!instructions.length) return;
+      rows.push(sep(t("Instructions")));
       for (const path of instructions) {
         rows.push({
           label: "$(law) " + path,
@@ -1419,14 +1460,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           run: () => this.onMessage({ type: "attachPath", path }),
         });
       }
-    }
+    });
 
-    const conversations = this.history()
-      .filter((x) => x.id !== this.session.id)
-      .sort((a, b) => b.updatedAt - a.updatedAt)
-      .slice(0, 8);
-    if (conversations.length) {
-      rows.push(separator(t("Conversations")));
+    group(() => {
+      const conversations = this.history()
+        .filter((x) => x.id !== this.session.id)
+        .sort((a, b) => b.updatedAt - a.updatedAt)
+        .slice(0, 8);
+      if (!conversations.length) return;
+      rows.push(sep(t("Conversations")));
       for (const row of conversations) {
         rows.push({
           label: "$(comment-discussion) " + (row.title || t("untitled")),
@@ -1434,7 +1476,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           run: () => this.onMessage({ type: "useSessionAsContext", id: row.id }),
         });
       }
-    }
+    });
 
     const picked = await vscode.window.showQuickPick(rows, {
       placeHolder: t("Add context to the next question"),
@@ -1444,6 +1486,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   }
 
   /**
+   * Which of the open tabs to attach.  /**
    * Which of the open tabs to attach.
    *
    * "All of them" and "this one" were the only two offers, and between a dozen tabs and one file

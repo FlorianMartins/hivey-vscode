@@ -2,6 +2,47 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.16.1 — 2026-09-01
+
+### Fixed
+
+- **The context picker had lost most of itself.** Every group was built in one `try`, so a failure
+  in any of them — the file system, a language server, the tab list — took the whole picker with it
+  and left a handful of rows. Each group is now built independently: one that cannot be built is
+  missing, the rest still opens. The open editors are listed **inline** again, so attaching the file
+  you are switching between is one click rather than two, and "All open editors" is always shown —
+  saying "no editor is open" rather than vanishing, because a row that disappears when there is
+  nothing to attach is indistinguishable from a feature that has been removed.
+- **The "latest" button, for the third time.** The first fix moved it off a hand-measured offset,
+  the second gave the transcript a box to hold it — and it was still being appended to the SCREEN,
+  whose bottom edge is below the composer. Same symptom, a different cause each time, which is why
+  it kept looking unfixed.
+- **A specialised conversation survived being left.** Opening another conversation from the history
+  left the guided start running over it, still asking questions about a conversation that already
+  existed. It ends when you leave.
+- **Inline code looked like raw markdown.** Its background was removed in 0.14.0 to stop a paragraph
+  reading as a row of chips — but the real offender was the block below it, where VS Code's injected
+  `code { background }` painted a band per line. With that fixed, a tint on an identifier is what
+  makes `;` read as a character from the code rather than as stray punctuation. Code blocks get
+  their surface back for the same reason.
+
+### Changed
+
+- **The `+` is a dropdown, not a dialog.** Two ways to start, under the button that was pressed —
+  it was briefly a quick pick, which answers a click in the corner of a side bar with a modal list
+  in the middle of the screen.
+- **An empty conversation is empty**: the mark, the name, and the one line that changes — whether
+  anything leaves the machine. It held three mode cards, a family chooser and a list of tips, in
+  answer to someone who had just pressed "new conversation" and wanted to type. All of it is still
+  one click away, in the composer or behind the `+`.
+- **More air and more colour in answers**: wider gaps between blocks, a longer line height, coloured
+  list markers, an accented quotation, a hairline under a top-level heading.
+- **The model and the cost moved to the button row**, at its far end and on hover. In the header
+  they competed with the name and the tags for a row that is tight at a docked width, and were read
+  on every turn by nobody.
+- **"Use in another conversation"** takes a forward arrow. The tray-with-a-down-arrow said
+  "download", which is what people read it as.
+
 ## 0.16.0 — 2026-09-01
 
 ### Added
