@@ -86,7 +86,9 @@ const PATHS = {
   restore: "M3.5 7.5a5 5 0 1 1 1.6 4.4M3.5 4v3.5H7",
   // A spanner: the workbench's own mark for "configure the tools this thing may use", which is
   // exactly what the skills picker is.
-  tools: "M10.5 2a3.5 3.5 0 0 0-3.2 4.9L2.6 11.6a1.4 1.4 0 0 0 2 2l4.7-4.7A3.5 3.5 0 1 0 10.5 2Z",
+  // A wand with a spark: what a skill IS — a named thing you invoke that changes what the assistant
+  // does. The spanner it replaces says "settings", which sent people looking for a preferences page.
+  tools: "M2.5 13.5 10 6M9 5l2 2M12 2v2M11 3h2M12.5 7.5v1.5M11.75 8.25h1.5",
   // A small chip: the model, and where it runs.
   chip: "M5.5 5.5h5v5h-5zM3 6.5h2.5M3 9.5h2.5M10.5 6.5H13M10.5 9.5H13M6.5 3v2.5M9.5 3v2.5M6.5 10.5V13M9.5 10.5V13",
   more: "M4 8a1 1 0 1 0 0-.01M8 8a1 1 0 1 0 0-.01M12 8a1 1 0 1 0 0-.01",

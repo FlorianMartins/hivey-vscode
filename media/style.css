@@ -2015,22 +2015,41 @@ pre.code {
   /* Except under a heading, which belongs to what follows it. */
   margin-top: var(--sp-2);
 }
+/* Headings are SIZE, not decoration.
+ *
+ * They had an accent bar down the left instead of a larger type size — the reasoning being that a
+ * bigger heading costs a line in a narrow panel. It cost more than it saved: every heading looked
+ * like a quoted block or a callout, which is a different thing entirely, and a document made of
+ * boxes reads as a form. A heading is bigger and heavier than what follows it; that is the whole
+ * convention, everyone already has it, and it needs no border to work. */
 .md-h {
-  margin: var(--sp-4) 0 var(--sp-2);
+  margin: var(--sp-5) 0 var(--sp-2);
   font-weight: 600;
   line-height: 1.3;
-  /* An accent on the leading edge rather than a larger type size. In a 400 px panel a heading two
-     steps up in size costs a line of body text and reads as shouting; a rule the eye catches on
-     costs nothing and finds the section just as fast. */
-  padding-left: var(--sp-3);
-  border-left: 2px solid var(--vscode-textLink-foreground, var(--vscode-focusBorder));
+  padding-left: 0;
+  border-left: none;
+  color: var(--vscode-foreground);
 }
 .md h3.md-h {
-  font-size: 15px;
+  font-size: 1.35em;
+  letter-spacing: -0.01em;
 }
 .md h4.md-h {
-  font-size: 13px;
-  color: var(--vscode-foreground);
+  font-size: 1.15em;
+}
+.md h5.md-h {
+  font-size: 1em;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.md h6.md-h {
+  font-size: 0.92em;
+  color: var(--muted);
+}
+/* The first heading of an answer has nothing above it to be separated from. */
+.md > .md-h:first-child {
+  margin-top: 0;
 }
 /* An identifier inside a sentence. Tinted and set on its own surface so `readSettings()` reads as a
    thing in the code rather than as an emphasised word. */
@@ -2521,11 +2540,12 @@ pre.code::-webkit-scrollbar-track {
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
-  /* At the bottom of the TRANSCRIPT, which is the gap between the last answer and the composer —
-     wherever the composer happens to end. It was pinned to the screen with a hand-measured offset,
-     so it sank into the composer the moment that grew a row, and a measurement like that is wrong
-     again on the next change nobody connects to it. */
-  bottom: var(--sp-2);
+  /* In the strip the transcript reserves for it, between the last answer and the composer. Twice
+     now this button has ended up over something: pinned to the screen it sank behind the composer
+     when that grew a row, and floating at the transcript's edge it covered the last line of the
+     answer. Reserving the space is the only arrangement where it cannot overlap anything, because
+     nothing else is ever drawn there. */
+  bottom: 0;
   z-index: 5;
   padding: 3px var(--sp-3);
   border-radius: 999px;
@@ -2802,15 +2822,94 @@ pre.code code {
 .btn.provider.remote {
   color: var(--vscode-foreground);
 }
+/* No frames. These are two words and a chevron under the box, and a border around each turned the
+   row into a pair of form fields — the heaviest thing on a panel whose whole surface is otherwise
+   flat. What says "this is a control" is the chevron and the hover, which is what the workbench
+   does with its own status-bar items. */
 .btn.tiny.provider,
 .btn.tiny.approval-scope {
   padding: 1px var(--sp-2);
   flex: 0 1 auto;
   min-width: 0;
+  border: none;
+  background: none;
+}
+.btn.tiny.provider:hover,
+.btn.tiny.approval-scope:hover {
+  background: var(--hover);
 }
 .btn.tiny.provider .lbl,
 .btn.tiny.approval-scope .lbl {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* ── What are you working on? ─────────────────────────────────────────────────────────────────
+ *
+ * The one question a new conversation asks, answered locally. Chips because every option is then
+ * visible without opening anything, and because several families at once is the normal case.
+ */
+.welcome-groups {
+  margin: var(--sp-4) 0 var(--sp-2);
+  padding: var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+.welcome-groups-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: var(--sp-2);
+}
+.welcome-groups-title {
+  font-size: var(--fs-control);
+  font-weight: 600;
+}
+.welcome-groups-hint {
+  font-size: var(--fs-meta);
+  color: var(--muted);
+}
+.welcome-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+}
+.welcome-chip {
+  font-family: inherit;
+  font-size: var(--fs-meta);
+  padding: 2px var(--sp-2);
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.welcome-chip:hover {
+  background: var(--hover);
+  color: var(--vscode-foreground);
+}
+/* Chosen: filled, in the accent the workbench already uses for a selected thing. */
+.welcome-chip.on {
+  background: color-mix(in srgb, var(--vscode-textLink-foreground, var(--vscode-focusBorder)) 20%, transparent);
+  border-color: color-mix(in srgb, var(--vscode-textLink-foreground, var(--vscode-focusBorder)) 55%, transparent);
+  color: var(--vscode-foreground);
+}
+/* Suggested but not chosen: outlined in the accent, so the guess is visible as a guess rather than
+   applied silently. Someone who agrees clicks it; someone who does not, ignores it. */
+.welcome-chip.suggested:not(.on) {
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--vscode-textLink-foreground, var(--vscode-focusBorder)) 45%, transparent);
+  color: var(--vscode-foreground);
+}
+
+/* The strip the "latest" button lives in: always there, empty when the button is not needed. Its
+   height is the button's, so nothing moves when the button appears. */
+.transcript-wrap {
+  padding-bottom: 26px;
+}
+.transcript {
+  /* The last answer stops above the strip rather than scrolling under it. */
+  padding-bottom: var(--sp-3);
 }

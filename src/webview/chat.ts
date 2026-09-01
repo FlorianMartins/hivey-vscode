@@ -88,6 +88,42 @@ function welcome(state: UiState, deps: ChatDeps): HTMLElement {
   }
   w.append(cards);
 
+  // ── What are you working on? ─────────────────────────────────────────────────────────────────
+  //
+  // Asked once, at the top of a new conversation, and answered locally — nothing is sent to compute
+  // it and nothing is sent to record it. It is the cheapest precision there is: choosing "Web"
+  // narrows thirty skills to the eight that apply, so the `/` list is the one for today's work and
+  // an answer arrives without a round trip spent establishing what kind of code this is.
+  //
+  // Chips rather than a dropdown, and multi-select rather than one: it is one click per family
+  // instead of two, several families are the normal case (a web app with a database), and every
+  // option is visible without opening anything. What the editor has open is pre-ticked, so for most
+  // people the correct answer is already given and the question is a confirmation.
+  const groups = el("div", "welcome-groups");
+  const head = el("div", "welcome-groups-head");
+  head.append(el("span", "welcome-groups-title", t("What are you working on?")));
+  head.append(el("span", "welcome-groups-hint", t("It picks the skills. Nothing is sent.")));
+  groups.append(head);
+
+  const chips = el("div", "welcome-chips");
+  const chosen = new Set(state.skillGroups.filter((g) => g.active && g.id !== "general").map((g) => g.id));
+  for (const group of state.skillGroups) {
+    // The general family is not offered: it applies whatever you are doing, and a checkbox that
+    // cannot usefully be unticked is a checkbox that teaches people to distrust the others.
+    if (group.id === "general") continue;
+    const chip = el("button", `welcome-chip${chosen.has(group.id) ? " on" : ""}${group.suggested ? " suggested" : ""}`);
+    chip.append(el("span", "welcome-chip-label", group.label));
+    chip.title = group.suggested ? t("{0} — looks like what you have open", group.hint) : group.hint;
+    chip.addEventListener("click", () => {
+      if (chosen.has(group.id)) chosen.delete(group.id);
+      else chosen.add(group.id);
+      deps.send({ type: "setSkillGroups", groups: [...chosen] });
+    });
+    chips.append(chip);
+  }
+  groups.append(chips);
+  w.append(groups);
+
   const tips = el("ul", "welcome-tips");
   for (const tip of [
     t("“#” attaches a file · “/” opens the commands · ⏎ sends."),
@@ -154,6 +190,15 @@ function renderEntry(entry: UiEntry, state: UiState, deps: ChatDeps): HTMLElemen
   }
   actions.append(
     button({ icon: ICON.copy, title: t("Copy"), className: "btn icon-only", onClick: () => deps.send({ type: "copy", text: entry.text }) }),
+    // Sending one message into another conversation. Copying it out and pasting it back is the
+    // thing this replaces, and that loses what it was — an answer, from a model, at a moment —
+    // and arrives as text the next conversation cannot tell from the user's own words.
+    button({
+      icon: ICON.bringIn,
+      title: t("Use in another conversation"),
+      className: "btn icon-only",
+      onClick: () => deps.send({ type: "shareEntry", id: entry.id }),
+    }),
     button({ icon: ICON.trash, title: t("Delete permanently"), className: "btn icon-only", onClick: () => deps.send({ type: "dropEntry", id: entry.id }) }),
   );
   wrap.append(head);
@@ -194,6 +239,19 @@ function renderEntry(entry: UiEntry, state: UiState, deps: ChatDeps): HTMLElemen
     );
   }
   wrap.append(actions);
+  // And under the answer, where the reader is when they decide the whole direction was wrong.
+  if (entry.role === "assistant" && entry.restoreId) {
+    wrap.append(
+      checkpointRule(
+        {
+          id: entry.restoreId,
+          checkpointFiles: entry.checkpointFiles ?? 0,
+          ...(entry.checkpointPartial ? { checkpointPartial: true } : {}),
+        },
+        deps,
+      ),
+    );
+  }
   return wrap;
 }
 
@@ -266,7 +324,7 @@ const MARKS: Record<string, string> = {
  * only one that puts files back, and something that overwrites the working tree should never be
  * discovered by accident.
  */
-function checkpointRule(entry: UiEntry, deps: ChatDeps): HTMLElement {
+function checkpointRule(entry: Pick<UiEntry, "id" | "checkpointFiles" | "checkpointPartial">, deps: ChatDeps): HTMLElement {
   const wrap = el("div", "checkpoint-rule");
   const action = button({
     icon: ICON.restore,
@@ -440,8 +498,12 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
   // separate buttons for about an hour, and the cost was immediate and measurable — the model name
   // collapsed to "qwe…" because every icon in this row is width the one label carrying real
   // information does not have. Copilot has one configure affordance for the same reason.
-  left.append(contextButton(state, deps), toolsButton(state, deps), modeButton(state, deps), modelButton(state, deps));
+  // Order: what to attach, what it may do, which model, how hard it thinks — then the skills.
+  // Skills sit last because they are the one control that changes what `/` offers rather than what
+  // this message does, and because that is where the user asked for it.
+  left.append(contextButton(state, deps), modeButton(state, deps), modelButton(state, deps));
   if (state.reasoningAvailable) left.append(reasoningButton(state, deps));
+  left.append(toolsButton(state, deps));
   bar.append(left);
 
   const right = el("div", "toolbar-group end");
@@ -598,7 +660,7 @@ function toolsButton(state: UiState, deps: ChatDeps): HTMLElement {
   const off = state.skills.filter((sk) => !sk.enabled).length;
   return button({
     icon: ICON.tools,
-    title: off ? t("Skills — {0} switched off", off) : t("Configure skills…"),
+    title: off ? t("Skills and sub-agents — {0} switched off", off) : t("Skills and sub-agents…"),
     className: `btn ghost icon-only${off ? " has-off" : ""}`,
     onClick: () => deps.send({ type: "openToolsPicker" }),
   });

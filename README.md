@@ -44,7 +44,7 @@ that does leave is **reversibly pseudonymised** first.
 | **Agent mode** | Reads the repository, searches it, consults the **editor's diagnostics**, edits files and proposes commands — **one approval per action**, a diff before every write, everything in the undo stack. |
 | **Permissions** | Per action and per shape of action: “allow once”, “for this conversation”, “always”. Allowing `npm test` does not allow `npm publish`. A dedicated screen separates what is permanent from what expires. |
 | **Reasoning** | An adjustable thinking budget (direct / brief / standard / deep), translated per provider — `reasoning.effort` on OpenRouter, a token budget on Anthropic. The thinking is shown in a collapsed block and never sent back to the model. |
-| **Terminal** | The `hivey-code` command (short alias `hivey`): the same core in a REPL, with command output actually captured and a diff printed before every write. Opened from the editor, it inherits the model, the address **and the key** you are already using. |
+| **Terminal** | The `hivey-code` command (short alias `hivey`): the same core in a REPL, with command output actually captured and a diff printed before every write. Launched from a shell, not from the editor. |
 | **In the editor** | `Ctrl+I` rewrites the selection in place · right-click → ask about the selection · commit message written from the staged diff · “explain the terminal output”. |
 | **Quick fixes** | On an error reported by your language server: “Fix with Hivey Code” and “Explain this problem”. The compiler says **what** and **where**; the model only has to fix it — which is what makes a small local model enough for most everyday cases. |
 | **Context notation** | `#file:`, `#selection`, `#changes`, `#problems`, `#codebase`, `#terminal`, `#sym:` — Copilot's notation, because you should not have to learn a second one. Resolved **on your machine** before anything is sent, which is what lets `#changes` attach unreleased code to a conversation with a local model. |
@@ -273,10 +273,9 @@ hivey "why is this test flaky?"   # one-shot question
 Configuration comes from `.hiveycode.json` (working directory, then `~`), so a project can commit its
 team configuration without committing a key (`apiKeyEnv` names the environment variable).
 
-From the editor, **Hivey Code: Open Hivey Code in the terminal** starts it with the model, the
-address and the key the sidebar is using — the key travelling in the process environment, never on
-the command line, and only when the endpoint is remote. If no key is stored for a remote endpoint,
-it says so *before* opening rather than failing on your first question.
+It is configured through `HIVEY_CODE_PROVIDER`, `HIVEY_CODE_MODEL`, `HIVEY_CODE_URL` and
+`HIVEY_CODE_KEY`, or through `.hiveycode.json`. There is no longer a command that launches it from
+the editor: it did not work reliably enough to keep, and a button that fails is worse than no button.
 
 REPL commands: `/context` lists the exchanges, `/mute 3` takes one out of the context without
 deleting it, `/forget 3` deletes it, `/mode` switches between chat, plan and agent, `/cost` shows

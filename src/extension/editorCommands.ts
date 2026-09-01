@@ -7,7 +7,6 @@
 
 import * as vscode from "vscode";
 import { t } from "../shared/i18n.js";
-import { missingKey, terminalEnvironment } from "../cli/env.js";
 import { runTurn } from "../core/agent/loop.js";
 import { isLocalEndpoint, redact, Vault } from "../core/redaction/index.js";
 import { headToTokens } from "../core/util/tokens.js";
@@ -141,53 +140,6 @@ export function registerEditorCommands(context: vscode.ExtensionContext, deps: E
 
     vscode.commands.registerCommand("hiveyCode.askWith", async (instruction: string) => {
       await deps.chat.focusWithPrompt(instruction, deps.workspace.activeContext());
-    }),
-
-    // `hivey-code` in the integrated terminal — the same assistant, where the work already is.
-    vscode.commands.registerCommand("hiveyCode.openTerminal", async () => {
-      const settings = readSettings();
-      const script = vscode.Uri.joinPath(deps.extensionUri, "dist", "cli.js").fsPath;
-      const provider = settings.chat.provider;
-      const baseUrl = settings.endpoints[provider] || settings.endpoints.local;
-      const apiKey = await deps.keys.get(provider);
-      const target = {
-        provider,
-        model: settings.chat.model,
-        baseUrl,
-        isLocal: isLocalEndpoint(baseUrl),
-        ...(apiKey ? { apiKey } : {}),
-      };
-
-      // Said before the terminal opens, not after the first question fails. This is the exact
-      // shape the feature was broken in for months: the client started, looked healthy, and
-      // answered the first question with `HTTP 401 Unauthorized` — which reads as a broken
-      // terminal rather than as a missing key.
-      if (missingKey(target)) {
-        const store = t("Store a key");
-        const answer = await vscode.window.showWarningMessage(
-          t("{0} needs a key and none is stored. The terminal would open and fail on the first question.", provider),
-          store,
-          t("Open anyway"),
-        );
-        if (answer === store) {
-          await vscode.commands.executeCommand("hiveyCode.setApiKey");
-          return;
-        }
-        if (answer !== t("Open anyway")) return;
-      }
-
-      // A fresh terminal every time. Reusing one by name looked tidy and was wrong: the
-      // configuration travels in the environment, and the environment of a terminal is fixed when
-      // it is created — so changing model in the sidebar left the reused terminal on the old one,
-      // silently.
-      const terminal = vscode.window.createTerminal({
-        name: "Hivey Code",
-        env: terminalEnvironment(target),
-      });
-      terminal.show();
-      // Windows shells split on spaces before quoting is considered, and both the editor's path and
-      // the extension's path routinely contain them ("Program Files", "Application Support").
-      terminal.sendText(`${quote(process.execPath)} ${quote(script)}`, true);
     }),
 
     vscode.commands.registerCommand("hiveyCode.explainTerminalSelection", async () => {

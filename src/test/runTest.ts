@@ -8,7 +8,15 @@ import { resolve } from "node:path";
 async function main(): Promise<void> {
   try {
     await runTests({
-      extensionDevelopmentPath: resolve(__dirname, "../../"),
+      // `dist-integration/runTest.js`, so one level up is the repository — not two.
+      //
+      // It said `../../`, which is the repository's PARENT. VS Code does not fail on a development
+      // path with no extension in it: it scans for nested ones, finds this repository, and caches
+      // the extension description it resolves. Everything appeared to work, and the cached
+      // description is what the screenshots were being taken of — so a change to the panel could be
+      // built, be present in the bundle, and not be on the picture, with nothing anywhere saying
+      // why. A wrong path that still works is worse than one that does not.
+      extensionDevelopmentPath: resolve(__dirname, ".."),
       extensionTestsPath: resolve(__dirname, "./suite/index.js"),
       // No workspace, no telemetry, no other extension: whatever fails here is ours.
       launchArgs: [

@@ -88,6 +88,29 @@ function clip(raw: string, path: string): Instructions {
 }
 
 /** The block appended to the system prompt, or an empty string when there is nothing to say. */
+/**
+ * The instruction files that exist, as workspace-relative paths.
+ *
+ * Every candidate rather than only the winning one: the prompt uses the first that exists, but the
+ * context picker is answering a different question — "which of these can I look at" — and a file
+ * that is being shadowed is exactly the one somebody needs to open to find out why.
+ */
+export async function instructionFiles(): Promise<string[]> {
+  const folder = vscode.workspace.workspaceFolders?.[0];
+  if (!folder) return [];
+  const found: string[] = [];
+  for (const parts of CANDIDATES) {
+    const uri = vscode.Uri.joinPath(folder.uri, ...parts);
+    try {
+      await vscode.workspace.fs.stat(uri);
+      found.push(parts.join("/"));
+    } catch {
+      /* absent */
+    }
+  }
+  return found;
+}
+
 export async function instructionsPrompt(): Promise<string> {
   const found = await readInstructions();
   if (!found) return "";

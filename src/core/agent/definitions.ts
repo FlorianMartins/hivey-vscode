@@ -59,6 +59,84 @@ export interface ParseResult {
 const NAME = /^[a-z0-9][a-z0-9-]{0,38}[a-z0-9]$/;
 
 /**
+ * Sub-agents that ship with the extension.
+ *
+ * The machinery for these existed and nothing used it, because a feature whose only form is "write
+ * a Markdown file in a directory you have to know about" is a feature for the person who wrote it.
+ * These four are the delegations that come up constantly, and each earns its place by having a
+ * NARROWER tool set than the conversation that calls it — which is the entire point of a sub-agent:
+ * it starts on a clean context and it cannot do more than its job.
+ *
+ * A repository that defines an agent of the same name wins. The team's `reviewer` is theirs, and a
+ * built-in silently overriding it would be the worst possible outcome.
+ */
+export const BUILTIN_AGENTS: AgentDefinition[] = [
+  {
+    kind: "agent",
+    name: "explorer",
+    description: "Finds where something lives in the repository and reports back. Reads only.",
+    tools: ["read_file", "list_files", "search_text"],
+    maxSteps: 12,
+    source: "built-in",
+    body: [
+      "You answer one question about a repository you have not seen before: where something is, and how it fits.",
+      "Search before reading, and read only what the search points at — you are called precisely so the caller",
+      "does not have to spend its context on this.",
+      "",
+      "Answer with paths and symbol names, not with prose about them. Cite file:line for every claim.",
+      "If you cannot find it, say so and say where you looked; a confident wrong path costs more than an admission.",
+    ].join("\n"),
+  },
+  {
+    kind: "agent",
+    name: "reviewer",
+    description: "Reviews the uncommitted changes. Reads the diff and the files around it; changes nothing.",
+    tools: ["git_diff", "git_status", "read_file", "search_text", "get_diagnostics"],
+    maxSteps: 16,
+    source: "built-in",
+    body: [
+      "You review a change. Read the diff first, then read enough of the surrounding files to judge it —",
+      "a diff read in isolation produces comments about things the rest of the file already handles.",
+      "",
+      "Order: correctness, then security, then what the next reader will get wrong. For each finding give the",
+      "file and line, what happens, and the smallest fix. Report nothing you are unsure of, and say plainly",
+      "when the change is fine — a review that always finds something is a review nobody reads twice.",
+    ].join("\n"),
+  },
+  {
+    kind: "agent",
+    name: "tester",
+    description: "Writes tests for something and runs them until they pass.",
+    tools: ["read_file", "search_text", "list_files", "write_file", "edit_file", "run_command", "get_diagnostics"],
+    maxSteps: 20,
+    source: "built-in",
+    body: [
+      "You write tests and make them pass. Read the existing tests first and match them: the same framework,",
+      "the same layout, the same naming. A test that does not look like its neighbours is a test that gets deleted.",
+      "",
+      "Cover the boundaries and the failure paths, not another version of the happy path. Run them, and if one",
+      "fails, decide whether the test or the code is wrong before changing either. Never weaken an assertion to",
+      "make a test pass.",
+    ].join("\n"),
+  },
+  {
+    kind: "agent",
+    name: "dba",
+    description: "Answers questions about the database: schema, queries, indexes. Reads only.",
+    tools: ["ibmi_sql", "ibmi_objects", "ibmi_library_list", "read_file", "search_text"],
+    maxSteps: 12,
+    source: "built-in",
+    body: [
+      "You answer questions about a database. Look at the schema before answering — column types and keys",
+      "decide most of the answer, and guessing at them produces SQL that parses and returns the wrong rows.",
+      "",
+      "Run only statements that read. Give the query, say what it will scan, and name the index it depends on.",
+      "On Db2 for i, qualify objects and use FETCH FIRST rather than LIMIT.",
+    ].join("\n"),
+  },
+];
+
+/**
  * Read one definition file.
  *
  * Deliberately forgiving about layout and strict about identity. Whitespace, CRLF, a missing

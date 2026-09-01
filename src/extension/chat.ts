@@ -15,14 +15,25 @@ import { route } from "../core/router/route.js";
 import { Session, type ContextItem, type Entry, type SessionData } from "../core/session/session.js";
 import { filterHistory, searchTranscript, upsertSession } from "../core/session/history.js";
 import { compactBrief, digestEntries, sessionAsContext, shouldSuggestCompact } from "../core/session/digest.js";
-import { ALWAYS_ON, BUILTIN_SKILLS, isSkillEnabled, SKILL_GROUPS, skillInvocation, toggleSkill } from "../core/session/skills.js";
+import {
+  activeGroups,
+  ALWAYS_ON,
+  applyGroups,
+  BUILTIN_SKILLS,
+  detectGroups,
+  isSkillEnabled,
+  SKILL_GROUPS,
+  skillInvocation,
+  toggleSkill,
+  type SkillGroup,
+} from "../core/session/skills.js";
 import { capture, describeRestore, trimCheckpoints } from "../core/session/checkpoint.js";
 import type { Plan } from "../core/agent/plan.js";
 import { promptForMode, toolsForMode } from "../core/session/modes.js";
 import { detectIbmiLanguage, ibmiPrompt } from "../core/ibmi/languages.js";
 import { parsePrompt, participantDirective, type MentionKind, type Participant } from "../core/session/mentions.js";
 import { resolveMentions } from "./mentions.js";
-import { instructionsPrompt } from "./instructions.js";
+import { instructionFiles, instructionsPrompt } from "./instructions.js";
 import { buildDefinitionTools, DefinitionStore, type SubAgentRun } from "./definitions.js";
 import { skillsPrompt } from "../core/agent/definitions.js";
 import { autoApprove } from "../core/agent/autoApprove.js";
@@ -44,6 +55,7 @@ import type {
   UiActiveEditor,
   UiSetup,
   UiSkill,
+  UiSkillGroup,
   UiState,
 } from "../shared/protocol.js";
 import { SECTION, endpointFor, providerFor, readSettings, routerConfig, type Keys, type Settings, writeTarget } from "./config.js";
@@ -282,6 +294,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       ...(e.checkpoint?.length ? { checkpointFiles: e.checkpoint.length } : {}),
       ...(e.checkpointPartial ? { checkpointPartial: true } : {}),
       ...(e.plan ? { plan: e.plan } : {}),
+      // An assistant entry carries the id of the question it answered, when that question has a
+      // checkpoint. The rule is then drawn under the ANSWER as well as above the question: the
+      // answer is where the reader is when they decide the whole thing was the wrong direction,
+      // and asking them to scroll up to the request to undo it is asking them to look for it.
+      ...this.restoreTarget(e),
       reasoning: e.reasoning,
       steps: e.steps,
       context: e.context?.map((c) => ({ kind: c.kind, label: c.label, tokens: estimateTokens(c.body) })),
@@ -324,6 +341,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       budget: { spentTodayUsd: this.gate.budget.spentToday(), dailyUsd: s.budget.dailyUsd },
       sessionCostUsd: this.session.totalCostUsd(),
       skills: this.uiSkills(),
+      skillGroups: this.uiSkillGroups(),
       // Unfiltered, and short. The `+` menu needs "the last few conversations", not "the ones that
       // pass whatever filter is set on a screen the user may not even have open".
       recent: stored
@@ -513,6 +531,19 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         case "compact":
           await this.compact();
           break;
+        case "setSkillGroups": {
+          const config = vscode.workspace.getConfiguration(SECTION);
+          // One write, not one per skill: choosing "Web and SQL" is a single decision, and a
+          // settings file that churned forty times while the user clicked chips would be a settings
+          // file that fights its own change listener.
+          await config.update(
+            "skills.disabled",
+            applyGroups(m.groups as SkillGroup[]),
+            vscode.ConfigurationTarget.Global,
+          );
+          this.sendState();
+          break;
+        }
         case "setSkillEnabled": {
           const config = vscode.workspace.getConfiguration(SECTION);
           const next = toggleSkill(readSettings().skills.disabled, m.name, m.enabled);
@@ -552,6 +583,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         }
         case "restoreCheckpoint":
           await this.restoreCheckpoint(m.id);
+          break;
+        case "shareEntry":
+          await this.shareEntry(m.id);
           break;
         case "deleteSession": {
           const rest = this.history().filter((s) => s.id !== m.id);
@@ -630,7 +664,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           const folder = vscode.workspace.workspaceFolders?.[0];
           if (folder) {
             const item = await this.workspace.fileContext(vscode.Uri.joinPath(folder.uri, m.path), readSettings());
-            if (item) this.attachments.push(item);
+            if (item) {
+              this.attachments.push(item);
+              this.remember(m.path);
+            }
           }
           this.sendState();
           break;
@@ -847,7 +884,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         break;
       }
       case "mention": {
-        await this.searchAttachment();
+        await this.searchAttachment("both");
         return;
       }
     }
@@ -1021,7 +1058,66 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     return [...builtins, ...repo];
   }
 
-  /** Re-read the repository's skills, then redraw. Called on activation and after an edit. */
+  /**
+   * The families, with what is on and what the workspace looks like.
+   *
+   * The suggestion comes from the languages the editor has OPEN rather than from a scan of the
+   * repository, and that is the better signal: a monorepo contains eight languages and the person
+   * in front of it is working on one of them today. It is only ever a pre-ticked answer — the
+   * question is asked, never assumed, and answering it costs nothing because nothing is sent
+   * anywhere to compute it.
+   */
+  private uiSkillGroups(): UiSkillGroup[] {
+    const disabled = readSettings().skills.disabled;
+    const active = new Set(activeGroups(disabled));
+    const suggested = new Set(detectGroups(openFiles().map((f) => f.language)));
+    return SKILL_GROUPS.map((g) => ({
+      id: g.id,
+      label: g.label,
+      hint: g.hint,
+      active: active.has(g.id),
+      suggested: suggested.has(g.id),
+    }));
+  }
+
+  /**
+   * The question an answer belongs to, when that question can be rolled back.
+   *
+   * The checkpoint lives on the user entry — that is where the rewind goes to — but the affordance
+   * has to appear on both, because "undo that" is a thought people have while looking at the reply.
+   */
+  private restoreTarget(entry: Entry): { restoreId?: string; checkpointFiles?: number; checkpointPartial?: boolean } {
+    if (entry.role !== "assistant") return {};
+    const i = this.session.entries.findIndex((e) => e.id === entry.id);
+    for (let j = i - 1; j >= 0; j--) {
+      const previous = this.session.entries[j]!;
+      if (previous.role !== "user") continue;
+      // The count travels with the id. Without it the rule under the answer said "0 files", which
+      // is both wrong and exactly the kind of number that stops anyone trusting the button.
+      if (!previous.checkpoint?.length) return {};
+      return {
+        restoreId: previous.id,
+        checkpointFiles: previous.checkpoint.length,
+        ...(previous.checkpointPartial ? { checkpointPartial: true } : {}),
+      };
+    }
+    return {};
+  }
+
+  /**
+   * Files this session has attached, newest first.
+   *
+   * Not persisted and deliberately short. What it answers is "the file I keep coming back to in
+   * this conversation", which is a question about the last twenty minutes; a list restored from
+   * last month would be a list of files that have since been renamed.
+   */
+  private recentAttachments: string[] = [];
+
+  private remember(path: string): void {
+    this.recentAttachments = [path, ...this.recentAttachments.filter((p) => p !== path)].slice(0, 12);
+  }
+
+  /** Re-read the repository's skills, then redraw. Called on activation and after an edit. */  /** Re-read the repository's skills, then redraw. Called on activation and after an edit. */  /** Re-read the repository's skills, then redraw. Called on activation and after an edit. */  /** Re-read the repository's skills, then redraw. Called on activation and after an edit. */
   private async refreshSkills(): Promise<void> {
     const found = await this.definitions.load();
     const next = found.skills.map((sk) => ({
@@ -1159,15 +1255,31 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
     rows.push(separator(t("Files & folders")));
     rows.push({
-      label: "$(search) " + t("Search files and symbols…"),
-      description: t("The whole workspace"),
-      run: () => this.searchAttachment(),
+      label: "$(search) " + t("Files…"),
+      description: t("Search the whole workspace"),
+      run: () => this.searchAttachment("files"),
+    });
+    rows.push({
+      label: "$(symbol-method) " + t("Symbols…"),
+      description: t("A class, a function, a procedure — its lines, not its file"),
+      run: () => this.searchAttachment("symbols"),
     });
     rows.push({
       label: "$(folder-opened) " + t("Import from disk…"),
       description: t("Even outside the workspace"),
       run: () => this.attach("browse"),
     });
+
+    // Files attached earlier in this session. The editor's "recently opened" list is behind an
+    // internal command, and what is wanted here is narrower anyway: the handful of files this
+    // conversation keeps coming back to, which is a list we already have.
+    const recentFiles = this.recentAttachments.filter((path) => !files.some((f) => f.path === path)).slice(0, 6);
+    if (recentFiles.length) {
+      rows.push(separator(t("Recent")));
+      for (const path of recentFiles) {
+        rows.push({ label: "$(history) " + path, run: () => this.onMessage({ type: "attachPath", path }) });
+      }
+    }
 
     rows.push(separator(t("The repository")));
     for (const [icon, label, kind] of [
@@ -1177,6 +1289,21 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       ["$(terminal)", t("Terminal selection"), "terminal"],
     ] as const) {
       rows.push({ label: `${icon} ${label}`, run: () => this.attachMention(kind) });
+    }
+
+    // The rules the repository sets for the assistant. Worth attaching explicitly when a question
+    // is ABOUT them — "why did you format it that way" — since otherwise they are only ever in the
+    // cacheable prefix where the user cannot see them.
+    const instructions = await instructionFiles();
+    if (instructions.length) {
+      rows.push(separator(t("Instructions")));
+      for (const path of instructions) {
+        rows.push({
+          label: "$(law) " + path,
+          description: t("The rules this repository sets for the assistant"),
+          run: () => this.onMessage({ type: "attachPath", path }),
+        });
+      }
     }
 
     const conversations = this.history()
@@ -1228,7 +1355,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    */
   private async toolsPicker(): Promise<void> {
     const skills = this.uiSkills();
-    type Row = vscode.QuickPickItem & { name?: string };
+    type Row = vscode.QuickPickItem & { name?: string; agent?: string };
     const rows: Row[] = [];
     const builtin = skills.filter((sk) => sk.builtin);
     const repo = skills.filter((sk) => !sk.builtin);
@@ -1272,9 +1399,28 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       }
     }
 
+    // The sub-agents, in the same list. From where the user stands a skill and a sub-agent are the
+    // same kind of thing — a named capability the assistant may reach for — and what differs is
+    // only that one is a prompt and the other is a nested turn with its own tools. Two pickers for
+    // one question would be two pickers.
+    const found = await this.definitions.load();
+    const agentsOff = readSettings().agents.disabled;
+    if (found.agents.length) {
+      rows.push({ label: t("Sub-agents"), kind: vscode.QuickPickItemKind.Separator });
+      for (const agent of found.agents) {
+        rows.push({
+          label: agent.name,
+          description: agent.description,
+          detail: agent.source === "built-in" ? t("built in") : agent.source,
+          agent: agent.name,
+          picked: !agentsOff.includes(agent.name),
+        });
+      }
+    }
+
     const picked = await vscode.window.showQuickPick(rows, {
       canPickMany: true,
-      placeHolder: t("Which skills are offered when you type “/”"),
+      placeHolder: t("What Hivey Code may reach for: skills and sub-agents"),
       matchOnDescription: true,
     });
     // Cancelled. Writing the empty selection would switch everything off because the user pressed
@@ -1284,9 +1430,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const on = new Set(picked.map((row) => row.name).filter(Boolean) as string[]);
     let disabled = readSettings().skills.disabled;
     for (const sk of skills) disabled = toggleSkill(disabled, sk.name, on.has(sk.name));
-    await vscode.workspace
-      .getConfiguration(SECTION)
-      .update("skills.disabled", disabled, vscode.ConfigurationTarget.Global);
+
+    const agentsOn = new Set(picked.map((row) => row.agent).filter(Boolean) as string[]);
+    const agentsDisabled = found.agents.filter((a) => !agentsOn.has(a.name)).map((a) => a.name).sort();
+
+    const config = vscode.workspace.getConfiguration(SECTION);
+    await config.update("skills.disabled", disabled, vscode.ConfigurationTarget.Global);
+    await config.update("agents.disabled", agentsDisabled, vscode.ConfigurationTarget.Global);
     this.sendState();
   }
 
@@ -1304,9 +1454,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    * across every file, and looks for symbols at the same time — the editor's own index answers
    * both, so a class name finds its file without you knowing where it lives.
    */
-  private async searchAttachment(): Promise<void> {
+  private async searchAttachment(mode: "files" | "symbols" | "both" = "both"): Promise<void> {
     const picker = vscode.window.createQuickPick<vscode.QuickPickItem & { path?: string; symbol?: vscode.SymbolInformation }>();
-    picker.placeholder = t("Search files and symbols to attach…");
+    picker.placeholder =
+      mode === "files" ? t("Search files to attach…") : mode === "symbols" ? t("Search symbols to attach…") : t("Search files and symbols to attach…");
     picker.matchOnDescription = true;
     // The editor has already filtered by the time items arrive, and filtering again on a fuzzy
     // query written for a path removes matches the query was aimed at.
@@ -1316,10 +1467,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       picker.busy = true;
       try {
         const [files, symbols] = await Promise.all([
-          this.workspace.findFiles(query, 40),
+          mode === "symbols" ? Promise.resolve([]) : this.workspace.findFiles(query, 40),
           // Symbols only once there is something to look for: an empty workspace-symbol query asks
           // every language server for its entire index, which on a large repository is seconds.
-          query.trim().length >= 2
+          mode !== "files" && query.trim().length >= (mode === "symbols" ? 1 : 2)
             ? (vscode.commands.executeCommand<vscode.SymbolInformation[]>("vscode.executeWorkspaceSymbolProvider", query) ??
               Promise.resolve([]))
             : Promise.resolve([]),
@@ -1363,6 +1514,61 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     picker.onDidHide(() => picker.dispose());
     picker.show();
     await load("");
+  }
+
+  /**
+   * Carry one message into another conversation.
+   *
+   * Copy-and-paste is what this replaces, and it loses the one thing worth keeping: that the text
+   * was an ANSWER, produced by a named model, at a point in another conversation. Pasted back in it
+   * arrives indistinguishable from the user's own words — which is exactly the confusion the
+   * untrusted fence exists to prevent.
+   *
+   * So it travels as an attachment with its provenance attached, and it is fenced, for the same
+   * reason a transcript is: an answer contains whatever the assistant read while producing it.
+   */
+  private async shareEntry(id: string): Promise<void> {
+    const entry = this.session.get(id);
+    if (!entry?.text.trim()) return;
+
+    type Row = vscode.QuickPickItem & { target?: string };
+    const others = this.history()
+      .filter((x) => x.id !== this.session.id)
+      .sort((a, b) => b.updatedAt - a.updatedAt)
+      .slice(0, 12);
+    const rows: Row[] = [
+      { label: "$(add) " + t("A new conversation"), description: t("Started with this as its context"), target: "new" },
+      ...(others.length ? [{ label: t("Existing"), kind: vscode.QuickPickItemKind.Separator } as Row] : []),
+      ...others.map((x) => ({
+        label: "$(comment-discussion) " + (x.title || t("untitled")),
+        description: t("{0} messages", x.entries.length),
+        target: x.id,
+      })),
+    ];
+
+    const picked = await vscode.window.showQuickPick(rows, { placeHolder: t("Where should this go?") });
+    if (!picked?.target) return;
+
+    const item: ContextItem = {
+      kind: "message",
+      label: t("{0}, from “{1}”", entry.role === "user" ? t("You") : "Hivey Code", this.session.title || t("untitled")),
+      body: entry.text,
+      untrusted: true,
+    };
+
+    // The current conversation is saved before we leave it. Without this, sharing out of a
+    // conversation that had not been persisted since its last turn would lose that turn.
+    this.persist();
+    if (picked.target === "new") {
+      this.newSession();
+    } else {
+      const found = this.history().find((x) => x.id === picked.target);
+      if (found) this.session = new Session(found);
+    }
+    this.attachments.push(item);
+    this.screen = "chat";
+    this.sendState();
+    this.post({ type: "status", text: t("Attached here. Ask your question.") });
   }
 
   private async restoreCheckpoint(id: string): Promise<void> {
@@ -1671,7 +1877,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             runSubAgent: (run) =>
               this.runSubAgent(run, { settings, providerId, model, baseUrl, isLocal, vault, allTools, mode }),
           },
-          definitions,
+          {
+            ...definitions,
+            // A switched-off skill or sub-agent is not described to the model either. Filtering it
+            // out of the picker alone would leave the model announcing a delegation it cannot make.
+            skills: definitions.skills.filter((sk) => isSkillEnabled(skillInvocation(sk.name), settings.skills.disabled)),
+            agents: definitions.agents.filter((a) => !settings.agents.disabled.includes(a.name)),
+          },
         ),
       );
     }
@@ -1723,6 +1935,44 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const isLocal = isLocalEndpoint(baseUrl);
     const vault = new Vault();
     const steps: Array<{ tool: string; summary: string; ok: boolean }> = [];
+
+    // What this question will send, said before it is sent.
+    //
+    // It existed once as a modal dialog, was removed for being invasive, and is back as a card in
+    // the conversation — which is where it belonged: it is a fact about the message being sent, and
+    // the message is on that screen. "Always" switches it off for good, so anyone who does not want
+    // it pays for it once. Nothing about it is a privacy control; the egress gate is separate and
+    // untouched by the answer given here.
+    if (settings.privacy.confirmSend !== "never") {
+      const price = this.priceLookup(model);
+      const cost = isLocal ? 0 : estimateCost(built.estimatedTokens, price);
+      const detail = [
+        t("~{0} tokens", built.estimatedTokens),
+        isLocal ? t("on this machine, nothing billed") : t("~{0} $ on {1}", cost.toFixed(4), safeHost(baseUrl)),
+      ];
+      const answer = await new Promise<"once" | "session" | "always" | "no">((resolve) => {
+        const id = randomNonce();
+        this.approvals.set(id, resolve);
+        this.post({
+          type: "approval",
+          id,
+          tool: "send",
+          description: t("Send this question to {0}?", model),
+          choices: ["once", "always", "no"],
+          detail,
+        });
+      });
+      if (answer === "no") {
+        this.post({ type: "status", text: t("Not sent.") });
+        this.post({ type: "turnEnd" });
+        return;
+      }
+      if (answer === "always") {
+        await vscode.workspace
+          .getConfiguration(SECTION)
+          .update("privacy.confirmSend", "never", vscode.ConfigurationTarget.Global);
+      }
+    }
 
     try {
       const provider = await providerFor(settings, this.keys, providerId);

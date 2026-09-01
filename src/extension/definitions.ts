@@ -19,6 +19,7 @@ import { t } from "../shared/i18n.js";
 import type { Tool, ToolResult } from "../core/agent/loop.js";
 import {
   agentTemplate,
+  BUILTIN_AGENTS,
   parseDefinition,
   skillTemplate,
   toolsForAgent,
@@ -56,7 +57,8 @@ export class DefinitionStore {
   async load(): Promise<Definitions> {
     if (this.cache) return this.cache;
     const folder = vscode.workspace.workspaceFolders?.[0];
-    if (!folder) return (this.cache = EMPTY);
+    // The built-in agents work without a folder: delegating a question does not require a workspace.
+    if (!folder) return (this.cache = { ...EMPTY, agents: BUILTIN_AGENTS });
 
     const skills: Skill[] = [];
     const agents: AgentDefinition[] = [];
@@ -90,7 +92,17 @@ export class DefinitionStore {
     dedupe(skills, problems);
     dedupe(agents, problems);
 
-    return (this.cache = { skills, agents, problems });
+    // The built-ins, minus anything this repository defines under the same name: a team that has
+
+    // written its own `reviewer` means theirs, and a shipped agent quietly replacing it would be the
+
+    // worst outcome available.
+
+    const own = new Set(agents.map((a) => a.name));
+
+    const merged = [...agents, ...BUILTIN_AGENTS.filter((a) => !own.has(a.name))];
+
+    return (this.cache = { skills, agents: merged, problems });
   }
 
   invalidate(): void {
@@ -165,7 +177,38 @@ export function buildDefinitionTools(deps: DefinitionDeps, definitions: Definiti
 
   if (definitions.agents.length) {
     const names = definitions.agents.map((a) => a.name);
+    // Which agents can be dispatched several at a time.
+    //
+    // One that can only read cannot interfere with another: three of them reading three parts of a
+    // repository at once is the whole reason to have them. One that can write can, and two agents
+    // editing files concurrently is a race nobody can reconstruct from a transcript afterwards.
+    const READ_ONLY_TOOLS = new Set([
+      "read_file",
+      "list_files",
+      "search_text",
+      "get_diagnostics",
+      "git_status",
+      "git_diff",
+      "git_log",
+      "git_branches",
+      "git_blame",
+      "git_show",
+      "ibmi_member",
+      "ibmi_members",
+      "ibmi_objects",
+      "ibmi_library_list",
+      "ibmi_sql",
+    ]);
+    const readOnly = (name: string): boolean => {
+      const agent = definitions.agents.find((a) => a.name === name);
+      // An empty tool list means "whatever the mode allows", which in agent mode includes writing.
+      // Absence of a restriction is not a restriction.
+      if (!agent?.tools.length) return false;
+      return agent.tools.every((tool) => READ_ONLY_TOOLS.has(tool));
+    };
+
     out.push({
+      parallel: (args) => readOnly(String(args["name"] ?? "")),
       schema: {
         name: "run_agent",
         description:

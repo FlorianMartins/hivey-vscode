@@ -60,6 +60,7 @@ export function buildTools(deps: ToolDeps): Tool[] {
   const s = () => deps.settings();
 
   const readFile: Tool = {
+    parallel: () => true,
     schema: {
       name: "read_file",
       description: "Read a file from the workspace. Returns its text, truncated if very large.",
@@ -79,6 +80,7 @@ export function buildTools(deps: ToolDeps): Tool[] {
   };
 
   const listFiles: Tool = {
+    parallel: () => true,
     schema: {
       name: "list_files",
       description: "List workspace files matching a glob, e.g. `src/**/*.ts`.",
@@ -99,6 +101,7 @@ export function buildTools(deps: ToolDeps): Tool[] {
   };
 
   const searchText: Tool = {
+    parallel: () => true,
     schema: {
       name: "search_text",
       description: "Search the workspace for a regular expression. Returns matching lines with their paths.",
@@ -139,6 +142,7 @@ export function buildTools(deps: ToolDeps): Tool[] {
   };
 
   const diagnostics: Tool = {
+    parallel: () => true,
     schema: {
       name: "get_diagnostics",
       description:
@@ -313,6 +317,7 @@ export function buildTools(deps: ToolDeps): Tool[] {
     // a dialog about a display, which is exactly the kind of prompt that teaches people to click
     // through prompts.
     approval: () => false,
+    parallel: () => true,
     async run(args, ctx): Promise<ToolResult> {
       const { plan, error } = parsePlan(args["steps"]);
       if (!plan) return { content: error ?? "Invalid plan.", isError: true };

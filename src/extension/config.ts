@@ -30,6 +30,8 @@ export interface Settings {
     allowUnredacted: boolean;
     blockedGlobs: string[];
     egressPolicy: "ask-once" | "ask-always" | "trust";
+    /** Whether each question is previewed with its size and price before it is sent. */
+    confirmSend: "always" | "never";
     auditLog: boolean;
     customTerms: string[];
   };
@@ -37,6 +39,8 @@ export interface Settings {
   context: { maxTokens: number; repoMap: boolean };
   /** Which skills the user has switched off. Names, `/` included; absent means on. */
   skills: { disabled: string[] };
+  /** Which sub-agents the user has switched off, by name. */
+  agents: { disabled: string[] };
   panel: { minWidth: number };
   permissions: {
     /** How much runs without asking. `off` is the default and the right one for a first session. */
@@ -85,6 +89,9 @@ export function readSettings(scope?: vscode.Uri): Settings {
       allowUnredacted,
       blockedGlobs: c.get<string[]>("privacy.blockedGlobs", []),
       egressPolicy: c.get<"ask-once" | "ask-always" | "trust">("privacy.egressPolicy", "ask-once"),
+      // Distinct from `egressPolicy`, which is about privacy. This is about size and price, applies
+      // to a local model too, and is switched off by the card's own "Always" button.
+      confirmSend: c.get<"always" | "never">("privacy.confirmSend", "always"),
       auditLog: c.get<boolean>("privacy.auditLog", true),
       customTerms: c.get<string[]>("privacy.customTerms", []),
     },
@@ -97,6 +104,7 @@ export function readSettings(scope?: vscode.Uri): Settings {
       repoMap: c.get<boolean>("context.repoMap", true),
     },
     skills: { disabled: c.get<string[]>("skills.disabled", []) },
+    agents: { disabled: c.get<string[]>("agents.disabled", []) },
     panel: { minWidth: c.get<number>("panel.minWidth", 260) },
     permissions: {
       autoApprove: c.get<"off" | "workspace" | "all">("permissions.autoApprove", "off"),

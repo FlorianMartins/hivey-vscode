@@ -2,7 +2,7 @@
   "name": "hivey-code",
   "displayName": "Hivey Code",
   "description": "%extension.description%",
-  "version": "0.14.0",
+  "version": "0.15.0",
   "publisher": "hivey",
   "license": "Apache-2.0",
   "repository": {
@@ -142,12 +142,6 @@
         "category": "Hivey Code"
       },
       {
-        "command": "hiveyCode.openTerminal",
-        "title": "%command.openTerminal.title%",
-        "category": "Hivey Code",
-        "icon": "$(terminal)"
-      },
-      {
         "command": "hiveyCode.fixDiagnostic",
         "title": "%command.fixDiagnostic.title%",
         "category": "Hivey Code"
@@ -254,6 +248,12 @@
         "title": "%command.openSettings.title%",
         "category": "Hivey Code",
         "icon": "$(gear)"
+      },
+      {
+        "command": "hiveyCode.setLanguage",
+        "title": "%command.setLanguage.title%",
+        "category": "Hivey Code",
+        "icon": "$(globe)"
       }
     ],
     "menus": {
@@ -272,11 +272,6 @@
           "command": "hiveyCode.showHistory",
           "when": "view == hiveyCode.chat || view == hiveyCode.chatSide",
           "group": "navigation@2"
-        },
-        {
-          "command": "hiveyCode.openTerminal",
-          "when": "view == hiveyCode.chat || view == hiveyCode.chatSide",
-          "group": "navigation@3"
         },
         {
           "command": "hiveyCode.moveToSecondarySideBar",
@@ -322,6 +317,11 @@
           "command": "hiveyCode.openSettings",
           "when": "view == hiveyCode.chat || view == hiveyCode.chatSide",
           "group": "9_more@7"
+        },
+        {
+          "command": "hiveyCode.setLanguage",
+          "when": "view == hiveyCode.chat || view == hiveyCode.chatSide",
+          "group": "9_more@8"
         }
       ],
       "editor/context": [
@@ -529,6 +529,15 @@
           "default": "ask-once",
           "description": "%config.privacy.egressPolicy%"
         },
+        "hiveyCode.privacy.confirmSend": {
+          "type": "string",
+          "enum": [
+            "always",
+            "never"
+          ],
+          "default": "always",
+          "markdownDescription": "%config.privacy.confirmSend%"
+        },
         "hiveyCode.privacy.auditLog": {
           "type": "boolean",
           "default": true,
@@ -652,6 +661,14 @@
             "type": "string"
           },
           "markdownDescription": "%config.skills.disabled%"
+        },
+        "hiveyCode.agents.disabled": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "markdownDescription": "%config.agents.disabled%"
         },
         "hiveyCode.permissions.autoApprove": {
           "type": "string",

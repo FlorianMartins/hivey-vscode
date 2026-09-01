@@ -42,6 +42,17 @@ export interface Tool {
    * `false` runs it. Reads are usually free, writes and commands are not.
    */
   approval(args: Record<string, unknown>): string | false;
+  /**
+   * Whether this call may run at the same time as its neighbours in one step.
+   *
+   * A function of the ARGUMENTS rather than a flag on the tool, because for the interesting case it
+   * depends on them: dispatching a sub-agent is safe to fan out when that agent can only read, and
+   * is not when it can write. Two agents editing files concurrently is a race nobody can debug from
+   * a transcript.
+   *
+   * Absent means sequential, which is the safe answer for anything with a side effect.
+   */
+  parallel?(args: Record<string, unknown>): boolean;
   run(args: Record<string, unknown>, ctx: ToolContext): Promise<ToolResult>;
   /**
    * A version of this tool that cannot change anything, for plan mode.
@@ -143,23 +154,40 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
 
     // Every call gets a result message, including the ones that were refused or failed. A missing
     // result is a protocol error with most providers and a silent hang with the rest.
+    //
+    // Two passes, and the split is the whole point. APPROVALS ARE RESOLVED FIRST, one at a time,
+    // because they are questions to a person and two dialogs at once is not an interface. Only then
+    // is anything executed — and there, calls the tool declares safe to fan out run together.
+    //
+    // Fusing only CONSECUTIVE parallel-safe calls, rather than hoisting them all to the front, is
+    // what keeps the order the model asked for: a read followed by a write followed by a read is
+    // three steps in a sequence it may well be depending on.
+    interface Planned {
+      call: ToolCall;
+      tool?: Tool;
+      args?: Record<string, unknown>;
+      /** Set when the call is already settled — unknown tool, bad JSON, refused, cancelled. */
+      settled?: string;
+      parallel: boolean;
+    }
+
+    const planned: Planned[] = [];
     for (const call of res.toolCalls) {
       if (opts.signal?.aborted) {
-        working.push({ role: "tool", toolCallId: call.id, content: "Cancelled by the user." });
+        planned.push({ call, settled: "Cancelled by the user.", parallel: false });
         continue;
       }
       const tool = byName.get(call.name);
       if (!tool) {
-        working.push({ role: "tool", toolCallId: call.id, content: `Unknown tool: ${call.name}` });
+        planned.push({ call, settled: `Unknown tool: ${call.name}`, parallel: false });
         continue;
       }
-
       let args: Record<string, unknown>;
       try {
         args = JSON.parse(call.args || "{}") as Record<string, unknown>;
       } catch {
         // A malformed call is the model's mistake to fix, not a crash.
-        working.push({ role: "tool", toolCallId: call.id, content: "Arguments were not valid JSON. Send the call again." });
+        planned.push({ call, settled: "Arguments were not valid JSON. Send the call again.", parallel: false });
         continue;
       }
 
@@ -172,22 +200,47 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
         const result: ToolResult = { content: "The user declined this action.", isError: true };
         trace.push({ call, result, approved: false });
         opts.onToolResult?.({ call, result });
-        working.push({ role: "tool", toolCallId: call.id, content: result.content });
+        planned.push({ call, settled: result.content, parallel: false });
         continue;
       }
 
+      planned.push({ call, tool, args, parallel: Boolean(tool.parallel?.(args)) });
+    }
+
+    const execute = async (item: Planned): Promise<void> => {
+      if (item.settled !== undefined) {
+        working.push({ role: "tool", toolCallId: item.call.id, content: item.settled });
+        return;
+      }
       let result: ToolResult;
       try {
-        result = await tool.run(args, {
+        result = await item.tool!.run(item.args!, {
           signal: opts.signal,
           report: (m) => opts.report?.(m),
         });
       } catch (err) {
         result = { content: `Tool failed: ${(err as Error).message}`, isError: true };
       }
-      trace.push({ call, result, approved: true });
-      opts.onToolResult?.({ call, result });
-      working.push({ role: "tool", toolCallId: call.id, content: result.content });
+      trace.push({ call: item.call, result, approved: true });
+      opts.onToolResult?.({ call: item.call, result });
+      working.push({ role: "tool", toolCallId: item.call.id, content: result.content });
+    };
+
+    for (let i = 0; i < planned.length; ) {
+      const item = planned[i]!;
+      if (!item.parallel) {
+        await execute(item);
+        i += 1;
+        continue;
+      }
+      // A run of neighbours that may all go at once. One is not a batch, and `Promise.all` on a
+      // single item costs a microtask to say the same thing.
+      let end = i;
+      while (end < planned.length && planned[end]!.parallel) end += 1;
+      const batch = planned.slice(i, end);
+      if (batch.length > 1) opts.report?.(`${batch.length} in parallel`);
+      await Promise.all(batch.map(execute));
+      i = end;
     }
   }
 

@@ -13,7 +13,6 @@
   "command.editSelection.title": "Modifier la sélection avec l'IA",
   "command.generateCommitMessage.title": "Rédiger le message de commit",
   "command.explainTerminalSelection.title": "Expliquer la sortie du terminal",
-  "command.openTerminal.title": "Ouvrir Hivey Code dans le terminal",
   "command.fixDiagnostic.title": "Corriger ce problème",
   "command.explainDiagnostic.title": "Expliquer ce problème",
   "command.showHistory.title": "Historique des conversations",
@@ -73,5 +72,8 @@
   "config.endpoints.servers": "Serveurs de modèles supplémentaires, sur cette machine ou sur votre réseau. Chacun est interrogé et ses modèles apparaissent dans le sélecteur : `{ \"name\": \"Serveur GPU\", \"url\": \"http://192.168.1.50:11434/v1\" }`. Une adresse de votre propre réseau est traitée comme locale — rien n'est facturé et rien n'est pseudonymisé, puisque rien ne sort.",
   "config.endpoints.servers.name": "Le nom du serveur dans le sélecteur.",
   "config.endpoints.servers.url": "L'URL de base compatible OpenAI, terminée par /v1.",
-  "config.skills.disabled": "Compétences qui ne sont pas proposées dans la liste `/`, par nom (`/tests`). Se règle depuis le bouton des compétences dans la zone de saisie. Enregistrer ce qui est DÉSACTIVÉ plutôt que ce qui est activé fait qu'une compétence ajoutée par une mise à jour, ou par un collègue qui livre un fichier, arrive active plutôt qu'invisible."
+  "config.skills.disabled": "Compétences qui ne sont pas proposées dans la liste `/`, par nom (`/tests`). Se règle depuis le bouton des compétences dans la zone de saisie. Enregistrer ce qui est DÉSACTIVÉ plutôt que ce qui est activé fait qu'une compétence ajoutée par une mise à jour, ou par un collègue qui livre un fichier, arrive active plutôt qu'invisible.",
+  "config.privacy.confirmSend": "Prévisualiser chaque question avant l'envoi : combien de jetons elle utilisera et ce qu'elle coûtera. Affiché sous forme de carte dans la conversation, jamais en boîte de dialogue. Le bouton **Toujours** de la carte règle ceci sur `never`.",
+  "command.setLanguage.title": "Langue du panneau",
+  "config.agents.disabled": "Sous-agents qui ne peuvent pas être sollicités, par nom. Se règle depuis le bouton des compétences dans la zone de saisie, à côté des compétences."
 }

@@ -13,7 +13,6 @@
   "command.editSelection.title": "Edit the selection with AI",
   "command.generateCommitMessage.title": "Write the commit message",
   "command.explainTerminalSelection.title": "Explain the terminal output",
-  "command.openTerminal.title": "Open Hivey Code in the terminal",
   "command.fixDiagnostic.title": "Fix this problem",
   "command.explainDiagnostic.title": "Explain this problem",
   "command.showHistory.title": "Conversation history",
@@ -73,5 +72,8 @@
   "config.endpoints.servers": "Extra model servers, on this machine or on your network. Each one is probed and its models appear in the picker: `{ \"name\": \"GPU box\", \"url\": \"http://192.168.1.50:11434/v1\" }`. An address on your own network is treated as local — nothing is billed and nothing is pseudonymised, because nothing leaves.",
   "config.endpoints.servers.name": "How the server is named in the picker.",
   "config.endpoints.servers.url": "The OpenAI-compatible base URL, ending in /v1.",
-  "config.skills.disabled": "Skills that are not offered in the `/` list, by name (`/tests`). Toggled from the skills button in the composer. Storing what is OFF rather than what is on means a skill added by an update, or by a colleague committing a file, arrives switched on rather than invisible."
+  "config.skills.disabled": "Skills that are not offered in the `/` list, by name (`/tests`). Toggled from the skills button in the composer. Storing what is OFF rather than what is on means a skill added by an update, or by a colleague committing a file, arrives switched on rather than invisible.",
+  "config.privacy.confirmSend": "Preview each question before it is sent: how many tokens it will use and what it will cost. Shown as a card in the conversation, never as a dialog. The card's **Always** button sets this to `never`.",
+  "command.setLanguage.title": "Language of the panel",
+  "config.agents.disabled": "Sub-agents that may not be dispatched, by name. Toggled from the skills button in the composer, alongside the skills."
 }

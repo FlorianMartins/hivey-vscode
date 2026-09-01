@@ -2,6 +2,63 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.15.0 — 2026-09-01
+
+### Added
+
+- **Around 70 skills, grouped by family**: Web, Python, Java, .NET, Systems (C, C++, Go, Rust),
+  Mobile (Flutter and Dart), SQL & data, Build & deploy, **Design & UX**, **Security**, and a much
+  larger IBM i set — display files, printer files, CL, embedded SQL, ILE structure, commitment
+  control, moving native I/O to SQL. Each names the tools of its subject: a test refuses any whose
+  prompt is the generic one with a word changed.
+- **"What are you working on?"** on every new conversation, answered **locally — nothing is sent to
+  ask it and nothing is sent to record it**. Choosing "Web" narrows seventy skills to the dozen that
+  apply, so the `/` list is the one for today's work. What the editor has open is pre-ticked, as a
+  visible guess rather than a silent one.
+- **Sub-agents that ship with the extension** — `explorer`, `reviewer`, `tester`, `dba` — where
+  before there was machinery and nothing using it. A repository that defines one of the same name
+  wins. All of them, and the skills, are switched on and off in the same picker.
+- **Sub-agents run in parallel** when they can only read. Neighbouring tool calls the tool declares
+  safe now go at once, while approvals stay strictly one at a time — two dialogs is not an
+  interface. Only *consecutive* safe calls are fused, so read → write → read keeps its order.
+- **A pre-send card** showing what the question will send and cost, with **Send / Always / Cancel**.
+  In the conversation, never as a dialog; **Always** switches it off for good.
+- **Share a message into another conversation** from the hover row: it arrives as an attachment
+  carrying where it came from, rather than as pasted text indistinguishable from your own words.
+- **The context picker is complete**: the editor, open editors, files, symbols, recent, the
+  repository, **instructions**, conversations.
+- **The panel's language** is one command away rather than a settings search.
+
+### Changed
+
+- **Headings are size, not decoration.** They had an accent bar instead of a larger type size, so
+  every heading read as a quoted block and a document made of them read as a form.
+- **No frames** on the provider and approval controls under the composer.
+- The skills button moved to the right of the reasoning selector and became a wand: the spanner said
+  "settings" and sent people looking for a preferences page.
+- **On the multi-agent mode:** not built, deliberately. The modes answer "what is this allowed to
+  do" and are enforced in code; "multi-agent" is a strategy, not a permission, so it would be a
+  fourth mode with agent's powers and unpredictable behaviour. The capability it was for now exists
+  without it.
+
+### Removed
+
+- **The command that opened the terminal client from the editor.** It never worked reliably enough
+  to keep. The likely cause, found while removing it: in PowerShell — the default shell on Windows —
+  `"C:\…\Code.exe" "…cli.js"` prints the path instead of running it, because PowerShell needs a
+  leading `&` for a quoted command. The `hivey-code` CLI itself is unchanged and still launched from
+  a shell.
+
+### Fixed
+
+- **Uninstalling left the panel on screen until a restart.** Stopping an MCP server is a child
+  process being signalled and waited for, and it was registered as a `dispose()` — which the editor
+  calls synchronously and does not await. It moved to `deactivate`, which the editor *does* await.
+- **The screenshot harness pointed one directory too high** (`../../` from `dist-integration` is the
+  repository's *parent*). VS Code does not fail on that: it scans for nested extensions, finds the
+  repository, and caches the description it resolves. Everything appeared to work — and a change
+  could be built, be present in the bundle, and not be on the picture, with nothing saying why.
+
 ## 0.14.0 — 2026-09-01
 
 ### Fixed

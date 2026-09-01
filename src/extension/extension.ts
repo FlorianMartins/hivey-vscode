@@ -40,7 +40,8 @@ export function activate(context: vscode.ExtensionContext): void {
   // be able to delay the editor's startup, and a server nobody has trusted yet must not run at all.
   const mcp = new McpManager(context, context.extension.packageJSON.version as string);
   void mcp.startAll();
-  disposables.push({ dispose: () => void mcp.stopAll() });
+  // Awaited in `deactivate`, not fired and forgotten in a `dispose`. See the note there.
+  pendingShutdown = () => mcp.stopAll();
 
   // Skills and sub-agents the repository defines. Watched, so an edit takes effect on the next
   // turn rather than on the next window.
@@ -120,6 +121,29 @@ export function activate(context: vscode.ExtensionContext): void {
       await chat.reveal();
       await vscode.commands.executeCommand("workbench.action.moveFocusedView");
       void vscode.window.setStatusBarMessage(t("Pick where the panel should live — it stays there."), 6000);
+    }),
+
+    // The language, one command away rather than buried in a settings search. The setting existed
+    // and followed the editor, which is right by default and wrong for the person whose editor is in
+    // one language and who reads another — a common enough arrangement that hunting for it in the
+    // settings page was a poor answer.
+    vscode.commands.registerCommand("hiveyCode.setLanguage", async () => {
+      const current = readSettings().language;
+      const picked = await vscode.window.showQuickPick(
+        [
+          { label: t("Follow the editor"), detail: t("Whatever VS Code is displaying in"), id: "auto" },
+          { label: "English", detail: t("Always English"), id: "en" },
+          { label: "Français", detail: t("Always French"), id: "fr" },
+        ].map((row) => ({ ...row, description: row.id === current ? t("current") : "" })),
+        { placeHolder: t("Which language should Hivey Code use?") },
+      );
+      if (!picked) return;
+      await vscode.workspace
+        .getConfiguration(SECTION)
+        .update("language", picked.id, vscode.ConfigurationTarget.Global);
+      applyLanguage();
+      chat.reload();
+      void vscode.window.showInformationMessage(t("Language changed. Reopen a panel if a title still shows the old one."));
     }),
 
     vscode.commands.registerCommand("hiveyCode.openSettings", () =>
@@ -320,6 +344,22 @@ async function announce(context: vscode.ExtensionContext, log: vscode.OutputChan
   }
 }
 
-export function deactivate(): void {
-  /* nothing to unwind: every disposable is registered on the context */
+/**
+ * What activation started and a `dispose()` cannot finish.
+ *
+ * `vscode.Disposable.dispose()` is synchronous: the editor calls it and moves on. Stopping an MCP
+ * server is not — it is a child process that has to be signalled and waited for. Registering it as
+ * a disposable, which is what this did, meant the editor tore the extension down while stdio
+ * children were still alive, and an extension host with live children does not finish unloading —
+ * which is what "I uninstalled it and the panel is still there until I restart" looks like from the
+ * outside.
+ *
+ * `deactivate` may return a promise, and the editor awaits it. That is the hook for anything with a
+ * real shutdown, so that is where this belongs.
+ */
+let pendingShutdown: (() => Promise<void>) | undefined;
+
+export async function deactivate(): Promise<void> {
+  await pendingShutdown?.();
+  pendingShutdown = undefined;
 }

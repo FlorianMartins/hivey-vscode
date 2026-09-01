@@ -32,6 +32,8 @@ export interface UiEntry {
   checkpointFiles?: number;
   /** True when the checkpoint could not hold everything the turn changed. */
   checkpointPartial?: boolean;
+  /** On an ANSWER: the id of the question it can be rolled back to. */
+  restoreId?: string;
   /** The to-do list the agent kept while answering this turn. */
   plan?: Plan;
   /** What the model thought before answering, when a reasoning effort was asked for. */
@@ -102,6 +104,17 @@ export interface UiPermissionRule {
 
 /** A model server found running on this machine. */
 import type { Plan } from "../core/agent/plan.js";
+
+/** A family of skills, as the new-conversation screen shows it. */
+export interface UiSkillGroup {
+  id: string;
+  label: string;
+  hint: string;
+  /** True when the family's skills are on. */
+  active: boolean;
+  /** True when what the editor has open looks like this kind of work. */
+  suggested: boolean;
+}
 
 /** A skill in the panel's own terms: what to call it, and whether it is on. */
 export interface UiSkill {
@@ -179,6 +192,8 @@ export interface UiState {
   sessionCostUsd: number;
   /** Every skill the panel may offer, and whether the user has left it switched on. */
   skills: UiSkill[];
+  /** The families, with whether each is currently in play and whether the workspace suggests it. */
+  skillGroups: UiSkillGroup[];
   /**
    * The most recent conversations, unfiltered.
    *
@@ -226,6 +241,8 @@ export type ToExtension =
   /** Replace the conversation so far with a summary the model writes. */
   | { type: "compact" }
   | { type: "setSkillEnabled"; name: string; enabled: boolean }
+  /** Choose the families in play — everything else is switched off in one write. */
+  | { type: "setSkillGroups"; groups: string[] }
   /** Put the repository's skills where a colleague can be given them. */
   | { type: "shareSkills" }
   | { type: "openSkill"; source: string }
@@ -237,6 +254,8 @@ export type ToExtension =
   | { type: "setProvider"; provider: string }
   /** Put the files back as they were before this question, and rewind the conversation to it. */
   | { type: "restoreCheckpoint"; id: string }
+  /** Carry one message into another conversation, as context there. */
+  | { type: "shareEntry"; id: string }
   | { type: "setMode"; mode: Mode }
   | { type: "setReasoning"; reasoning: Reasoning }
   /** `baseUrl` accompanies a model served by a machine other than the configured one. */
