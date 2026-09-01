@@ -88,7 +88,11 @@ const PATHS = {
   // exactly what the skills picker is.
   // A wand with a spark: what a skill IS — a named thing you invoke that changes what the assistant
   // does. The spanner it replaces says "settings", which sent people looking for a preferences page.
-  tools: "M2.5 13.5 10 6M9 5l2 2M12 2v2M11 3h2M12.5 7.5v1.5M11.75 8.25h1.5",
+  // Sliders. The workbench's own shape for "configure this", legible at 14 px in a way a wrench is
+  // not, and unambiguous in a row where every other icon is an action: two of the three glyphs I
+  // tried here read as "settings page" (a gear) or as "magic" (a wand), and this one reads as
+  // "adjust what is on".
+  tools: "M2 5.5h2.5M7.5 5.5H14M2 10.5h6.5M11.5 10.5H14M7.5 5.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 1 1 3 0M11.5 10.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 1 1 3 0",
   // A small chip: the model, and where it runs.
   chip: "M5.5 5.5h5v5h-5zM3 6.5h2.5M3 9.5h2.5M10.5 6.5H13M10.5 9.5H13M6.5 3v2.5M9.5 3v2.5M6.5 10.5V13M9.5 10.5V13",
   more: "M4 8a1 1 0 1 0 0-.01M8 8a1 1 0 1 0 0-.01M12 8a1 1 0 1 0 0-.01",

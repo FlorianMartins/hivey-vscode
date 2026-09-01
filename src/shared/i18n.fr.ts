@@ -882,4 +882,8 @@ export const FR: Record<string, string> = {
   "Use in another conversation": "Utiliser dans une autre conversation",
   "Where should this go?": "Où cela doit-il aller ?",
   "{0}, from “{1}”": "{0}, depuis « {1} »",
+  "Do not send the open file": "Ne pas envoyer le fichier ouvert",
+  "Send the open file after all": "Envoyer quand même le fichier ouvert",
+  "{0} — not sent. It comes back when you open another file.": "{0} — non envoyé. Il revient quand vous ouvrez un autre fichier.",
+  "{0} — the open file, sent with your question. ~{1} tokens": "{0} — le fichier ouvert, envoyé avec votre question. ~{1} jetons",
 };

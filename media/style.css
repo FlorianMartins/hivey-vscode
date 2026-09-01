@@ -782,12 +782,23 @@ pre.code {
    Being the only shrinkable item in a row that no longer wraps, it absorbed every pixel of pressure
    and disappeared entirely on a narrow panel, which reads as the control having been removed. It
    keeps a floor wide enough to stay recognisable; past that the row scrolls rather than eats it. */
+/* The model name is the only label allowed to give up characters, and it now has a floor low
+   enough that it always can.
+ *
+ * At 12ch, four controls plus the send button no longer fitted a docked side bar: the row did not
+ * wrap (deliberately) and did not shrink (because of the floor), so it OVERFLOWED — the skills
+ * button painted over the send button. A floor that cannot be met is not a floor, it is an
+   overlap. `overflow: hidden` on the group makes that failure impossible rather than merely
+   unlikely. */
 .composer-toolbar .btn.model {
   flex: 0 1 auto;
-  /* Wide enough to be a name rather than a stub. The floor was 9ch when four controls shared this
-     row; with the configure menu merged there is room for the label to actually say something,
-     which is the whole reason the control is here. */
-  min-width: 12ch;
+  min-width: 7ch;
+}
+.composer-toolbar .toolbar-group {
+  overflow: hidden;
+}
+.composer-toolbar .toolbar-group.end {
+  overflow: visible;
 }
 /* The mode never shrinks. It is one short word, and "Ag…" tells the reader nothing at all — worse
    than a truncated model name, because the model's full id is one hover away and the mode's
@@ -2912,4 +2923,39 @@ pre.code code {
 .transcript {
   /* The last answer stops above the strip rather than scrolling under it. */
   padding-bottom: var(--sp-3);
+}
+
+/* ── The file the editor is showing ───────────────────────────────────────────────────────────
+ *
+ * Offered, not attached — so it is outlined where a real attachment is filled. The distinction is
+ * not decorative: this chip follows the active tab and vanishes when you switch away, while an
+ * attachment is something you chose and that stays until you remove it. Drawing a suggestion the
+ * same way as a decision is how people stop trusting either.
+ */
+.chip.implicit {
+  background: none;
+  border: 1px dashed var(--border-strong);
+  color: var(--vscode-foreground);
+}
+.chip.implicit .chip-ico {
+  flex: 0 0 auto;
+  opacity: 0.7;
+}
+.chip.implicit .chip-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* The end of a path is the part that identifies it. `src/extension/…` tells you nothing that
+     `…/chat.ts` does not, and the reverse is not true. */
+  direction: rtl;
+  text-align: left;
+  unicode-bidi: plaintext;
+}
+/* Waved away: still shown, still one click from coming back. Removing it from the row entirely
+   would leave no way to change your mind and no sign that anything had been decided. */
+.chip.implicit.off {
+  opacity: 0.5;
+  border-style: dotted;
+}
+.chip.implicit.off .chip-label {
+  text-decoration: line-through;
 }

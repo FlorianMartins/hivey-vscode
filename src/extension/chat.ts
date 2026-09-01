@@ -309,6 +309,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const s = readSettings();
     const baseUrl = safeUrl(s, s.chat.provider);
     const stored = this.history();
+    // What the editor is showing, offered rather than required. Recomputed on every state send
+    // because it follows the active tab; the block list applies, so a file the policy excludes
+    // simply does not appear.
+    const implicit = this.workspace.activeContext(3000, s);
     const contextTokens = this.session.entries
       .filter((e) => e.included)
       .reduce((sum, e) => sum + estimateTokens(e.text) + (e.context ?? []).reduce((a, c) => a + estimateTokens(c.body), 0), 0);
@@ -350,6 +354,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         .slice(0, 10)
         .map((x) => ({ id: x.id, title: x.title, messages: x.entries.length })),
       attachments: this.attachments.map((c) => ({ kind: c.kind, label: c.label, tokens: estimateTokens(c.body) })),
+      ...(implicit ? { implicit: { kind: implicit.kind, label: implicit.label, tokens: estimateTokens(implicit.body) } } : {}),
+      implicitOn: Boolean(implicit) && this.implicitDismissed !== implicit?.label,
       openFiles: openFiles(),
       ...(activeEditor() ? { activeEditor: activeEditor()! } : {}),
       history: filterHistory(stored, this.historyFilter),
@@ -672,6 +678,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           this.sendState();
           break;
         }
+        case "setImplicit":
+          // Remembered by LABEL rather than as a flag. Dismissing means "not this file", and the
+          // suggestion should come back when a different file is opened — which is what the editor's
+          // own chat does, and what stops a single dismissal switching the feature off for ever.
+          this.implicitDismissed = m.on ? undefined : this.workspace.activeContext(3000, readSettings())?.label;
+          this.sendState();
+          break;
         case "removeAttachment":
           this.attachments = this.attachments.filter((a) => a.label !== m.label);
           this.sendState();
@@ -1111,6 +1124,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    * this conversation", which is a question about the last twenty minutes; a list restored from
    * last month would be a list of files that have since been renamed.
    */
+  /** The label of the suggestion the user waved away. Cleared by opening a different file. */
+  private implicitDismissed: string | undefined;
+
   private recentAttachments: string[] = [];
 
   private remember(path: string): void {
@@ -1811,7 +1827,16 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           repoMap: () => this.workspace.repoMap(Math.floor(settings.context.maxTokens * 0.4)),
         })
       : [];
-    const context = [...this.attachments, ...resolved];
+    // The file on screen, unless the user waved it away or has already attached it by hand. It goes
+    // FIRST, because it is what the question is most likely about, and because a model reads the
+    // beginning of a long prompt more reliably than the middle.
+    const implicit = this.workspace.activeContext(3000, settings);
+    const useImplicit =
+      implicit &&
+      this.implicitDismissed !== implicit.label &&
+      !this.attachments.some((a) => a.label === implicit.label) &&
+      !resolved.some((a) => a.label === implicit.label);
+    const context = [...(useImplicit ? [implicit] : []), ...this.attachments, ...resolved];
 
     this.session.add({ role: "user", text, context: context.length ? context : undefined });
     this.attachments = [];

@@ -2,6 +2,37 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.15.1 — 2026-09-01
+
+### Added
+
+- **The file you have open is offered as context, and sent by default** — the editor's own chat
+  behaviour. It appears as an outlined chip above the box, showing the selection's line range when
+  there is one and the whole file otherwise, and it follows the active tab. One click puts it aside;
+  opening a different file brings the offer back, because the dismissal means "not this file" rather
+  than "never again".
+  - It is deliberately **not** an attachment: an attachment is something you chose and that stays,
+    while this changes under you as you switch tabs. Merging the two would mean every tab switch
+    quietly adding a file to a list you thought you were curating — so it is drawn differently,
+    outlined where an attachment is filled.
+  - **The privacy block list applies to it.** Attaching `.env` on request earns a warning and a
+    refusal, which is a conversation; a `.env` attaching itself because it is the open tab is the
+    exact failure that list exists to prevent, and it would be silent. Output channels, diff views
+    and settings editors are excluded too; an unsaved buffer is not, because asking about code you
+    have just typed is an ordinary case.
+
+### Changed
+
+- The skills button takes the workbench's **sliders** glyph. A wrench read as "settings" and sent
+  people looking for a preferences page; a wand read as decoration. Sliders say "adjust what is on".
+
+### Fixed
+
+- **The toolbar overflowed onto the send button.** The model name had a floor of 12 characters, the
+  row deliberately does not wrap, and four controls plus send no longer fitted a docked side bar — so
+  it neither wrapped nor shrank, and simply overlapped. The floor is low enough to always be met, and
+  the group can no longer paint outside itself.
+
 ## 0.15.0 — 2026-09-01
 
 ### Added

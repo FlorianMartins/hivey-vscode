@@ -203,6 +203,17 @@ export interface UiState {
    */
   recent: Array<{ id: string; title: string; messages: number }>;
   attachments: UiContextItem[];
+  /**
+   * The file the editor is showing, offered without being asked for.
+   *
+   * Kept apart from `attachments` on purpose. An attachment is something the user chose and that
+   * stays until they remove it; this follows the active editor and changes under them. Merging the
+   * two would mean every tab switch silently added another file to a list the user thought they
+   * were curating.
+   */
+  implicit?: UiContextItem;
+  /** False when the user has dismissed the suggestion for the file currently open. */
+  implicitOn: boolean;
   openFiles: UiOpenFile[];
   activeEditor?: UiActiveEditor;
   history: UiHistoryRow[];
@@ -271,6 +282,8 @@ export type ToExtension =
   | { type: "attach"; what: "active" | "editor" | "selection" | "browse" | "openFiles" | "mention" }
   | { type: "attachPath"; path: string }
   | { type: "removeAttachment"; label: string }
+  /** Keep or drop the file the editor is showing, for as long as it is the one on screen. */
+  | { type: "setImplicit"; on: boolean }
   | { type: "setPermission"; tool: string; prefix?: string; level: "always" | "never" }
   | { type: "forgetPermission"; tool: string; prefix?: string }
   | { type: "clearSessionPermissions" }

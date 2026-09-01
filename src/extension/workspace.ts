@@ -95,11 +95,25 @@ export class WorkspaceContext {
     return out;
   }
 
-  /** The file in the active editor, or the selection when there is one. */
-  activeContext(maxTokens = 3000): ContextItem | undefined {
+  /**
+   * The file in the active editor, or the selection when there is one.
+   *
+   * `settings` is optional and only supplied on the IMPLICIT path — the attachment nobody asked
+   * for. When it is given, the privacy block list applies and a blocked file yields nothing at all.
+   * That asymmetry is deliberate: a user who explicitly attaches `.env` gets a warning and a
+   * refusal, which is a conversation; a `.env` that attaches itself because it happens to be the
+   * open tab is the exact failure the block list exists to prevent, and it would happen silently.
+   */
+  activeContext(maxTokens = 3000, settings?: Settings): ContextItem | undefined {
     const ed = vscode.window.activeTextEditor;
     if (!ed) return undefined;
+    // A file, or a buffer that is not saved yet — asking about code you have just typed and not
+    // written to disk is one of the ordinary cases. What this excludes is everything else that is
+    // technically a text document: an output channel, a diff view, a settings editor, the release
+    // notes. None of those is something to hand a model unasked.
+    if (settings && ed.document.uri.scheme !== "file" && ed.document.uri.scheme !== "untitled") return undefined;
     const rel = relative(ed.document.uri);
+    if (settings && EgressGate.isBlocked(rel, settings.privacy.blockedGlobs)) return undefined;
     if (!ed.selection.isEmpty) {
       const text = ed.document.getText(ed.selection);
       return {

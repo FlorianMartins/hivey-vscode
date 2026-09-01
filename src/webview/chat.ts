@@ -428,8 +428,31 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
   const wrap = el("div", `composer${isStreaming() ? " working" : ""}`);
   const card = el("div", "composer-card");
 
-  if (state.attachments.length) {
+  if (state.attachments.length || state.implicit) {
     const chips = el("div", "chips attached");
+
+    // The file the editor is showing, offered rather than attached. It looks different from the
+    // chips beside it — outlined instead of filled — because it behaves differently: it follows the
+    // active tab and disappears when you switch away, while a real attachment is something you
+    // chose and that stays. A suggestion drawn as a decision is a suggestion people stop trusting.
+    if (state.implicit) {
+      const chip = el("span", `chip implicit${state.implicitOn ? "" : " off"}`);
+      chip.append(icon("file", "chip-ico"));
+      chip.append(el("span", "chip-label", state.implicit.label));
+      chip.title = state.implicitOn
+        ? t("{0} — the open file, sent with your question. ~{1} tokens", state.implicit.label, formatTokens(state.implicit.tokens))
+        : t("{0} — not sent. It comes back when you open another file.", state.implicit.label);
+      chip.append(
+        button({
+          icon: state.implicitOn ? ICON.close : ICON.add,
+          title: state.implicitOn ? t("Do not send the open file") : t("Send the open file after all"),
+          className: "btn chip-x",
+          onClick: () => deps.send({ type: "setImplicit", on: !state.implicitOn }),
+        }),
+      );
+      chips.append(chip);
+    }
+
     for (const a of state.attachments) {
       const chip = el("span", "chip removable", `${a.label}`);
       chip.title = `${a.kind} · ~${formatTokens(a.tokens)} jetons`;
