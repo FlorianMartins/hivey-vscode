@@ -139,3 +139,31 @@ test("the family is decided by the tag, and an unknown tag is plain", () => {
   assert.equal(familyOf("brainfuck"), "plain");
   assert.equal(familyOf(""), "plain");
 });
+
+// ── Comments, per dialect ────────────────────────────────────────────────────────────────────
+//
+// Reported as "the lines with --", which is SQL's comment marker and nothing else's. A comment is
+// the one token kind whose marker differs between every family here, so it is worth asserting per
+// family rather than once.
+
+test("a double dash comments a line of SQL, and only of SQL", () => {
+  const sql = highlight("-- how the total is computed\nSELECT 1 FROM SYSIBM.SYSDUMMY1", "sql");
+  assert.deepEqual(kinds(sql, "comment"), ["-- how the total is computed"]);
+
+  // Two minus signs in a language that has no such comment must stay arithmetic.
+  const ts = highlight("const a = b - -1;", "ts");
+  assert.equal(kinds(ts, "comment").length, 0);
+});
+
+test("each family uses its own marker", () => {
+  assert.deepEqual(kinds(highlight("// note\nconst a = 1;", "ts"), "comment"), ["// note"]);
+  assert.deepEqual(kinds(highlight("# note\nx = 1", "py"), "comment"), ["# note"]);
+  assert.deepEqual(kinds(highlight("// note\ndcl-s a char(1);", "rpgle"), "comment"), ["// note"]);
+  assert.deepEqual(kinds(highlight("-- note\nSELECT 1", "db2"), "comment"), ["-- note"]);
+});
+
+test("a comment runs to the end of its line and no further", () => {
+  const tokens = highlight("SELECT 1 -- why\nSELECT 2", "sql");
+  assert.deepEqual(kinds(tokens, "comment"), ["-- why"]);
+  assert.equal(text(tokens), "SELECT 1 -- why\nSELECT 2");
+});
