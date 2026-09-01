@@ -306,10 +306,16 @@ mark.hit {
 
 /* ── Transcript ──────────────────────────────────────────────────────────────────────────── */
 
+/* Narrow side margins.
+ *
+ * A docked side bar is 280 px wide and eight of those were being spent on each side for no reason
+ * beyond habit — which at that width is six per cent of the line. The measure gets them back, and
+ * the vertical rhythm is untouched: what makes this read as considered is the space BETWEEN things,
+ * not the space around them. */
 .transcript {
   flex: 1 1 auto;
   overflow-y: auto;
-  padding: var(--sp-3) var(--sp-4) var(--sp-5);
+  padding: var(--sp-3) var(--sp-2) var(--sp-5);
   scrollbar-gutter: stable;
 }
 
@@ -406,7 +412,7 @@ mark.hit {
   border: 1px solid color-mix(in srgb, var(--vscode-textLink-foreground, var(--vscode-focusBorder)) 22%, transparent);
   border-left: 2px solid color-mix(in srgb, var(--vscode-textLink-foreground, var(--vscode-focusBorder)) 55%, transparent);
   border-radius: var(--radius-lg);
-  padding: var(--sp-3) var(--sp-4);
+  padding: var(--sp-2) var(--sp-3);
 }
 
 .error {
@@ -1949,7 +1955,7 @@ pre.code {
 .composer-meter {
   display: flex;
   justify-content: flex-end;
-  padding: 0 var(--sp-1) var(--sp-1);
+  padding: 0 0 var(--sp-1);
   min-height: 14px;
 }
 
@@ -2196,6 +2202,12 @@ pre.code {
    that genuinely needs to align with the transcript's text column. */
 .composer {
   padding: var(--sp-2) var(--sp-2) var(--sp-3);
+}
+/* The box lines up with the text of the answers above it rather than with the panel's edge: the
+   composer's own border already provides the inset, so matching the transcript's padding would sit
+   it two steps in from everything else. */
+.composer-card {
+  margin: 0;
 }
 .composer-input {
   line-height: 1.5;
@@ -2456,21 +2468,11 @@ pre.code {
 .skill-row:hover .skill-open {
   opacity: 1;
 }
-/* A dot on the button when something is off, so the state is visible without opening the menu —
-   otherwise a skill switched off weeks ago is indistinguishable from one that never existed. */
-.btn.has-off {
-  position: relative;
-}
-.btn.has-off::after {
-  content: "";
-  position: absolute;
-  top: 2px;
-  right: 2px;
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: var(--vscode-editorWarning-foreground, var(--muted));
-}
+/* No badge on the skills button.
+ *
+ * It showed a dot whenever anything was switched off, which was a reasonable signal when everything
+ * was on by default and became permanent noise the moment families became opt-in: with fourteen
+ * families off by default the dot is always lit, and a badge that is always lit says nothing. */
 
 /* ── Scrollbars, and the width they were costing ──────────────────────────────────────────────
  *
@@ -2820,7 +2822,7 @@ pre.code code {
   display: flex;
   align-items: center;
   gap: var(--sp-1);
-  padding: var(--sp-1) var(--sp-1) 0;
+  padding: var(--sp-1) 0 0;
   min-height: 22px;
   /* One line, always. Wrapping put the readings on a row of their own, left-aligned under the
      controls, which reads as a second toolbar rather than as a measurement. The labels are one
@@ -2958,4 +2960,95 @@ pre.code code {
 }
 .chip.implicit.off .chip-label {
   text-decoration: line-through;
+}
+
+/* ── The guided start ─────────────────────────────────────────────────────────────────────────
+ *
+ * One question per screen, and nothing here is a message: it is drawn from state, and the first
+ * real question replaces it. A wizard that left three of its own turns at the top of every
+ * specialised conversation would be a wizard people stop using on the second day.
+ */
+.wizard {
+  padding: var(--sp-3) var(--sp-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+.wizard-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.wizard-step {
+  font-size: var(--fs-meta);
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.wizard-title {
+  margin: 0;
+  font-size: 1.25em;
+  font-weight: 600;
+}
+.wizard-lede {
+  margin: 0;
+  font-size: var(--fs-control);
+  color: var(--muted);
+  line-height: 1.5;
+}
+.wizard-skills {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-height: 46vh;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--sp-1);
+}
+.wizard-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-top: var(--sp-1);
+}
+/* The last screen is the handover: nothing to press, the composer has the floor. */
+.wizard.ready .wizard-title {
+  font-size: 1.4em;
+}
+
+/* ── What is attached ─────────────────────────────────────────────────────────────────────────
+ *
+ * Inside the box, above the text, the way the editor's own chat does it — because an attachment is
+ * part of the message being written, unlike the provider or the approval scope, which are settings
+ * for the conversation and sit outside.
+ */
+.context-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 0 var(--sp-1) var(--sp-1);
+}
+.context-count {
+  font-size: var(--fs-meta);
+  color: var(--muted);
+}
+.chips.attached {
+  /* Many attachments scroll rather than push the box off the screen. Six files is a normal amount
+     to attach and would otherwise take half the panel before a word is typed. */
+  max-height: 88px;
+  overflow-y: auto;
+  flex-wrap: wrap;
+}
+.chip .chip-ico {
+  flex: 0 0 auto;
+  opacity: 0.65;
+}
+.chip .chip-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* The end of a path identifies it; the beginning rarely does. */
+  direction: rtl;
+  text-align: left;
+  unicode-bidi: plaintext;
 }

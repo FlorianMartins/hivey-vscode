@@ -166,15 +166,40 @@ function safe<T>(fn: () => T): T | undefined {
   }
 }
 
+/**
+ * The files open in tabs.
+ *
+ * From `window.tabGroups`, not from `workspace.textDocuments`, and the difference is the reason
+ * "Open editors" appeared empty for people with a dozen tabs. `textDocuments` holds the documents
+ * the editor has LOADED — a tab that has not been focused since the window opened is not among
+ * them, and neither is one restored from the previous session and never clicked. `tabGroups` is
+ * what the Open Editors view itself reads, so it is what "open editors" has to mean here.
+ */
 export function openFiles(): Array<{ path: string; active: boolean; language: string; dirty: boolean }> {
-  const active = vscode.window.activeTextEditor?.document.uri.toString();
-  const docs = vscode.workspace.textDocuments.filter(
-    (d) => !d.isClosed && d.uri.scheme === "file" && !d.uri.path.endsWith(".git"),
-  );
-  return docs.map((d) => ({
-    path: vscode.workspace.asRelativePath(d.uri, false),
-    active: d.uri.toString() === active,
-    language: d.languageId,
-    dirty: d.isDirty,
-  }));
+  const activeUri = vscode.window.activeTextEditor?.document.uri.toString();
+  const loaded = new Map(vscode.workspace.textDocuments.map((d) => [d.uri.toString(), d]));
+  const out: Array<{ path: string; active: boolean; language: string; dirty: boolean }> = [];
+  const seen = new Set<string>();
+
+  for (const group of vscode.window.tabGroups.all) {
+    for (const tab of group.tabs) {
+      const input = tab.input as { uri?: vscode.Uri } | undefined;
+      const uri = input?.uri;
+      // Only plain text tabs. A diff, a notebook, a webview and a settings editor are all tabs, and
+      // none of them is a file to hand a model.
+      if (!uri || uri.scheme !== "file" || uri.path.endsWith(".git")) continue;
+      const key = uri.toString();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const doc = loaded.get(key);
+      out.push({
+        path: vscode.workspace.asRelativePath(uri, false),
+        active: key === activeUri,
+        // A tab that is not loaded has no language id yet; the extension is what it has.
+        language: doc?.languageId ?? uri.path.split(".").pop() ?? "",
+        dirty: tab.isDirty,
+      });
+    }
+  }
+  return out;
 }

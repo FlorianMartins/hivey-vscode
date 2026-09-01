@@ -105,6 +105,28 @@ export interface UiPermissionRule {
 /** A model server found running on this machine. */
 import type { Plan } from "../core/agent/plan.js";
 
+/**
+ * Starting a conversation by answering three questions.
+ *
+ * A conversation begins with a great deal already decided — what the assistant may do, what it
+ * knows about, which skills exist — and all of it is decided by defaults nobody chose. The guided
+ * start asks instead, once, before the first question: what may it do, what is this about, and
+ * which of those skills do you actually want.
+ *
+ * It is EPHEMERAL. Nothing here is a message: the steps are drawn from this state, and when the
+ * first real question is asked they are gone, leaving a conversation that looks like any other. A
+ * wizard that left three of its own messages at the top of every specialised conversation would be
+ * a wizard people stop using on the second day.
+ */
+export interface UiWizard {
+  step: "mode" | "family" | "skills" | "ready";
+  /** Chosen so far. */
+  mode?: Mode;
+  families: string[];
+  /** For the skills step: the skills of the chosen families, with what is ticked. */
+  skills: UiSkill[];
+}
+
 /** A family of skills, as the new-conversation screen shows it. */
 export interface UiSkillGroup {
   id: string;
@@ -194,6 +216,8 @@ export interface UiState {
   skills: UiSkill[];
   /** The families, with whether each is currently in play and whether the workspace suggests it. */
   skillGroups: UiSkillGroup[];
+  /** The guided setup, when a specialised conversation is being started. */
+  wizard?: UiWizard;
   /**
    * The most recent conversations, unfiltered.
    *
@@ -254,6 +278,12 @@ export type ToExtension =
   | { type: "setSkillEnabled"; name: string; enabled: boolean }
   /** Choose the families in play — everything else is switched off in one write. */
   | { type: "setSkillGroups"; groups: string[] }
+  /** Start the guided setup for a specialised conversation. */
+  | { type: "startWizard" }
+  /** Answer the step on screen. `value` is a mode, a list of families, or a list of skills. */
+  | { type: "wizardAnswer"; step: "mode" | "family" | "skills"; value: string[] }
+  | { type: "wizardBack" }
+  | { type: "wizardCancel" }
   /** Put the repository's skills where a colleague can be given them. */
   | { type: "shareSkills" }
   | { type: "openSkill"; source: string }

@@ -16,12 +16,11 @@ import { Session, type ContextItem, type Entry, type SessionData } from "../core
 import { filterHistory, searchTranscript, upsertSession } from "../core/session/history.js";
 import { compactBrief, digestEntries, sessionAsContext, shouldSuggestCompact } from "../core/session/digest.js";
 import {
-  activeGroups,
   ALWAYS_ON,
-  applyGroups,
   BUILTIN_SKILLS,
   detectGroups,
   isSkillEnabled,
+  normaliseGroups,
   SKILL_GROUPS,
   skillInvocation,
   toggleSkill,
@@ -56,6 +55,7 @@ import type {
   UiSetup,
   UiSkill,
   UiSkillGroup,
+  UiWizard,
   UiState,
 } from "../shared/protocol.js";
 import { SECTION, endpointFor, providerFor, readSettings, routerConfig, type Keys, type Settings, writeTarget } from "./config.js";
@@ -346,6 +346,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       sessionCostUsd: this.session.totalCostUsd(),
       skills: this.uiSkills(),
       skillGroups: this.uiSkillGroups(),
+      ...(this.wizard ? { wizard: this.uiWizard() } : {}),
       // Unfiltered, and short. The `+` menu needs "the last few conversations", not "the ones that
       // pass whatever filter is set on a screen the user may not even have open".
       recent: stored
@@ -537,14 +538,69 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         case "compact":
           await this.compact();
           break;
+        case "startWizard":
+          // A fresh conversation first: the guided start is about the one being created, and
+          // running it over a conversation in progress would change the rules half way through.
+          this.newSession();
+          this.wizard = { step: "mode", families: [] };
+          this.sendState();
+          break;
+
+        case "wizardAnswer": {
+          if (!this.wizard) break;
+          const config = vscode.workspace.getConfiguration(SECTION);
+          if (m.step === "mode") {
+            this.wizard.mode = m.value[0] as Mode;
+            this.session.mode = this.wizard.mode;
+            this.savePrefs();
+            this.wizard.step = "family";
+          } else if (m.step === "family") {
+            this.wizard.families = m.value as SkillGroup[];
+            await config.update(
+              "skills.groups",
+              normaliseGroups(this.wizard.families),
+              vscode.ConfigurationTarget.Global,
+            );
+            this.wizard.step = "skills";
+          } else {
+            // The skills step sends what is TICKED. Everything offered and not ticked is switched
+            // off — which is only correct because the offer was limited to the chosen families.
+            const on = new Set(m.value);
+            const offered = BUILTIN_SKILLS.filter(
+              (sk) => normaliseGroups(this.wizard!.families).includes(sk.group) && !ALWAYS_ON.has(sk.name),
+            );
+            let disabled = readSettings().skills.disabled;
+            for (const sk of offered) disabled = toggleSkill(disabled, sk.name, on.has(sk.name));
+            await config.update("skills.disabled", disabled, vscode.ConfigurationTarget.Global);
+            this.wizard.step = "ready";
+          }
+          this.sendState();
+          break;
+        }
+
+        case "wizardBack":
+          if (!this.wizard) break;
+          this.wizard.step =
+            this.wizard.step === "ready" ? "skills" : this.wizard.step === "skills" ? "family" : "mode";
+          this.sendState();
+          break;
+
+        case "wizardCancel":
+          this.wizard = undefined;
+          this.sendState();
+          break;
+
         case "setSkillGroups": {
           const config = vscode.workspace.getConfiguration(SECTION);
           // One write, not one per skill: choosing "Web and SQL" is a single decision, and a
           // settings file that churned forty times while the user clicked chips would be a settings
           // file that fights its own change listener.
+          // The families, not the individual skills. Choosing "Rust" must not also undo the four
+          // skills you had switched off inside Python last week: the two lists answer different
+          // questions and are stored separately for that reason.
           await config.update(
-            "skills.disabled",
-            applyGroups(m.groups as SkillGroup[]),
+            "skills.groups",
+            normaliseGroups(m.groups as SkillGroup[]),
             vscode.ConfigurationTarget.Global,
           );
           this.sendState();
@@ -1045,6 +1101,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     await this.focus();
   }
 
+  /** Begin the guided start, from the title bar's `+`. */
+  startWizard(): void {
+    void this.onMessage({ type: "startWizard" });
+  }
+
   /**
    * Every skill the panel may offer, with the user's switch on each.
    *
@@ -1056,18 +1117,20 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private skillsCache: UiSkill[] = [];
 
   private uiSkills(): UiSkill[] {
-    const disabled = readSettings().skills.disabled;
-    const builtins = BUILTIN_SKILLS.map((sk) => ({
+    const policy = readSettings().skills;
+    // Only the families in play. A picker listing seventy skills of which sixty belong to languages
+    // this project does not contain is a picker nobody reads to the end.
+    const builtins = BUILTIN_SKILLS.filter((sk) => policy.groups.includes(sk.group)).map((sk) => ({
       name: sk.name,
       description: sk.hint,
-      enabled: isSkillEnabled(sk.name, disabled),
+      enabled: isSkillEnabled(sk.name, policy),
       builtin: true,
       ...(ALWAYS_ON.has(sk.name) ? { required: true } : {}),
     }));
     // The repository's own, from the last load. Refreshing them is asynchronous and this is called
     // on every state send, so the list is filled in by `refreshSkills` rather than awaited here —
     // a panel that blocked on the file system every keystroke would be a panel that stutters.
-    const repo = this.skillsCache.map((sk) => ({ ...sk, enabled: isSkillEnabled(sk.name, disabled) }));
+    const repo = this.skillsCache.map((sk) => ({ ...sk, enabled: isSkillEnabled(sk.name, policy.disabled) }));
     return [...builtins, ...repo];
   }
 
@@ -1081,8 +1144,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    * anywhere to compute it.
    */
   private uiSkillGroups(): UiSkillGroup[] {
-    const disabled = readSettings().skills.disabled;
-    const active = new Set(activeGroups(disabled));
+    const active = new Set(readSettings().skills.groups);
     const suggested = new Set(detectGroups(openFiles().map((f) => f.language)));
     return SKILL_GROUPS.map((g) => ({
       id: g.id,
@@ -1124,6 +1186,35 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    * this conversation", which is a question about the last twenty minutes; a list restored from
    * last month would be a list of files that have since been renamed.
    */
+  /**
+   * The guided start, while it is running.
+   *
+   * Held here rather than in the session because it is not part of the conversation: nothing it
+   * produces is a message, and a conversation exported or reopened later shows no trace of it.
+   */
+  private wizard: { step: "mode" | "family" | "skills" | "ready"; mode?: Mode; families: SkillGroup[] } | undefined;
+
+  private uiWizard(): UiWizard {
+    const w = this.wizard!;
+    const policy = { groups: normaliseGroups(w.families), disabled: readSettings().skills.disabled };
+    return {
+      step: w.step,
+      ...(w.mode ? { mode: w.mode } : {}),
+      families: w.families,
+      // Only the chosen families' skills, and only at the step that asks about them. Sending the
+      // whole catalogue would be seventy rows for a question about four.
+      skills:
+        w.step === "skills"
+          ? BUILTIN_SKILLS.filter((sk) => policy.groups.includes(sk.group) && !ALWAYS_ON.has(sk.name)).map((sk) => ({
+              name: sk.name,
+              description: sk.hint,
+              enabled: isSkillEnabled(sk.name, policy),
+              builtin: true,
+            }))
+          : [],
+    };
+  }
+
   /** The label of the suggestion the user waved away. Cleared by opening a different file. */
   private implicitDismissed: string | undefined;
 
@@ -1249,23 +1340,31 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     rows.push(separator(t("The editor")));
     if (active?.hasSelection) {
       rows.push({
-        label: "$(selection) " + t("Selection"),
+        label: "$(selection) " + t("The lines I have selected"),
         description: `${active.path} · ${active.selectedLines} ${active.selectedLines === 1 ? t("line") : t("lines")}`,
         run: () => this.attach("selection"),
       });
     }
     if (active) {
+      // Named for what it is rather than for how much of it. "Whole file" answers a question about
+      // granularity that nobody has asked yet; what the reader wants to know is WHICH file, and the
+      // answer is "the one in front of you".
       rows.push({
-        label: "$(file-code) " + t("Whole file"),
+        label: "$(file-code) " + t("The file I am looking at"),
         description: active.path,
         run: () => this.attach("editor"),
       });
     }
     if (files.length) {
       rows.push({
-        label: "$(files) " + t("Open editors"),
-        description: t("All {0} open files", files.length),
+        label: "$(files) " + t("All {0} open editors", files.length),
+        description: t("~{0} tokens", Math.round(files.length * 1200)),
         run: () => this.attach("openFiles"),
+      });
+      rows.push({
+        label: "$(list-selection) " + t("Choose from the open editors…"),
+        description: t("Tick the ones you want"),
+        run: () => this.pickOpenEditors(),
       });
     }
 
@@ -1345,6 +1444,31 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   }
 
   /**
+   * Which of the open tabs to attach.
+   *
+   * "All of them" and "this one" were the only two offers, and between a dozen tabs and one file
+   * there is an obvious middle that came up constantly: the four files this question is actually
+   * about. A multi-select over the tabs is that middle, and it costs one screen.
+   */
+  private async pickOpenEditors(): Promise<void> {
+    const files = openFiles();
+    if (!files.length) return;
+    const picked = await vscode.window.showQuickPick(
+      files.map((f) => ({
+        label: f.path,
+        description: f.active ? t("active") : f.dirty ? t("edited") : "",
+        // The tabs in front of you are ticked to start with only if there is exactly one; with a
+        // dozen open, pre-ticking them all would make "choose" mean "untick eleven".
+        picked: files.length === 1,
+        path: f.path,
+      })),
+      { canPickMany: true, placeHolder: t("Which open editors to attach?"), matchOnDescription: true },
+    );
+    if (!picked?.length) return;
+    for (const row of picked) await this.onMessage({ type: "attachPath", path: row.path });
+  }
+
+  /**
    * One mention, resolved as if it had been typed.
    *
    * The picker and the `#` notation must not be two implementations of "attach the diff": they
@@ -1370,23 +1494,37 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    * accepted is what is on, so there is no per-row save and nothing to get out of step.
    */
   private async toolsPicker(): Promise<void> {
+    const settings = readSettings();
     const skills = this.uiSkills();
-    type Row = vscode.QuickPickItem & { name?: string; agent?: string };
+    type Row = vscode.QuickPickItem & { name?: string; agent?: string; family?: SkillGroup };
     const rows: Row[] = [];
-    const builtin = skills.filter((sk) => sk.builtin);
-    const repo = skills.filter((sk) => !sk.builtin);
+    const sep = (label: string): Row => ({ label, kind: vscode.QuickPickItemKind.Separator });
 
-    // Grouped by language, because that is how the choice is actually made. With everything on, the
-    // `/` list runs to thirty entries and the model is handed thirty descriptions of things it will
-    // not do today — both cost precision. Someone working on a Python service wants Python and the
-    // general ones and wants the rest out of the way, which is one gesture when the list is grouped
-    // and thirty when it is not.
+    // ── Families first ──────────────────────────────────────────────────────────────────────
     //
-    // A multi-select quick pick replaces the WHOLE selection on accept, so ticking one group's
-    // boxes and nothing else is exactly "use these skills for this work" — the interaction the
-    // grouping exists to make possible.
-    const byGroup = new Map<string, typeof builtin>();
-    for (const sk of builtin) {
+    // One row per family, ticked when the family is in play. This is the "all of Python in one
+    // click" the individual list cannot give: a family that is off has no skills listed, so there
+    // is nothing to tick — the membership has to be its own row.
+    //
+    // Family rows govern MEMBERSHIP only, individual rows govern what is off inside a family that
+    // is in play. Keeping the two separate is what stops the picker contradicting itself: "Python
+    // is in play, and three of its skills are switched off" is a coherent state, and it would not
+    // be if one row meant both things.
+    rows.push(sep(t("Families — tick one to bring all of its skills into play")));
+    for (const group of SKILL_GROUPS) {
+      const count = BUILTIN_SKILLS.filter((sk) => sk.group === group.id).length;
+      rows.push({
+        label: `$(folder) ${group.label}`,
+        description: t("{0} skills", count),
+        detail: group.hint,
+        family: group.id,
+        picked: settings.skills.groups.includes(group.id),
+      });
+    }
+
+    // ── The skills of the families in play ──────────────────────────────────────────────────
+    const byGroup = new Map<string, typeof skills>();
+    for (const sk of skills.filter((x) => x.builtin)) {
       const group = BUILTIN_SKILLS.find((b) => b.name === sk.name)?.group ?? "general";
       const list = byGroup.get(group) ?? [];
       list.push(sk);
@@ -1395,37 +1533,45 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     for (const { id, label } of SKILL_GROUPS) {
       const list = byGroup.get(id);
       if (!list?.length) continue;
-      rows.push({ label, kind: vscode.QuickPickItemKind.Separator });
+      rows.push(sep(label));
       for (const sk of list) {
         rows.push({
-          label: sk.name,
+          label: `$(symbol-event) ${sk.name}`,
           description: sk.description,
-          // A required skill is shown, ticked and explained rather than hidden: a list missing an
-          // entry the user has seen in the composer reads as a bug.
           ...(sk.required ? { detail: t("Always available: it is how you free a full context.") } : {}),
           name: sk.name,
           picked: sk.enabled,
         });
       }
     }
+
+    const repo = skills.filter((sk) => !sk.builtin);
     if (repo.length) {
-      rows.push({ label: t("From this repository"), kind: vscode.QuickPickItemKind.Separator });
+      rows.push(sep(t("Skills this repository defines")));
       for (const sk of repo) {
-        rows.push({ label: sk.name, description: sk.description, detail: sk.source, name: sk.name, picked: sk.enabled });
+        rows.push({
+          label: `$(symbol-event) ${sk.name}`,
+          description: sk.description,
+          detail: sk.source,
+          name: sk.name,
+          picked: sk.enabled,
+        });
       }
     }
 
-    // The sub-agents, in the same list. From where the user stands a skill and a sub-agent are the
-    // same kind of thing — a named capability the assistant may reach for — and what differs is
-    // only that one is a prompt and the other is a nested turn with its own tools. Two pickers for
-    // one question would be two pickers.
+    // ── Sub-agents, set apart ───────────────────────────────────────────────────────────────
+    //
+    // A different icon and a heading that says what they are, because a sub-agent and a skill are
+    // not the same thing however similar they look in a list: one expands into a prompt, the other
+    // runs a nested turn with its own tools. In one undifferentiated column they read as more
+    // slash-commands with odd names.
     const found = await this.definitions.load();
-    const agentsOff = readSettings().agents.disabled;
+    const agentsOff = settings.agents.disabled;
     if (found.agents.length) {
-      rows.push({ label: t("Sub-agents"), kind: vscode.QuickPickItemKind.Separator });
+      rows.push(sep(t("Sub-agents — each runs on its own, with its own tools")));
       for (const agent of found.agents) {
         rows.push({
-          label: agent.name,
+          label: `$(person) ${agent.name}`,
           description: agent.description,
           detail: agent.source === "built-in" ? t("built in") : agent.source,
           agent: agent.name,
@@ -1436,21 +1582,29 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
     const picked = await vscode.window.showQuickPick(rows, {
       canPickMany: true,
-      placeHolder: t("What Hivey Code may reach for: skills and sub-agents"),
+      placeHolder: t("What Hivey Code may reach for: families, skills and sub-agents"),
       matchOnDescription: true,
+      matchOnDetail: true,
     });
     // Cancelled. Writing the empty selection would switch everything off because the user pressed
     // Escape, which is the opposite of what Escape means.
     if (!picked) return;
 
+    const groups = normaliseGroups(picked.map((row) => row.family).filter(Boolean) as SkillGroup[]);
+
+    // Only skills that were LISTED can have been unticked. A family newly brought into play had no
+    // rows, so its skills keep whatever they had — which for a first activation is "all on", and is
+    // exactly the one-click behaviour the family row promises.
+    const listed = new Set(rows.map((row) => row.name).filter(Boolean) as string[]);
     const on = new Set(picked.map((row) => row.name).filter(Boolean) as string[]);
-    let disabled = readSettings().skills.disabled;
-    for (const sk of skills) disabled = toggleSkill(disabled, sk.name, on.has(sk.name));
+    let disabled = settings.skills.disabled;
+    for (const name of listed) disabled = toggleSkill(disabled, name, on.has(name));
 
     const agentsOn = new Set(picked.map((row) => row.agent).filter(Boolean) as string[]);
     const agentsDisabled = found.agents.filter((a) => !agentsOn.has(a.name)).map((a) => a.name).sort();
 
     const config = vscode.workspace.getConfiguration(SECTION);
+    await config.update("skills.groups", groups, vscode.ConfigurationTarget.Global);
     await config.update("skills.disabled", disabled, vscode.ConfigurationTarget.Global);
     await config.update("agents.disabled", agentsDisabled, vscode.ConfigurationTarget.Global);
     this.sendState();
@@ -1838,6 +1992,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       !resolved.some((a) => a.label === implicit.label);
     const context = [...(useImplicit ? [implicit] : []), ...this.attachments, ...resolved];
 
+    // The guided start ends here, whatever step it was on: the user has asked their question, which
+    // is the thing it existed to lead up to.
+    this.wizard = undefined;
     this.session.add({ role: "user", text, context: context.length ? context : undefined });
     this.attachments = [];
     this.sendState();

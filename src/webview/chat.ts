@@ -50,6 +50,12 @@ export function chatScreen(state: UiState, deps: ChatDeps): HTMLElement {
 
 function transcript(state: UiState, deps: ChatDeps): HTMLElement {
   const list = el("div", "transcript");
+  // The guided start replaces the welcome, and both replace nothing: neither is a message, and when
+  // the first question is asked they are simply not drawn again.
+  if (state.wizard) {
+    list.append(wizardCard(state, state.wizard, deps));
+    return list;
+  }
   if (!state.session.entries.length) {
     list.append(welcome(state, deps));
     return list;
@@ -134,6 +140,132 @@ function welcome(state: UiState, deps: ChatDeps): HTMLElement {
   }
   w.append(tips);
   return w;
+}
+
+/**
+ * The guided start: three questions, then the floor.
+ *
+ * One question per screen rather than a form with three sections, because each answer narrows the
+ * next: the families you pick decide which skills are offered, and offering all seventy up front is
+ * the thing this exists to avoid. The steps are drawn from state and are not messages — when the
+ * first real question is asked they are gone, and the conversation looks like any other.
+ */
+function wizardCard(state: UiState, wizard: NonNullable<UiState["wizard"]>, deps: ChatDeps): HTMLElement {
+  const wrap = el("div", "wizard");
+
+  const head = el("div", "wizard-head");
+  const steps = ["mode", "family", "skills", "ready"] as const;
+  const at = steps.indexOf(wizard.step);
+  head.append(el("span", "wizard-step", t("Step {0} of 3", Math.min(at + 1, 3))));
+  head.append(el("div", "spacer"));
+  head.append(
+    button({
+      label: t("Skip"),
+      className: "btn tiny ghost",
+      title: t("Start an ordinary conversation instead"),
+      onClick: () => deps.send({ type: "wizardCancel" }),
+    }),
+  );
+  wrap.append(head);
+
+  if (wizard.step === "mode") {
+    wrap.append(el("h2", "wizard-title", t("What may Hivey Code do?")));
+    wrap.append(el("p", "wizard-lede", t("This decides which tools exist for the whole conversation, not how it is asked.")));
+    const cards = el("div", "welcome-cards");
+    for (const m of MODES) {
+      const card = el("button", "welcome-card");
+      card.append(el("span", "welcome-card-title", m.label));
+      card.append(el("span", "welcome-card-hint", m.hint));
+      card.addEventListener("click", () => deps.send({ type: "wizardAnswer", step: "mode", value: [m.id] }));
+      cards.append(card);
+    }
+    wrap.append(cards);
+    return wrap;
+  }
+
+  if (wizard.step === "family") {
+    wrap.append(el("h2", "wizard-title", t("What is this about?")));
+    wrap.append(el("p", "wizard-lede", t("It decides which skills are offered. Nothing is sent to answer it.")));
+    const chosen = new Set(wizard.families);
+    const chips = el("div", "welcome-chips");
+    for (const group of state.skillGroups) {
+      if (group.id === "general") continue;
+      const chip = el("button", `welcome-chip${chosen.has(group.id) ? " on" : ""}${group.suggested ? " suggested" : ""}`);
+      chip.append(el("span", "welcome-chip-label", group.label));
+      chip.title = group.suggested ? t("{0} — looks like what you have open", group.hint) : group.hint;
+      chip.addEventListener("click", () => {
+        if (chosen.has(group.id)) chosen.delete(group.id);
+        else chosen.add(group.id);
+        // Redrawn from the panel's own copy: the answer is only sent when the step is finished, so
+        // ticking four families is one write rather than four.
+        wizard.families = [...chosen];
+        deps.rerender();
+      });
+      chips.append(chip);
+    }
+    wrap.append(chips);
+    wrap.append(wizardFoot(deps, () => deps.send({ type: "wizardAnswer", step: "family", value: [...chosen] }), t("Continue")));
+    return wrap;
+  }
+
+  if (wizard.step === "skills") {
+    wrap.append(el("h2", "wizard-title", t("Which of these do you want?")));
+    wrap.append(
+      el("p", "wizard-lede", t("Everything ticked appears when you type “/”. Fewer means a shorter list and a sharper answer.")),
+    );
+    const on = new Set(wizard.skills.filter((sk) => sk.enabled).map((sk) => sk.name));
+    const list = el("div", "wizard-skills");
+    for (const sk of wizard.skills) {
+      const row = el("div", `skill-row${on.has(sk.name) ? " on" : ""}`);
+      const box = el("span", "skill-check", on.has(sk.name) ? "\u2611" : "\u25A2");
+      row.append(box);
+      const main = el("div", "skill-main");
+      main.append(el("div", "skill-name", sk.name));
+      main.append(el("div", "skill-desc", sk.description));
+      row.append(main);
+      row.addEventListener("click", () => {
+        const next = !row.classList.contains("on");
+        row.classList.toggle("on", next);
+        box.textContent = next ? "\u2611" : "\u25A2";
+        if (next) on.add(sk.name);
+        else on.delete(sk.name);
+      });
+      list.append(row);
+    }
+    wrap.append(list);
+    wrap.append(
+      wizardFoot(deps, () => deps.send({ type: "wizardAnswer", step: "skills", value: [...on] }), t("Use these")),
+    );
+    return wrap;
+  }
+
+  // Ready. The last screen says nothing but the question, because everything else has been settled
+  // and the only thing left is for the user to type.
+  wrap.classList.add("ready");
+  wrap.append(el("h2", "wizard-title", t("What would you like to do?")));
+  wrap.append(
+    el(
+      "p",
+      "wizard-lede",
+      t("{0} mode · {1} skills in play. Ask below, and attach what you need.", modeLabel(wizard.mode), state.skills.filter((sk) => sk.enabled).length),
+    ),
+  );
+  wrap.append(wizardFoot(deps, undefined, undefined));
+  return wrap;
+}
+
+function modeLabel(mode: Mode | undefined): string {
+  return MODES.find((m) => m.id === mode)?.label ?? MODES[2]!.label;
+}
+
+function wizardFoot(deps: ChatDeps, onNext: (() => void) | undefined, label: string | undefined): HTMLElement {
+  const foot = el("div", "wizard-foot");
+  foot.append(
+    button({ label: t("Back"), className: "btn tiny ghost", onClick: () => deps.send({ type: "wizardBack" }) }),
+  );
+  foot.append(el("div", "spacer"));
+  if (onNext && label) foot.append(button({ label, className: "btn tiny primary", onClick: onNext }));
+  return foot;
 }
 
 function renderEntry(entry: UiEntry, state: UiState, deps: ChatDeps): HTMLElement {
@@ -454,8 +586,10 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
     }
 
     for (const a of state.attachments) {
-      const chip = el("span", "chip removable", `${a.label}`);
-      chip.title = `${a.kind} · ~${formatTokens(a.tokens)} jetons`;
+      const chip = el("span", "chip removable");
+      chip.append(icon(chipIcon(a.kind), "chip-ico"));
+      chip.append(el("span", "chip-label", a.label));
+      chip.title = t("{0} · ~{1} tokens", a.kind, formatTokens(a.tokens));
       chip.append(
         button({
           icon: ICON.close,
@@ -465,6 +599,27 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
         }),
       );
       chips.append(chip);
+    }
+
+    // A heading over the row once there is more than one thing in it, with what the lot costs and
+    // one way to clear it. Chips alone answer "what is attached"; at four or five of them the
+    // question becomes "how much is this sending", and that is a number, not a list.
+    if (state.attachments.length > 1) {
+      const head = el("div", "context-head");
+      const total = state.attachments.reduce((sum, a) => sum + a.tokens, 0);
+      head.append(el("span", "context-count", t("Context — {0} items, ~{1} tokens", state.attachments.length, formatTokens(total))));
+      head.append(el("div", "spacer"));
+      head.append(
+        button({
+          label: t("Clear"),
+          className: "btn tiny ghost",
+          title: t("Remove everything attached"),
+          onClick: () => {
+            for (const a of state.attachments) deps.send({ type: "removeAttachment", label: a.label });
+          },
+        }),
+      );
+      card.append(head);
     }
     card.append(chips);
   }
@@ -643,6 +798,23 @@ function formatCost(usd: number): string {
   return `${usd.toFixed(2)} $`;
 }
 
+/** A chip's icon, from what the attachment is. The label says which one; this says what kind. */
+function chipIcon(kind: string): Parameters<typeof icon>[0] {
+  switch (kind) {
+    case "selection":
+    case "symbol":
+      return "edit";
+    case "conversation":
+    case "message":
+      return "history";
+    case "diff":
+    case "changes":
+      return "bringIn";
+    default:
+      return "file";
+  }
+}
+
 function autoGrow(area: HTMLTextAreaElement): void {
   area.style.height = "auto";
   // The floor matches the stylesheet's `min-height`. Two numbers for one decision is how a box
@@ -680,11 +852,14 @@ function contextButton(state: UiState, deps: ChatDeps): HTMLElement {
 
 /** Which skills are offered, in the editor's own multi-select picker. */
 function toolsButton(state: UiState, deps: ChatDeps): HTMLElement {
-  const off = state.skills.filter((sk) => !sk.enabled).length;
+  const on = state.skills.filter((sk) => sk.enabled).length;
   return button({
     icon: ICON.tools,
-    title: off ? t("Skills and sub-agents — {0} switched off", off) : t("Skills and sub-agents…"),
-    className: `btn ghost icon-only${off ? " has-off" : ""}`,
+    // The count of what is ON, in the tooltip. The badge that used to sit on this icon counted what
+    // was off, which was a signal while everything was on by default and became permanently lit the
+    // moment families became opt-in.
+    title: t("Skills and sub-agents — {0} in play", on),
+    className: "btn ghost icon-only",
     onClick: () => deps.send({ type: "openToolsPicker" }),
   });
 }
@@ -901,10 +1076,17 @@ function actionMessage(action: NonNullable<BuiltinSkill["action"]>): ToExtension
   }
 }
 
-/** The skills on offer right now: the built-in ones the user has left on. */
-function enabledSkills(state: UiState): BuiltinSkill[] {
-  const off = new Set(state.skills.filter((sk) => sk.builtin && !sk.enabled).map((sk) => sk.name));
-  return BUILTIN_SKILLS.filter((sk) => !off.has(sk.name));
+/**
+ * The skills on offer right now.
+ *
+ * Derived from the state the extension sends rather than from the catalogue, because the catalogue
+ * is every skill that exists and the state is the ones in play. Reading the catalogue and
+ * subtracting was the old shape, and it offered seventy commands to someone who had chosen four
+ * families — the filter has to be the other way round.
+ */
+function offeredSkills(state: UiState): BuiltinSkill[] {
+  const on = new Set(state.skills.filter((sk) => sk.builtin && sk.enabled).map((sk) => sk.name));
+  return BUILTIN_SKILLS.filter((sk) => on.has(sk.name));
 }
 
 /** The `#` notations, offered as the user types. Kept in step with the parser by a test. */
@@ -946,7 +1128,7 @@ function slashHints(container: HTMLElement, area: HTMLTextAreaElement, deps: Cha
   // A skill the user switched off is not offered, and — below, in `matchSlash` — not expanded
   // either. Hiding it from the list while still honouring it when typed would make the switch a
   // decoration.
-  const available = state ? enabledSkills(state) : BUILTIN_SKILLS;
+  const available = state ? offeredSkills(state) : BUILTIN_SKILLS;
   const repoSkills = (state?.skills ?? [])
     .filter((sk) => !sk.builtin && sk.enabled)
     .map((sk) => ({ name: sk.name, hint: sk.description }));
@@ -976,7 +1158,7 @@ function slashHints(container: HTMLElement, area: HTMLTextAreaElement, deps: Cha
 }
 
 function matchSlash(text: string, state?: UiState): BuiltinSkill | undefined {
-  const available = state ? enabledSkills(state) : BUILTIN_SKILLS;
+  const available = state ? offeredSkills(state) : BUILTIN_SKILLS;
   return available.find((c) => text === c.name || text.startsWith(`${c.name} `));
 }
 

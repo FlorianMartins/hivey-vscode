@@ -77,7 +77,39 @@ export function activate(context: vscode.ExtensionContext): void {
       completion.updateStatus(s);
     }),
 
+    // Unchanged, and deliberately silent: a command in the palette, or on a keybinding, must ACT.
+    // It briefly asked which kind of conversation to start, and the cost was immediate — anything
+    // that invoked it non-interactively waited for ever for an answer nobody was there to give.
     vscode.commands.registerCommand("hiveyCode.newSession", () => chat.newSession()),
+
+    /**
+     * Two ways to start, offered where the `+` already is.
+     *
+     * The ordinary one stays first, because it is what almost every conversation wants: the base
+     * skills, no questions. The guided one exists for the conversation worth setting up — a mode, a
+     * subject, and the handful of skills that go with it — and asking those three questions costs
+     * nothing, since none of it is sent anywhere.
+     */
+    vscode.commands.registerCommand("hiveyCode.newConversationMenu", async () => {
+      const plain = {
+        label: "$(add) " + t("New conversation"),
+        detail: t("The base skills, nothing to answer."),
+        guided: false,
+      };
+      const guided = {
+        label: "$(list-selection) " + t("Specialised conversation…"),
+        detail: t("Choose what it may do, what it is about, and which skills — then ask."),
+        guided: true,
+      };
+      const picked = await vscode.window.showQuickPick([plain, guided], {
+        placeHolder: t("How should this conversation start?"),
+      });
+      if (!picked) return;
+      await chat.reveal();
+      if (picked.guided) chat.startWizard();
+      else chat.newSession();
+    }),
+
     vscode.commands.registerCommand("hiveyCode.completionAccepted", () => completion.noteAccepted()),
 
     vscode.commands.registerCommand("hiveyCode.toggleCompletions", async () => {

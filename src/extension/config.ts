@@ -9,6 +9,7 @@
 
 import * as vscode from "vscode";
 import { t } from "../shared/i18n.js";
+import { DEFAULT_GROUPS, type SkillGroup, type SkillPolicy } from "../core/session/skills.js";
 import { makeProvider, type Provider, type ProviderId } from "../core/providers/index.js";
 import { isLocalEndpoint } from "../core/redaction/index.js";
 import type { RedactionLevel, RedactionPolicy } from "../core/redaction/types.js";
@@ -37,8 +38,8 @@ export interface Settings {
   };
   budget: { perRequestUsd: number; dailyUsd: number };
   context: { maxTokens: number; repoMap: boolean };
-  /** Which skills the user has switched off. Names, `/` included; absent means on. */
-  skills: { disabled: string[] };
+  /** Which families are in play, and which individual skills are off inside them. */
+  skills: SkillPolicy;
   /** Which sub-agents the user has switched off, by name. */
   agents: { disabled: string[] };
   panel: { minWidth: number };
@@ -103,7 +104,13 @@ export function readSettings(scope?: vscode.Uri): Settings {
       maxTokens: c.get<number>("context.maxTokens", 8000),
       repoMap: c.get<boolean>("context.repoMap", true),
     },
-    skills: { disabled: c.get<string[]>("skills.disabled", []) },
+    skills: {
+      // Families are opt-in and default to the ones that apply whatever is open. Everything else
+      // arrives switched off, which is the difference between offering a choice and pre-answering
+      // it. Individual skills inside an active family stay opt-OUT — see `SkillPolicy`.
+      groups: c.get<SkillGroup[]>("skills.groups", DEFAULT_GROUPS),
+      disabled: c.get<string[]>("skills.disabled", []),
+    },
     agents: { disabled: c.get<string[]>("agents.disabled", []) },
     panel: { minWidth: c.get<number>("panel.minWidth", 260) },
     permissions: {

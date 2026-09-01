@@ -41,49 +41,58 @@ export interface BuiltinSkill {
 
 export type SkillGroup =
   | "general"
-  | "web"
+  | "frontend"
+  | "javascript"
   | "python"
   | "java"
   | "dotnet"
-  | "systems"
-  | "mobile"
+  | "cpp"
+  | "go"
+  | "rust"
+  | "flutter"
   | "data"
   | "devops"
   | "design"
   | "security"
-  | "ibmi";
+  | "rpg"
+  | "dds"
+  | "db2i"
+  | "cl";
 
 /**
  * The families, in the order the picker shows them.
  *
- * General first, because it applies whatever is open. The rest are the kinds of work this tool is
- * actually used for, and they are deliberately coarse: a family per language would be twenty
- * headings to scroll, and "Go or Rust or C" is one decision for the person making it — they are
- * working on a systems codebase today and not on a web one.
+ * One per language or per body of practice, rather than the four coarse buckets this started as.
+ * "Systems" grouped C, Go and Rust together and that was a filing decision, not a user's: nobody
+ * works on all three today, and the point of choosing a family is to switch off what does not
+ * apply. The rule for splitting is whether the answer would differ — a Go developer and a Rust
+ * developer want different skills, an HTML author and a TypeScript author want different skills, so
+ * those are different families.
+ *
+ * Every family must hold at least three skills. A heading with one entry under it is a heading that
+ * makes the list longer without making the choice easier.
  */
 export const SKILL_GROUPS: Array<{ id: SkillGroup; label: string; hint: string }> = [
   { id: "general", label: t("Any language"), hint: t("Applies whatever you have open.") },
-  { id: "web", label: t("Web"), hint: t("HTML, CSS, JavaScript, TypeScript") },
-  { id: "python", label: "Python", hint: t("Tests, typing, packaging") },
-  { id: "java", label: "Java", hint: t("JUnit, Javadoc, streams, null-safety") },
-  { id: "dotnet", label: ".NET", hint: t("C#, LINQ, async, XML documentation") },
-  { id: "systems", label: t("Systems"), hint: t("C, C++, Go, Rust — memory, errors, concurrency") },
-  { id: "mobile", label: t("Mobile"), hint: t("Flutter and Dart, Swift, Kotlin") },
-  { id: "data", label: t("SQL & data"), hint: t("Queries, indexes, schema, migrations") },
+  { id: "frontend", label: t("HTML & CSS"), hint: t("Markup, styling, accessibility, responsive layout") },
+  { id: "javascript", label: t("JavaScript & TypeScript"), hint: t("Types, modules, async, browser performance") },
+  { id: "python", label: "Python", hint: t("Tests, typing, docstrings, idiom") },
+  { id: "java", label: "Java", hint: t("JUnit, Javadoc, streams, null-safety, concurrency") },
+  { id: "dotnet", label: t("C# & .NET"), hint: t("LINQ, async, XML documentation, tests") },
+  { id: "cpp", label: "C & C++", hint: t("Ownership, undefined behaviour, memory") },
+  { id: "go", label: "Go", hint: t("Table tests, errors, goroutines, modules") },
+  { id: "rust", label: "Rust", hint: t("Ownership, unsafe, errors, documentation") },
+  { id: "flutter", label: t("Flutter & Dart"), hint: t("Widgets, state, tests, adaptive layout") },
+  { id: "data", label: t("SQL & databases"), hint: t("Queries, indexes, schema, migrations") },
   { id: "devops", label: t("Build & deploy"), hint: t("Docker, CI, shell, configuration") },
-  { id: "design", label: t("Design & UX"), hint: t("Layout, typography, states, wording") },
+  { id: "design", label: t("Design & UX"), hint: t("Layout, states, wording, motion") },
   { id: "security", label: t("Security"), hint: t("Threats, authorisation, secrets, dependencies") },
-  { id: "ibmi", label: t("IBM i"), hint: t("RPG, DDS, display and printer files, CL, Db2 for i") },
+  { id: "rpg", label: t("RPG & ILE"), hint: t("Free-form conversion, procedures, embedded SQL") },
+  { id: "dds", label: t("DDS, display & printer files"), hint: t("PF, LF, DSPF, PRTF") },
+  { id: "db2i", label: t("Db2 for i"), hint: t("SQL, commitment control, catalogue, journalling") },
+  { id: "cl", label: "CL", hint: t("Programs, message handling, parameters") },
 ];
 
-/**
- * A skill is a prompt with a body of convention attached.
- *
- * The test that governs every entry below: it must name the tools, rules or idioms of its subject.
- * "Write tests, in Java" is the generic skill with a word changed and is worth nothing — what makes
- * `/junit` useful is `@ParameterizedTest`, `@Nested` and AssertJ, because those are what the model
- * will otherwise approximate.
- */
 export const BUILTIN_SKILLS: BuiltinSkill[] = [
   // ── Any language ────────────────────────────────────────────────────────────────────────────
   { group: "general", name: "/compact", hint: t("summarise the conversation and free the context"), action: "compact" },
@@ -100,13 +109,13 @@ export const BUILTIN_SKILLS: BuiltinSkill[] = [
   { group: "security", name: "/security", hint: t("security review"), prompt: t("Review this for security: injection through anything that reaches a query, a shell or a template; authorisation checked at the boundary rather than in the caller; secrets in code or logs; unsafe deserialisation. Rank by exploitability and say what an attacker would need."), attach: true },
 
   // ── Web ─────────────────────────────────────────────────────────────────────────────────────
-  { group: "web", name: "/a11y", hint: t("accessibility audit"), prompt: t("Audit this against WCAG 2.2 AA: the accessible name of every control, keyboard reachability and focus order, contrast, ARIA used where a native element would do, and what a screen reader announces. Cite the criterion for each finding and separate what is certain from what needs a browser."), attach: true },
-  { group: "web", name: "/semantic", hint: t("the right HTML elements"), prompt: t("Rewrite this markup with the elements that carry its meaning: landmarks, headings in order, lists for lists, buttons for actions and links for navigation. Say what each change gives a screen reader that the original did not."), attach: true },
-  { group: "web", name: "/css", hint: t("simplify the stylesheet"), prompt: t("Review this CSS: specificity that will be hard to override, magic numbers, layout done with hacks where the cascade or grid would do, and anything that breaks on a narrow screen or in the other colour scheme. Propose the simpler version."), attach: true },
-  { group: "web", name: "/responsive", hint: t("make it hold at every width"), prompt: t("Find where this breaks between a phone and a wide monitor: fixed widths, text that cannot wrap, tables and code that overflow, touch targets under 44 px. Fix it with the intrinsic sizing that removes the breakpoint rather than adding one."), attach: true },
-  { group: "web", name: "/types", hint: t("tighten the TypeScript types"), prompt: t("Tighten the types here: replace `any` and unchecked casts with types the compiler can verify, narrow rather than assert, and make impossible states unrepresentable. Change no behaviour, and say which changes would fail the build elsewhere."), attach: true },
-  { group: "web", name: "/jsdoc", hint: t("document the exported API"), prompt: t("Write JSDoc for what this module exports: the contract, the parameters, what is returned, what throws, and the example that removes the need to read the body. Do not restate the signature."), attach: true },
-  { group: "web", name: "/perf-web", hint: t("what makes the page slow"), prompt: t("Find what costs the most here: layout thrash, work on every keystroke or scroll without throttling, bundles pulled in for one function, images without dimensions. Give the cheapest fix for each and say what it is worth."), attach: true },
+  { group: "frontend", name: "/a11y", hint: t("accessibility audit"), prompt: t("Audit this against WCAG 2.2 AA: the accessible name of every control, keyboard reachability and focus order, contrast, ARIA used where a native element would do, and what a screen reader announces. Cite the criterion for each finding and separate what is certain from what needs a browser."), attach: true },
+  { group: "frontend", name: "/semantic", hint: t("the right HTML elements"), prompt: t("Rewrite this markup with the elements that carry its meaning: landmarks, headings in order, lists for lists, buttons for actions and links for navigation. Say what each change gives a screen reader that the original did not."), attach: true },
+  { group: "frontend", name: "/css", hint: t("simplify the stylesheet"), prompt: t("Review this CSS: specificity that will be hard to override, magic numbers, layout done with hacks where the cascade or grid would do, and anything that breaks on a narrow screen or in the other colour scheme. Propose the simpler version."), attach: true },
+  { group: "frontend", name: "/responsive", hint: t("make it hold at every width"), prompt: t("Find where this breaks between a phone and a wide monitor: fixed widths, text that cannot wrap, tables and code that overflow, touch targets under 44 px. Fix it with the intrinsic sizing that removes the breakpoint rather than adding one."), attach: true },
+  { group: "javascript", name: "/types", hint: t("tighten the TypeScript types"), prompt: t("Tighten the types here: replace `any` and unchecked casts with types the compiler can verify, narrow rather than assert, and make impossible states unrepresentable. Change no behaviour, and say which changes would fail the build elsewhere."), attach: true },
+  { group: "javascript", name: "/jsdoc", hint: t("document the exported API"), prompt: t("Write JSDoc for what this module exports: the contract, the parameters, what is returned, what throws, and the example that removes the need to read the body. Do not restate the signature."), attach: true },
+  { group: "javascript", name: "/perf-web", hint: t("what makes the page slow"), prompt: t("Find what costs the most here: layout thrash, work on every keystroke or scroll without throttling, bundles pulled in for one function, images without dimensions. Give the cheapest fix for each and say what it is worth."), attach: true },
 
   // ── Python ──────────────────────────────────────────────────────────────────────────────────
   { group: "python", name: "/pytest", hint: t("write pytest tests"), prompt: t("Write pytest tests for this: plain functions, fixtures for the setup, parametrize for the table of cases, and a name per test saying what it asserts. Cover the boundaries and the error paths, and use no mock where a real object is cheap."), attach: true },
@@ -129,20 +138,24 @@ export const BUILTIN_SKILLS: BuiltinSkill[] = [
   { group: "dotnet", name: "/nunit", hint: t("write the tests"), prompt: t("Write tests in the framework this project already uses (xUnit, NUnit or MSTest): one behaviour per test, data-driven cases where they are data, and a name that says what is asserted. Cover the exceptions."), attach: true },
 
   // ── Systems ─────────────────────────────────────────────────────────────────────────────────
-  { group: "systems", name: "/gotest", hint: t("write Go table tests"), prompt: t("Write Go tests in the table style: a slice of cases with names, t.Run per case, t.Parallel where it is safe, and the standard library rather than an assertion framework. Cover the error returns."), attach: true },
-  { group: "systems", name: "/goerr", hint: t("review the error handling"), prompt: t("Review the error handling: errors swallowed or logged and returned twice, missing context from %w, sentinel errors compared with == where errors.Is is needed, and defers that hide a failure to close."), attach: true },
-  { group: "systems", name: "/borrow", hint: t("review the Rust ownership"), prompt: t("Review the ownership here: clones that exist to satisfy the borrow checker rather than the design, lifetimes that could be elided, Rc/RefCell standing in for a structure that does not need shared mutation, and unwrap on a path that can fail."), attach: true },
-  { group: "systems", name: "/unsafe", hint: t("justify or remove the unsafe"), prompt: t("For each unsafe block or raw pointer here: state the invariant that makes it sound, or show the safe construction that removes it. Treat an unsafe block without a written invariant as a defect."), attach: true },
-  { group: "systems", name: "/raii", hint: t("make the lifetime the type's job"), prompt: t("Rewrite this C++ so ownership is expressed in types: unique_ptr or a value where a raw owning pointer is used, RAII for anything acquired and released, the rule of zero where the compiler can write the special members. Say what each change makes impossible."), attach: true },
-  { group: "systems", name: "/undefined", hint: t("find the undefined behaviour"), prompt: t("Find the undefined behaviour here: reads past a bound, signed overflow, strict-aliasing violations, uninitialised reads, use after move, and lifetimes ending before the last use. For each, say what a compiler is permitted to do with it."), attach: true },
-  { group: "systems", name: "/memory", hint: t("who owns what"), prompt: t("Trace ownership through this code: what allocates, what frees, what can be used after free or freed twice, and where a bound is checked. Propose the structure that makes the lifetime obvious rather than a comment claiming it."), attach: true },
+  { group: "go", name: "/gotest", hint: t("write Go table tests"), prompt: t("Write Go tests in the table style: a slice of cases with names, t.Run per case, t.Parallel where it is safe, and the standard library rather than an assertion framework. Cover the error returns."), attach: true },
+  { group: "go", name: "/goroutines", hint: t("review the goroutines"), prompt: t("Review the concurrency here: goroutines started and never joined, channels that can block for ever, a context accepted and not honoured, and shared state without a mutex or a channel. Say what would deadlock and under what conditions."), attach: true },
+  { group: "go", name: "/gomod", hint: t("review the module"), prompt: t("Review this module: dependencies pulled in for one function, versions that are not pinned where they matter, a replace directive left from local work, and packages that would be better internal. Say what each change costs."), attach: true },
+  { group: "go", name: "/goerr", hint: t("review the error handling"), prompt: t("Review the error handling: errors swallowed or logged and returned twice, missing context from %w, sentinel errors compared with == where errors.Is is needed, and defers that hide a failure to close."), attach: true },
+  { group: "rust", name: "/borrow", hint: t("review the Rust ownership"), prompt: t("Review the ownership here: clones that exist to satisfy the borrow checker rather than the design, lifetimes that could be elided, Rc/RefCell standing in for a structure that does not need shared mutation, and unwrap on a path that can fail."), attach: true },
+  { group: "rust", name: "/rusterr", hint: t("review the error handling"), prompt: t("Review the errors here: unwrap and expect on paths that can fail, a single error type doing the work of several, missing From impls that would let ? work, and errors that lose their cause. Propose the enum the caller can actually match on."), attach: true },
+  { group: "rust", name: "/rustdoc", hint: t("document the crate"), prompt: t("Write doc comments for what this crate exports: what it is for, the invariants, what panics and when, and an example that compiles. Use //! for the module and /// for items, and link other items with square brackets."), attach: true },
+  { group: "rust", name: "/unsafe", hint: t("justify or remove the unsafe"), prompt: t("For each unsafe block or raw pointer here: state the invariant that makes it sound, or show the safe construction that removes it. Treat an unsafe block without a written invariant as a defect."), attach: true },
+  { group: "cpp", name: "/raii", hint: t("make the lifetime the type's job"), prompt: t("Rewrite this C++ so ownership is expressed in types: unique_ptr or a value where a raw owning pointer is used, RAII for anything acquired and released, the rule of zero where the compiler can write the special members. Say what each change makes impossible."), attach: true },
+  { group: "cpp", name: "/undefined", hint: t("find the undefined behaviour"), prompt: t("Find the undefined behaviour here: reads past a bound, signed overflow, strict-aliasing violations, uninitialised reads, use after move, and lifetimes ending before the last use. For each, say what a compiler is permitted to do with it."), attach: true },
+  { group: "cpp", name: "/memory", hint: t("who owns what"), prompt: t("Trace ownership through this code: what allocates, what frees, what can be used after free or freed twice, and where a bound is checked. Propose the structure that makes the lifetime obvious rather than a comment claiming it."), attach: true },
 
   // ── Mobile ──────────────────────────────────────────────────────────────────────────────────
-  { group: "mobile", name: "/widget", hint: t("review the widget tree"), prompt: t("Review this widget tree: work done in build(), const constructors missing where the subtree never changes, setState rebuilding more than it needs, and layout that overflows on a small screen. Give the restructured tree."), attach: true },
-  { group: "mobile", name: "/darttest", hint: t("write the Flutter tests"), prompt: t("Write tests for this in the right kind: a unit test for pure logic, a widget test with pumpWidget and finders for the UI, a golden test where the look is the contract. Name each test for the behaviour it pins."), attach: true },
-  { group: "mobile", name: "/state", hint: t("review the state management"), prompt: t("Review how state is held here: state above the widget that owns it, rebuilds wider than the change, controllers and streams never disposed, and business logic inside a widget. Propose the arrangement that fits the pattern this project already uses."), attach: true },
-  { group: "mobile", name: "/dartdoc", hint: t("document the Dart API"), prompt: t("Write doc comments for what this library exports: the contract, the parameters, what is returned, what throws, and a short example. Use /// and reference other symbols with square brackets."), attach: true },
-  { group: "mobile", name: "/adaptive", hint: t("make it hold on every device"), prompt: t("Find where this breaks between a small phone and a tablet: hard-coded sizes, text that ignores the platform scale factor, touch targets under 48 dp, and layout that assumes one orientation. Fix it with layout that adapts rather than with a device check."), attach: true },
+  { group: "flutter", name: "/widget", hint: t("review the widget tree"), prompt: t("Review this widget tree: work done in build(), const constructors missing where the subtree never changes, setState rebuilding more than it needs, and layout that overflows on a small screen. Give the restructured tree."), attach: true },
+  { group: "flutter", name: "/darttest", hint: t("write the Flutter tests"), prompt: t("Write tests for this in the right kind: a unit test for pure logic, a widget test with pumpWidget and finders for the UI, a golden test where the look is the contract. Name each test for the behaviour it pins."), attach: true },
+  { group: "flutter", name: "/state", hint: t("review the state management"), prompt: t("Review how state is held here: state above the widget that owns it, rebuilds wider than the change, controllers and streams never disposed, and business logic inside a widget. Propose the arrangement that fits the pattern this project already uses."), attach: true },
+  { group: "flutter", name: "/dartdoc", hint: t("document the Dart API"), prompt: t("Write doc comments for what this library exports: the contract, the parameters, what is returned, what throws, and a short example. Use /// and reference other symbols with square brackets."), attach: true },
+  { group: "flutter", name: "/adaptive", hint: t("make it hold on every device"), prompt: t("Find where this breaks between a small phone and a tablet: hard-coded sizes, text that ignores the platform scale factor, touch targets under 48 dp, and layout that assumes one orientation. Fix it with layout that adapts rather than with a device check."), attach: true },
 
   // ── SQL & data ──────────────────────────────────────────────────────────────────────────────
   { group: "data", name: "/query", hint: t("review the query"), prompt: t("Review this query: what it will scan, whether the predicates are sargable, joins that multiply rows, and correlated subqueries that run per row. Give the rewrite and say what you expect the plan to change to."), attach: true },
@@ -177,17 +190,21 @@ export const BUILTIN_SKILLS: BuiltinSkill[] = [
   // The largest family, and the reason the dialect rules in core exist: a model that guesses at
   // column positions produces a member that looks right, compiles into something else, and fails
   // in a spool file.
-  { group: "ibmi", name: "/tofree", hint: t("convert fixed-format RPG to fully free"), prompt: t("Convert this member to fully free-form RPGLE. Start with **FREE, use dcl-f/dcl-s/dcl-ds/dcl-proc, keep every comment, and change no behaviour. Point out anything with no free-form equivalent instead of inventing one."), attach: true },
-  { group: "ibmi", name: "/sql", hint: t("write it as Db2 for i SQL"), prompt: t("Write this as Db2 for i SQL. Qualify the objects, use FETCH FIRST rather than LIMIT, and say which library list the unqualified names would resolve against."), attach: true },
-  { group: "ibmi", name: "/dds", hint: t("explain this DDS"), prompt: t("Explain this DDS member: the record formats, the key fields, the keywords that change behaviour, and anything that would surprise someone reading it for the first time."), attach: true },
-  { group: "ibmi", name: "/dspf", hint: t("review this display file"), prompt: t("Review this DSPF: the record formats and their overlay order, indicators and what each one drives, CFxx/CAxx keys and where they are handled, subfile control and whether the size is right, and the DDS keywords that will surprise the next reader."), attach: true },
-  { group: "ibmi", name: "/prtf", hint: t("review this printer file"), prompt: t("Review this PRTF: page size and orientation against the form, the record formats and their line positions, overflow handling, and the editing that will change the printed value. Say what breaks if the form changes."), attach: true },
-  { group: "ibmi", name: "/cl", hint: t("review this CL"), prompt: t("Review this CL program: MONMSG placed where it can hide a real failure, unqualified object references and what the library list would resolve them to, overrides never deleted, and the return code the caller sees."), attach: true },
-  { group: "ibmi", name: "/embedsql", hint: t("review the embedded SQL"), prompt: t("Review this embedded SQL in RPG: SQLCODE and SQLSTATE checked after every statement, host variables sized to their columns, cursors closed on every path, literals that should be parameter markers, and the isolation level in force."), attach: true },
-  { group: "ibmi", name: "/ile", hint: t("review the ILE structure"), prompt: t("Review this as ILE: what belongs in a service program rather than in the program, the procedures that should be exported and their prototypes, the activation group and what it means for open files and commitment, and the binding directory this needs."), attach: true },
-  { group: "ibmi", name: "/rpgdoc", hint: t("document this member"), prompt: t("Document this member the way an RPG shop reads: a header saying what it is for and what calls it, a note per procedure, and the files it uses with what it does to each. Keep the column layout untouched if the member is fixed-format."), attach: true },
-  { group: "ibmi", name: "/commitctl", hint: t("review the commitment control"), prompt: t("Review the commitment control here: what is under commit and what is not, where COMMIT and ROLLBACK are issued, what happens on an unhandled error, and whether the activation group scope matches the unit of work.") },
-  { group: "ibmi", name: "/dbmodern", hint: t("modernise the data access"), prompt: t("Propose the SQL replacement for these native I/O operations (CHAIN, SETLL, READE): the query, whether a cursor or a single fetch is right, and what changes about record locking and about the record format the program expects. Say where native I/O should stay."), attach: true },
+  { group: "rpg", name: "/tofree", hint: t("convert fixed-format RPG to fully free"), prompt: t("Convert this member to fully free-form RPGLE. Start with **FREE, use dcl-f/dcl-s/dcl-ds/dcl-proc, keep every comment, and change no behaviour. Point out anything with no free-form equivalent instead of inventing one."), attach: true },
+  { group: "db2i", name: "/sql", hint: t("write it as Db2 for i SQL"), prompt: t("Write this as Db2 for i SQL. Qualify the objects, use FETCH FIRST rather than LIMIT, and say which library list the unqualified names would resolve against."), attach: true },
+  { group: "dds", name: "/dds", hint: t("explain this DDS"), prompt: t("Explain this DDS member: the record formats, the key fields, the keywords that change behaviour, and anything that would surprise someone reading it for the first time."), attach: true },
+  { group: "dds", name: "/dspf", hint: t("review this display file"), prompt: t("Review this DSPF: the record formats and their overlay order, indicators and what each one drives, CFxx/CAxx keys and where they are handled, subfile control and whether the size is right, and the DDS keywords that will surprise the next reader."), attach: true },
+  { group: "dds", name: "/prtf", hint: t("review this printer file"), prompt: t("Review this PRTF: page size and orientation against the form, the record formats and their line positions, overflow handling, and the editing that will change the printed value. Say what breaks if the form changes."), attach: true },
+  { group: "cl", name: "/clparm", hint: t("review the command definition"), prompt: t("Review this command definition: parameter types and lengths against what the program expects, defaults that hide a required choice, prompt text that says what the value is for, and validity checking done in the CMD rather than in the program."), attach: true },
+  { group: "cl", name: "/clerr", hint: t("review the message handling"), prompt: t("Review the message handling here: MONMSG with no message id, escape messages resent so the caller sees them, diagnostic messages left in the job log without an escape, and the message file the program depends on. Say what the caller learns when this fails."), attach: true },
+  { group: "cl", name: "/cl", hint: t("review this CL"), prompt: t("Review this CL program: MONMSG placed where it can hide a real failure, unqualified object references and what the library list would resolve them to, overrides never deleted, and the return code the caller sees."), attach: true },
+  { group: "rpg", name: "/embedsql", hint: t("review the embedded SQL"), prompt: t("Review this embedded SQL in RPG: SQLCODE and SQLSTATE checked after every statement, host variables sized to their columns, cursors closed on every path, literals that should be parameter markers, and the isolation level in force."), attach: true },
+  { group: "rpg", name: "/ile", hint: t("review the ILE structure"), prompt: t("Review this as ILE: what belongs in a service program rather than in the program, the procedures that should be exported and their prototypes, the activation group and what it means for open files and commitment, and the binding directory this needs."), attach: true },
+  { group: "rpg", name: "/rpgdoc", hint: t("document this member"), prompt: t("Document this member the way an RPG shop reads: a header saying what it is for and what calls it, a note per procedure, and the files it uses with what it does to each. Keep the column layout untouched if the member is fixed-format."), attach: true },
+  { group: "db2i", name: "/journal", hint: t("review the journalling"), prompt: t("Review journalling here: which files are journalled and which are not, what the journal receivers cost and when they are detached, and what a recovery would actually be able to replay. Say what is lost if the system ends abnormally now."), },
+  { group: "db2i", name: "/qsys2", hint: t("use the catalogue instead"), prompt: t("Replace this with a QSYS2 or SYSTOOLS service where one exists — object lists, job information, journal entries, IFS objects — rather than a command whose output has to be parsed. Give the query and say what it returns that the command did not."), attach: true },
+  { group: "db2i", name: "/commitctl", hint: t("review the commitment control"), prompt: t("Review the commitment control here: what is under commit and what is not, where COMMIT and ROLLBACK are issued, what happens on an unhandled error, and whether the activation group scope matches the unit of work.") },
+  { group: "rpg", name: "/dbmodern", hint: t("modernise the data access"), prompt: t("Propose the SQL replacement for these native I/O operations (CHAIN, SETLL, READE): the query, whether a cursor or a single fetch is right, and what changes about record locking and about the record format the program expects. Say where native I/O should stay."), attach: true },
 ];
 
 /**
@@ -200,17 +217,36 @@ export const BUILTIN_SKILLS: BuiltinSkill[] = [
  */
 export const ALWAYS_ON = new Set(["/compact"]);
 
+/** The families in play by default: the ones that apply whatever you have open, and nothing else. */
+export const DEFAULT_GROUPS: SkillGroup[] = ["general"];
+
 /**
- * Whether a skill is on.
+ * Which skills are on, in two parts — and the two parts are not the same kind of thing.
  *
- * The stored list holds what is DISABLED rather than what is enabled, and that asymmetry is
- * deliberate: a skill added by a future version, or by a colleague committing a file, is on by
- * default. Storing the enabled set instead would mean every new skill arrives switched off and
- * invisible, which is how a feature ships and nobody ever sees it.
+ * A FAMILY is opt-in. Only `general` is on to begin with, because the alternative is what this
+ * started as: seventy skills all enabled, a `/` list nobody can read, and — the reason the user
+ * noticed — every box ticked in a picker whose whole purpose is choosing. Being handed a
+ * pre-answered question is worse than being handed no question.
+ *
+ * A SKILL inside an active family is opt-OUT, and the asymmetry is deliberate: a skill added by an
+ * update, or committed by a colleague, into a family you already use should arrive working. Storing
+ * the enabled set instead would ship every future skill switched off and invisible.
  */
-export function isSkillEnabled(name: string, disabled: string[]): boolean {
+export interface SkillPolicy {
+  /** Families in play. */
+  groups: SkillGroup[];
+  /** Individual skills switched off inside an active family. */
+  disabled: string[];
+}
+
+export function isSkillEnabled(name: string, policy: SkillPolicy | string[]): boolean {
   if (ALWAYS_ON.has(name)) return true;
-  return !disabled.includes(name);
+  // The array form is the old shape, kept because repository skills have no family and are governed
+  // by the disabled list alone.
+  if (Array.isArray(policy)) return !policy.includes(name);
+  const skill = BUILTIN_SKILLS.find((s) => s.name === name);
+  if (skill && !policy.groups.includes(skill.group)) return false;
+  return !policy.disabled.includes(name);
 }
 
 /** The stored list after a toggle. Kept sorted and unique so the setting file stays readable. */
@@ -223,35 +259,28 @@ export function toggleSkill(disabled: string[], name: string, enabled: boolean):
 }
 
 /**
- * The stored list after choosing which families to work with.
+ * The families after a choice, with `general` always kept.
  *
- * Everything outside the chosen families is switched off and everything inside is switched on, in
- * one write. `general` is always kept: it is the set that applies whatever is open, and a profile
- * that silenced `/fix` because you said "Web" would be a profile nobody uses twice.
+ * A profile that silenced `/fix` because you said "Rust" would be a profile nobody uses twice.
  */
-export function applyGroups(groups: SkillGroup[]): string[] {
-  const keep = new Set<SkillGroup>([...groups, "general"]);
-  return BUILTIN_SKILLS.filter((s) => !keep.has(s.group) && !ALWAYS_ON.has(s.name))
-    .map((s) => s.name)
-    .sort();
+export function normaliseGroups(groups: SkillGroup[]): SkillGroup[] {
+  const known = new Set(SKILL_GROUPS.map((g) => g.id));
+  const kept = new Set<SkillGroup>(["general", ...groups.filter((g) => known.has(g))]);
+  return SKILL_GROUPS.map((g) => g.id).filter((id) => kept.has(id));
 }
 
-/** Which families are fully on, for showing the current profile back to the user. */
-export function activeGroups(disabled: string[]): SkillGroup[] {
-  const off = new Set(disabled);
-  return SKILL_GROUPS.map((g) => g.id).filter((id) =>
-    BUILTIN_SKILLS.some((s) => s.group === id && !off.has(s.name)),
-  );
+/** The skills a policy actually offers, in catalogue order. */
+export function enabledSkills(policy: SkillPolicy): BuiltinSkill[] {
+  return BUILTIN_SKILLS.filter((s) => isSkillEnabled(s.name, policy));
 }
 
 /**
  * What the workspace looks like it is made of.
  *
- * A suggestion, never an imposition — offered as the pre-ticked answer on a new conversation, where
- * the user can change it in one click. Detection from the languages the editor has actually opened
- * rather than from a file scan: the point is to guess well enough that most people accept the guess,
- * and what someone has open is a far better signal of what they are working on today than what the
- * repository contains.
+ * A suggestion, never an imposition — offered as the pre-ticked answer where the user can change it
+ * in one click. Detection from the languages the editor has actually opened rather than from a file
+ * scan: what someone has open is a far better signal of what they are working on today than what
+ * the repository contains, and a monorepo contains everything.
  *
  * Returns an empty list when nothing is recognised, which the caller reads as "ask, do not assume".
  */
@@ -259,16 +288,21 @@ export function detectGroups(languageIds: string[]): SkillGroup[] {
   const seen = new Set(languageIds.map((id) => id.toLowerCase()));
   const has = (...ids: string[]) => ids.some((id) => seen.has(id));
   const found: SkillGroup[] = [];
-  if (has("html", "css", "scss", "less", "javascript", "javascriptreact", "typescript", "typescriptreact", "vue", "svelte"))
-    found.push("web");
+  if (has("html", "css", "scss", "less", "vue", "svelte", "handlebars")) found.push("frontend");
+  if (has("javascript", "javascriptreact", "typescript", "typescriptreact")) found.push("javascript");
   if (has("python")) found.push("python");
   if (has("java", "kotlin", "groovy")) found.push("java");
   if (has("csharp", "fsharp", "vb")) found.push("dotnet");
-  if (has("go", "rust", "c", "cpp", "zig")) found.push("systems");
+  if (has("c", "cpp", "objective-c", "objective-cpp")) found.push("cpp");
+  if (has("go")) found.push("go");
+  if (has("rust")) found.push("rust");
+  if (has("dart")) found.push("flutter");
   if (has("sql", "plsql", "postgres", "mysql")) found.push("data");
   if (has("dockerfile", "shellscript", "yaml", "terraform", "makefile")) found.push("devops");
-  if (has("rpgle", "rpg", "sqlrpgle", "dds", "dds.pf", "dds.lf", "dds.dspf", "dds.prtf", "cl", "clle", "cobol"))
-    found.push("ibmi");
+  if (has("rpgle", "rpg", "sqlrpgle")) found.push("rpg");
+  if (has("dds", "dds.pf", "dds.lf", "dds.dspf", "dds.prtf")) found.push("dds");
+  if (has("db2", "sqlrpgle")) found.push("db2i");
+  if (has("cl", "clle", "cmd")) found.push("cl");
   return found;
 }
 

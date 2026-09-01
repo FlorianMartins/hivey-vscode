@@ -2,6 +2,48 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.16.0 — 2026-09-01
+
+### Added
+
+- **A specialised conversation**, from the `+` at the top. Three questions, answered locally and in
+  order because each narrows the next: what may it do, what is this about, and which of those skills
+  do you want — then "What would you like to do?" and the floor is yours. Nothing it produces is a
+  message: the steps are drawn from state and are gone the moment you ask something, so a
+  specialised conversation looks like any other afterwards.
+- **Eighteen families instead of nine.** HTML & CSS and JavaScript & TypeScript are separate, as are
+  C & C++, Go and Rust, and IBM i is now RPG & ILE, DDS, Db2 for i and CL. A Go developer and a Rust
+  developer want different skills; "Systems" was a filing decision, not a user's. Every family holds
+  at least three skills, asserted by a test.
+- **Pick a whole family in one click** in the skills picker: family rows govern membership, the rows
+  under them govern what is off inside a family in play. Sub-agents sit under their own heading with
+  their own icon, because a nested turn with its own tools is not a slash-command.
+- **The open editors, properly.** "All N open editors", and a picker to tick the four you mean.
+
+### Changed
+
+- **Families are opt-in and only the general one starts on.** Everything was ticked in a picker
+  whose purpose is choosing, which is worse than no question at all. Skills INSIDE a family in play
+  stay opt-out, so one committed by a colleague into a family you use arrives working.
+- **Narrower side margins** through the transcript, the composer and the guided start. At 280 px the
+  old padding was six per cent of the line, spent on habit.
+- **The attachments row** gains a heading with the count and total once there is more than one, a
+  way to clear it, an icon per kind, and a scroll rather than half the panel.
+- "Whole file" is now **"The file I am looking at"**, and "Selection" **"The lines I have
+  selected"** — the reader's question is *which* file, not how much of it.
+- **No badge on the skills icon.** It counted what was off, which was a signal while everything was
+  on by default and became permanently lit the moment families became opt-in.
+
+### Fixed
+
+- **"Open editors" was empty for anyone with tabs they had not clicked.** It read
+  `workspace.textDocuments`, which holds the documents the editor has *loaded* — a tab restored from
+  the last session and never focused is not among them. It reads `window.tabGroups` now, which is
+  what the Open Editors view itself reads.
+- **`hiveyCode.newSession` asked a question**, which broke anything invoking it non-interactively. A
+  command on a keybinding or in the palette must act; the choice belongs to the `+`, and now lives
+  in a command of its own.
+
 ## 0.15.1 — 2026-09-01
 
 ### Added

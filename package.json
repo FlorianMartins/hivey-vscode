@@ -2,7 +2,7 @@
   "name": "hivey-code",
   "displayName": "Hivey Code",
   "description": "%extension.description%",
-  "version": "0.15.1",
+  "version": "0.16.0",
   "publisher": "hivey",
   "license": "Apache-2.0",
   "repository": {
@@ -254,6 +254,12 @@
         "title": "%command.setLanguage.title%",
         "category": "Hivey Code",
         "icon": "$(globe)"
+      },
+      {
+        "command": "hiveyCode.newConversationMenu",
+        "title": "%command.newConversationMenu.title%",
+        "category": "Hivey Code",
+        "icon": "$(add)"
       }
     ],
     "menus": {
@@ -264,7 +270,7 @@
           "group": "navigation@0"
         },
         {
-          "command": "hiveyCode.newSession",
+          "command": "hiveyCode.newConversationMenu",
           "when": "view == hiveyCode.chat || view == hiveyCode.chatSide",
           "group": "navigation@1"
         },
@@ -653,6 +659,16 @@
           "minimum": 0,
           "maximum": 600,
           "markdownDescription": "%config.panel.minWidth%"
+        },
+        "hiveyCode.skills.groups": {
+          "type": "array",
+          "default": [
+            "general"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "markdownDescription": "%config.skills.groups%"
         },
         "hiveyCode.skills.disabled": {
           "type": "array",

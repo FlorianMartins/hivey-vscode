@@ -2,7 +2,18 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ALWAYS_ON, BUILTIN_SKILLS, isSkillEnabled, SKILL_GROUPS, skillInvocation, toggleSkill } from "../src/core/session/skills.js";
+import {
+  ALWAYS_ON,
+  BUILTIN_SKILLS,
+  DEFAULT_GROUPS,
+  detectGroups,
+  enabledSkills,
+  isSkillEnabled,
+  normaliseGroups,
+  SKILL_GROUPS,
+  skillInvocation,
+  toggleSkill,
+} from "../src/core/session/skills.js";
 
 test("a skill nobody has switched off is on", () => {
   assert.equal(isSkillEnabled("/tests", []), true);
@@ -95,4 +106,85 @@ test("a language skill names the tools of its language, not just its language", 
   assert.match(find("/pytest"), /parametrize/);
   assert.match(find("/a11y"), /WCAG/);
   assert.match(find("/hints"), /mypy/);
+});
+
+// ── Families are opt-in, skills are opt-out ──────────────────────────────────────────────────
+//
+// The asymmetry is the whole model, and it exists because of a real complaint: every box was
+// ticked in a picker whose purpose is choosing. Being handed a pre-answered question is worse than
+// being handed no question.
+
+test("only the general family is in play to begin with", () => {
+  assert.deepEqual(DEFAULT_GROUPS, ["general"]);
+  const policy = { groups: DEFAULT_GROUPS, disabled: [] };
+  assert.equal(isSkillEnabled("/fix", policy), true, "a general skill is on");
+  assert.equal(isSkillEnabled("/pytest", policy), false, "a Python skill is not");
+  assert.equal(isSkillEnabled("/tofree", policy), false, "nor an RPG one");
+});
+
+test("choosing a family brings all of its skills, without touching the others", () => {
+  const policy = { groups: normaliseGroups(["python"]), disabled: [] };
+  const on = enabledSkills(policy).map((s) => s.name);
+  assert.ok(on.includes("/pytest"));
+  assert.ok(on.includes("/fix"), "general comes along, always");
+  assert.ok(!on.includes("/junit"), "and Java does not");
+});
+
+test("general survives every choice", () => {
+  // A profile that silenced /fix because you said "Rust" is a profile nobody uses twice.
+  assert.ok(normaliseGroups(["rust"]).includes("general"));
+  assert.ok(normaliseGroups([]).includes("general"));
+});
+
+test("families are returned in catalogue order, deduplicated, and unknown ones dropped", () => {
+  const out = normaliseGroups(["rust", "python", "rust", "nonsense" as never]);
+  assert.deepEqual(out, SKILL_GROUPS.map((g) => g.id).filter((id) => out.includes(id)));
+  assert.equal(new Set(out).size, out.length);
+  assert.ok(!out.includes("nonsense" as never));
+});
+
+test("a skill switched off inside an active family stays off", () => {
+  const policy = { groups: normaliseGroups(["python"]), disabled: ["/pytest"] };
+  assert.equal(isSkillEnabled("/pytest", policy), false);
+  assert.equal(isSkillEnabled("/hints", policy), true);
+});
+
+test("a skill switched off in a family that is not in play does not come back on activation", () => {
+  // Because the two lists answer different questions: membership and per-skill preference. Turning
+  // Python on must not undo the four Python skills you switched off last week.
+  const disabled = ["/pytest"];
+  assert.equal(isSkillEnabled("/pytest", { groups: normaliseGroups(["python"]), disabled }), false);
+});
+
+test("compacting survives an empty policy", () => {
+  assert.equal(isSkillEnabled("/compact", { groups: [], disabled: ["/compact"] }), true);
+});
+
+// ── Detection ────────────────────────────────────────────────────────────────────────────────
+
+test("what the editor has open suggests the families, and nothing else", () => {
+  assert.deepEqual(detectGroups(["python"]), ["python"]);
+  assert.deepEqual(detectGroups(["typescriptreact", "css"]).sort(), ["frontend", "javascript"]);
+  assert.ok(detectGroups(["rpgle"]).includes("rpg"));
+  assert.ok(detectGroups(["dds.dspf"]).includes("dds"));
+});
+
+test("an unrecognised workspace suggests nothing, rather than guessing", () => {
+  // The caller reads an empty list as "ask, do not assume".
+  assert.deepEqual(detectGroups(["cobol", "fortran"]), []);
+  assert.deepEqual(detectGroups([]), []);
+});
+
+test("every family holds at least three skills", () => {
+  // A heading with one entry under it makes the list longer without making the choice easier.
+  for (const group of SKILL_GROUPS) {
+    const count = BUILTIN_SKILLS.filter((s) => s.group === group.id).length;
+    assert.ok(count >= 3, `the "${group.id}" family holds only ${count}`);
+  }
+});
+
+test("nothing is offered by a family nobody selected", () => {
+  const names = enabledSkills({ groups: ["general"], disabled: [] }).map((s) => s.name);
+  assert.ok(!names.some((n) => ["/a11y", "/junit", "/borrow", "/dspf"].includes(n)));
+  assert.ok(names.length >= 8 && names.length <= 15, `general should be a handful, got ${names.length}`);
 });

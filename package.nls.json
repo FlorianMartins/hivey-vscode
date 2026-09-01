@@ -75,5 +75,7 @@
   "config.skills.disabled": "Skills that are not offered in the `/` list, by name (`/tests`). Toggled from the skills button in the composer. Storing what is OFF rather than what is on means a skill added by an update, or by a colleague committing a file, arrives switched on rather than invisible.",
   "config.privacy.confirmSend": "Preview each question before it is sent: how many tokens it will use and what it will cost. Shown as a card in the conversation, never as a dialog. The card's **Always** button sets this to `never`.",
   "command.setLanguage.title": "Language of the panel",
-  "config.agents.disabled": "Sub-agents that may not be dispatched, by name. Toggled from the skills button in the composer, alongside the skills."
+  "config.agents.disabled": "Sub-agents that may not be dispatched, by name. Toggled from the skills button in the composer, alongside the skills.",
+  "config.skills.groups": "Which families of skills are in play: `general`, `frontend`, `javascript`, `python`, `java`, `dotnet`, `cpp`, `go`, `rust`, `flutter`, `data`, `devops`, `design`, `security`, `rpg`, `dds`, `db2i`, `cl`. Families are **opt-in** and only `general` is on to begin with, so the `/` list holds what you chose rather than everything that exists. Set from the new-conversation screen or the composer's skills button.",
+  "command.newConversationMenu.title": "New conversation…"
 }
