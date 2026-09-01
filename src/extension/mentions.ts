@@ -70,9 +70,26 @@ async function resolveOne(mention: Mention, deps: ResolveDeps): Promise<ContextI
     }
 
     case "openFiles": {
+      // Every open TAB, not the editors currently on screen.
+      //
+      // It read `visibleTextEditors`, which is what is laid out in the editor area right now —
+      // one document, or two in a split. So "attach all N open files" attached one, and the count
+      // beside it was right while the result was wrong. `tabGroups` is what the Open Editors view
+      // reads, and what anyone means by "open".
       const items: string[] = [];
-      for (const editor of vscode.window.visibleTextEditors) {
-        items.push(`--- ${relative(editor.document.uri)}\n${editor.document.getText()}`);
+      const seen = new Set<string>();
+      for (const group of vscode.window.tabGroups.all) {
+        for (const tab of group.tabs) {
+          const uri = (tab.input as { uri?: vscode.Uri } | undefined)?.uri;
+          if (!uri || uri.scheme !== "file" || seen.has(uri.toString())) continue;
+          seen.add(uri.toString());
+          try {
+            const doc = await vscode.workspace.openTextDocument(uri);
+            items.push(`--- ${relative(uri)}\n${doc.getText()}`);
+          } catch {
+            // A tab whose file has been deleted since. One missing file must not lose the rest.
+          }
+        }
       }
       if (!items.length) return undefined;
       return {

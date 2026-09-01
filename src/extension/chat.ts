@@ -532,6 +532,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             void vscode.window.showInformationMessage(t("That conversation has nothing left to attach."));
             break;
           }
+          // Carrying a conversation into a fresh one: the current transcript is saved first, then
+          // left. Without the save, the turn that prompted this would be lost.
+          if (m.into === "new") {
+            this.persist();
+            this.newSession();
+          }
           // Replaces any earlier attachment of the same conversation rather than stacking a second
           // copy: pressing the button twice is a thing people do when nothing visibly happened.
           this.attachments = this.attachments.filter((a) => a.label !== item.label);
@@ -1130,6 +1136,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       description: sk.hint,
       enabled: isSkillEnabled(sk.name, policy),
       builtin: true,
+      group: sk.group,
+      groupLabel: SKILL_GROUPS.find((g) => g.id === sk.group)?.label ?? sk.group,
       ...(ALWAYS_ON.has(sk.name) ? { required: true } : {}),
     }));
     // The repository's own, from the last load. Refreshing them is asynchronous and this is called
@@ -1155,6 +1163,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       id: g.id,
       label: g.label,
       hint: g.hint,
+      skills: BUILTIN_SKILLS.filter((sk) => sk.group === g.id).length,
       active: active.has(g.id),
       suggested: suggested.has(g.id),
     }));
@@ -1215,6 +1224,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
               description: sk.hint,
               enabled: isSkillEnabled(sk.name, policy),
               builtin: true,
+              group: sk.group,
+              groupLabel: SKILL_GROUPS.find((g) => g.id === sk.group)?.label ?? sk.group,
             }))
           : [],
     };
@@ -1358,14 +1369,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       rows.push(sep(t("The editor")));
       if (active?.hasSelection) {
         rows.push({
-          label: "$(selection) " + t("The lines I have selected"),
+          label: "$(selection) " + t("This selection"),
           description: `${active.path} · ${active.selectedLines} ${active.selectedLines === 1 ? t("line") : t("lines")}`,
           run: () => this.attach("selection"),
         });
       }
       if (active) {
         rows.push({
-          label: "$(file-code) " + t("The file I am looking at"),
+          label: "$(file-code) " + t("This file"),
           description: active.path,
           run: () => this.attach("editor"),
         });
@@ -1536,137 +1547,147 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    * "Configure Tools" is one. Picking is the whole interaction: what is ticked when the list is
    * accepted is what is on, so there is no per-row save and nothing to get out of step.
    */
+  /**
+   * What Hivey Code may reach for, in two levels rather than one list.
+   *
+   * One list held eighteen family rows, then every skill of every active family under its own
+   * separator, then the sub-agents — forty-odd rows in which the headings are the only thing
+   * distinguishing three quite different kinds of decision, and VS Code draws a separator as a thin
+   * line with small grey text. The result was unreadable, and it was unreadable because it was
+   * answering three questions at once.
+   *
+   * So: which areas, which skills, which sub-agents. Each is one screen with one kind of thing on
+   * it, and the first screen says how many are on in each — which is the summary the flat list
+   * could never show.
+   */
   private async toolsPicker(): Promise<void> {
     const settings = readSettings();
     const skills = this.uiSkills();
-    type Row = vscode.QuickPickItem & { name?: string; agent?: string; family?: SkillGroup };
-    const rows: Row[] = [];
-    const sep = (label: string): Row => ({ label, kind: vscode.QuickPickItemKind.Separator });
-
-    // ── Families first ──────────────────────────────────────────────────────────────────────
-    //
-    // One row per family, ticked when the family is in play. This is the "all of Python in one
-    // click" the individual list cannot give: a family that is off has no skills listed, so there
-    // is nothing to tick — the membership has to be its own row.
-    //
-    // Family rows govern MEMBERSHIP only, individual rows govern what is off inside a family that
-    // is in play. Keeping the two separate is what stops the picker contradicting itself: "Python
-    // is in play, and three of its skills are switched off" is a coherent state, and it would not
-    // be if one row meant both things.
-    rows.push(sep(t("Families — tick one to bring all of its skills into play")));
-    for (const group of SKILL_GROUPS) {
-      const count = BUILTIN_SKILLS.filter((sk) => sk.group === group.id).length;
-      rows.push({
-        label: `$(folder) ${group.label}`,
-        description: t("{0} skills", count),
-        detail: group.hint,
-        family: group.id,
-        picked: settings.skills.groups.includes(group.id),
-      });
-    }
-
-    // ── The skills of the families in play ──────────────────────────────────────────────────
-    const byGroup = new Map<string, typeof skills>();
-    for (const sk of skills.filter((x) => x.builtin)) {
-      const group = BUILTIN_SKILLS.find((b) => b.name === sk.name)?.group ?? "general";
-      const list = byGroup.get(group) ?? [];
-      list.push(sk);
-      byGroup.set(group, list);
-    }
-    for (const { id, label } of SKILL_GROUPS) {
-      const list = byGroup.get(id);
-      if (!list?.length) continue;
-      rows.push(sep(label));
-      for (const sk of list) {
-        rows.push({
-          label: `$(symbol-event) ${sk.name}`,
-          description: sk.description,
-          ...(sk.required ? { detail: t("Always available: it is how you free a full context.") } : {}),
-          name: sk.name,
-          picked: sk.enabled,
-        });
-      }
-    }
-
-    const repo = skills.filter((sk) => !sk.builtin);
-    if (repo.length) {
-      rows.push(sep(t("Skills this repository defines")));
-      for (const sk of repo) {
-        rows.push({
-          label: `$(symbol-event) ${sk.name}`,
-          description: sk.description,
-          detail: sk.source,
-          name: sk.name,
-          picked: sk.enabled,
-        });
-      }
-    }
-
-    // ── Sub-agents, set apart ───────────────────────────────────────────────────────────────
-    //
-    // A different icon and a heading that says what they are, because a sub-agent and a skill are
-    // not the same thing however similar they look in a list: one expands into a prompt, the other
-    // runs a nested turn with its own tools. In one undifferentiated column they read as more
-    // slash-commands with odd names.
     const found = await this.definitions.load();
-    const agentsOff = settings.agents.disabled;
-    if (found.agents.length) {
-      rows.push(sep(t("Sub-agents — each runs on its own, with its own tools")));
-      for (const agent of found.agents) {
-        rows.push({
-          label: `$(person) ${agent.name}`,
-          description: agent.description,
-          detail: agent.source === "built-in" ? t("built in") : agent.source,
-          agent: agent.name,
-          picked: !agentsOff.includes(agent.name),
-        });
-      }
-    }
 
-    const picked = await vscode.window.showQuickPick(rows, {
-      canPickMany: true,
-      placeHolder: t("What Hivey Code may reach for: families, skills and sub-agents"),
-      matchOnDescription: true,
-      matchOnDetail: true,
-    });
-    // Cancelled. Writing the empty selection would switch everything off because the user pressed
-    // Escape, which is the opposite of what Escape means.
-    if (!picked) return;
+    const activeFamilies = settings.skills.groups.filter((g) => g !== "general").length;
+    const skillsOn = skills.filter((sk) => sk.enabled).length;
+    const agentsOn = found.agents.filter((a) => !settings.agents.disabled.includes(a.name)).length;
 
-    const groups = normaliseGroups(picked.map((row) => row.family).filter(Boolean) as SkillGroup[]);
-
-    // Only skills that were LISTED can have been unticked. A family newly brought into play had no
-    // rows, so its skills keep whatever they had — which for a first activation is "all on", and is
-    // exactly the one-click behaviour the family row promises.
-    const listed = new Set(rows.map((row) => row.name).filter(Boolean) as string[]);
-    const on = new Set(picked.map((row) => row.name).filter(Boolean) as string[]);
-    let disabled = settings.skills.disabled;
-    for (const name of listed) disabled = toggleSkill(disabled, name, on.has(name));
-
-    const agentsOn = new Set(picked.map((row) => row.agent).filter(Boolean) as string[]);
-    const agentsDisabled = found.agents.filter((a) => !agentsOn.has(a.name)).map((a) => a.name).sort();
+    const chosen = await vscode.window.showQuickPick(
+      [
+        {
+          label: "$(folder) " + t("Areas"),
+          description: activeFamilies ? t("{0} chosen", activeFamilies) : t("none chosen"),
+          detail: t("Which languages and subjects this conversation is about"),
+          id: "families" as const,
+        },
+        {
+          label: "$(symbol-event) " + t("Skills"),
+          description: t("{0} in play", skillsOn),
+          detail: t("The `/` commands offered, within the areas you chose"),
+          id: "skills" as const,
+        },
+        {
+          label: "$(person) " + t("Sub-agents"),
+          description: t("{0} in play", agentsOn),
+          detail: t("Each runs on its own, with its own tools, and reports back"),
+          id: "agents" as const,
+        },
+      ],
+      { placeHolder: t("What Hivey Code may reach for") },
+    );
+    if (!chosen) return;
 
     const config = vscode.workspace.getConfiguration(SECTION);
-    await config.update("skills.groups", groups, vscode.ConfigurationTarget.Global);
-    await config.update("skills.disabled", disabled, vscode.ConfigurationTarget.Global);
-    await config.update("agents.disabled", agentsDisabled, vscode.ConfigurationTarget.Global);
+
+    if (chosen.id === "families") {
+      const picked = await vscode.window.showQuickPick(
+        SKILL_GROUPS.filter((g) => g.id !== "general").map((g) => ({
+          label: g.label,
+          description: t("{0} skills", BUILTIN_SKILLS.filter((sk) => sk.group === g.id).length),
+          detail: g.hint,
+          id: g.id,
+          picked: settings.skills.groups.includes(g.id),
+        })),
+        {
+          canPickMany: true,
+          placeHolder: t("Which areas is this conversation about?"),
+          matchOnDetail: true,
+        },
+      );
+      if (!picked) return;
+      await config.update(
+        "skills.groups",
+        normaliseGroups(picked.map((row) => row.id)),
+        vscode.ConfigurationTarget.Global,
+      );
+      this.sendState();
+      return;
+    }
+
+    if (chosen.id === "skills") {
+      type Row = vscode.QuickPickItem & { name?: string };
+      const rows: Row[] = [];
+      for (const group of SKILL_GROUPS) {
+        const list = skills.filter((sk) => sk.builtin && sk.group === group.id);
+        if (!list.length) continue;
+        rows.push({ label: group.label, kind: vscode.QuickPickItemKind.Separator });
+        for (const sk of list) {
+          rows.push({
+            label: sk.name,
+            description: sk.description,
+            ...(sk.required ? { detail: t("Always available: it is how you free a full context.") } : {}),
+            name: sk.name,
+            picked: sk.enabled,
+          });
+        }
+      }
+      const repo = skills.filter((sk) => !sk.builtin);
+      if (repo.length) {
+        rows.push({ label: t("Skills this repository defines"), kind: vscode.QuickPickItemKind.Separator });
+        for (const sk of repo) {
+          rows.push({ label: sk.name, description: sk.description, detail: sk.source, name: sk.name, picked: sk.enabled });
+        }
+      }
+      if (!rows.length) {
+        void vscode.window.showInformationMessage(t("Choose an area first — the skills follow from it."));
+        return;
+      }
+      const picked = await vscode.window.showQuickPick(rows, {
+        canPickMany: true,
+        placeHolder: t("Which skills are offered when you type “/”"),
+        matchOnDescription: true,
+      });
+      if (!picked) return;
+      const listed = new Set(rows.map((row) => row.name).filter(Boolean) as string[]);
+      const on = new Set(picked.map((row) => row.name).filter(Boolean) as string[]);
+      let disabled = settings.skills.disabled;
+      for (const name of listed) disabled = toggleSkill(disabled, name, on.has(name));
+      await config.update("skills.disabled", disabled, vscode.ConfigurationTarget.Global);
+      this.sendState();
+      return;
+    }
+
+    if (!found.agents.length) {
+      void vscode.window.showInformationMessage(t("No sub-agent is defined."));
+      return;
+    }
+    const picked = await vscode.window.showQuickPick(
+      found.agents.map((agent) => ({
+        label: agent.name,
+        description: agent.description,
+        detail: agent.source === "built-in" ? t("built in") : agent.source,
+        name: agent.name,
+        picked: !settings.agents.disabled.includes(agent.name),
+      })),
+      { canPickMany: true, placeHolder: t("Which sub-agents may be dispatched?"), matchOnDescription: true },
+    );
+    if (!picked) return;
+    const on = new Set(picked.map((row) => row.name));
+    await config.update(
+      "agents.disabled",
+      found.agents.filter((a) => !on.has(a.name)).map((a) => a.name).sort(),
+      vscode.ConfigurationTarget.Global,
+    );
     this.sendState();
   }
 
-  /**
-   * Search the workspace for something to attach.
-   *
-   * This is the nearest thing to the editor's own "add context" picker that an extension can build.
-   * That picker is internal to the built-in chat — there is no API to open it, and the command it
-   * hides behind takes undocumented arguments that change between releases — so reusing it is not
-   * on offer. Matching its BEHAVIOUR is, and it turns out to be the part that matters.
-   *
-   * What it replaces was a `showQuickPick` over the first hundred files, sorted however the
-   * filesystem felt: a fixed list that could not find the file you wanted in a repository of any
-   * size, because the file you wanted was usually not in the hundred. This searches as you type,
-   * across every file, and looks for symbols at the same time — the editor's own index answers
-   * both, so a class name finds its file without you knowing where it lives.
-   */
   private async searchAttachment(mode: "files" | "symbols" | "both" = "both"): Promise<void> {
     const picker = vscode.window.createQuickPick<vscode.QuickPickItem & { path?: string; symbol?: vscode.SymbolInformation }>();
     picker.placeholder =

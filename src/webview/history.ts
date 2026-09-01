@@ -149,21 +149,26 @@ function historyRow(row: UiHistoryRow, state: UiState, send: (m: ToExtension) =>
   // current work, not a request to leave it: it wants the earlier transcript in the context of the
   // conversation already open, not a jump backwards that abandons it.
   //
-  // Not offered on the conversation you are already in: attaching a transcript to itself is a
-  // request nobody means, and the answer to it would be an attachment that grows every turn.
-  if (row.id !== state.session.id) {
-    tools.append(
-      button({
-        icon: ICON.forward,
-        title: t("Use as context in the current conversation — attached, not opened"),
-        className: "btn icon-only",
-        onClick: (ev) => {
-          ev?.stopPropagation();
-          send({ type: "useSessionAsContext", id: row.id });
-        },
-      }),
-    );
-  }
+  // On every row, including the one you are in.
+  //
+  // It used to be hidden on the current conversation, because attaching a transcript to itself is
+  // a request nobody means — true, and the wrong conclusion: the row you are on is the one you
+  // reach for first, so hiding the button there made the whole feature look absent. On that row it
+  // means the other useful thing instead: carry this conversation into a fresh one.
+  const current = row.id === state.session.id;
+  tools.append(
+    button({
+      icon: ICON.forward,
+      title: current
+        ? t("Start a new conversation with this one as context")
+        : t("Use as context in the current conversation — attached, not opened"),
+      className: "btn icon-only",
+      onClick: (ev) => {
+        ev?.stopPropagation();
+        send({ type: "useSessionAsContext", id: row.id, ...(current ? { into: "new" as const } : {}) });
+      },
+    }),
+  );
   tools.append(
     button({
       icon: ICON.trash,

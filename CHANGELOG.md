@@ -2,6 +2,39 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.16.2 — 2026-09-01
+
+### Fixed
+
+- **"All open editors" attached one file.** It read `visibleTextEditors` — what is laid out on
+  screen right now, which is one document or two in a split — so the count beside it was right while
+  the result was wrong. It reads the tabs, like the row above it.
+- **Bold containing code showed its own punctuation.** `**a `x` b**` came out as the literal
+  characters, because the bold branch set its contents as text rather than parsing them. Emphasis
+  containing an identifier is not an edge case in an answer about code — it is most of the bold in
+  one. Every emphasis span now nests, bounded by construction: the delimiters are removed before
+  recursing, so the string is strictly shorter every time.
+- **The "latest" button** sits a few pixels lower, centred in the strip rather than on its top edge.
+
+### Changed
+
+- **The skills picker is two levels.** One list held eighteen family rows, then every skill under
+  its own separator, then the sub-agents — forty rows answering three different questions at once,
+  with a thin grey line to tell them apart. It is now *areas*, *skills*, *sub-agents*, one screen
+  each, and the first says how many are on in each.
+- **The guided start asks properly.** The families are rows carrying their subject, their examples
+  and how many skills sit behind them, rather than eighteen chips; and the skills that follow are
+  grouped under the family they came from, with an "all" beside each heading.
+- **Comments in code are green**, not grey. No colour is registered for a comment — syntax colours
+  come from a TextMate theme a webview cannot read — so it takes the ANSI palette, which every theme
+  defines and which is designed for text.
+- **"Use in another conversation" is on every history row**, including the one you are in, where it
+  means "start a fresh conversation with this one attached". Hiding it there made the whole feature
+  look absent, since that is the row anyone reaches for first.
+- **Narrower margins again**, and the placeholders ask rather than instruct: "What can I do for
+  you?" and "What can we plan together?" instead of "Describe the change".
+- "The file I am looking at" is **"This file"**.
+
 ## 0.16.1 — 2026-09-01
 
 ### Fixed

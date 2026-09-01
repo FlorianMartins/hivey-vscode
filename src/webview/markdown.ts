@@ -146,9 +146,16 @@ export function inline<K extends keyof HTMLElementTagNameMap>(
   while ((m = re.exec(text))) {
     if (m.index > last) appendText(node, text.slice(last, m.index), highlight);
     const token = m[0];
+    // Code is the one span whose contents are LITERAL: backticks mean "what is inside is text".
     if (token.startsWith("`")) node.append(el("code", "md-code", token.slice(1, -1)));
-    else if (token.startsWith("**") || token.startsWith("__")) node.append(el("strong", undefined, token.slice(2, -2)));
-    else if (token.startsWith("~~")) node.append(el("del", "md-del", token.slice(2, -2)));
+    // Everything else nests, and used to not.
+    //
+    // `**a `x` b**` came out as the literal characters `a \`x\` b` in bold, because the bold branch
+    // set its contents as TEXT. Emphasis containing an identifier is not an edge case in an answer
+    // about code — it is most of the bold in one — and the failure was the exact thing markdown
+    // exists to avoid: showing its own punctuation.
+    else if (token.startsWith("**") || token.startsWith("__")) node.append(nested("strong", token.slice(2, -2), highlight));
+    else if (token.startsWith("~~")) node.append(nested("del", token.slice(2, -2), highlight, "md-del"));
     else if (token.startsWith("[")) {
       const label = token.slice(1, token.indexOf("]"));
       const target = token.slice(token.indexOf("](") + 2, -1);
@@ -156,10 +163,28 @@ export function inline<K extends keyof HTMLElementTagNameMap>(
       // Shown, not followed: the panel forbids remote origins, and a live link would be a way out.
       link.title = target;
       node.append(link);
-    } else node.append(el("em", undefined, token.slice(1, -1)));
+    } else node.append(nested("em", token.slice(1, -1), highlight));
     last = m.index + token.length;
   }
   if (last < text.length) appendText(node, text.slice(last), highlight);
+  return node;
+}
+
+/**
+ * An emphasis span whose contents are parsed in turn.
+ *
+ * Bounded by construction rather than by a depth counter: the recursion is on a strictly shorter
+ * string every time — the delimiters are removed before recursing — so it terminates whatever the
+ * input, including the pathological one a model occasionally emits.
+ */
+function nested<K extends keyof HTMLElementTagNameMap>(
+  tag: K,
+  text: string,
+  highlight?: string,
+  className?: string,
+): HTMLElementTagNameMap[K] {
+  const node = inline(text, tag, highlight);
+  if (className) node.className = className;
   return node;
 }
 

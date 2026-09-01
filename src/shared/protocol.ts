@@ -132,6 +132,8 @@ export interface UiSkillGroup {
   id: string;
   label: string;
   hint: string;
+  /** How many skills it holds — the number the choice is actually made on. */
+  skills: number;
   /** True when the family's skills are on. */
   active: boolean;
   /** True when what the editor has open looks like this kind of work. */
@@ -150,6 +152,10 @@ export interface UiSkill {
   source?: string;
   /** True for a control that cannot be switched off, such as compacting. */
   required?: boolean;
+  /** Which family it belongs to, so a list of them can be grouped under headings. */
+  group?: string;
+  /** That family's name, so the panel does not have to hold a second copy of the table. */
+  groupLabel?: string;
 }
 
 export interface UiRuntime {
@@ -271,7 +277,8 @@ export type ToExtension =
   | { type: "openScreen"; screen: Screen }
   | { type: "openSession"; id: string }
   /** Attach an earlier conversation to the current one instead of leaving for it. */
-  | { type: "useSessionAsContext"; id: string }
+  /** `into: "new"` starts a fresh conversation and attaches this one to it. */
+  | { type: "useSessionAsContext"; id: string; into?: "new" }
   | { type: "deleteSession"; id: string }
   /** Replace the conversation so far with a summary the model writes. */
   | { type: "compact" }

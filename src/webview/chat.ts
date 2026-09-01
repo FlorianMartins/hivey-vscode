@@ -171,37 +171,79 @@ function wizardCard(state: UiState, wizard: NonNullable<UiState["wizard"]>, deps
 
   if (wizard.step === "family") {
     wrap.append(el("h2", "wizard-title", t("What is this about?")));
-    wrap.append(el("p", "wizard-lede", t("It decides which skills are offered. Nothing is sent to answer it.")));
+    wrap.append(el("p", "wizard-lede", t("Pick the areas you are working in. It decides which skills you are offered next — nothing is sent to ask it.")));
     const chosen = new Set(wizard.families);
-    const chips = el("div", "welcome-chips");
+
+    // A list with room to read, not a row of chips.
+    //
+    // Eighteen families as chips is eighteen words in a paragraph shape: you cannot see what any of
+    // them covers, and the one thing that would help — how many skills are behind each — has
+    // nowhere to go. As rows, each carries its subject, its examples and its count, which is the
+    // whole basis on which the choice is made.
+    const list = el("div", "wizard-families");
     for (const group of state.skillGroups) {
       if (group.id === "general") continue;
-      const chip = el("button", `welcome-chip${chosen.has(group.id) ? " on" : ""}${group.suggested ? " suggested" : ""}`);
-      chip.append(el("span", "welcome-chip-label", group.label));
-      chip.title = group.suggested ? t("{0} — looks like what you have open", group.hint) : group.hint;
-      chip.addEventListener("click", () => {
+      const row = el("button", `wizard-family${chosen.has(group.id) ? " on" : ""}`);
+      row.append(el("span", "skill-check", chosen.has(group.id) ? "\u2611" : "\u25A2"));
+      const main = el("div", "skill-main");
+      const name = el("div", "wizard-family-name");
+      name.append(el("span", undefined, group.label));
+      if (group.suggested) name.append(el("span", "wizard-suggested", t("what you have open")));
+      main.append(name);
+      main.append(el("div", "skill-desc", group.hint));
+      row.append(main);
+      row.append(el("span", "wizard-family-count", String(group.skills)));
+      row.addEventListener("click", () => {
         if (chosen.has(group.id)) chosen.delete(group.id);
         else chosen.add(group.id);
-        // Redrawn from the panel's own copy: the answer is only sent when the step is finished, so
-        // ticking four families is one write rather than four.
         wizard.families = [...chosen];
         deps.rerender();
       });
-      chips.append(chip);
+      list.append(row);
     }
-    wrap.append(chips);
-    wrap.append(wizardFoot(deps, () => deps.send({ type: "wizardAnswer", step: "family", value: [...chosen] }), t("Continue")));
+    wrap.append(list);
+    wrap.append(
+      wizardFoot(
+        deps,
+        () => deps.send({ type: "wizardAnswer", step: "family", value: [...chosen] }),
+        chosen.size ? t("Show me those skills") : t("Skip the skills"),
+      ),
+    );
     return wrap;
   }
 
   if (wizard.step === "skills") {
     wrap.append(el("h2", "wizard-title", t("Which of these do you want?")));
     wrap.append(
-      el("p", "wizard-lede", t("Everything ticked appears when you type “/”. Fewer means a shorter list and a sharper answer.")),
+      el("p", "wizard-lede", t("These are the skills of what you chose. Everything ticked appears when you type “/”.")),
     );
     const on = new Set(wizard.skills.filter((sk) => sk.enabled).map((sk) => sk.name));
     const list = el("div", "wizard-skills");
+
+    // Under the family it came from, because "which of these" is answered family by family: you
+    // keep the four Python ones and drop the Java ones, and an undifferentiated column of twenty
+    // makes that a reading exercise.
+    let lastGroup: string | undefined;
     for (const sk of wizard.skills) {
+      if (sk.group && sk.group !== lastGroup) {
+        lastGroup = sk.group;
+        const heading = el("div", "wizard-group");
+        heading.append(el("span", undefined, sk.groupLabel ?? sk.group));
+        heading.append(
+          button({
+            label: t("All"),
+            className: "btn tiny ghost",
+            title: t("Tick everything in this family"),
+            onClick: (ev) => {
+              ev.stopPropagation();
+              for (const other of wizard.skills) if (other.group === lastGroupOf(heading)) on.add(other.name);
+              deps.rerender();
+            },
+          }),
+        );
+        heading.dataset["group"] = sk.group;
+        list.append(heading);
+      }
       const row = el("div", `skill-row${on.has(sk.name) ? " on" : ""}`);
       const box = el("span", "skill-check", on.has(sk.name) ? "\u2611" : "\u25A2");
       row.append(box);
@@ -238,6 +280,10 @@ function wizardCard(state: UiState, wizard: NonNullable<UiState["wizard"]>, deps
   );
   wrap.append(wizardFoot(deps, undefined, undefined));
   return wrap;
+}
+
+function lastGroupOf(heading: HTMLElement): string | undefined {
+  return heading.dataset["group"];
 }
 
 function modeLabel(mode: Mode | undefined): string {
@@ -631,11 +677,13 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
   // Short. The old ones explained the mode in a full sentence — beside a button that names the
   // mode — and wrapped onto three lines in a docked panel, so the empty box was the noisiest thing
   // on the screen. A placeholder is read once and then in the way for ever.
+  // Phrased as the assistant offering rather than the user being instructed. "Describe the change"
+  // is a form label; "What can I do for you?" is the sentence someone actually answers.
   area.placeholder =
     state.mode === "agent"
-      ? t("Describe the change…")
+      ? t("What can I do for you?")
       : state.mode === "plan"
-        ? t("What should I investigate?")
+        ? t("What can we plan together?")
         : t("Ask a question…");
   area.addEventListener("input", () => {
     autoGrow(area);
