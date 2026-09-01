@@ -3350,3 +3350,36 @@ pre.code code {
 .btn.tiny.primary:hover {
   background: var(--vscode-button-hoverBackground);
 }
+
+/* ── The controls under a message ─────────────────────────────────────────────────────────────
+ *
+ * Bigger, and a shade brighter. They are hidden until the pointer arrives, which is right — a quiet
+ * transcript should stay quiet — but the ones that then appeared were 14 px glyphs in the muted
+ * colour, which is the colour this stylesheet uses for text you are not meant to read. Something
+ * revealed on purpose should be legible the moment it is.
+ *
+ * The size comes from padding rather than from a larger glyph: the icons are drawn on a 16-unit
+ * grid and scaling them past 14 px softens the strokes. What grows is the target.
+ */
+.entry-actions .btn.icon-only {
+  padding: var(--sp-1) var(--sp-2);
+  border-radius: var(--radius);
+  color: color-mix(in srgb, var(--vscode-foreground) 72%, transparent);
+}
+.entry-actions .btn.icon-only:hover {
+  color: var(--vscode-foreground);
+  background: var(--hover);
+}
+.entry-actions .btn.icon-only .ico {
+  width: 15px;
+  height: 15px;
+}
+/* Deleting and restoring are the two that change something outside the conversation, so they are
+   the two that take a colour on hover — not before, because a red icon sitting in a row of grey
+   ones reads as a warning about the message rather than as an action available on it. */
+.entry-actions .btn.icon-only.restore:hover {
+  color: var(--vscode-editorWarning-foreground, var(--vscode-foreground));
+}
+.entry-actions .btn.icon-only.danger:hover {
+  color: var(--vscode-errorForeground, var(--vscode-foreground));
+}

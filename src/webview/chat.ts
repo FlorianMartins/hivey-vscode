@@ -368,7 +368,14 @@ function renderEntry(entry: UiEntry, state: UiState, deps: ChatDeps): HTMLElemen
       className: "btn icon-only",
       onClick: () => deps.send({ type: "shareEntry", id: entry.id }),
     }),
-    button({ icon: ICON.trash, title: t("Delete permanently"), className: "btn icon-only", onClick: () => deps.send({ type: "dropEntry", id: entry.id }) }),
+    button({
+      icon: ICON.trash,
+      title: t("Delete permanently"),
+      // Named, not positional. `:last-child` would have styled whichever element happened to end
+      // the row — which since the receipt moved in is the receipt, not this button.
+      className: "btn icon-only danger",
+      onClick: () => deps.send({ type: "dropEntry", id: entry.id }),
+    }),
   );
   wrap.append(head);
 
