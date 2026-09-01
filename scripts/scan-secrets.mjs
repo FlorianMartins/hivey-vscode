@@ -27,7 +27,13 @@ if (build.status !== 0) process.exit(build.status ?? 1);
 
 const { redact, Vault, DEFAULT_POLICY } = await import(pathToFileURL(out).href);
 
-const files = execFileSync("git", staged ? ["diff", "--cached", "--name-only"] : ["ls-files"], { encoding: "utf8" })
+// `--others --exclude-standard` adds files that exist and are not yet tracked. Without it a local
+// run scans a strictly smaller set than CI does, so a new file passes on the machine that wrote it
+// and fails on the machine that checks it — which is precisely how a fixture shaped like an
+// OpenRouter key reached `main`. The counts differing (130 here, 138 there) was the only visible
+// symptom, and nobody reads a count.
+const listing = staged ? ["diff", "--cached", "--name-only"] : ["ls-files", "--cached", "--others", "--exclude-standard"];
+const files = execFileSync("git", listing, { encoding: "utf8" })
   .split("\n")
   .map((f) => f.trim())
   .filter(Boolean)

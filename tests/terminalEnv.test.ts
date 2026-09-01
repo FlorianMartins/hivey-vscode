@@ -10,6 +10,16 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { ENV, missingKey, terminalEnvironment } from "../src/cli/env.js";
 
+/**
+ * Deliberately not shaped like a key.
+ *
+ * The project's own secret scanner reads every tracked file, and a fixture spelled `sk-or-v1-…`
+ * trips it — correctly. A scanner that has been taught to ignore one file that looks like a
+ * credential is a scanner that will ignore the next one too, so the fixture changes rather than the
+ * rule. Nothing here depends on the value's shape; only on it arriving.
+ */
+const KEY = "a-value-that-travels";
+
 const remote = { provider: "openrouter", model: "anthropic/claude-sonnet-4.5", baseUrl: "https://openrouter.ai/api/v1", isLocal: false };
 const local = { provider: "local", model: "qwen2.5-coder:7b", baseUrl: "http://127.0.0.1:11434/v1", isLocal: true };
 
@@ -23,16 +33,16 @@ test("the provider travels, so the client speaks the right wire format", () => {
 });
 
 test("a remote endpoint carries the key", () => {
-  const env = terminalEnvironment({ ...remote, apiKey: "sk-or-v1-secret" });
-  assert.equal(env[ENV.key], "sk-or-v1-secret");
+  const env = terminalEnvironment({ ...remote, apiKey: KEY });
+  assert.equal(env[ENV.key], KEY);
 });
 
 test("a local endpoint never carries a key, even when one is stored", () => {
   // There is no reason for a credential to be in the environment of a process that will not use it,
   // and "no reason" is the whole test for whether a secret should be somewhere.
-  const env = terminalEnvironment({ ...local, apiKey: "sk-or-v1-secret" });
+  const env = terminalEnvironment({ ...local, apiKey: KEY });
   assert.equal(env[ENV.key], undefined);
-  assert.ok(!Object.values(env).includes("sk-or-v1-secret"));
+  assert.ok(!Object.values(env).includes(KEY));
 });
 
 test("no key stored means no empty variable", () => {
@@ -48,7 +58,7 @@ test("the editor's own Node is what runs", () => {
 
 test("a terminal that would fail is known to be failing before it opens", () => {
   assert.equal(missingKey(remote), true, "remote, no key");
-  assert.equal(missingKey({ ...remote, apiKey: "sk-x" }), false);
+  assert.equal(missingKey({ ...remote, apiKey: KEY }), false);
   assert.equal(missingKey(local), false, "a local server needs no key");
   assert.equal(missingKey({ ...local, apiKey: undefined }), false);
 });
