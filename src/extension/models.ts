@@ -8,7 +8,9 @@
 import * as vscode from "vscode";
 import { t } from "../shared/i18n.js";
 import { GENERATED_MODELS } from "../core/router/catalog.generated.js";
-import { isLocalEndpoint } from "../core/redaction/index.js";
+import { isLocalEndpoint, isLoopbackEndpoint } from "../core/redaction/index.js";
+import { discoverLocal, rankModels } from "../core/providers/discover.js";
+import { request } from "../core/util/http.js";
 import type { UiModel } from "../shared/protocol.js";
 import { endpointFor, providerFor, type Keys, type Settings } from "./config.js";
 import { shortModelName } from "../core/models/names.js";
@@ -23,46 +25,101 @@ async function served(settings: Settings, keys: Keys, provider: Settings["chat"]
   }
 }
 
+/**
+ * Every model server that answers, on this machine and on this network.
+ *
+ * The picker used to show what ONE endpoint served — the address in `endpoints.local` — which made
+ * "On your machine" a list of one runtime's models rather than a list of the machine's. Someone
+ * running Ollama for chat and LM Studio for a bigger model saw half of what they had, with no
+ * indication the other half existed. And a team whose model lives on a GPU box down the corridor
+ * had nowhere to say so at all: the setting was singular, so the case was unrepresentable.
+ *
+ * So this probes all of them — the well-known loopback ports, plus whatever the user declared in
+ * `endpoints.servers` — and each model remembers which server serves it, so choosing one can point
+ * the extension at the right address rather than hoping it is already there.
+ *
+ * The probe is the same one the setup screen uses, on the same terms: loopback and declared
+ * addresses only, never a scan, and nothing is sent but the question "what do you serve".
+ */
+async function localServers(settings: Settings): Promise<Array<{ name: string; baseUrl: string; models: string[] }>> {
+  const extra = [
+    ...(settings.endpoints.local ? [{ name: t("Configured endpoint"), baseUrl: settings.endpoints.local }] : []),
+    ...settings.servers.map((x) => ({ name: x.name, baseUrl: x.url })),
+  ];
+  try {
+    const found = await discoverLocal({
+      extra,
+      // Shorter than the setup screen's probe. There the user is watching a spinner and waiting for
+      // an answer; here the model list is being refreshed behind a panel that is already usable, so
+      // a server that has not replied in half a second can be missing from this pass and present in
+      // the next one.
+      timeoutMs: 600,
+      fetchJson: async (url, timeoutMs) => {
+        const res = await request(url, { timeoutMs, label: "discovery" });
+        if (!res.ok) throw new Error(String(res.status));
+        return res.json();
+      },
+    });
+    return found.map((r) => ({ name: r.name, baseUrl: r.baseUrl, models: rankModels(r.models) }));
+  } catch {
+    return [];
+  }
+}
+
 export async function listModels(settings: Settings, keys: Keys, current: string): Promise<UiModel[]> {
   const out: UiModel[] = [];
   const seen = new Set<string>();
 
-  // 1. What the local endpoint serves. Always first: it is the free tier, and the default.
-  const localUrl = safe(() => endpointFor(settings, "local"));
-  if (localUrl) {
-    for (const id of await served(settings, keys, "local")) {
+  // 1. Everything running on this machine or this network. Always first: it is the free tier, and
+  //    the argument this extension exists to make.
+  for (const server of await localServers(settings)) {
+    const loopback = isLoopbackEndpoint(server.baseUrl);
+    for (const id of server.models) {
+      // The same model served by two runtimes is one row. The first server wins, and the probe
+      // returns them in the order the discovery list defines, so that is the better-known one.
+      const key = `${id}@${server.baseUrl}`;
+      if (seen.has(key) || seen.has(id)) continue;
+      seen.add(key);
       seen.add(id);
       out.push({
         id,
         name: id,
-        vendor: "local",
+        vendor: loopback ? "local" : "network",
         context: 0,
         inUsd: 0,
         outUsd: 0,
         cachedInUsd: 0,
         provider: "local",
         local: true,
+        loopback,
+        server: server.name,
+        baseUrl: server.baseUrl,
         current: id === current,
       });
     }
   }
 
-  // 2. An internal gateway, if one is configured — same idea, someone else's hardware.
+  // 2. An internal gateway, if one is configured — same idea, someone else's hardware, possibly
+  //    behind a key. Local only if its address says so.
   const gatewayUrl = safe(() => endpointFor(settings, "openai-compatible"));
   if (gatewayUrl) {
     for (const id of await served(settings, keys, "openai-compatible")) {
       if (seen.has(id)) continue;
       seen.add(id);
+      const local = isLocalEndpoint(gatewayUrl);
       out.push({
         id,
         name: id,
-        vendor: t("gateway"),
+        vendor: local ? "network" : t("gateway"),
         context: 0,
         inUsd: 0,
         outUsd: 0,
         cachedInUsd: 0,
         provider: "openai-compatible",
-        local: isLocalEndpoint(gatewayUrl),
+        local,
+        loopback: isLoopbackEndpoint(gatewayUrl),
+        server: t("gateway"),
+        baseUrl: gatewayUrl,
         current: id === current,
       });
     }
@@ -81,6 +138,7 @@ export async function listModels(settings: Settings, keys: Keys, current: string
       cachedInUsd,
       provider: "openrouter",
       local: false,
+      loopback: false,
       current: id === current,
     });
   }

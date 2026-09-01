@@ -2,6 +2,64 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.12.0 — 2026-09-01
+
+### Added
+
+- **Compacting a conversation.** `/compact`, or the offer that appears once the conversation fills
+  two thirds of its budget: the model writes a summary that replaces the exchanges **in the
+  prompt**, and nothing is deleted. Every exchange stays on screen, muted, one click from coming
+  back — the mechanism [ADR-0003](docs/adr/0003-le-transcript-n-est-pas-le-prompt.md) already
+  provided, so it needed no new state and no migration. The summary is pinned (it becomes the
+  oldest message the moment you ask the next question, and would otherwise be the first thing
+  trimmed), and the gain is **measured and shown** — `8 200 → 900 tokens` — rather than asserted.
+  See [ADR-0007](docs/adr/0007-compacter-plutot-que-tronquer.md).
+- **An earlier conversation as context.** A button on every row of the history attaches that
+  transcript to the conversation you are in, instead of leaving for it. Fenced as untrusted, like
+  any other attachment: a transcript contains whatever the assistant read while it was running.
+- **Syntax colour in answers**, written by hand — no grammar engine, no runtime dependency, and no
+  palette of ours: every colour is one of the editor's own variables, so a snippet reads correctly
+  on a light theme, a dark one and a high-contrast one. Families rather than languages, and an
+  unknown language tag is left entirely plain. RPG (fixed and free), DDS, CL and Db2 for i are
+  included, columns and all. See [ADR-0008](docs/adr/0008-la-couleur-vient-du-theme.md).
+- **Tables, checklists and horizontal rules** in answers, and the answer is now **rendered as it
+  streams** rather than shown as raw markdown and reformatted at the end — which meant reading
+  every answer twice and having the text move under your eyes as it finished.
+- **Every model server on your machine, and on your network.** The picker used to list what one
+  configured address served; it now lists every runtime that answers, under **“On your machine”**
+  and **“On your network”** — two homes, because one works on a train and the other is somebody
+  else's to reboot. A team's GPU box is declared in `hiveyCode.endpoints.servers` or from the setup
+  screen, and an address on your own network counts as local: nothing billed, nothing
+  pseudonymised. Choosing a model now carries its address, so a model served by a second runtime no
+  longer fails on the first question.
+
+### Fixed
+
+- **The terminal mode never worked behind a gateway.** The editor handed the terminal client a URL
+  and a model and never the provider or the key, so anyone not running a local server opened it,
+  typed a question and got `HTTP 401 Unauthorized` — which reads as a broken feature rather than as
+  a missing hand-off. Both halves of the contract now live in one file. The key travels in the
+  process environment (never on the command line, which is world-readable on Linux and lands in
+  shell history everywhere) and **only when the endpoint is remote**. If no key is stored, it says
+  so *before* opening the terminal.
+- **The panel stopped jumping to the left sidebar.** Pressing History — or the model picker, the
+  search, the setup screen, or any editor command — in the right-hand panel revealed the
+  activity-bar copy and moved the conversation there. Two ways to bring the panel forward existed
+  and disagreed; there is now one, and it does nothing at all when a copy is already on screen.
+- **The composer overhung the answers.** The transcript reserves a gutter for its scrollbar and the
+  composer did not, so the box you type in sat that many pixels wider than everything above it. The
+  gutter is now measured on the machine it runs on rather than assumed.
+
+### Changed
+
+- The composer is **three rows** rather than two, and its border **turns clockwise** while the model
+  is answering — the only motion in the interface, and switched off for anyone who has asked their
+  system for reduced motion.
+- The history's filters take **one row per question**: when, then what kind. Eight chips sharing a
+  line meant the grouping changed with the width of the panel.
+- The context meter gains a **bar**, shown only once the conversation genuinely fills a fifth of the
+  budget. At 3 % it drew a dot at the end of a grey line, which reads as a rendering fault.
+
 ## 0.11.1 — 2026-08-27
 
 ### Fixed

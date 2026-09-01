@@ -2,7 +2,7 @@
   "name": "hivey-code",
   "displayName": "Hivey Code",
   "description": "%extension.description%",
-  "version": "0.11.1",
+  "version": "0.12.0",
   "publisher": "hivey",
   "license": "Apache-2.0",
   "repository": {
@@ -448,6 +448,28 @@
           "type": "string",
           "default": "http://127.0.0.1:11434/v1",
           "description": "%config.endpoints.local%"
+        },
+        "hiveyCode.endpoints.servers": {
+          "type": "array",
+          "default": [],
+          "markdownDescription": "%config.endpoints.servers%",
+          "items": {
+            "type": "object",
+            "required": [
+              "name",
+              "url"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "%config.endpoints.servers.name%"
+              },
+              "url": {
+                "type": "string",
+                "description": "%config.endpoints.servers.url%"
+              }
+            }
+          }
         },
         "hiveyCode.endpoints.openaiCompatible": {
           "type": "string",

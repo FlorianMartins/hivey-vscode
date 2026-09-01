@@ -252,7 +252,10 @@ export function restoreDraft(draft: Draft | undefined): void {
 
 function composer(state: UiState, deps: ChatDeps): HTMLElement {
   lastDeps = deps;
-  const wrap = el("div", "composer");
+  // The working state lives on the composer rather than on the transcript because that is where the
+  // user is looking while they wait — and because it is the control that is unavailable, which is
+  // the thing the animation is actually telling them.
+  const wrap = el("div", `composer${isStreaming() ? " working" : ""}`);
   const card = el("div", "composer-card");
 
   if (state.attachments.length) {
@@ -274,7 +277,9 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
   }
 
   const area = el("textarea", "composer-input");
-  area.rows = 2;
+  // Three, not two. Two rows fitted one line of text and the top of a second, which made every
+  // instruction longer than a sentence a scrolling box from the first word.
+  area.rows = 3;
   area.placeholder =
     state.mode === "agent"
       ? t("Describe the change. “#” attaches a file, “/” opens the commands.")
@@ -334,19 +339,82 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
   const meter = el("div", "composer-meter");
   const tokens = el("span", "composer-tokens", t("{0} tokens", formatTokens(state.contextTokens)));
   tokens.title = t("What the next question will send, once muted exchanges are removed.");
+  // A bar rather than a percentage, and only once there is something to watch. At 3 % it drew a
+  // green dot at the end of a grey line — which reads as a rendering fault, not as a measurement,
+  // and put a permanent smudge above the composer for the first twenty exchanges of every
+  // conversation. Below a fifth the token count alone says everything true.
+  if (state.contextFill >= 0.2) {
+    const gauge = el("div", "composer-gauge");
+    const fill = el("div", `composer-gauge-fill${state.contextFill > 0.85 ? " high" : state.contextFill > 0.6 ? " warm" : ""}`);
+    fill.style.width = `${Math.round(state.contextFill * 100)}%`;
+    gauge.append(fill);
+    gauge.title = t("{0}% of the context budget", Math.round(state.contextFill * 100));
+    meter.append(gauge);
+  }
   meter.append(tokens);
+  const offer = state.suggestCompact ? compactOffer(state, deps) : undefined;
+  if (offer) wrap.append(offer);
   wrap.append(meter, card);
   // Size the box to its content on first paint, not only after the first keystroke.
   requestAnimationFrame(() => autoGrow(area));
   return wrap;
 }
 
+/**
+ * The token count at which the user last said "not now".
+ *
+ * Dismissing has to mean something, and "never again in this conversation" is the wrong meaning:
+ * the conversation keeps growing, and the offer is worth making again when it has grown
+ * materially. So the dismissal remembers the size it was dismissed at, and the offer returns once
+ * the conversation is a third larger than that. It is not persisted — a dismissal is about the
+ * moment, not about the conversation.
+ */
+let compactDismissedAt: number | undefined;
+
+function compactOffer(state: UiState, deps: ChatDeps): HTMLElement | undefined {
+  // Nothing at all rather than something hidden: an empty element with a margin is still a gap the
+  // reader can see, and "hidden" is the state a debugger has to explain later.
+  if (compactDismissedAt !== undefined && state.contextTokens < compactDismissedAt * 1.33) return undefined;
+
+  const wrap = el("div", "compact-offer");
+  wrap.append(icon("sparkle", "compact-ico"));
+  const body = el("div", "compact-body");
+  body.append(el("div", "compact-title", t("This conversation fills {0}% of the context.", Math.round(state.contextFill * 100))));
+  // Says what it does to the transcript, because "compact" alone reads as "delete". Nothing is
+  // deleted, and that is the first thing anyone wants to know before pressing it.
+  body.append(el("div", "compact-hint", t("Summarising replaces it in the prompt. Nothing leaves the screen.")));
+  wrap.append(body);
+
+  wrap.append(
+    button({
+      label: t("Summarise"),
+      className: "btn tiny primary",
+      onClick: () => {
+        compactDismissedAt = undefined;
+        deps.send({ type: "compact" });
+      },
+    }),
+    button({
+      icon: ICON.close,
+      title: t("Not now"),
+      className: "btn icon-only",
+      onClick: () => {
+        compactDismissedAt = state.contextTokens;
+        deps.rerender();
+      },
+    }),
+  );
+  return wrap;
+}
+
 function autoGrow(area: HTMLTextAreaElement): void {
   area.style.height = "auto";
-  const height = Math.min(220, Math.max(46, area.scrollHeight));
+  // The floor matches the stylesheet's `min-height`. Two numbers for one decision is how a box
+  // ends up snapping to a different size the moment somebody types into it.
+  const height = Math.min(260, Math.max(68, area.scrollHeight));
   area.style.height = `${height}px`;
   // The scrollbar only appears once the box has stopped growing.
-  area.style.overflowY = area.scrollHeight > 220 ? "auto" : "hidden";
+  area.style.overflowY = area.scrollHeight > 260 ? "auto" : "hidden";
 }
 
 let streaming = false;
@@ -536,7 +604,19 @@ function reasoningButton(state: UiState, deps: ChatDeps): HTMLElement {
   return b;
 }
 
-const SLASH: Array<{ name: string; hint: string; prompt: string; attach?: boolean }> = [
+/**
+ * `prompt` sends words to the model. `action` does something to the conversation instead.
+ *
+ * The distinction earns its place with `/compact`: everything else in this list is a question
+ * phrased for the user, but summarising the conversation is an operation ON the conversation.
+ * Expressing it as a prompt would have sent the word "compact" to the model and hoped.
+ */
+type SlashCommand =
+  | { name: string; hint: string; prompt: string; attach?: boolean; action?: never }
+  | { name: string; hint: string; action: ToExtension; prompt?: never; attach?: never };
+
+const SLASH: SlashCommand[] = [
+  { name: "/compact", hint: t("summarise the conversation and free the context"), action: { type: "compact" } },
   { name: t("/explain"), hint: t("explain the file or the selection"), prompt: t("Explain this code: what it does, how it fits into the rest, and what deserves attention."), attach: true },
   { name: "/tests", hint: t("write tests"), prompt: t("Write tests for this code, in the style and with the tools already used in this repository. Cover the edge cases."), attach: true },
   { name: t("/fix"), hint: t("find and fix the problem"), prompt: t("Find the defect in this code and fix it. Say in one sentence what was wrong."), attach: true },
@@ -611,9 +691,13 @@ function slashHints(container: HTMLElement, area: HTMLTextAreaElement, deps: Cha
   }
 }
 
+function matchSlash(text: string): SlashCommand | undefined {
+  return SLASH.find((c) => text === c.name || text.startsWith(`${c.name} `));
+}
+
 function expandSlash(text: string): { text: string; attach: boolean } | undefined {
-  const match = SLASH.find((c) => text === c.name || text.startsWith(`${c.name} `));
-  if (!match) return undefined;
+  const match = matchSlash(text);
+  if (!match?.prompt) return undefined;
   const extra = text.slice(match.name.length).trim();
   return { text: extra ? `${match.prompt}\n\n${extra}` : match.prompt, attach: match.attach ?? false };
 }
@@ -621,6 +705,17 @@ function expandSlash(text: string): { text: string; attach: boolean } | undefine
 function submit(area: HTMLTextAreaElement, deps: ChatDeps): void {
   let text = area.value.trim();
   if (!text || isStreaming()) return;
+  // A command that acts on the conversation clears the box and does its thing. It deliberately
+  // does not go through the editing path below: `/compact` typed while editing an old message is a
+  // command, not a replacement for that message.
+  const command = matchSlash(text);
+  if (command?.action) {
+    area.value = "";
+    delete area.dataset["editing"];
+    autoGrow(area);
+    deps.send(command.action);
+    return;
+  }
   const editing = area.dataset["editing"];
   const expanded = expandSlash(text);
   if (expanded) {

@@ -214,7 +214,44 @@ class LiveTurn {
       this.text = el("div", "live-text");
       this.body.append(this.text);
     }
-    this.text.textContent = this.buffer;
+    this.scheduleRender();
+  }
+
+  /**
+   * Render the answer AS IT ARRIVES, not once it has finished.
+   *
+   * The panel used to show raw markdown while streaming and swap in the formatted version at the
+   * end, so every answer was read twice: once as asterisks and backticks, once as prose. The
+   * rewrite at the end also moved the text under the reader's eyes, which is the single most
+   * unpleasant thing a streaming interface can do.
+   *
+   * Two things make re-parsing on the fly cheap enough to do this way. It is throttled to one
+   * repaint per frame rather than one per token — a fast model emits tokens far faster than a
+   * screen refreshes, and rendering more often than the display can show is work nobody sees. And
+   * it is skipped entirely while the user has a selection inside the answer, because replacing the
+   * nodes under a selection destroys it, and someone selecting text mid-answer is someone about to
+   * copy it.
+   */
+  private pending = false;
+
+  private scheduleRender(): void {
+    if (this.pending) return;
+    this.pending = true;
+    requestAnimationFrame(() => {
+      this.pending = false;
+      this.renderBuffer();
+    });
+  }
+
+  private renderBuffer(): void {
+    if (!this.text) return;
+    const selection = window.getSelection();
+    if (selection && !selection.isCollapsed && this.text.contains(selection.anchorNode)) return;
+    // No code actions while streaming: Copy and Compare on a block that is still being written
+    // would act on half of it. They arrive with `finish()`, on the finished answer.
+    const rendered = markdown(closeOpenFence(this.buffer));
+    rendered.className = "md live";
+    this.text.replaceChildren(...Array.from(rendered.childNodes));
   }
 
   appendReasoning(chunk: string): void {
@@ -303,7 +340,7 @@ class LiveTurn {
     scrollToEnd();
   }
 
-  /** Replace the raw stream with rendered markdown once the turn ends. */
+  /** The authoritative render: the finished text, with the actions that act on it. */
   finish(): void {
     if (this.text && this.buffer) {
       const rendered = markdown(this.buffer, {
@@ -316,6 +353,21 @@ class LiveTurn {
     }
     this.root.classList.remove("streaming");
   }
+}
+
+/**
+ * Close a fence the model has opened and not yet closed.
+ *
+ * Mid-stream, an answer is routinely cut in the middle of a code block. Handed to the renderer as
+ * it stands, the opening ``` has no partner, so the block is not recognised and its contents render
+ * as paragraphs — then snap into a code block the moment the closing fence arrives. Adding the
+ * missing fence to the COPY being rendered (never to the buffer) means a code block appears as a
+ * code block from its first line and simply grows.
+ */
+function closeOpenFence(text: string): string {
+  let open = false;
+  for (const line of text.split("\n")) if (/^\s*```/.test(line)) open = !open;
+  return open ? `${text}\n\u0060\u0060\u0060` : text;
 }
 
 function ensureLive(): LiveTurn {
@@ -398,6 +450,25 @@ document.addEventListener("keydown", (ev) => {
     document.querySelector<HTMLInputElement>(".search-input")?.focus();
   }
 });
+
+/**
+ * How wide this platform's scrollbar is, published as a CSS variable.
+ *
+ * The transcript reserves a gutter for its scrollbar; the composer, which does not scroll, had no
+ * reason to know about it and so sat that many pixels wider than every answer above it — the box
+ * you type in visibly overhanging the text it produces. The width is the platform's decision (and
+ * the user's, via their editor settings), so it is measured rather than assumed: a constant that is
+ * right on this machine is wrong on the next one, and silently.
+ */
+function publishScrollbarWidth(): void {
+  const probe = document.createElement("div");
+  probe.style.cssText = "position:absolute;visibility:hidden;overflow-y:scroll;width:60px;height:60px";
+  document.body.append(probe);
+  const width = probe.offsetWidth - probe.clientWidth;
+  probe.remove();
+  document.documentElement.style.setProperty("--scrollbar-gutter", `${width}px`);
+}
+publishScrollbarWidth();
 
 send({ type: "ready" });
 export { isStreaming };

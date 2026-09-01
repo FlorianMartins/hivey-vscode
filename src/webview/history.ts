@@ -44,9 +44,14 @@ export function historyScreen(state: UiState, send: (m: ToExtension) => void): H
     }),
   );
 
-  const chips = el("div", "filter-chips");
+  // Two rows, not one. Period and mode answer different questions — "when" and "what kind" — and
+  // eight chips on a shared line meant the mode filters wrapped mid-group at the side bar's normal
+  // width, so which chips belonged together depended on how wide the panel happened to be. A
+  // grouping that changes with the layout is not a grouping. Each row now holds one question, and
+  // the selected chip in each says what the current answer is.
+  const periods = el("div", "filter-chips");
   for (const p of PERIODS) {
-    chips.append(
+    periods.append(
       button({
         label: p.label,
         className: `chip-btn${filter.period === p.id ? " selected" : ""}`,
@@ -54,9 +59,11 @@ export function historyScreen(state: UiState, send: (m: ToExtension) => void): H
       }),
     );
   }
-  chips.append(el("div", "filter-gap"));
+  bar.append(periods);
+
+  const modes = el("div", "filter-chips");
   for (const m of MODES) {
-    chips.append(
+    modes.append(
       button({
         label: m.label,
         className: `chip-btn${filter.mode === m.id ? " selected" : ""}`,
@@ -64,7 +71,7 @@ export function historyScreen(state: UiState, send: (m: ToExtension) => void): H
       }),
     );
   }
-  bar.append(chips);
+  bar.append(modes);
 
   const row2 = el("div", "filter-row");
   row2.append(
@@ -135,7 +142,29 @@ function historyRow(row: UiHistoryRow, state: UiState, send: (m: ToExtension) =>
   open.addEventListener("click", () => send({ type: "openSession", id: row.id }));
 
   wrap.append(open);
-  wrap.append(
+
+  const tools = el("div", "history-tools");
+  // Opening a conversation and REFERRING to one are different intentions, and until now only the
+  // first existed. "What did we decide about the invoices last week" is a question about the
+  // current work, not a request to leave it: it wants the earlier transcript in the context of the
+  // conversation already open, not a jump backwards that abandons it.
+  //
+  // Not offered on the conversation you are already in: attaching a transcript to itself is a
+  // request nobody means, and the answer to it would be an attachment that grows every turn.
+  if (row.id !== state.session.id) {
+    tools.append(
+      button({
+        icon: ICON.bringIn,
+        title: t("Use as context in the current conversation — attached, not opened"),
+        className: "btn icon-only",
+        onClick: (ev) => {
+          ev?.stopPropagation();
+          send({ type: "useSessionAsContext", id: row.id });
+        },
+      }),
+    );
+  }
+  tools.append(
     button({
       icon: ICON.trash,
       title: t("Delete this conversation"),
@@ -143,6 +172,7 @@ function historyRow(row: UiHistoryRow, state: UiState, send: (m: ToExtension) =>
       onClick: () => send({ type: "deleteSession", id: row.id }),
     }),
   );
+  wrap.append(tools);
   return wrap;
 }
 

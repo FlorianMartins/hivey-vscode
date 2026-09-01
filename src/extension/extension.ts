@@ -17,17 +17,6 @@ import { McpManager } from "./integrations/mcp.js";
 import { watchInstructions } from "./instructions.js";
 import { createDefinition, DefinitionStore } from "./definitions.js";
 
-/**
- * Bring the panel forward, whichever of its two homes it is in.
- *
- * `hiveyCode.chat.focus` always reveals the activity-bar copy. Someone who has moved to the
- * right-hand one would be yanked back to the left every time a command needed the panel.
- */
-async function focusPanel(chat: ChatViewProvider): Promise<void> {
-  const id = chat.visibleViewId() ?? ChatViewProvider.viewId;
-  await vscode.commands.executeCommand(`${id}.focus`);
-}
-
 export function activate(context: vscode.ExtensionContext): void {
   // The editor knows which language the user reads, unless they said otherwise.
   const applyLanguage = () => {
@@ -128,7 +117,7 @@ export function activate(context: vscode.ExtensionContext): void {
       //
       // The panel is declared in the activity bar, which is a DEFAULT rather than a restriction:
       // the editor remembers where it is put, so this is a one-time move, not a mode.
-      await focusPanel(chat);
+      await chat.reveal();
       await vscode.commands.executeCommand("workbench.action.moveFocusedView");
       void vscode.window.setStatusBarMessage(t("Pick where the panel should live — it stays there."), 6000);
     }),
@@ -137,7 +126,7 @@ export function activate(context: vscode.ExtensionContext): void {
       vscode.commands.executeCommand("workbench.action.openSettings", SECTION),
     ),
     vscode.commands.registerCommand("hiveyCode.searchConversation", async () => {
-      await focusPanel(chat);
+      await chat.reveal();
       chat.openSearch();
     }),
     vscode.commands.registerCommand("hiveyCode.newSkill", () => createDefinition("skill")),
@@ -169,7 +158,7 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
 
     vscode.commands.registerCommand("hiveyCode.setup", async () => {
-      await focusPanel(chat);
+      await chat.reveal();
       chat.openSetup();
     }),
 
@@ -234,7 +223,7 @@ export function activate(context: vscode.ExtensionContext): void {
     // Opens the picker in place rather than navigating to the comparison screen: from the command
     // palette the user wants to change model, not to read a table of four hundred of them.
     vscode.commands.registerCommand("hiveyCode.pickModel", async () => {
-      await focusPanel(chat);
+      await chat.reveal();
       chat.openModelPicker();
     }),
 

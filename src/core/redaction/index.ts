@@ -76,6 +76,24 @@ export function redactMessages<T extends { content: string }>(
   return { messages: out, findings, hasSecret };
 }
 
+/**
+ * Strictly this machine: loopback only.
+ *
+ * `isLocalEndpoint` answers a question about TRUST — may this text leave without being
+ * pseudonymised — and a server on the office network qualifies. This answers a different question,
+ * about PLACE: is the model running on the laptop in front of you, or on a machine down the
+ * corridor. Both are private; only one works on a train, and only one is somebody else's to
+ * switch off. The interface names them separately because a user choosing a model cares which.
+ */
+export function isLoopbackEndpoint(baseUrl: string): boolean {
+  try {
+    const h = new URL(baseUrl).hostname;
+    return h === "localhost" || h.endsWith(".localhost") || h === "::1" || h === "[::1]" || /^127\./.test(h);
+  } catch {
+    return false;
+  }
+}
+
 /** A local endpoint is one that cannot leave the machine or the operator's own network. */
 export function isLocalEndpoint(baseUrl: string): boolean {
   try {

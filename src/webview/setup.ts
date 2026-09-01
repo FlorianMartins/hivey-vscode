@@ -17,6 +17,8 @@ import type { ToExtension, UiRuntime, UiState } from "../shared/protocol.js";
 const drafts: Record<string, { key: string; url: string }> = {};
 let expanded: string | undefined;
 let openGateway: string | undefined;
+let showServerForm = false;
+const serverDraft = { name: "", url: "" };
 
 interface Gateway {
   id: string;
@@ -97,7 +99,25 @@ export function setupScreen(state: UiState, send: (m: ToExtension) => void, rere
       onClick: () => send({ type: "probeLocal" }),
     }),
   );
+  localFoot.append(el("div", "spacer"));
+  localFoot.append(
+    button({
+      label: t("A server on your network…"),
+      className: "btn tiny ghost",
+      title: t("A machine on your own network — the team's GPU box, a vLLM server"),
+      onClick: () => {
+        showServerForm = !showServerForm;
+        rerender();
+      },
+    }),
+  );
   local.append(localFoot);
+  // The case the probe cannot find, because finding it would mean scanning a network this
+  // extension has no business scanning. Plenty of teams run one shared GPU machine; the address is
+  // something they know and nothing can discover for them, so it is asked for rather than guessed
+  // at. Once declared it is probed like any other, and what it serves appears in the picker beside
+  // the models running on the laptop.
+  if (showServerForm) local.append(serverForm(send, rerender));
   wrap.append(local);
 
   // ── Through a gateway ───────────────────────────────────────────────────────────────────────
@@ -136,6 +156,55 @@ export function setupScreen(state: UiState, send: (m: ToExtension) => void, rere
   );
   wrap.append(foot);
   return wrap;
+}
+
+/**
+ * Declaring a model server that is not on this machine.
+ *
+ * Two fields and no explanation of what a base URL is, because the placeholder is the explanation:
+ * someone who runs a model server knows their address, and someone who does not is not on this
+ * card. What the note under it says is the part that is NOT obvious — that an address on your own
+ * network is treated exactly like localhost, so nothing is pseudonymised and nothing is billed.
+ */
+function serverForm(send: (m: ToExtension) => void, rerender: () => void): HTMLElement {
+  const box = el("div", "setup-server-form");
+
+  const name = el("input", "setup-input");
+  name.placeholder = t("Name — “Team GPU”");
+  name.value = serverDraft.name;
+  name.addEventListener("input", () => (serverDraft.name = name.value));
+
+  const url = el("input", "setup-input");
+  url.placeholder = "http://192.168.1.50:11434/v1";
+  url.value = serverDraft.url;
+  url.addEventListener("input", () => (serverDraft.url = url.value));
+
+  const submit = () => {
+    const address = serverDraft.url.trim();
+    if (!address) return;
+    send({ type: "addServer", name: serverDraft.name.trim(), url: address });
+    serverDraft.name = "";
+    serverDraft.url = "";
+    showServerForm = false;
+    rerender();
+  };
+  url.addEventListener("keydown", (ev) => {
+    if ((ev as KeyboardEvent).key === "Enter") submit();
+  });
+
+  box.append(name, url);
+  const row = el("div", "setup-server-actions");
+  row.append(el("div", "spacer"));
+  row.append(button({ label: t("Add and search"), className: "btn tiny primary", onClick: submit }));
+  box.append(row);
+  box.append(
+    el(
+      "p",
+      "setup-note",
+      t("An address on your own network counts as local: nothing is pseudonymised, nothing is billed, nothing leaves it."),
+    ),
+  );
+  return box;
 }
 
 function runtimeCard(runtime: UiRuntime, state: UiState, send: (m: ToExtension) => void, rerender: () => void): HTMLElement {

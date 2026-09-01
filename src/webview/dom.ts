@@ -74,6 +74,13 @@ const PATHS = {
   settings: "M8 6a2 2 0 1 0 0 4 2 2 0 0 0 0-4ZM8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M12.6 3.4l-1.4 1.4M4.8 11.2l-1.4 1.4",
   shield: "M8 2 13 4v4.2C13 11 10.8 13.3 8 14.2 5.2 13.3 3 11 3 8.2V4Z",
   attach: "M8 3v10M3 8h10",
+  // Four rays around a point: the editor's own mark for "the assistant did something", used here
+  // where the panel is offering rather than reporting.
+  sparkle: "M8 2.5 9.1 6.4 13 7.5 9.1 8.6 8 12.5 6.9 8.6 3 7.5 6.9 6.4Z",
+  // An arrow coming down into a tray: "bring this in here". Distinct from `attach`, which is a
+  // plus sign — next to a wastebasket in the history, a plus reads as "new", which is the opposite
+  // of what the button does.
+  bringIn: "M8 2v7M5.2 6.2 8 9.2l2.8-3M3 11.5v2h10v-2",
   more: "M4 8a1 1 0 1 0 0-.01M8 8a1 1 0 1 0 0-.01M12 8a1 1 0 1 0 0-.01",
 } as const;
 
@@ -85,7 +92,7 @@ const PATHS = {
  * disabled next to them. The colour was never wrong: it is `currentColor`, the same as its
  * neighbours. A dot has to be filled to have the weight of a line.
  */
-const FILLED = new Set<IconName>(["more"]);
+const FILLED = new Set<IconName>(["more", "sparkle"]);
 
 export type IconName = keyof typeof PATHS;
 
@@ -118,7 +125,7 @@ export function icon(name: IconName, className = "ico"): SVGSVGElement {
 export const ICON: Record<
   | "send" | "stop" | "add" | "history" | "search" | "close" | "chevron" | "chevronLeft" | "file"
   | "check" | "cross" | "mute" | "unmute" | "pin" | "edit" | "copy" | "trash" | "settings"
-  | "shield" | "attach" | "more" | "back",
+  | "shield" | "attach" | "sparkle" | "bringIn" | "more" | "back",
   IconName
 > = {
   send: "send",
@@ -142,6 +149,8 @@ export const ICON: Record<
   settings: "settings",
   shield: "shield",
   attach: "attach",
+  sparkle: "sparkle",
+  bringIn: "bringIn",
   more: "more",
 };
 

@@ -27,6 +27,7 @@ import { buildRepoMap } from "../core/context/repomap.js";
 import { buildCliTools } from "./tools.js";
 import { promptForMode, toolsForMode, MODES, type Mode } from "../core/session/modes.js";
 import { t } from "../shared/i18n.js";
+import { ENV } from "./env.js";
 
 interface CliConfig {
   provider: ProviderId;
@@ -42,10 +43,25 @@ interface CliConfig {
   mode: Mode;
 }
 
+/**
+ * The provider named in the environment, if it is one this build knows.
+ *
+ * Validated rather than cast. `provider` selects the wire format — Anthropic's API is not the
+ * OpenAI one — so an unrecognised value must fall back to something that works rather than reach
+ * `makeProvider` and produce a request nobody can read. It was previously not read at all, which
+ * meant the editor could open a terminal pointed at Anthropic and the client would speak OpenAI to
+ * it.
+ */
+function providerFromEnv(): ProviderId {
+  const named = process.env[ENV.provider];
+  const known: ProviderId[] = ["local", "openrouter", "openai-compatible", "anthropic"];
+  return known.find((id) => id === named) ?? "local";
+}
+
 const DEFAULTS: CliConfig = {
-  provider: "local",
-  model: process.env["HIVEY_CODE_MODEL"] ?? "qwen2.5-coder:7b",
-  baseUrl: process.env["HIVEY_CODE_URL"] ?? "http://127.0.0.1:11434/v1",
+  provider: providerFromEnv(),
+  model: process.env[ENV.model] ?? "qwen2.5-coder:7b",
+  baseUrl: process.env[ENV.url] ?? "http://127.0.0.1:11434/v1",
   redaction: "strict",
   customTerms: [],
   blockedGlobs: ["**/.env*", "**/*.pem", "**/*.key", "**/id_rsa*", "**/secrets/**", "**/.aws/**", "**/.ssh/**"],
@@ -62,6 +78,17 @@ const C = {
   bold: (s: string) => `\x1b[1m${s}\x1b[0m`,
 };
 
+/**
+ * Defaults, then the committed file, then the environment. In that order, and the order matters.
+ *
+ * The file used to win, which is right for a client started by hand and wrong for one started from
+ * the editor: a repository that pins `provider: "local"` would silently ignore the model the user
+ * had just chosen in the sidebar two seconds earlier. The environment is the more specific
+ * statement of intent — somebody set it deliberately, for this process — so it goes last.
+ *
+ * Only variables that are actually present override. Reading an absent variable as an empty string
+ * would let the editor blank out a working configuration by not setting something.
+ */
 async function loadConfig(cwd: string): Promise<CliConfig> {
   const merged: CliConfig = { ...DEFAULTS };
   for (const path of [join(homedir(), ".hiveycode.json"), join(cwd, ".hiveycode.json")]) {
@@ -71,6 +98,9 @@ async function loadConfig(cwd: string): Promise<CliConfig> {
       /* absent or unreadable: defaults stand */
     }
   }
+  if (process.env[ENV.provider]) merged.provider = providerFromEnv();
+  if (process.env[ENV.model]) merged.model = process.env[ENV.model]!;
+  if (process.env[ENV.url]) merged.baseUrl = process.env[ENV.url]!;
   return merged;
 }
 
@@ -98,7 +128,7 @@ class FileSpendStore implements SpendStore {
 async function main(): Promise<void> {
   const cwd = process.cwd();
   const cfg = await loadConfig(cwd);
-  const apiKey = cfg.apiKeyEnv ? process.env[cfg.apiKeyEnv] : process.env["HIVEY_CODE_KEY"];
+  const apiKey = cfg.apiKeyEnv ? process.env[cfg.apiKeyEnv] : process.env[ENV.key];
   const isLocal = isLocalEndpoint(cfg.baseUrl);
   const provider = makeProvider({ id: cfg.provider, baseUrl: cfg.baseUrl, apiKey });
 

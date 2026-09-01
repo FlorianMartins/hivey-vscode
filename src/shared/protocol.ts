@@ -73,6 +73,15 @@ export interface UiModel {
   provider: string;
   /** True when this endpoint runs on the user's own machine or network. */
   local: boolean;
+  /**
+   * True only for this machine. `local` covers the office GPU box too, and the picker separates
+   * them: one works on a train, the other is somebody else's to switch off.
+   */
+  loopback?: boolean;
+  /** Which server serves it — "Ollama", "LM Studio", the name the user gave their own. */
+  server?: string;
+  /** The address that serves it, so choosing the model can also point the extension at it. */
+  baseUrl?: string;
   /** True when the model is currently selected for the chat role. */
   current?: boolean;
 }
@@ -157,6 +166,15 @@ export interface UiState {
   matches: string[];
   searchQuery: string;
   setup: UiSetup;
+  /**
+   * True when the conversation is long enough that summarising it is worth offering.
+   *
+   * Computed by the extension, which is the only side that knows the model's context window. The
+   * panel drawing this from its own token count would be guessing at a number it does not have.
+   */
+  suggestCompact: boolean;
+  /** How much of the model's context the conversation currently occupies, 0–1, for the meter. */
+  contextFill: number;
 }
 
 /** Panel → extension. */
@@ -168,10 +186,15 @@ export type ToExtension =
   | { type: "renameSession"; title: string }
   | { type: "openScreen"; screen: Screen }
   | { type: "openSession"; id: string }
+  /** Attach an earlier conversation to the current one instead of leaving for it. */
+  | { type: "useSessionAsContext"; id: string }
   | { type: "deleteSession"; id: string }
+  /** Replace the conversation so far with a summary the model writes. */
+  | { type: "compact" }
   | { type: "setMode"; mode: Mode }
   | { type: "setReasoning"; reasoning: Reasoning }
-  | { type: "setModel"; model: string; provider: string }
+  /** `baseUrl` accompanies a model served by a machine other than the configured one. */
+  | { type: "setModel"; model: string; provider: string; baseUrl?: string }
   | { type: "refreshModels" }
   | { type: "setHistoryFilter"; filter: Partial<UiHistoryFilter> }
   | { type: "search"; query: string }
@@ -200,6 +223,8 @@ export type ToExtension =
   | { type: "saveKey"; provider: string; key: string }
   | { type: "clearKey"; provider: string }
   | { type: "setEndpoint"; provider: string; url: string }
+  /** Declare a model server on this machine or this network, and probe it. */
+  | { type: "addServer"; name: string; url: string }
   | { type: "useLocal"; baseUrl: string; model: string }
   | { type: "finishSetup" }
   | { type: "openExternal"; url: string };

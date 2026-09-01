@@ -746,9 +746,11 @@ pre.code {
 }
 .composer-input {
   width: 100%;
-  min-height: 46px;
+  /* Three rows of text. Kept in step with `autoGrow`'s floor, which is the only other place that
+     knows this number. */
+  min-height: 68px;
   overflow-y: hidden;
-  max-height: 220px;
+  max-height: 260px;
   resize: none;
   border: none;
   outline: none;
@@ -917,12 +919,6 @@ pre.code {
   align-items: center;
   gap: var(--sp-1);
   flex-wrap: wrap;
-}
-.filter-gap {
-  width: 1px;
-  height: 16px;
-  background: var(--border);
-  margin: 0 var(--sp-1);
 }
 .chip-btn {
   font-family: inherit;
@@ -1950,4 +1946,374 @@ pre.code {
   font-size: var(--fs-meta);
   color: var(--muted);
   padding: 0 var(--sp-3) var(--sp-1);
+}
+
+/* ── Syntax colour ────────────────────────────────────────────────────────────────────────────
+ *
+ * Every colour below is one of VS Code's own variables, and that is not a stylistic preference —
+ * it is the only way this can be right. A hard-coded palette is tuned against one theme and wrong
+ * against the other several hundred; these tokens are defined by whichever theme the user
+ * installed, so a snippet reads the same way here as it does in the editor two panes over.
+ *
+ * The choices are the editor's own semantics rather than the nearest matching hue: keywords take
+ * the colour the workbench gives keyword symbols, strings the colour it gives string values in the
+ * debugger, comments the colour it gives descriptive text. Each has a fallback, because a minimal
+ * theme may define only half of them and an undefined variable renders as nothing at all.
+ */
+.tok-comment {
+  color: var(--vscode-descriptionForeground, var(--muted));
+  font-style: italic;
+}
+.tok-string {
+  color: var(--vscode-debugTokenExpression-string, var(--vscode-charts-orange));
+}
+.tok-number {
+  color: var(--vscode-debugTokenExpression-number, var(--vscode-charts-green));
+}
+/* Not `symbolIcon.keywordForeground`, which looks like the obvious choice and is registered as an
+   alias of the plain foreground — so keywords came out the same colour as everything around them.
+   `debugTokenExpression.name` is the workbench's own keyword purple (#c586c0 dark, #9b46b0 light)
+   and falls back to the foreground on high-contrast themes, which is what high contrast wants. The
+   lesson is cheap to state and was not free to learn: a variable that exists is not a variable that
+   carries a colour. */
+.tok-keyword {
+  color: var(--vscode-debugTokenExpression-name, var(--vscode-symbolIcon-methodForeground));
+  font-weight: 600;
+}
+.tok-type {
+  color: var(--vscode-symbolIcon-classForeground, var(--vscode-charts-yellow));
+}
+.tok-function {
+  color: var(--vscode-symbolIcon-functionForeground, var(--vscode-charts-blue));
+}
+/* Compiler directives, `**FREE`, `/COPY`: not code and not comment — instructions to the toolchain
+   about the code. The editor has a colour for exactly that idea. */
+.tok-meta {
+  color: var(--vscode-textPreformat-foreground, var(--vscode-symbolIcon-constantForeground));
+  font-weight: 600;
+}
+
+/* ── The answer, made scannable ───────────────────────────────────────────────────────────────
+ *
+ * An answer is read at two speeds: skimmed for the one line that matters, then read properly. The
+ * rules below serve the first — what a heading, a quote, a table or an inline identifier IS should
+ * be legible without reading a word of it. None of them add a colour of their own; they borrow the
+ * editor's, at the weight the workbench itself uses for the same idea.
+ */
+.md > * + * {
+  margin-top: var(--sp-3);
+}
+.md-h {
+  margin: var(--sp-4) 0 var(--sp-2);
+  font-weight: 600;
+  line-height: 1.3;
+  /* An accent on the leading edge rather than a larger type size. In a 400 px panel a heading two
+     steps up in size costs a line of body text and reads as shouting; a rule the eye catches on
+     costs nothing and finds the section just as fast. */
+  padding-left: var(--sp-3);
+  border-left: 2px solid var(--vscode-textLink-foreground, var(--vscode-focusBorder));
+}
+.md h3.md-h {
+  font-size: 15px;
+}
+.md h4.md-h {
+  font-size: 13px;
+  color: var(--vscode-foreground);
+}
+/* An identifier inside a sentence. Tinted and set on its own surface so `readSettings()` reads as a
+   thing in the code rather than as an emphasised word. */
+.md-code {
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 0.92em;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: var(--vscode-textCodeBlock-background, var(--surface));
+  color: var(--vscode-textPreformat-foreground, var(--vscode-foreground));
+  border: 1px solid var(--border);
+}
+.md-quote {
+  margin: var(--sp-3) 0;
+  padding: var(--sp-2) var(--sp-3);
+  border-left: 3px solid var(--vscode-textBlockQuote-border, var(--border-strong));
+  background: var(--vscode-textBlockQuote-background, transparent);
+  color: var(--muted);
+}
+.md-quote p {
+  margin: 0;
+}
+.md-rule {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: var(--sp-4) 0;
+}
+.md-del {
+  color: var(--muted);
+}
+.md-link {
+  color: var(--vscode-textLink-foreground);
+  text-decoration: underline dotted;
+  cursor: help;
+}
+.md-list {
+  margin: var(--sp-2) 0;
+  padding-left: var(--sp-5);
+}
+.md-list li + li {
+  margin-top: var(--sp-1);
+}
+.md-list li::marker {
+  color: var(--vscode-textLink-foreground, var(--muted));
+}
+/* A checklist the assistant wrote. The box replaces the marker rather than joining it: two bullets
+   per line is what `- [ ]` renders as when nobody has thought about it. */
+.md-task {
+  list-style: none;
+  margin-left: calc(-1 * var(--sp-4));
+}
+.md-check {
+  display: inline-block;
+  width: 1.2em;
+  color: var(--vscode-textLink-foreground, var(--muted));
+}
+.md-task.done {
+  color: var(--muted);
+}
+.md-task.done .md-check {
+  color: var(--vscode-gitDecoration-addedResourceForeground, var(--vscode-charts-green));
+}
+
+/* A table scrolls inside itself. Widening the panel to fit one would push the composer past the
+   edge of the side bar, which is a worse failure than a table you drag sideways. */
+.md-table-wrap {
+  overflow-x: auto;
+  margin: var(--sp-3) 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.md-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: var(--fs-control);
+}
+.md-table th,
+.md-table td {
+  padding: var(--sp-1) var(--sp-3);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.md-table th {
+  background: var(--surface);
+  font-weight: 600;
+  color: var(--vscode-foreground);
+}
+.md-table tr:last-child td {
+  border-bottom: none;
+}
+
+/* The answer being written. A caret at the end of the last line, so a pause between tokens reads as
+   thinking rather than as a finished answer that stopped mid-sentence. */
+.md.live > *:last-child::after {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 1em;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  background: var(--vscode-editorCursor-foreground, var(--vscode-foreground));
+  animation: hc-caret 1.1s steps(2, start) infinite;
+}
+@keyframes hc-caret {
+  50% {
+    opacity: 0;
+  }
+}
+
+/* ── The composer ─────────────────────────────────────────────────────────────────────────────
+ *
+ * Three complaints, one cause and one addition.
+ *
+ * THE WIDTH. The transcript reserves a scrollbar gutter and the composer did not, so the box you
+ * type in was wider than every answer above it and ran past their right edge. The gutter is
+ * measured once at startup rather than assumed, because its width is the platform's decision, not
+ * ours — a hard-coded 10px is right on one operating system and visibly wrong on the next.
+ *
+ * THE HEIGHT. Two rows was one line of text plus a hint of a second. Three is a paragraph, which is
+ * the length of an actual instruction to an agent.
+ *
+ * THE WORKING STATE. A border that turns while the model is answering: the panel already says
+ * "thinking…" in words, and a word has to be read. This is visible from across the room, and it is
+ * the only motion in the interface, so it never competes with anything.
+ */
+.composer {
+  padding-right: calc(var(--sp-3) + var(--scrollbar-gutter, 0px));
+}
+.composer-input {
+  line-height: 1.55;
+  padding: var(--sp-2);
+}
+.composer-card {
+  position: relative;
+  /* Sits above the panel background rather than in it: an input the eye finds without a border
+     doing the work is what makes the surface read as considered rather than as a form. */
+  background: var(--vscode-input-background, var(--surface));
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--vscode-widget-shadow, transparent) 60%, transparent);
+  transition: box-shadow 120ms ease, border-color 120ms ease;
+}
+.composer-card:focus-within {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--vscode-focusBorder) 40%, transparent),
+    0 2px 8px color-mix(in srgb, var(--vscode-widget-shadow, transparent) 70%, transparent);
+}
+
+/* The turning border.
+ *
+ * A conic gradient rotated by an animated custom property, masked to the card's outline so only the
+ * border itself moves. The colour is the editor's focus colour fading into nothing, so on any
+ * theme it is the same accent the workbench uses to say "this is where the attention is".
+ *
+ * `@property` is what makes an angle animatable at all — without it a custom property interpolates
+ * as a string and the gradient jumps between frames instead of turning. */
+@property --hc-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+.composer.working .composer-card {
+  border-color: transparent;
+}
+.composer.working .composer-card::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: conic-gradient(
+    from var(--hc-angle),
+    transparent 0deg,
+    color-mix(in srgb, var(--vscode-focusBorder) 25%, transparent) 60deg,
+    var(--vscode-focusBorder) 110deg,
+    color-mix(in srgb, var(--vscode-focusBorder) 25%, transparent) 160deg,
+    transparent 220deg
+  );
+  /* Composited to a ring: fill the rectangle, then subtract everything but the 1px edge. Drawing
+     four rotating edges by hand is the alternative, and it does not round the corners. */
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  animation: hc-rotate 1.6s linear infinite;
+  pointer-events: none;
+}
+@keyframes hc-rotate {
+  to {
+    --hc-angle: 360deg;
+  }
+}
+/* Motion is a preference, and someone who has switched it off in the operating system has said so
+   about every interface, not only about this one. The ring stays, still, as a plain accent. */
+@media (prefers-reduced-motion: reduce) {
+  .composer.working .composer-card::before {
+    animation: none;
+    background: var(--vscode-focusBorder);
+    opacity: 0.5;
+  }
+  .md.live > *:last-child::after {
+    animation: none;
+  }
+}
+
+/* The context gauge: how full, next to how much. */
+.composer-meter {
+  align-items: center;
+  gap: var(--sp-2);
+}
+.composer-gauge {
+  flex: 0 1 90px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--border);
+  overflow: hidden;
+}
+.composer-gauge-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: var(--vscode-gitDecoration-addedResourceForeground, var(--vscode-charts-green));
+  transition: width 200ms ease;
+}
+.composer-gauge-fill.warm {
+  background: var(--vscode-editorWarning-foreground, var(--vscode-charts-yellow));
+}
+.composer-gauge-fill.high {
+  background: var(--vscode-errorForeground, var(--vscode-charts-red));
+}
+
+/* The offer to summarise. A card, not a dialog: it is a suggestion about the conversation and it
+   belongs in the conversation, where it can be ignored by scrolling past it. */
+.compact-offer {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: 0 var(--sp-1) var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--border);
+  border-left: 2px solid var(--vscode-textLink-foreground, var(--vscode-focusBorder));
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.compact-ico {
+  flex: 0 0 auto;
+  color: var(--vscode-textLink-foreground, var(--vscode-focusBorder));
+}
+.compact-body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.compact-title {
+  font-size: var(--fs-control);
+}
+.compact-hint {
+  font-size: var(--fs-meta);
+  color: var(--muted);
+}
+
+/* ── History ──────────────────────────────────────────────────────────────────────────────── */
+
+/* One question per row: when, then what kind. */
+.filter-chips + .filter-chips {
+  margin-top: var(--sp-1);
+}
+.history-tools {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  flex: 0 0 auto;
+}
+
+/* ── A server on your network ─────────────────────────────────────────────────────────────── */
+
+.setup-server-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-3);
+  margin-top: var(--sp-2);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+}
+.setup-server-actions {
+  display: flex;
+  align-items: center;
+}
+.setup-input {
+  width: 100%;
+  padding: var(--sp-1) var(--sp-2);
+  border: 1px solid var(--vscode-input-border, var(--border-strong));
+  border-radius: var(--radius);
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  font-family: inherit;
+  font-size: var(--fs-control);
+}
+.setup-input:focus {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
 }

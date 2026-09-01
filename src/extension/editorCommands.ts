@@ -7,6 +7,7 @@
 
 import * as vscode from "vscode";
 import { t } from "../shared/i18n.js";
+import { missingKey, terminalEnvironment } from "../cli/env.js";
 import { runTurn } from "../core/agent/loop.js";
 import { isLocalEndpoint, redact, Vault } from "../core/redaction/index.js";
 import { headToTokens } from "../core/util/tokens.js";
@@ -146,15 +147,34 @@ export function registerEditorCommands(context: vscode.ExtensionContext, deps: E
     vscode.commands.registerCommand("hiveyCode.openTerminal", async () => {
       const settings = readSettings();
       const script = vscode.Uri.joinPath(deps.extensionUri, "dist", "cli.js").fsPath;
+      const provider = settings.chat.provider;
+      const baseUrl = settings.endpoints[provider] || settings.endpoints.local;
+      const apiKey = await deps.keys.get(provider);
+      const target = {
+        provider,
+        model: settings.chat.model,
+        baseUrl,
+        isLocal: isLocalEndpoint(baseUrl),
+        ...(apiKey ? { apiKey } : {}),
+      };
 
-      // Run on the Node that VS Code itself runs on, not on whatever `node` the user's shell
-      // happens to resolve. Requiring a separate Node installation to use a VS Code extension is an
-      // unreasonable thing to ask, and it fails in the least helpful way possible: the terminal
-      // opens, prints "command not found", and looks like the feature is broken.
-      //
-      // `process.execPath` is the editor's own binary. `ELECTRON_RUN_AS_NODE` tells it to behave as
-      // a plain Node process rather than starting a window — the documented way to do this.
-      const node = process.execPath;
+      // Said before the terminal opens, not after the first question fails. This is the exact
+      // shape the feature was broken in for months: the client started, looked healthy, and
+      // answered the first question with `HTTP 401 Unauthorized` — which reads as a broken
+      // terminal rather than as a missing key.
+      if (missingKey(target)) {
+        const store = t("Store a key");
+        const answer = await vscode.window.showWarningMessage(
+          t("{0} needs a key and none is stored. The terminal would open and fail on the first question.", provider),
+          store,
+          t("Open anyway"),
+        );
+        if (answer === store) {
+          await vscode.commands.executeCommand("hiveyCode.setApiKey");
+          return;
+        }
+        if (answer !== t("Open anyway")) return;
+      }
 
       // A fresh terminal every time. Reusing one by name looked tidy and was wrong: the
       // configuration travels in the environment, and the environment of a terminal is fixed when
@@ -162,16 +182,12 @@ export function registerEditorCommands(context: vscode.ExtensionContext, deps: E
       // silently.
       const terminal = vscode.window.createTerminal({
         name: "Hivey Code",
-        env: {
-          ELECTRON_RUN_AS_NODE: "1",
-          HIVEY_CODE_URL: settings.endpoints[settings.chat.provider] ?? settings.endpoints.local,
-          HIVEY_CODE_MODEL: settings.chat.model,
-        },
+        env: terminalEnvironment(target),
       });
       terminal.show();
       // Windows shells split on spaces before quoting is considered, and both the editor's path and
       // the extension's path routinely contain them ("Program Files", "Application Support").
-      terminal.sendText(`${quote(node)} ${quote(script)}`, true);
+      terminal.sendText(`${quote(process.execPath)} ${quote(script)}`, true);
     }),
 
     vscode.commands.registerCommand("hiveyCode.explainTerminalSelection", async () => {

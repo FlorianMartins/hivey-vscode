@@ -44,7 +44,7 @@ that does leave is **reversibly pseudonymised** first.
 | **Agent mode** | Reads the repository, searches it, consults the **editor's diagnostics**, edits files and proposes commands — **one approval per action**, a diff before every write, everything in the undo stack. |
 | **Permissions** | Per action and per shape of action: “allow once”, “for this conversation”, “always”. Allowing `npm test` does not allow `npm publish`. A dedicated screen separates what is permanent from what expires. |
 | **Reasoning** | An adjustable thinking budget (direct / brief / standard / deep), translated per provider — `reasoning.effort` on OpenRouter, a token budget on Anthropic. The thinking is shown in a collapsed block and never sent back to the model. |
-| **Terminal** | The `hivey-code` command (short alias `hivey`): the same core in a REPL, with command output actually captured and a diff printed before every write. |
+| **Terminal** | The `hivey-code` command (short alias `hivey`): the same core in a REPL, with command output actually captured and a diff printed before every write. Opened from the editor, it inherits the model, the address **and the key** you are already using. |
 | **In the editor** | `Ctrl+I` rewrites the selection in place · right-click → ask about the selection · commit message written from the staged diff · “explain the terminal output”. |
 | **Quick fixes** | On an error reported by your language server: “Fix with Hivey Code” and “Explain this problem”. The compiler says **what** and **where**; the model only has to fix it — which is what makes a small local model enough for most everyday cases. |
 | **Context notation** | `#file:`, `#selection`, `#changes`, `#problems`, `#codebase`, `#terminal`, `#sym:` — Copilot's notation, because you should not have to learn a second one. Resolved **on your machine** before anything is sent, which is what lets `#changes` attach unreleased code to a conversation with a local model. |
@@ -54,6 +54,9 @@ that does leave is **reversibly pseudonymised** first.
 | **IBM i** | Db2 for i, CL commands, source members, object lists and the library list, over the connection Code for IBM i has already negotiated. And the part that decides whether the code compiles: **the dialect is detected from the member, and its column rules go into the prompt** — RPG III, fixed and free ILE RPG, SQLRPGLE, CL, DDS (PF/LF/DSPF/PRTF), Db2 for i, COBOL. |
 | **ARCAD Elias** | Check-out, check-in, compile, cross-references and the Transformer RPG conversion, through the `arcad.*` commands Elias itself registers — plus calls to the REST server you have already configured. |
 | **MCP** | Connect any Model Context Protocol server, stdio or HTTP. Its tools join the set, under the same permissions. A local server never starts until you have said so in a dialog that names the command. |
+| **Compacting** | When a conversation fills its budget, one command — `/compact`, or the offer that appears at two thirds — replaces it in the prompt with a summary the model writes, **and deletes nothing**: every exchange stays on screen, muted, one click from coming back. The gain is measured and shown (`8 200 → 900 tokens`), not asserted. |
+| **Conversations as context** | Any earlier conversation can be **attached** to the current one from the history rather than opened. “What did we settle about the invoices last week” is a question about today's work. |
+| **Rendered as it streams** | Headings, tables, checklists, quotes and **syntax-coloured** code appear formatted while the answer is being written, not after — including RPG, DDS, CL and Db2 for i. Every colour is one of the editor's own variables. |
 | **Search** | Inside the open conversation (`Ctrl+F`, matches highlighted) **and** across the whole history — the search looks inside the messages and shows the fragment that matched. |
 | **History filters** | Period, mode, “paid only”, and four sort orders (recently updated, created, longest, most expensive). |
 | **Context control** | Every exchange can be **muted** (stays on screen, stops being sent), **pinned** (survives trimming), edited or deleted. It is the most direct lever there is on both quality **and** cost. |
@@ -270,15 +273,22 @@ hivey "why is this test flaky?"   # one-shot question
 Configuration comes from `.hiveycode.json` (working directory, then `~`), so a project can commit its
 team configuration without committing a key (`apiKeyEnv` names the environment variable).
 
+From the editor, **Hivey Code: Open Hivey Code in the terminal** starts it with the model, the
+address and the key the sidebar is using — the key travelling in the process environment, never on
+the command line, and only when the endpoint is remote. If no key is stored for a remote endpoint,
+it says so *before* opening rather than failing on your first question.
+
 REPL commands: `/context` lists the exchanges, `/mute 3` takes one out of the context without
 deleting it, `/forget 3` deletes it, `/mode` switches between chat, plan and agent, `/cost` shows
-the day's spend. From the editor, `Hivey Code: Open Hivey Code in the terminal` starts it with the same
-configuration as the sidebar.
+the day's spend.
 
 ## Enterprise deployment
 
-- Serve one model for everyone: **vLLM** or **Ollama** behind an internal URL, and push
-  `hiveyCode.endpoints.local` through VS Code's settings policy.
+- Serve one model for everyone: **vLLM** or **Ollama** behind an internal URL, declared in
+  `hiveyCode.endpoints.servers` (or pushed through VS Code's settings policy). Its models appear in
+  the picker under **“On your network”**, beside whatever is running on the laptop. An address on
+  your own network counts as local: nothing is billed and nothing is pseudonymised, because nothing
+  leaves it.
 - Lock down what needs it: `privacy.blockedGlobs`, `privacy.customTerms` (client and project
   names), `privacy.egressPolicy: "ask-always"`, `budget.dailyUsd`.
 - `hiveyCode.*` settings are workspace-scoped: a sensitive repository can force `chat.provider: "local"`
@@ -295,15 +305,17 @@ src/core/         no `vscode` import — testable without an editor
   router/         local first, consented escalation, prices, budget
   completion/     FIM per model family, cache, answer cleanup
   context/        repository map, symbols, imports
-  session/        the transcript, the prompt derived from it, the modes, the history, `#`/`@`
+  session/        the transcript, the prompt derived from it, the modes, the history, `#`/`@`,
+                  and the digest that both compacting and “use as context” are made of
   agent/          the tool loop, and the permission book
   ibmi/           dialects, column rules, symbols read by column, Db2 for i decisions
   mcp/            the Model Context Protocol client, written by hand
+  markdown/       the syntax highlighter: families, not grammars; never a guess
   models/         the curated quality index the picker ranks by
 src/shared/       the panel↔extension protocol, and the translation catalogue
 src/extension/    the VS Code layer (sidebar, completion, commands, egress gate)
   integrations/   Git, Code for IBM i, ARCAD Elias, MCP servers
-src/cli/          the terminal client
+src/cli/          the terminal client, and the environment contract it shares with the extension
 src/webview/      the panel: chat / history / models / permissions screens, the model picker,
                   hand-drawn SVG icons, and never `innerHTML` on model output
 ```

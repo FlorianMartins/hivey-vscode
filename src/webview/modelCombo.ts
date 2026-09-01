@@ -101,7 +101,15 @@ function toItems(state: UiState): ComboItem[] {
       tier: model.local ? "free" : priceTier(model.inUsd, model.outUsd),
       local: model.local,
       current: Boolean(model.current),
-      group: model.local ? t("On your machine") : vendorLabel(vendor),
+      // Three homes, not two. "On your machine" and "On your network" are both private and both
+      // free, and they are not the same offer: one keeps working on a train, the other is a shared
+      // machine somebody else can reboot. Collapsing them would hide the only difference that
+      // matters when choosing between them.
+      group: model.local
+        ? model.loopback === false
+          ? t("On your network")
+          : t("On your machine")
+        : vendorLabel(vendor),
       model,
     };
   });
@@ -195,7 +203,15 @@ export function openModelCombo(anchor: HTMLElement, state: UiState, send: (m: To
 
   const pick = (item: ComboItem) => {
     closeModelCombo();
-    send({ type: "setModel", model: item.model.id, provider: item.model.provider });
+    // The address travels with the choice. A model served by LM Studio while the extension points
+    // at Ollama's port would otherwise be selected and then fail on the first question, with a
+    // name in the button that the configured server has never heard of.
+    send({
+      type: "setModel",
+      model: item.model.id,
+      provider: item.model.provider,
+      ...(item.model.baseUrl ? { baseUrl: item.model.baseUrl } : {}),
+    });
   };
 
   /** Redraws only the rows, so the search box keeps its text and its focus. */
@@ -226,9 +242,12 @@ export function openModelCombo(anchor: HTMLElement, state: UiState, send: (m: To
     name.append(el("span", "ci-label", item.label));
     if (item.local) name.append(el("span", "ci-tag", t("local")));
     main.append(name);
-    main.append(
-      el("div", `ci-detail${item.why ? " why" : ""}`, item.why ?? `${item.detail} · ${formatContext(item.model.context)}`),
-    );
+    const detail = item.why
+      ? item.why
+      : item.local && item.model.server
+        ? `${item.detail} · ${item.model.server}`
+        : `${item.detail} · ${formatContext(item.model.context)}`;
+    main.append(el("div", `ci-detail${item.why ? " why" : ""}`, detail));
     node.append(main);
 
     // Each segment keeps its OWN colour: the quality estimate in its band's colour, the price in
@@ -240,7 +259,9 @@ export function openModelCombo(anchor: HTMLElement, state: UiState, send: (m: To
     node.append(badge);
 
     node.title = item.local
-      ? t("Served on your machine: nothing leaves, nothing is billed.")
+      ? item.model.loopback === false
+        ? t("Served by {0} on your network: nothing leaves it, nothing is billed.", item.model.server ?? item.model.baseUrl ?? "")
+        : t("Served on your machine by {0}: nothing leaves, nothing is billed.", item.model.server ?? "")
       : t("Input {0} $/M · output {1} $/M", item.model.inUsd, item.model.outUsd);
     node.addEventListener("mousedown", (ev) => {
       ev.preventDefault();

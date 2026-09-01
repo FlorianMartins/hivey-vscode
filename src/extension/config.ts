@@ -23,6 +23,8 @@ export interface Settings {
   chat: { provider: ProviderId; model: string };
   completion: { provider: ProviderId | "off"; model: string; enabled: boolean; debounceMs: number; maxTokens: number; multiline: boolean };
   endpoints: Record<ProviderId, string>;
+  /** Extra model servers, on this machine or on the operator's network. Probed, never assumed. */
+  servers: Array<{ name: string; url: string }>;
   privacy: {
     redaction: RedactionLevel;
     allowUnredacted: boolean;
@@ -69,6 +71,12 @@ export function readSettings(scope?: vscode.Uri): Settings {
       openrouter: c.get<string>("endpoints.openrouter", "https://openrouter.ai/api/v1"),
       anthropic: c.get<string>("endpoints.anthropic", "https://api.anthropic.com/v1"),
     },
+    // Filtered here rather than at the point of use: a half-written entry in the settings must not
+    // become a probe of an empty URL, and every consumer would otherwise have to remember that.
+    servers: c
+      .get<Array<{ name?: string; url?: string }>>("endpoints.servers", [])
+      .filter((x): x is { name: string; url: string } => Boolean(x && typeof x.url === "string" && x.url.trim()))
+      .map((x) => ({ name: (x.name || "").trim() || x.url, url: x.url.trim() })),
     privacy: {
       // "off" is only honoured when the user also ticked the box that says they mean it.
       redaction: level === "off" && !allowUnredacted ? "balanced" : level,

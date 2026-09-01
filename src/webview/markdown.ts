@@ -7,6 +7,9 @@
 
 import { button, el, ICON } from "./dom.js";
 import { t } from "../shared/i18n.js";
+// Named on import: `highlight` is already this file's word for the search term being
+// wrapped in <mark>, and two meanings of one word in one file is how a bug hides.
+import { highlight as highlightCode } from "../core/markdown/highlight.js";
 
 export interface CodeActions {
   onCopy(code: string): void;
@@ -66,6 +69,28 @@ export function markdown(text: string, actions?: CodeActions, highlight?: string
       continue;
     }
 
+    // A horizontal rule. Models use it to separate an answer from its caveats, and rendering it as
+    // three literal dashes turns a deliberate break into what looks like a typo.
+    if (/^\s*([-*_])\s*\1\s*\1[\s\-*_]*$/.test(line)) {
+      flush();
+      body.append(el("hr", "md-rule"));
+      i++;
+      continue;
+    }
+
+    // A table. Worth having because of what a coding assistant puts in one — a column of file
+    // names against a column of what to do to them — which as pipe-separated text is the least
+    // readable thing on the screen and as a table is the most.
+    if (isTableRow(line) && i + 1 < lines.length && isTableDivider(lines[i + 1]!)) {
+      flush();
+      const rows: string[][] = [splitRow(line)];
+      const align = alignments(lines[i + 1]!);
+      i += 2;
+      while (i < lines.length && isTableRow(lines[i]!)) rows.push(splitRow(lines[i++]!));
+      body.append(table(rows, align, highlight));
+      continue;
+    }
+
     const bullet = line.match(/^\s*[-*+]\s+(.*)$/);
     const numbered = line.match(/^\s*(\d+)[.)]\s+(.*)$/);
     if (bullet || numbered) {
@@ -75,7 +100,18 @@ export function markdown(text: string, actions?: CodeActions, highlight?: string
         const b = lines[i]!.match(/^\s*[-*+]\s+(.*)$/);
         const n = lines[i]!.match(/^\s*\d+[.)]\s+(.*)$/);
         if (!b && !n) break;
-        list.append(inline((b?.[1] ?? n?.[1])!, "li", highlight));
+        const content = (b?.[1] ?? n?.[1])!;
+        // `- [ ]` and `- [x]`: a plan the assistant wrote, with the done parts marked. Rendered as
+        // a real box because the alternative — the literal characters — is read as an array index.
+        const task = content.match(/^\[([ xX])\]\s+(.*)$/);
+        if (task) {
+          const item = inline(task[2]!, "li", highlight);
+          item.classList.add("md-task", task[1] === " " ? "todo" : "done");
+          item.prepend(el("span", "md-check", task[1] === " " ? "\u25A2" : "\u2611"));
+          list.append(item);
+        } else {
+          list.append(inline(content, "li", highlight));
+        }
         i++;
       }
       body.append(list);
@@ -101,7 +137,7 @@ export function inline<K extends keyof HTMLElementTagNameMap>(
   highlight?: string,
 ): HTMLElementTagNameMap[K] {
   const node = el(tag);
-  const re = /(`[^`\n]+`)|(\*\*[^*\n]+\*\*)|(__[^_\n]+__)|(\*[^*\n]+\*)|(\[[^\]\n]+\]\([^)\s]+\))/g;
+  const re = /(`[^`\n]+`)|(\*\*[^*\n]+\*\*)|(__[^_\n]+__)|(~~[^~\n]+~~)|(\*[^*\n]+\*)|(\[[^\]\n]+\]\([^)\s]+\))/g;
   let last = 0;
   let m: RegExpExecArray | null;
   while ((m = re.exec(text))) {
@@ -109,6 +145,7 @@ export function inline<K extends keyof HTMLElementTagNameMap>(
     const token = m[0];
     if (token.startsWith("`")) node.append(el("code", "md-code", token.slice(1, -1)));
     else if (token.startsWith("**") || token.startsWith("__")) node.append(el("strong", undefined, token.slice(2, -2)));
+    else if (token.startsWith("~~")) node.append(el("del", "md-del", token.slice(2, -2)));
     else if (token.startsWith("[")) {
       const label = token.slice(1, token.indexOf("]"));
       const target = token.slice(token.indexOf("](") + 2, -1);
@@ -158,7 +195,73 @@ export function codeBlock(code: string, lang: string, actions?: CodeActions): HT
   }
 
   const pre = el("pre", "code");
-  pre.append(el("code", undefined, code));
+  const node = el("code");
+  // Colour comes from the theme, always. Each token kind maps to a CSS class and the stylesheet
+  // maps that class to one of VS Code's own variables, so a snippet reads correctly on a light
+  // theme, a dark one and a high-contrast one without this file knowing which is installed.
+  for (const token of highlightCode(code, lang)) {
+    if (token.kind === "plain") node.append(document.createTextNode(token.text));
+    else node.append(el("span", `tok-${token.kind}`, token.text));
+  }
+  pre.append(node);
   wrap.append(head, pre);
+  return wrap;
+}
+
+// ── Tables ───────────────────────────────────────────────────────────────────────────────────
+
+function isTableRow(line: string): boolean {
+  return /\|/.test(line) && /^\s*\|?[^|]*\|/.test(line);
+}
+
+/** `|---|:--:|` — the line that turns three pipe-separated lines into a table rather than prose. */
+function isTableDivider(line: string): boolean {
+  return /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/.test(line);
+}
+
+function splitRow(line: string): string[] {
+  return line
+    .replace(/^\s*\|/, "")
+    .replace(/\|\s*$/, "")
+    .split("|")
+    .map((c) => c.trim());
+}
+
+function alignments(divider: string): Array<"left" | "center" | "right"> {
+  return splitRow(divider).map((cell) => {
+    const left = cell.startsWith(":");
+    const right = cell.endsWith(":");
+    return left && right ? "center" : right ? "right" : "left";
+  });
+}
+
+function table(rows: string[][], align: Array<"left" | "center" | "right">, hl?: string): HTMLElement {
+  // Wrapped in its own scroller. A table of file paths is wider than a docked side bar, and a table
+  // that widens the panel pushes the composer off the edge — which is a worse failure than a table
+  // the reader has to scroll.
+  const wrap = el("div", "md-table-wrap");
+  const node = el("table", "md-table");
+  const head = el("thead");
+  const headRow = el("tr");
+  for (const [i, cell] of (rows[0] ?? []).entries()) {
+    const th = inline(cell, "th", hl);
+    th.style.textAlign = align[i] ?? "left";
+    headRow.append(th);
+  }
+  head.append(headRow);
+  node.append(head);
+
+  const bodyRows = el("tbody");
+  for (const row of rows.slice(1)) {
+    const tr = el("tr");
+    for (const [i, cell] of row.entries()) {
+      const td = inline(cell, "td", hl);
+      td.style.textAlign = align[i] ?? "left";
+      tr.append(td);
+    }
+    bodyRows.append(tr);
+  }
+  node.append(bodyRows);
+  wrap.append(node);
   return wrap;
 }

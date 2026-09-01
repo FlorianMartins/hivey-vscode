@@ -14,6 +14,7 @@ import { costOf, makeLookup, type Price } from "../core/router/pricing.js";
 import { route } from "../core/router/route.js";
 import { Session, type ContextItem, type Entry, type SessionData } from "../core/session/session.js";
 import { filterHistory, searchTranscript, upsertSession } from "../core/session/history.js";
+import { compactBrief, digestEntries, sessionAsContext, shouldSuggestCompact } from "../core/session/digest.js";
 import { promptForMode, toolsForMode } from "../core/session/modes.js";
 import { detectIbmiLanguage, ibmiPrompt } from "../core/ibmi/languages.js";
 import { parsePrompt, participantDirective, type Participant } from "../core/session/mentions.js";
@@ -136,7 +137,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const settings = readSettings();
     // Whatever is already configured is probed too, so a custom address is confirmed rather than
     // ignored — and so someone who is already set up sees their own server in the list.
-    const extra = settings.endpoints.local ? [{ name: t("Configured endpoint"), baseUrl: settings.endpoints.local }] : [];
+    const extra = [
+      ...(settings.endpoints.local ? [{ name: t("Configured endpoint"), baseUrl: settings.endpoints.local }] : []),
+      // Servers the user declared. They cannot be discovered — finding a GPU box on the office
+      // network would mean scanning it, which this extension will not do — so being probed is the
+      // whole point of having been declared.
+      ...settings.servers.map((x) => ({ name: x.name, baseUrl: x.url })),
+    ];
     const found = await discoverLocal({
       extra,
       fetchJson: async (url, timeoutMs) => {
@@ -278,6 +285,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const s = readSettings();
     const baseUrl = safeUrl(s, s.chat.provider);
     const stored = this.history();
+    const contextTokens = this.session.entries
+      .filter((e) => e.included)
+      .reduce((sum, e) => sum + estimateTokens(e.text) + (e.context ?? []).reduce((a, c) => a + estimateTokens(c.body), 0), 0);
+    const budgetTokens = s.context.maxTokens;
 
     const state: UiState = {
       screen: this.screen,
@@ -294,9 +305,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       modelLabel: this.models.length ? labelFor(this.models, s.chat.model) : s.chat.model,
       provider: s.chat.provider,
       remote: !isLocalEndpoint(baseUrl),
-      contextTokens: this.session.entries
-        .filter((e) => e.included)
-        .reduce((sum, e) => sum + estimateTokens(e.text) + (e.context ?? []).reduce((a, c) => a + estimateTokens(c.body), 0), 0),
+      contextTokens,
+      contextFill: budgetTokens > 0 ? Math.min(1, contextTokens / budgetTokens) : 0,
+      // Computed here rather than in the panel because the budget is a setting, and a panel that
+      // guessed at it would offer to summarise a conversation that fits comfortably.
+      suggestCompact: shouldSuggestCompact(
+        contextTokens,
+        budgetTokens,
+        this.session.entries.filter((e) => e.included).length,
+      ),
       budget: { spentTodayUsd: this.gate.budget.spentToday(), dailyUsd: s.budget.dailyUsd },
       attachments: this.attachments.map((c) => ({ kind: c.kind, label: c.label, tokens: estimateTokens(c.body) })),
       openFiles: openFiles(),
@@ -355,9 +372,29 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     for (const view of this.views) view.webview.html = this.html(view.webview);
   }
 
+  /**
+   * Bring the panel forward — and only if it is not already there.
+   *
+   * Two mistakes lived here, and they were the same mistake. `hiveyCode.chat.focus` names the
+   * ACTIVITY-BAR copy specifically, so every command that needed the panel dragged the user back to
+   * the left sidebar: pressing History in the right-hand panel opened the left one and moved the
+   * conversation there, and so did the model picker, the search, the setup screen and every editor
+   * command. The panel exists in two places on purpose; a command that always reveals one of them
+   * makes the other decorative.
+   *
+   * So: if a copy is on screen, nothing happens at all — the user is already looking at the thing
+   * being opened, and revealing it can only move it somewhere they did not ask for. Otherwise the
+   * one they used last is revealed, falling back to the activity bar for a first run.
+   */
+  private async focus(): Promise<void> {
+    for (const view of this.views) if (view.visible) return;
+    const id = this.view?.viewType ?? ChatViewProvider.viewId;
+    await vscode.commands.executeCommand(`${id}.focus`);
+  }
+
   /** Open the panel on a given screen — used by the palette commands and by the tests. */
   async show(screen: Screen): Promise<void> {
-    await vscode.commands.executeCommand("hiveyCode.chat.focus");
+    await this.focus();
     this.screen = screen;
     this.sendState();
     if (screen === "models" && !this.models.length) void this.loadModels();
@@ -377,7 +414,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   }
 
   async focusWithPrompt(text: string, context?: ContextItem): Promise<void> {
-    await vscode.commands.executeCommand("hiveyCode.chat.focus");
+    await this.focus();
     this.screen = "chat";
     if (context) this.attachments.push(context);
     this.sendState();
@@ -432,6 +469,33 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           this.sendState();
           break;
         }
+        case "useSessionAsContext": {
+          const found = this.history().find((x) => x.id === m.id);
+          if (!found) break;
+          const item = sessionAsContext(found, {
+            you: t("You"),
+            assistant: "Hivey Code",
+            // A quarter of the turn's budget. An attachment that can fill the context is not an
+            // attachment, it is a replacement for the conversation it was added to.
+            maxTokens: Math.floor(readSettings().context.maxTokens * 0.25),
+            omittedNote: (n) => t("({0} earlier exchanges omitted.)", n),
+            label: (title) => t("conversation: {0}", title || t("untitled")),
+          });
+          if (!item.body.trim()) {
+            void vscode.window.showInformationMessage(t("That conversation has nothing left to attach."));
+            break;
+          }
+          // Replaces any earlier attachment of the same conversation rather than stacking a second
+          // copy: pressing the button twice is a thing people do when nothing visibly happened.
+          this.attachments = this.attachments.filter((a) => a.label !== item.label);
+          this.attachments.push(item);
+          this.screen = "chat";
+          this.sendState();
+          break;
+        }
+        case "compact":
+          await this.compact();
+          break;
         case "deleteSession": {
           const rest = this.history().filter((s) => s.id !== m.id);
           await this.ctx.workspaceState.update(HISTORY_KEY, rest);
@@ -454,6 +518,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           await config.update("chat.model", m.model, writeTarget());
           if (m.provider && m.provider !== readSettings().chat.provider) {
             await config.update("chat.provider", m.provider, writeTarget());
+          }
+          // A model served by a machine other than the configured one brings its address with it.
+          // Without this, picking a model from a second runtime selected a name the configured
+          // server has never heard of, and the failure arrived a question later.
+          if (m.baseUrl && m.provider === "local" && m.baseUrl !== readSettings().endpoints.local) {
+            await config.update("endpoints.local", m.baseUrl, writeTarget());
           }
           this.models = this.models.map((x) => ({ ...x, current: x.id === m.model }));
           this.screen = "chat";
@@ -578,6 +648,28 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         case "clearKey": {
           await this.keys.delete(m.provider as Parameters<Keys["delete"]>[0]);
           await this.refreshSetup();
+          break;
+        }
+
+        case "addServer": {
+          const url = m.url.trim();
+          // Rejected here rather than stored and failed later: an address that is not an address
+          // would sit in the settings looking configured and probe nothing for ever.
+          if (!/^https?:\/\//i.test(url)) {
+            void vscode.window.showWarningMessage(t("A server address starts with http:// or https://."));
+            break;
+          }
+          const config = vscode.workspace.getConfiguration(SECTION);
+          const existing = readSettings().servers;
+          if (!existing.some((x) => x.url === url)) {
+            await config.update(
+              "endpoints.servers",
+              [...existing, { name: m.name || url, url }],
+              vscode.ConfigurationTarget.Global,
+            );
+          }
+          await this.probeLocal();
+          void this.loadModels(true);
           break;
         }
 
@@ -830,10 +922,16 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     return !(await this.keys.get(provider));
   }
 
-  /** Which copy of the panel the user is looking at, if either is on screen. */
-  visibleViewId(): string | undefined {
-    for (const view of this.views) if (view.visible) return view.viewType;
-    return this.view?.viewType;
+  /**
+   * Reveal the panel from a command, without choosing a side for the user.
+   *
+   * The whole implementation is `focus()`; what this adds is that the extension has exactly one
+   * way to bring the panel forward. The previous arrangement had two — a helper in `extension.ts`
+   * that picked the visible copy, and a hard-coded command inside `show()` that undid its choice a
+   * line later — which is why the panel kept jumping back to the left.
+   */
+  async reveal(): Promise<void> {
+    await this.focus();
   }
 
   /** Reopens the first-run screen and re-probes, from the command palette. */
@@ -868,6 +966,145 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     }
     const doc = await vscode.workspace.openTextDocument({ language: "markdown", content: lines.join("\n") });
     await vscode.window.showTextDocument(doc);
+  }
+
+  /**
+   * Replace the conversation so far with a summary of it.
+   *
+   * The idea is the CLI's `/compact`, and it fits this product better than it fits the one it comes
+   * from, because the machinery already exists: muting an exchange keeps it on screen and takes it
+   * out of the prompt. So compacting deletes nothing. It adds one summary the model wrote, mutes
+   * everything the summary covers, and leaves the whole transcript there to scroll back through —
+   * the user can unmute any of it, and the summary can be dropped like any other message.
+   *
+   * Run without tools and without the repository map: this is a turn ABOUT the conversation, and
+   * giving it the ability to go and read files would let a summary invent material that was never
+   * discussed. It still passes the egress gate and the budget, because it is still a request that
+   * leaves the machine.
+   */
+  private async compact(): Promise<void> {
+    const settings = readSettings();
+    const covered = this.session.entries.filter((e) => e.included && !e.error && e.text.trim());
+    if (covered.length < 2) {
+      void vscode.window.showInformationMessage(t("There is not enough conversation to summarise yet."));
+      return;
+    }
+
+    this.screen = "chat";
+    this.turn?.abort();
+    const ctl = new AbortController();
+    this.turn = ctl;
+    this.post({ type: "turnStart" });
+    this.post({ type: "status", text: t("Summarising the conversation…") });
+
+    const providerId = settings.chat.provider;
+    const model = settings.chat.model;
+    const baseUrl = safeUrl(settings, providerId);
+    const isLocal = isLocalEndpoint(baseUrl);
+    const vault = new Vault();
+
+    try {
+      const provider = await providerFor(settings, this.keys, providerId);
+      const transcript = digestEntries(covered, {
+        you: t("You"),
+        assistant: "Hivey Code",
+        // Most of the window, since the summary is the point of the request rather than a
+        // side-effect of it. What does not fit is the oldest material, which is what a summary
+        // written under pressure would have compressed hardest anyway.
+        maxTokens: Math.floor(settings.context.maxTokens * 0.8),
+        omittedNote: (n) => t("({0} earlier exchanges omitted.)", n),
+      });
+
+      const messages = [
+        { role: "system" as const, content: compactBrief(), cacheable: true },
+        { role: "user" as const, content: transcript },
+      ];
+      const prepared = await this.gate.prepare(messages, settings, { provider: providerId, model, baseUrl, isLocal }, vault);
+      if (!prepared) {
+        this.post({ type: "status", text: t("Request cancelled.") });
+        return;
+      }
+
+      let streamed = "";
+      const result = await runTurn({
+        provider,
+        model,
+        messages: prepared.messages,
+        signal: ctl.signal,
+        maxTokens: 2048,
+        temperature: 0.2,
+        onDelta: (d) => {
+          if (!d.text) return;
+          streamed += d.text;
+          this.post({ type: "delta", text: vault.restore(d.text) });
+        },
+        afterResponse: (text) => vault.restore(text),
+      });
+
+      const summary = (result.text || streamed).trim();
+      if (!summary) {
+        this.post({ type: "error", message: t("The summary came back empty; nothing was changed.") });
+        return;
+      }
+
+      // Mute FIRST, add SECOND. The other order mutes the summary along with everything else,
+      // because at that point it is one of the entries the loop is walking.
+      const ids = new Set(covered.map((e) => e.id));
+      for (const entry of this.session.entries) if (ids.has(entry.id)) entry.included = false;
+      // Pinned, because the whole point is that it survives the trimming that would otherwise drop
+      // it first — it is the oldest entry the moment the next question is asked.
+      this.session.add({
+        role: "assistant",
+        text: `${t("**Summary of the conversation so far**")}\n\n${summary}`,
+        model,
+        pinned: true,
+      });
+
+      if (!isLocal) {
+        const cost = costOf(result.usage, this.priceLookup(model));
+        this.gate.record(
+          {
+            at: Date.now(),
+            provider: providerId,
+            host: safeHost(baseUrl),
+            model,
+            promptTokens: result.usage.promptTokens,
+            completionTokens: result.usage.completionTokens,
+            cachedTokens: result.usage.cachedTokens,
+            usd: cost.usd,
+            redactions: prepared.findings.length,
+            redactionSummary: vault.summary().map((x) => `${x.label}\u00d7${x.count}`).join(", "),
+          },
+          settings,
+        );
+      }
+      // The gain, measured rather than asserted. "Compacted" tells the user an operation ran;
+      // "8 200 → 900 tokens" tells them whether it was worth running, which is the only thing they
+      // can act on — and it is the number this feature exists to move.
+      const before = covered.reduce(
+        (sum, e) => sum + estimateTokens(e.text) + (e.context ?? []).reduce((a, c) => a + estimateTokens(c.body), 0),
+        0,
+      );
+      const after = estimateTokens(summary);
+      this.post({
+        type: "status",
+        text: t(
+          "{0} exchanges summarised: {1} → {2} tokens. Everything stays on screen.",
+          covered.length,
+          before,
+          after,
+        ),
+      });
+      this.persist();
+    } catch (err) {
+      const message = (err as Error).message;
+      this.post({ type: "error", message });
+      this.log.appendLine(`[compact] ${message}`);
+    } finally {
+      this.turn = undefined;
+      this.post({ type: "turnEnd" });
+      this.sendState();
+    }
   }
 
   private async ask(text: string): Promise<void> {
