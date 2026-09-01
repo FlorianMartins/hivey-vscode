@@ -2521,7 +2521,11 @@ pre.code::-webkit-scrollbar-track {
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
-  bottom: calc(var(--sp-5) + 84px);
+  /* At the bottom of the TRANSCRIPT, which is the gap between the last answer and the composer —
+     wherever the composer happens to end. It was pinned to the screen with a hand-measured offset,
+     so it sank into the composer the moment that grew a row, and a measurement like that is wrong
+     again on the next change nobody connects to it. */
+  bottom: var(--sp-2);
   z-index: 5;
   padding: 3px var(--sp-3);
   border-radius: 999px;
@@ -2697,4 +2701,116 @@ pre.code::-webkit-scrollbar-track {
 .entry:hover .entry-meta,
 .entry:focus-within .entry-meta {
   opacity: 1;
+}
+
+/* ── The band behind every line of a code block ───────────────────────────────────────────────
+ *
+ * VS Code injects its own stylesheet into every webview, and it contains:
+ *
+ *     code { background-color: var(--vscode-textPreformat-background); padding: 1px 3px; … }
+ *     pre code { padding: 0; }
+ *
+ * It resets the PADDING for code inside a pre and not the BACKGROUND. So the `<code>` in every
+ * block kept a fill, and because it is an inline element that fill paints one box per line — each
+ * band ending exactly where its line of text ends. Which is why it read as selected text rather
+ * than as a background: a selection is the only other thing on a screen shaped like that.
+ *
+ * Invisible from our own stylesheet, and the reason it survived two attempts at "remove the fill
+ * from the code block": the fill was never ours. Found by reading the CSS the host injects, which
+ * is on disk next to the editor.
+ */
+pre.code code {
+  background: none;
+  color: var(--vscode-editor-foreground, var(--vscode-foreground));
+  padding: 0;
+  border-radius: 0;
+}
+
+/* The transcript's own box, so what floats over it floats over IT and not over the screen. */
+.transcript-wrap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* ── The restore point ────────────────────────────────────────────────────────────────────────
+ *
+ * A rule across the transcript with the action on it, above the question it returns to. Visible
+ * without hovering, unlike every other per-message control: it is the only one that writes to the
+ * working tree, and something that overwrites files should not be discovered by accident.
+ */
+.checkpoint-rule {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: var(--sp-2) 0 var(--sp-4);
+  position: relative;
+}
+.checkpoint-rule::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  border-top: 1px dashed var(--border-strong);
+}
+.checkpoint-btn {
+  position: relative;
+  z-index: 1;
+  padding: 2px var(--sp-3);
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  /* Sits ON the line: the panel's own background is what breaks the rule behind the label. */
+  background: var(--vscode-sideBar-background, var(--vscode-editor-background));
+  color: var(--muted);
+  font-size: var(--fs-meta);
+}
+.checkpoint-btn:hover {
+  color: var(--vscode-foreground);
+  background: var(--hover);
+  border-color: var(--vscode-focusBorder);
+}
+/* A partial checkpoint cannot put everything back, and says so before it is pressed rather than
+   afterwards. */
+.checkpoint-btn.partial {
+  color: var(--vscode-editorWarning-foreground, var(--muted));
+  border-style: dashed;
+}
+
+/* ── Under the composer: what it runs on, and what it may do ──────────────────────────────────
+ *
+ * Outside the box, because these are settings for the conversation rather than parts of the message
+ * being written — inside the border they read as controls of the text. The readings sit at the far
+ * end of the same line: what you set on the left, what it is costing on the right.
+ */
+.composer-footer {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: var(--sp-1) var(--sp-1) 0;
+  min-height: 22px;
+  /* One line, always. Wrapping put the readings on a row of their own, left-aligned under the
+     controls, which reads as a second toolbar rather than as a measurement. The labels are one
+     word each so that the line holds. */
+  flex-wrap: nowrap;
+}
+.btn.provider.local {
+  color: var(--vscode-gitDecoration-addedResourceForeground, var(--vscode-charts-green));
+}
+.btn.provider.remote {
+  color: var(--vscode-foreground);
+}
+.btn.tiny.provider,
+.btn.tiny.approval-scope {
+  padding: 1px var(--sp-2);
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.btn.tiny.provider .lbl,
+.btn.tiny.approval-scope .lbl {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

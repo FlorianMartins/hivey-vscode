@@ -15,12 +15,12 @@ import { route } from "../core/router/route.js";
 import { Session, type ContextItem, type Entry, type SessionData } from "../core/session/session.js";
 import { filterHistory, searchTranscript, upsertSession } from "../core/session/history.js";
 import { compactBrief, digestEntries, sessionAsContext, shouldSuggestCompact } from "../core/session/digest.js";
-import { ALWAYS_ON, BUILTIN_SKILLS, isSkillEnabled, skillInvocation, toggleSkill } from "../core/session/skills.js";
+import { ALWAYS_ON, BUILTIN_SKILLS, isSkillEnabled, SKILL_GROUPS, skillInvocation, toggleSkill } from "../core/session/skills.js";
 import { capture, describeRestore, trimCheckpoints } from "../core/session/checkpoint.js";
 import type { Plan } from "../core/agent/plan.js";
 import { promptForMode, toolsForMode } from "../core/session/modes.js";
 import { detectIbmiLanguage, ibmiPrompt } from "../core/ibmi/languages.js";
-import { parsePrompt, participantDirective, type Participant } from "../core/session/mentions.js";
+import { parsePrompt, participantDirective, type MentionKind, type Participant } from "../core/session/mentions.js";
 import { resolveMentions } from "./mentions.js";
 import { instructionsPrompt } from "./instructions.js";
 import { buildDefinitionTools, DefinitionStore, type SubAgentRun } from "./definitions.js";
@@ -536,6 +536,20 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         case "newSkill":
           await vscode.commands.executeCommand("hiveyCode.newSkill");
           break;
+        case "openContextPicker":
+          await this.contextPicker();
+          break;
+        case "openToolsPicker":
+          await this.toolsPicker();
+          break;
+        case "setProvider": {
+          const config = vscode.workspace.getConfiguration(SECTION);
+          await config.update("chat.provider", m.provider, writeTarget());
+          await this.refreshSetup();
+          void this.loadModels(true);
+          this.sendState();
+          break;
+        }
         case "restoreCheckpoint":
           await this.restoreCheckpoint(m.id);
           break;
@@ -1099,6 +1113,183 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    * would have made the one operation designed to recover from a mistake the one operation you
    * cannot take back.
    */
+  /**
+   * Adding context, in the editor's own picker.
+   *
+   * This was a menu drawn inside the webview, and it was the wrong shape twice over. It could not
+   * offer what the editor offers — no icons from the product's own set, no separators, no type-ahead
+   * over categories — and it was one more surface behaving almost, but not quite, like the rest of
+   * the workbench. A quick pick is the control VS Code uses for exactly this question, so it is
+   * keyboard-navigable, themed and familiar for free.
+   *
+   * The categories follow the editor's chat because they follow the question people are actually
+   * answering: is the thing I want open in front of me, somewhere in the repository, part of the
+   * project's own rules, or something we discussed before.
+   */
+  private async contextPicker(): Promise<void> {
+    type Row = vscode.QuickPickItem & { run?: () => Promise<void> | void };
+    const active = activeEditor();
+    const files = openFiles();
+    const rows: Row[] = [];
+
+    const separator = (label: string): Row => ({ label, kind: vscode.QuickPickItemKind.Separator });
+
+    rows.push(separator(t("The editor")));
+    if (active?.hasSelection) {
+      rows.push({
+        label: "$(selection) " + t("Selection"),
+        description: `${active.path} · ${active.selectedLines} ${active.selectedLines === 1 ? t("line") : t("lines")}`,
+        run: () => this.attach("selection"),
+      });
+    }
+    if (active) {
+      rows.push({
+        label: "$(file-code) " + t("Whole file"),
+        description: active.path,
+        run: () => this.attach("editor"),
+      });
+    }
+    if (files.length) {
+      rows.push({
+        label: "$(files) " + t("Open editors"),
+        description: t("All {0} open files", files.length),
+        run: () => this.attach("openFiles"),
+      });
+    }
+
+    rows.push(separator(t("Files & folders")));
+    rows.push({
+      label: "$(search) " + t("Search files and symbols…"),
+      description: t("The whole workspace"),
+      run: () => this.searchAttachment(),
+    });
+    rows.push({
+      label: "$(folder-opened) " + t("Import from disk…"),
+      description: t("Even outside the workspace"),
+      run: () => this.attach("browse"),
+    });
+
+    rows.push(separator(t("The repository")));
+    for (const [icon, label, kind] of [
+      ["$(list-tree)", t("Codebase"), "codebase"],
+      ["$(git-compare)", t("Changes"), "changes"],
+      ["$(warning)", t("Problems"), "problems"],
+      ["$(terminal)", t("Terminal selection"), "terminal"],
+    ] as const) {
+      rows.push({ label: `${icon} ${label}`, run: () => this.attachMention(kind) });
+    }
+
+    const conversations = this.history()
+      .filter((x) => x.id !== this.session.id)
+      .sort((a, b) => b.updatedAt - a.updatedAt)
+      .slice(0, 8);
+    if (conversations.length) {
+      rows.push(separator(t("Conversations")));
+      for (const row of conversations) {
+        rows.push({
+          label: "$(comment-discussion) " + (row.title || t("untitled")),
+          description: t("{0} messages", row.entries.length),
+          run: () => this.onMessage({ type: "useSessionAsContext", id: row.id }),
+        });
+      }
+    }
+
+    const picked = await vscode.window.showQuickPick(rows, {
+      placeHolder: t("Add context to the next question"),
+      matchOnDescription: true,
+    });
+    await picked?.run?.();
+  }
+
+  /**
+   * One mention, resolved as if it had been typed.
+   *
+   * The picker and the `#` notation must not be two implementations of "attach the diff": they
+   * would drift, and the one nobody uses would be the one that breaks. Both go through
+   * `resolveMentions`, which is also what applies the privacy policy.
+   */
+  private async attachMention(kind: MentionKind): Promise<void> {
+    const settings = readSettings();
+    const items = await resolveMentions([{ kind, raw: `#${kind}` }], {
+      workspace: this.workspace,
+      settings,
+      repoMap: () => this.workspace.repoMap(Math.floor(settings.context.maxTokens * 0.4)),
+    });
+    this.attachments.push(...items);
+    this.sendState();
+  }
+
+  /**
+   * Switching skills on and off, in the editor's own picker.
+   *
+   * A multi-select quick pick, which is the control VS Code uses for exactly this — its own
+   * "Configure Tools" is one. Picking is the whole interaction: what is ticked when the list is
+   * accepted is what is on, so there is no per-row save and nothing to get out of step.
+   */
+  private async toolsPicker(): Promise<void> {
+    const skills = this.uiSkills();
+    type Row = vscode.QuickPickItem & { name?: string };
+    const rows: Row[] = [];
+    const builtin = skills.filter((sk) => sk.builtin);
+    const repo = skills.filter((sk) => !sk.builtin);
+
+    // Grouped by language, because that is how the choice is actually made. With everything on, the
+    // `/` list runs to thirty entries and the model is handed thirty descriptions of things it will
+    // not do today — both cost precision. Someone working on a Python service wants Python and the
+    // general ones and wants the rest out of the way, which is one gesture when the list is grouped
+    // and thirty when it is not.
+    //
+    // A multi-select quick pick replaces the WHOLE selection on accept, so ticking one group's
+    // boxes and nothing else is exactly "use these skills for this work" — the interaction the
+    // grouping exists to make possible.
+    const byGroup = new Map<string, typeof builtin>();
+    for (const sk of builtin) {
+      const group = BUILTIN_SKILLS.find((b) => b.name === sk.name)?.group ?? "general";
+      const list = byGroup.get(group) ?? [];
+      list.push(sk);
+      byGroup.set(group, list);
+    }
+    for (const { id, label } of SKILL_GROUPS) {
+      const list = byGroup.get(id);
+      if (!list?.length) continue;
+      rows.push({ label, kind: vscode.QuickPickItemKind.Separator });
+      for (const sk of list) {
+        rows.push({
+          label: sk.name,
+          description: sk.description,
+          // A required skill is shown, ticked and explained rather than hidden: a list missing an
+          // entry the user has seen in the composer reads as a bug.
+          ...(sk.required ? { detail: t("Always available: it is how you free a full context.") } : {}),
+          name: sk.name,
+          picked: sk.enabled,
+        });
+      }
+    }
+    if (repo.length) {
+      rows.push({ label: t("From this repository"), kind: vscode.QuickPickItemKind.Separator });
+      for (const sk of repo) {
+        rows.push({ label: sk.name, description: sk.description, detail: sk.source, name: sk.name, picked: sk.enabled });
+      }
+    }
+
+    const picked = await vscode.window.showQuickPick(rows, {
+      canPickMany: true,
+      placeHolder: t("Which skills are offered when you type “/”"),
+      matchOnDescription: true,
+    });
+    // Cancelled. Writing the empty selection would switch everything off because the user pressed
+    // Escape, which is the opposite of what Escape means.
+    if (!picked) return;
+
+    const on = new Set(picked.map((row) => row.name).filter(Boolean) as string[]);
+    let disabled = readSettings().skills.disabled;
+    for (const sk of skills) disabled = toggleSkill(disabled, sk.name, on.has(sk.name));
+    await vscode.workspace
+      .getConfiguration(SECTION)
+      .update("skills.disabled", disabled, vscode.ConfigurationTarget.Global);
+    this.sendState();
+  }
+
   /**
    * Search the workspace for something to attach.
    *

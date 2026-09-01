@@ -230,6 +230,11 @@ export type ToExtension =
   | { type: "shareSkills" }
   | { type: "openSkill"; source: string }
   | { type: "newSkill" }
+  /** Open the editor's own picker for adding context — a native quick pick, not a webview menu. */
+  | { type: "openContextPicker" }
+  /** Open the editor's own picker for switching skills on and off. */
+  | { type: "openToolsPicker" }
+  | { type: "setProvider"; provider: string }
   /** Put the files back as they were before this question, and rewind the conversation to it. */
   | { type: "restoreCheckpoint"; id: string }
   | { type: "setMode"; mode: Mode }

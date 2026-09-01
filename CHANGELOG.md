@@ -2,6 +2,54 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.14.0 — 2026-09-01
+
+### Fixed
+
+- **The band behind every line of code.** Blocks looked as though their contents were selected, and
+  two attempts at "remove the fill from the code block" did not touch it — because the fill was
+  never ours. VS Code injects its own stylesheet into every webview, containing
+  `code { background-color: var(--vscode-textPreformat-background) }` and a `pre code` rule that
+  resets the *padding* and not the background. Being an inline element, that fill paints one box per
+  line, each ending exactly where its line of text ends: the shape of a selection. Found by reading
+  the CSS the host injects, which is on disk next to the editor.
+- **Adding context is the editor's own picker now.** The webview menu it replaces could not offer
+  what the workbench offers, and was one more surface behaving almost-but-not-quite like everything
+  around it. The categories follow the question people are answering: the editor, files & folders,
+  the repository, earlier conversations.
+- **The README screenshots use VS Code's default theme.** They were captured under a deep-navy theme
+  nobody chose: the profile said `"Dark Modern"`, which VS Code does not resolve — and an
+  unresolvable theme name does not fall back to the default, it leaves whatever was there. The full
+  identifier is now passed, and the result is checked by sampling a pixel rather than by reading the
+  setting back.
+
+### Added
+
+- **Skills for other languages**, grouped by family so a whole one is switched on or off in a
+  gesture: **Web** (accessibility audit against WCAG, semantic markup, stylesheet review, TypeScript
+  types), **Python** (pytest, type hints, docstrings, idiom), **Java** (JUnit 5, Javadoc, streams,
+  null-safety), alongside the general set and IBM i. Each carries the conventions of its language —
+  a prompt that says "write tests, in Java" is the generic one with a word changed, and is worth
+  nothing.
+- **Configuring skills** opens the editor's own multi-select picker, the way its "Configure Tools"
+  does. Accepting replaces the whole selection, so ticking one family and nothing else is exactly
+  "use these for this work".
+- **The provider switch** under the composer: this machine, OpenRouter, Anthropic, your own gateway.
+  Its colour says whether anything leaves the machine, which should never take reading to establish.
+
+### Changed
+
+- **Approvals and the readings moved out of the box**, onto a row under it: they are settings for the
+  conversation, not parts of the message being written, and inside the border they read as controls
+  of the text. Their labels are one word each — "Ask every time" truncated to "Ask ever…", which is
+  worse than a word that fits.
+- **Restore checkpoint is a rule across the transcript**, above the question it returns to, the way
+  the editor's chat marks one. Visible without hovering, unlike every other per-message control: it
+  is the only one that writes to the working tree, and something that overwrites files should not be
+  discovered by accident.
+- **The "latest" button** floats at the bottom of the transcript rather than at a hand-measured
+  offset from the screen, so it stays put when the composer grows a row.
+
 ## 0.13.0 — 2026-09-01
 
 The panel moves towards the editor's own chat, in behaviour as much as in looks.

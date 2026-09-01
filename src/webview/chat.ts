@@ -36,7 +36,13 @@ export interface ChatDeps {
 
 export function chatScreen(state: UiState, deps: ChatDeps): HTMLElement {
   const wrap = el("div", "screen chat-screen");
-  wrap.append(transcript(state, deps), composer(state, deps));
+  // The transcript sits in its own positioned box so the "latest" button can float at the BOTTOM
+  // OF THE TRANSCRIPT — which is the gap between the last answer and the composer, wherever the
+  // composer happens to end up. Pinning it to the screen with a hand-measured offset put it inside
+  // the composer the moment the composer grew a row.
+  const area = el("div", "transcript-wrap");
+  area.append(transcript(state, deps));
+  wrap.append(area, composer(state, deps));
   return wrap;
 }
 
@@ -100,6 +106,16 @@ function renderEntry(entry: UiEntry, state: UiState, deps: ChatDeps): HTMLElemen
     `entry ${entry.role}${entry.included ? "" : " muted"}${entry.error ? " failed" : ""}`,
   );
 
+  // The way back to before this question: a rule across the transcript with the action on it,
+  // ABOVE the question rather than in the hover row below it. The position is the meaning — a line
+  // drawn between two turns is a place in the conversation you can return to, which is exactly what
+  // a checkpoint is. As a small icon among mute, pin, copy and delete it read as a fifth thing you
+  // could do to a message, and the one action there that changes files on disk should not be the
+  // hardest of the five to notice.
+  if (entry.role === "user" && entry.checkpointFiles) {
+    wrap.append(checkpointRule(entry, deps));
+  }
+
   const head = el("div", "entry-head");
   // A small mark before the name, the way the editor's own chat does it. It is not decoration:
   // when an answer is long enough to scroll, the mark is what tells you at a glance whether the
@@ -135,22 +151,6 @@ function renderEntry(entry: UiEntry, state: UiState, deps: ChatDeps): HTMLElemen
     actions.append(
       button({ icon: ICON.edit, title: t("Edit and resend"), className: "btn icon-only", onClick: () => startEdit(entry, deps) }),
     );
-    // The way back to before this question. Offered on the QUESTION rather than on the answer,
-    // because what gets rolled back is the whole idea, and the idea starts with what was asked.
-    // Only where there is something to put back: a button that is present but inert on most turns
-    // teaches people that it does nothing.
-    if (entry.checkpointFiles) {
-      actions.append(
-        button({
-          icon: ICON.restore,
-          title: entry.checkpointPartial
-            ? t("Restore {0} file(s) — some changes were too large to record", entry.checkpointFiles)
-            : t("Restore the {0} file(s) this turn changed, and rewind here", entry.checkpointFiles),
-          className: "btn icon-only restore",
-          onClick: () => deps.send({ type: "restoreCheckpoint", id: entry.id }),
-        }),
-      );
-    }
   }
   actions.append(
     button({ icon: ICON.copy, title: t("Copy"), className: "btn icon-only", onClick: () => deps.send({ type: "copy", text: entry.text }) }),
@@ -257,6 +257,30 @@ const MARKS: Record<string, string> = {
   done: "\u25CF",
   skipped: "\u2013",
 };
+
+/**
+ * The line between two turns that you can go back to.
+ *
+ * A horizontal rule with the action sitting on it, the way the editor's chat marks a restore point.
+ * It is visible without hovering — unlike everything else attached to a message — because it is the
+ * only one that puts files back, and something that overwrites the working tree should never be
+ * discovered by accident.
+ */
+function checkpointRule(entry: UiEntry, deps: ChatDeps): HTMLElement {
+  const wrap = el("div", "checkpoint-rule");
+  const action = button({
+    icon: ICON.restore,
+    label: t("Restore checkpoint"),
+    className: "btn tiny checkpoint-btn",
+    title: entry.checkpointPartial
+      ? t("Restore {0} file(s) — some changes were too large to record", entry.checkpointFiles ?? 0)
+      : t("Put the {0} file(s) this turn changed back, and rewind the conversation here", entry.checkpointFiles ?? 0),
+    onClick: () => deps.send({ type: "restoreCheckpoint", id: entry.id }),
+  });
+  if (entry.checkpointPartial) action.classList.add("partial");
+  wrap.append(action);
+  return wrap;
+}
 
 export function stepList(steps: Array<{ tool: string; summary: string; ok: boolean }>): HTMLElement {
   const list = el("div", "steps");
@@ -416,7 +440,7 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
   // separate buttons for about an hour, and the cost was immediate and measurable — the model name
   // collapsed to "qwe…" because every icon in this row is width the one label carrying real
   // information does not have. Copilot has one configure affordance for the same reason.
-  left.append(contextButton(state, deps), configureButton(state, deps), modeButton(state, deps), modelButton(state, deps));
+  left.append(contextButton(state, deps), toolsButton(state, deps), modeButton(state, deps), modelButton(state, deps));
   if (state.reasoningAvailable) left.append(reasoningButton(state, deps));
   bar.append(left);
 
@@ -432,7 +456,12 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
   // The meter sits ABOVE the box, on the panel's own background — not inside the border. Inside it,
   // it still read as part of the field you type into, which is exactly what it should not be: it is
   // a reading about the conversation, not a control of the message.
-  const meter = el("div", "composer-meter");
+  const meter = el("div", "composer-footer");
+  // What the session runs on, and how much of it runs without asking. Both belong OUTSIDE the box:
+  // they are settings for the conversation, not parts of the message being written, and inside the
+  // border they read as controls of the text. The editor's own chat makes the same split.
+  meter.append(providerButton(state, deps), approvalButton(state, deps));
+  meter.append(el("div", "spacer"));
   const tokens = el("span", "composer-tokens", t("{0} tokens", formatTokens(state.contextTokens)));
   tokens.title = t("What the next question will send, once muted exchanges are removed.");
   // A bar rather than a percentage, and only once there is something to watch. At 3 % it drew a
@@ -462,7 +491,7 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
   }
   const offer = state.suggestCompact ? compactOffer(state, deps) : undefined;
   if (offer) wrap.append(offer);
-  wrap.append(meter, card);
+  wrap.append(card, meter);
   // Size the box to its content on first paint, not only after the first keystroke.
   requestAnimationFrame(() => autoGrow(area));
   return wrap;
@@ -547,111 +576,90 @@ export function isStreaming(): boolean {
   return streaming;
 }
 
+/**
+ * Adding context.
+ *
+ * One line, because the picker is the editor's own. A menu drawn in the webview could not offer
+ * what the workbench offers — its icon set, its separators, type-ahead across categories, keyboard
+ * navigation people already have in their fingers — and was one more surface behaving almost, but
+ * not quite, like everything around it.
+ */
 function contextButton(state: UiState, deps: ChatDeps): HTMLElement {
-  const b = button({
+  return button({
     icon: ICON.attach,
     title: t("Add context to the next question"),
     className: "btn ghost icon-only",
+    onClick: () => deps.send({ type: "openContextPicker" }),
+  });
+}
+
+/** Which skills are offered, in the editor's own multi-select picker. */
+function toolsButton(state: UiState, deps: ChatDeps): HTMLElement {
+  const off = state.skills.filter((sk) => !sk.enabled).length;
+  return button({
+    icon: ICON.tools,
+    title: off ? t("Skills — {0} switched off", off) : t("Configure skills…"),
+    className: `btn ghost icon-only${off ? " has-off" : ""}`,
+    onClick: () => deps.send({ type: "openToolsPicker" }),
+  });
+}
+
+/**
+ * `short` is what fits on the button, `label` is what the menu says.
+ *
+ * One word each, because the row under the composer holds three things and a docked side bar is
+ * 280 px wide: "Ask every time" truncated to "Ask ever…", which is worse than a word that fits.
+ * The full phrasing lives one hover and one click away, where there is room for it.
+ */
+const SCOPES: Array<{ id: UiState["policy"]["scope"]; short: string; label: string; hint: string }> = [
+  { id: "off", short: t("Ask"), label: t("Ask every time"), hint: t("Every change and every command is approved by you.") },
+  { id: "workspace", short: t("Folder"), label: t("Inside this folder"), hint: t("Edits in the open folder run; commands are still asked.") },
+  { id: "all", short: t("Auto"), label: t("Never ask"), hint: t("Everything runs, anywhere on this machine.") },
+];
+
+const PROVIDERS: Array<{ id: string; short: string; label: string; hint: string }> = [
+  { id: "local", short: t("Local"), label: t("On this machine"), hint: t("Nothing leaves, nothing is billed, it works offline.") },
+  { id: "openrouter", short: "OpenRouter", label: "OpenRouter", hint: t("Four hundred models behind one key, billed per token.") },
+  { id: "anthropic", short: "Anthropic", label: "Anthropic", hint: t("Claude, billed directly, with prompt caching.") },
+  { id: "openai-compatible", short: t("Gateway"), label: t("Your own gateway"), hint: t("Azure, LiteLLM, a company proxy — any OpenAI API.") },
+];
+
+/**
+ * Where the answer comes from: this machine, or a gateway.
+ *
+ * A switch rather than a settings page, because it is a decision people make several times a day —
+ * a local model for the ordinary work, something larger for the one hard question — and a decision
+ * made that often has to be one click from the box you type in.
+ *
+ * The label says which, and the colour says whether anything leaves the machine. That second fact
+ * is the whole argument of this extension and it should never take reading to establish.
+ */
+function providerButton(state: UiState, deps: ChatDeps): HTMLElement {
+  const current = PROVIDERS.find((p) => p.id === state.provider) ?? PROVIDERS[0]!;
+  const b = button({
+    icon: ICON.chip,
+    label: state.remote ? current.short : t("Local"),
+    trailingIcon: ICON.chevron,
+    title: state.remote
+      ? t("{0} — what leaves is pseudonymised first", current.label)
+      : t("Runs on this machine: nothing leaves, nothing is billed"),
+    className: `btn ghost tiny provider${state.remote ? " remote" : " local"}`,
     onClick: () =>
       menu(b, (close) => {
         const panel = el("div", "menu-list");
-        panel.append(menuTitle(t("Add to the context")));
-        // Two entries where there used to be one, because "the open file" and "the selection" are
-        // two different things and the old entry silently chose between them. With three lines
-        // highlighted there was no way to attach the file they live in — the case where you most
-        // want to. Both are named after what the editor is actually showing, so neither is a guess.
-        const active = state.activeEditor;
-        if (active?.hasSelection) {
+        panel.append(menuTitle(t("Where the answer comes from")));
+        for (const p of PROVIDERS) {
           panel.append(
             menuItem({
-              label: t("Selection"),
-              detail: `${active.selectedLines} ${active.selectedLines === 1 ? t("line") : t("lines")}`,
-              hint: active.path,
+              label: p.label,
+              hint: p.hint,
+              selected: p.id === state.provider,
               onClick: () => {
-                deps.send({ type: "attach", what: "selection" });
+                deps.send({ type: "setProvider", provider: p.id });
                 close();
               },
             }),
           );
-        }
-        panel.append(
-          menuItem({
-            // `#editor` in the composer, and this in the menu: the same thing reached two ways.
-            label: t("Whole file"),
-            hint: active ? active.path : t("The file open in the editor"),
-            onClick: () => {
-              deps.send({ type: "attach", what: "editor" });
-              close();
-            },
-          }),
-        );
-
-        // All the open tabs, in the FIRST group rather than under a heading below a list of twelve
-        // file names. It was already here and was reported as missing, which is the same thing: an
-        // action nobody finds is an action that does not exist. The per-file list below is the
-        // exception — picking one file out of the tabs — not the headline.
-        if (state.openFiles.length) {
-          panel.append(
-            menuItem({
-              label: t("All {0} open files", state.openFiles.length),
-              hint: t("Everything open in a tab right now, ~{0} tokens", formatTokens(estimateOpenFiles(state))),
-              onClick: () => {
-                deps.send({ type: "attach", what: "openFiles" });
-                close();
-              },
-            }),
-          );
-        }
-
-        // An earlier conversation, reachable from where context is added rather than only from the
-        // history screen. Attaching one is adding context; having to leave for another screen to do
-        // it is what made it invisible.
-        if (state.recent.length > (state.recent.some((r) => r.id === state.session.id) ? 1 : 0)) {
-          panel.append(
-            menuItem({
-              label: t("An earlier conversation…"),
-              hint: t("Its transcript, attached — you stay in this one"),
-              onClick: () => {
-                close();
-                pickConversation(state, deps);
-              },
-            }),
-          );
-        }
-
-        panel.append(
-          menuItem({
-            label: t("Pick a file…"),
-            hint: t("VS Code's own picker, with fuzzy search"),
-            onClick: () => {
-              deps.send({ type: "attach", what: "mention" });
-              close();
-            },
-          }),
-          menuItem({
-            label: t("Import a file…"),
-            hint: t("From disk, even outside the workspace"),
-            onClick: () => {
-              deps.send({ type: "attach", what: "browse" });
-              close();
-            },
-          }),
-        );
-
-        if (state.openFiles.length) {
-          panel.append(separator(), menuTitle(t("Open tabs ({0})", state.openFiles.length)));
-          for (const f of state.openFiles.slice(0, 12)) {
-            panel.append(
-              menuItem({
-                label: f.path,
-                detail: f.active ? t("active") : f.dirty ? t("edited") : "",
-                onClick: () => {
-                  deps.send({ type: "attachPath", path: f.path });
-                  close();
-                },
-              }),
-            );
-          }
         }
         return panel;
       }),
@@ -659,118 +667,19 @@ function contextButton(state: UiState, deps: ChatDeps): HTMLElement {
   return b;
 }
 
-/**
- * Which earlier conversation to bring in.
- *
- * Anchored on the composer's own button, so it opens where the click was. The current conversation
- * is excluded: attaching a transcript to itself is a request nobody means, and the result would be
- * an attachment that grows every turn.
- */
-function pickConversation(state: UiState, deps: ChatDeps): void {
-  const anchor = document.querySelector<HTMLElement>(".composer-toolbar .btn.ghost");
-  if (!anchor) return;
-  menu(anchor, (close) => {
-    const panel = el("div", "menu-list");
-    panel.append(menuTitle(t("Attach a conversation")));
-    const rows = state.recent.filter((h) => h.id !== state.session.id);
-    if (!rows.length) {
-      panel.append(el("div", "empty", t("No other conversation yet.")));
-      return panel;
-    }
-    for (const row of rows) {
-      panel.append(
-        menuItem({
-          label: row.title || t("untitled"),
-          detail: t("{0} messages", row.messages),
-          onClick: () => {
-            deps.send({ type: "useSessionAsContext", id: row.id });
-            close();
-          },
-        }),
-      );
-    }
-    return panel;
-  });
-}
-
-/**
- * One skill, with its switch.
- *
- * The row toggles and the menu STAYS OPEN, because switching skills off is something people do
- * several of in a row; a menu that closed after each one would have to be reopened four times to
- * make one decision. The tick is redrawn in place rather than by rebuilding the menu, which would
- * lose the scroll position.
- */
-function skillRow(skill: UiSkill, deps: ChatDeps): HTMLElement {
-  const row = el("div", `skill-row${skill.enabled ? " on" : ""}${skill.required ? " required" : ""}`);
-  const box = el("span", "skill-check", skill.enabled ? "\u2611" : "\u25A2");
-  row.append(box);
-
-  const main = el("div", "skill-main");
-  main.append(el("div", "skill-name", skill.name));
-  main.append(el("div", "skill-desc", skill.description));
-  row.append(main);
-
-  if (skill.required) {
-    // Said, not merely enforced. A tick that cannot be clicked and does not say why reads as a bug.
-    row.title = t("Always available: it is how you free a full context.");
-    row.append(el("span", "skill-tag", t("always")));
-    return row;
-  }
-
-  row.title = skill.source ? skill.source : t("Click to switch it on or off");
-  row.addEventListener("click", () => {
-    const next = !row.classList.contains("on");
-    row.classList.toggle("on", next);
-    box.textContent = next ? "\u2611" : "\u25A2";
-    deps.send({ type: "setSkillEnabled", name: skill.name, enabled: next });
-  });
-
-  if (skill.source) {
-    row.append(
-      button({
-        icon: ICON.edit,
-        title: t("Open {0}", skill.source),
-        className: "btn icon-only skill-open",
-        onClick: (ev) => {
-          ev.stopPropagation();
-          deps.send({ type: "openSkill", source: skill.source! });
-        },
-      }),
-    );
-  }
-  return row;
-}
-
-const SCOPES: Array<{ id: UiState["policy"]["scope"]; label: string; hint: string }> = [
-  { id: "off", label: t("Ask every time"), hint: t("Every change and every command is approved by you.") },
-  { id: "workspace", label: t("Inside this folder"), hint: t("Edits in the open folder run; commands are still asked.") },
-  { id: "all", label: t("Never ask"), hint: t("Everything runs, anywhere on this machine.") },
-];
-
-/**
- * How much runs without asking, one click from where the question is typed.
- *
- * It lived only on a settings screen, which is the wrong place for it: the decision is made in the
- * middle of working ("stop asking me about this refactor"), and a control you have to navigate to
- * is one people answer by clicking through dialogs instead.
- *
- * The icon carries the state, because that is the state most worth seeing without opening anything:
- * a session left on "never ask" from yesterday is exactly what someone needs to notice today. And
- * the menu says, in words, that the block list is untouched by any of this — a bypass governs how
- * often you are interrupted, never what the agent may read or overwrite.
- */
-function configureButton(state: UiState, deps: ChatDeps): HTMLElement {
+/** How much runs without asking. Outside the box, next to what the answer runs on. */
+function approvalButton(state: UiState, deps: ChatDeps): HTMLElement {
   const scope = state.policy.scope;
   const current = SCOPES.find((sc) => sc.id === scope) ?? SCOPES[0]!;
-  const off = state.skills.filter((sk) => !sk.enabled).length;
   const b = button({
-    icon: ICON.settings,
-    title: t("Approvals: {0}", current.label),
-    className: `btn ghost icon-only perm-scope-${scope}${off ? " has-off" : ""}`,
+    icon: ICON.shield,
+    label: current.short,
+    trailingIcon: ICON.chevron,
+    title: t("Approvals: {0}", current.hint),
+    className: `btn ghost tiny approval-scope perm-scope-${scope}`,
     onClick: () =>
       menu(b, (close) => {
-        const panel = el("div", "menu-list skills-menu");
+        const panel = el("div", "menu-list");
         panel.append(menuTitle(t("What runs without asking")));
         for (const sc of SCOPES) {
           panel.append(
@@ -786,43 +695,13 @@ function configureButton(state: UiState, deps: ChatDeps): HTMLElement {
           );
         }
         panel.append(separator());
-        panel.append(
-          el("div", "menu-note", t("Protected files are never touched, whatever this is set to.")),
-        );
+        panel.append(el("div", "menu-note", t("Protected files are never touched, whatever this is set to.")));
         panel.append(
           menuItem({
             label: t("Allowed and denied lists…"),
             hint: t("Name the paths and commands yourself"),
             onClick: () => {
               deps.send({ type: "openScreen", screen: "permissions" });
-              close();
-            },
-          }),
-        );
-
-        // The skills, in the same menu. They answer one question together — "what will this thing
-        // do when I press send" — and splitting that question across two icons was two icons.
-        panel.append(separator(), menuTitle(t("Skills")));
-        for (const sk of state.skills.filter((sk) => sk.builtin)) panel.append(skillRow(sk, deps));
-        const repo = state.skills.filter((sk) => !sk.builtin);
-        if (repo.length) {
-          panel.append(menuTitle(t("From this repository")));
-          for (const sk of repo) panel.append(skillRow(sk, deps));
-        }
-        panel.append(
-          menuItem({
-            label: t("New skill…"),
-            hint: t("A Markdown file in .hiveycode/skills/"),
-            onClick: () => {
-              deps.send({ type: "newSkill" });
-              close();
-            },
-          }),
-          menuItem({
-            label: t("Share these skills…"),
-            hint: t("They travel with the repository — or copy them"),
-            onClick: () => {
-              deps.send({ type: "shareSkills" });
               close();
             },
           }),

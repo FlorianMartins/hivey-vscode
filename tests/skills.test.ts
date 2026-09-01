@@ -2,7 +2,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ALWAYS_ON, BUILTIN_SKILLS, isSkillEnabled, skillInvocation, toggleSkill } from "../src/core/session/skills.js";
+import { ALWAYS_ON, BUILTIN_SKILLS, isSkillEnabled, SKILL_GROUPS, skillInvocation, toggleSkill } from "../src/core/session/skills.js";
 
 test("a skill nobody has switched off is on", () => {
   assert.equal(isSkillEnabled("/tests", []), true);
@@ -56,4 +56,43 @@ test("every built-in does exactly one thing, and says what", () => {
 test("the names are unique, since the name is what the user types", () => {
   const names = BUILTIN_SKILLS.map((s) => s.name);
   assert.equal(new Set(names).size, names.length);
+});
+
+// ── Families ─────────────────────────────────────────────────────────────────────────────────
+
+test("every skill belongs to a family the picker knows how to show", () => {
+  // A skill in a group the picker does not list would be invisible — enabled, invoked by nobody,
+  // and impossible to switch off.
+  const known = new Set(SKILL_GROUPS.map((g) => g.id));
+  for (const skill of BUILTIN_SKILLS) {
+    assert.ok(known.has(skill.group), `${skill.name} is in the unknown group "${skill.group}"`);
+  }
+});
+
+test("every family has something in it", () => {
+  // An empty group renders as a heading with nothing under it.
+  for (const group of SKILL_GROUPS) {
+    assert.ok(
+      BUILTIN_SKILLS.some((s) => s.group === group.id),
+      `the "${group.id}" group is empty`,
+    );
+  }
+});
+
+test("the general family is the one that applies whatever the language", () => {
+  const general = BUILTIN_SKILLS.filter((s) => s.group === "general").map((s) => s.name);
+  // These are the ones that should never depend on which language is open.
+  for (const name of ["/compact", "/tests", "/doc", "/commit"]) {
+    assert.ok(general.includes(name), `${name} should be general`);
+  }
+});
+
+test("a language skill names the tools of its language, not just its language", () => {
+  // The point of a per-language skill is the body of convention it carries. A prompt that only says
+  // "write tests, in Java" is the generic one with a word changed, and is worth nothing.
+  const find = (name: string) => BUILTIN_SKILLS.find((s) => s.name === name)?.prompt ?? "";
+  assert.match(find("/junit"), /@ParameterizedTest/);
+  assert.match(find("/pytest"), /parametrize/);
+  assert.match(find("/a11y"), /WCAG/);
+  assert.match(find("/hints"), /mypy/);
 });

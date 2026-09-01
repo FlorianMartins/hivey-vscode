@@ -103,7 +103,11 @@ const editor = spawn("node", ["dist-integration/runTest.js"], {
     DISPLAY: display,
     HIVEY_CODE_SCREENSHOT: endpoint,
     HIVEY_CODE_LOCALE: locale,
-    ...(args.get("theme") ? { HIVEY_CODE_THEME: args.get("theme") } : {}),
+    // The editor's own default, unless a capture asks for another. Named in full — "Dark Modern"
+    // is not an identifier VS Code resolves, and an unresolvable theme name does not fall back to
+    // the default: it leaves whatever the profile had, which is how the README ended up showing a
+    // deep-navy theme nobody chose. The name is verified by sampling a pixel, not by reading it.
+    HIVEY_CODE_THEME: args.get("theme") ?? "Default Dark Modern",
     HIVEY_CODE_SCREENSHOT_HOLD: String(HOLD),
     HIVEY_CODE_SCREENSHOT_MARKER: marker,
   },
