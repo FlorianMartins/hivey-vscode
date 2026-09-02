@@ -798,12 +798,15 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
   meter.append(el("div", "spacer"));
   const tokens = el("span", "composer-tokens", t("{0} tokens", formatTokens(state.contextTokens)));
   tokens.title = t("What the next question will send, once muted exchanges are removed.");
-  // A ring rather than a bar. The bar was ninety pixels of a row that has to hold the provider, the
-  // approval setting, a token count and a price on one line at 280 px — and it was hidden below a
-  // fifth full, because a green dot at the end of a long grey line reads as a rendering fault
-  // rather than as a measurement. A ring says the same thing in fourteen pixels and says it
-  // legibly when nearly empty, so it no longer has to wait until the number is worrying.
-  if (state.contextFill > 0.02) meter.append(contextRing(state, deps));
+  // A ring rather than a bar, and always drawn.
+  //
+  // The bar was ninety pixels of a row that has to hold the provider, the approval setting, a token
+  // count and a price on one line at 280 px — and it was hidden below a fifth full, because a green
+  // dot at the end of a long grey line reads as a rendering fault rather than as a measurement. A
+  // ring says the same thing in fourteen pixels and says it legibly when nearly empty, so there is
+  // no longer any reason to hide it. Keeping the old threshold made the indicator vanish on a fresh
+  // conversation, which reads as having been removed rather than as having nothing to report.
+  meter.append(contextRing(state, deps));
   meter.append(tokens);
   // The two numbers anyone actually watches, on one line: how much of the context the next question
   // will use, and what this conversation has cost so far. The day's total lives in the cost report,
@@ -1134,14 +1137,20 @@ function providerButton(state: UiState, deps: ChatDeps): HTMLElement {
               detail: ready ? undefined : t("not set up"),
               selected: p.id === state.provider,
               onClick: () => {
-                deps.send({ type: "setProvider", provider: p.id });
-                // Their choice stands either way — but if there is nothing behind it yet, the next
-                // thing on screen is the field that fixes that, with the provider's own card already
-                // open, rather than an error after the next question.
+                // Nothing switches until there is something to switch to.
+                //
+                // Setting the provider to a gateway with no key leaves the panel configured to fail:
+                // the composer says "Anthropic", the next question says 401, and the setting has to
+                // be put back by hand. So an unconfigured choice opens that provider's card instead,
+                // and the switch happens where the key or the model is actually supplied — saving a
+                // key already selects its provider, and choosing a local model already selects that.
                 if (!ready) {
                   focusGateway(p.id === "local" ? undefined : p.id);
                   deps.send({ type: "openScreen", screen: "setup" });
+                  close();
+                  return;
                 }
+                deps.send({ type: "setProvider", provider: p.id });
                 close();
               },
             }),

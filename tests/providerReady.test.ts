@@ -32,6 +32,17 @@ test("a gateway needs its key", () => {
   assert.equal(providerReady("openrouter", stateWith({ hasKey: { anthropic: true } })), false);
 });
 
+test("an empty setup is not evidence of an empty keychain", () => {
+  // The state starts empty and used to stay empty for a whole session unless the setup screen was
+  // opened, so a key stored months ago was reported as "not set up" in the one menu that decides
+  // whether to send the user off to configure something they already had. The rule below is
+  // unchanged — what was wrong was asking it before anyone had read the keychain — so this test
+  // stands as the reminder: `hasKey: {}` means "not read yet" just as much as "nothing there", and
+  // the extension now reads it whenever the panel comes up.
+  assert.equal(providerReady("anthropic", stateWith({ hasKey: {} })), false);
+  assert.equal(providerReady("anthropic", stateWith({ hasKey: { anthropic: true } })), true);
+});
+
 test("a gateway that is only an API shape needs an address as well as a key", () => {
   // Azure, LiteLLM, a company proxy: the key alone points at nothing.
   const keyOnly = stateWith({ hasKey: { "openai-compatible": true } });

@@ -473,6 +473,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           this.sendState();
           void this.loadModels();
           void this.refreshSkills();
+          // What is already configured, read every time the panel comes up.
+          //
+          // This used to run only on a first run or when nothing could answer, so an established
+          // user's `hasKey` stayed empty for the whole session — and the composer, which asks it
+          // whether a provider is set up, called a key that was sitting in the keychain "not set
+          // up". The setup screen was right because opening it refreshed this; the panel beside it
+          // was wrong because nothing ever did. Three keychain reads is not a cost worth being
+          // wrong over.
+          await this.refreshSetup();
           // First run: open on the setup screen rather than on a chat that cannot answer. The
           // probe starts immediately, because the useful version of this screen is the one that
           // already knows what is running by the time it is read.

@@ -2497,7 +2497,9 @@ pre.code {
   fill: none;
   stroke: var(--vscode-disabledForeground, var(--border-strong));
   stroke-width: 3;
-  opacity: 0.5;
+  /* Legible as a ring even when the arc over it is a sliver. At half strength the empty state was a
+     grey smudge next to the token count, which is how an indicator gets read as absent. */
+  opacity: 0.75;
 }
 .context-ring .ring-arc {
   fill: none;

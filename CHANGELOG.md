@@ -2,6 +2,26 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.26.1 — 2026-09-02
+
+### Fixed
+
+- **A key that was already stored was called "not set up".** The extension reads the keychain into
+  the state the composer consults — but only on a first run, or when nothing could answer. For
+  anyone already installed it therefore stayed empty for the whole session: the setup screen was
+  right, because opening it does that read, and the menu beside it was wrong because nothing ever
+  did. It is read whenever the panel comes up now. An empty list means "not read yet" just as much
+  as "nothing there", which is a distinction worth a test rather than an assumption.
+- **The provider no longer switches to something that cannot answer.** Choosing a gateway with no
+  key left the panel configured to fail: the composer said "Anthropic", the next question said 401,
+  and the setting had to be put back by hand. An unconfigured choice now only opens that provider's
+  card; the switch happens where the key or the model is actually supplied, which both already do.
+- **The context ring was missing on a fresh conversation.** It kept a threshold inherited from the
+  bar it replaced — nothing below a fiftieth full — which existed because a long grey line with a
+  dot at the end reads as a rendering fault. A ring does not, so there was no reason to hide it, and
+  an indicator that vanishes reads as one that was removed. Its background is stronger too: at half
+  strength the empty state was a smudge beside the token count.
+
 ## 0.26.0 — 2026-09-02
 
 ### Added
