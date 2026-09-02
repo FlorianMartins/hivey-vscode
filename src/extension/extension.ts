@@ -15,7 +15,7 @@ import { showEgressReport, showCostReport } from "./reports.js";
 import { WorkspaceContext } from "./workspace.js";
 import { McpManager } from "./integrations/mcp.js";
 import { watchInstructions } from "./instructions.js";
-import { createDefinition, DefinitionStore } from "./definitions.js";
+import { createDefinition, definitionUri, DefinitionStore } from "./definitions.js";
 
 export function activate(context: vscode.ExtensionContext): void {
   // The editor knows which language the user reads, unless they said otherwise.
@@ -227,10 +227,8 @@ export function activate(context: vscode.ExtensionContext): void {
         await createDefinition(picked.make);
         return;
       }
-      const folder = vscode.workspace.workspaceFolders?.[0];
-      if (picked.detail && folder) {
-        await vscode.window.showTextDocument(vscode.Uri.joinPath(folder.uri, picked.detail));
-      }
+      const uri = picked.detail ? definitionUri(picked.detail) : undefined;
+      if (uri) await vscode.window.showTextDocument(uri);
     }),
 
     vscode.commands.registerCommand("hiveyCode.setup", async () => {

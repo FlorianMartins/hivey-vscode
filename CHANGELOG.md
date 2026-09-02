@@ -2,6 +2,50 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.20.0 — 2026-09-02
+
+### Fixed
+
+- **The side margins that would not go away.** The panel's own horizontal padding had been cut
+  three times and the empty strips down both edges never moved, because they were never the
+  panel's: VS Code prepends a stylesheet to every webview document, and in it
+  `body { padding: 0 20px }`. Forty pixels on a 280 px side bar — one seventh of the line — spent
+  by a rule that is in the editor's own files and that nothing here reports. The content now runs
+  to the panel's edge, with the small inset the composer's border needs and nothing else. (Same
+  trap as the grey band that used to sit behind every code block: `code { background }` from the
+  same injected stylesheet.)
+- **The controls under a message were inside the message.** Visible the moment an answer was
+  pinned: the tint that marks a pinned block ran under the buttons, because as far as the DOM was
+  concerned they were part of the answer. They are a control strip that belongs to the message the
+  way a scrollbar belongs to a list, and they now sit outside the article.
+
+- **A skill could only ever be a repository's.** Writing one in a window with no folder open
+  answered "Open a folder first" and stopped there, so the feature did not exist at all in that
+  window — and even with a folder, a habit of your own had to be committed to somebody's project
+  before you could use it. Definitions now also live in `~/.hiveycode/`: the same files one level
+  up, yours, in every project you open. With a folder there are two honest answers and creating one
+  asks which; without one there is nothing to ask. A repository's definition wins over a personal
+  one of the same name, for the reason both win over the built-ins.
+
+### Changed
+
+- **Your side, their side.** A question's name is right-aligned and an answer's stays left, so a
+  transcript of two speakers stops reading as one column of blocks. The mark stays on the outside of
+  the name in both — mirrored rather than merely pushed over — and the controls under your own
+  message follow it.
+- **A more modern send button** — an arrow up in a square, the glyph every composer settled on,
+  instead of a paper plane. The plane is a mail metaphor: it says the message goes off somewhere and
+  you will hear back later, which is the opposite of what a chat does.
+- **The control strip holds its height again.** Opening it on hover removed the empty band and paid
+  for it with everything below sliding down whenever the pointer crossed a message — worse than the
+  band, because a transcript that moves under the cursor cannot be read. It is out of the message
+  now, so holding its height costs the pair nothing.
+- **The buttons are readable.** Back to a 22 px square around a 14 px glyph, at 90 % of the
+  foreground instead of 72: at that weight, in a row you have to look for, they were a shade of the
+  background as much as of the text.
+- **"Latest" is smaller** — 10 px text, a 12 px chevron — and re-centred for its new height. It is
+  a way back, not a call to action.
+
 ## 0.19.0 — 2026-09-02
 
 ### Changed

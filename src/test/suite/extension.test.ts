@@ -8,8 +8,9 @@ import * as fs from "node:fs/promises";
 // keeps passing after a rename has broken the product.
 import { SECTION } from "../../extension/config.js";
 import { openFileUris } from "../../extension/models.js";
+import { DefinitionStore } from "../../extension/definitions.js";
 import { join } from "node:path";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { suite, test } from "./tiny.js";
 
 const ID = "hivey.hivey-code";
@@ -149,6 +150,31 @@ suite("Hivey Code", () => {
     } finally {
       await config.update("endpoints.local", undefined, vscode.ConfigurationTarget.Global);
       await config.update("completion.debounceMs", undefined, vscode.ConfigurationTarget.Global);
+    }
+  });
+
+  test("a personal skill is found with no folder open", async () => {
+    // Reported from a window with no workspace: creating a skill answered "Open a folder first", so
+    // the feature did not exist there at all — and a habit of your own had to be committed to
+    // somebody's repository before you could use it. Definitions may now also live in the home
+    // directory. This harness opens no folder, which is precisely the case that was broken, so the
+    // store either reads them there or the fix is not a fix.
+    const dir = join(homedir(), ".hiveycode", "skills");
+    const file = join(dir, "harness-personal.md");
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(file, "---\nname: harness-personal\ndescription: written by the test\n---\n\nBody.\n", "utf8");
+    const disposables: vscode.Disposable[] = [];
+    try {
+      assert.equal(vscode.workspace.workspaceFolders, undefined, "the case under test is: no folder");
+      const store = new DefinitionStore(disposables);
+      const found = await store.load();
+      assert.ok(
+        found.skills.some((sk) => sk.name === "harness-personal"),
+        `the personal skill was not read: ${found.skills.map((sk) => sk.name).join(", ") || "(none)"}`,
+      );
+    } finally {
+      await fs.rm(file, { force: true });
+      for (const d of disposables) d.dispose();
     }
   });
 

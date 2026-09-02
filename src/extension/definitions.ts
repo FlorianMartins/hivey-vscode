@@ -1,8 +1,10 @@
 // Loading the skills and sub-agents the user wrote, and offering them to the model.
 //
-// Everything here reads from `.hiveycode/` in the workspace. Nothing is generated, nothing is
-// cached across sessions, and a file the user edits takes effect on the next turn — a definition
-// you have to reload the window to try is a definition nobody iterates on.
+// Everything here reads from `.hiveycode/` — in the workspace, where a team's definitions are
+// committed alongside the code they are about, and in the home directory, where a person's own
+// follow them into every project. Nothing is generated, nothing is cached across sessions, and a
+// file the user edits takes effect on the next turn — a definition you have to reload the window
+// to try is a definition nobody iterates on.
 //
 // Two decisions worth defending:
 //
@@ -15,6 +17,8 @@
 //     more authority.
 
 import * as vscode from "vscode";
+import { homedir } from "node:os";
+import { isAbsolute } from "node:path";
 import { t } from "../shared/i18n.js";
 import type { Tool, ToolResult } from "../core/agent/loop.js";
 import {
@@ -30,6 +34,34 @@ import {
 const DIR = ".hiveycode";
 const MAX_FILES = 100;
 
+/**
+ * Where a definition lives when it is not a repository's.
+ *
+ * Skills were repository-only, which is right for a team's — they travel with the code that needs
+ * them — and wrong as the only possibility: it made "write a skill" impossible in a window with no
+ * folder open, and it meant a habit of your own had to be committed to somebody's project before
+ * you could use it. `~/.hiveycode/skills/` is the same layout, one level up, and yours.
+ *
+ * A repository's own definition wins over a personal one of the same name, for the reason the
+ * built-ins lose to both: the more specific answer to "what does this project need" is the project's.
+ */
+function personalRoot(): vscode.Uri {
+  return vscode.Uri.joinPath(vscode.Uri.file(homedir()), DIR);
+}
+
+/**
+ * The file a definition came from.
+ *
+ * A repository's `source` is relative to the repository; a personal one is an absolute path,
+ * because there is nothing for it to be relative to. Everything that opens a definition goes
+ * through here, so the distinction is made once.
+ */
+export function definitionUri(source: string): vscode.Uri | undefined {
+  if (isAbsolute(source)) return vscode.Uri.file(source);
+  const folder = vscode.workspace.workspaceFolders?.[0];
+  return folder ? vscode.Uri.joinPath(folder.uri, source) : undefined;
+}
+
 export interface Definitions {
   skills: Skill[];
   agents: AgentDefinition[];
@@ -43,47 +75,64 @@ export class DefinitionStore {
   private cache: Definitions | undefined;
 
   constructor(disposables: vscode.Disposable[]) {
-    const watcher = vscode.workspace.createFileSystemWatcher(`**/${DIR}/{skills,agents}/*.md`);
     const clear = () => {
       this.cache = undefined;
     };
-    watcher.onDidChange(clear);
-    watcher.onDidCreate(clear);
-    watcher.onDidDelete(clear);
-    disposables.push(watcher);
+    for (const pattern of [
+      `**/${DIR}/{skills,agents}/*.md` as const,
+      // The personal folder is outside every workspace, so it needs a watcher rooted at itself:
+      // a `**/` pattern only ever sees what the editor has opened.
+      new vscode.RelativePattern(personalRoot(), "{skills,agents}/*.md"),
+    ]) {
+      const watcher = vscode.workspace.createFileSystemWatcher(pattern);
+      watcher.onDidChange(clear);
+      watcher.onDidCreate(clear);
+      watcher.onDidDelete(clear);
+      disposables.push(watcher);
+    }
   }
 
   /** Everything currently defined. Re-read after any change to the files. */
   async load(): Promise<Definitions> {
     if (this.cache) return this.cache;
     const folder = vscode.workspace.workspaceFolders?.[0];
-    // The built-in agents work without a folder: delegating a question does not require a workspace.
-    if (!folder) return (this.cache = { ...EMPTY, agents: BUILTIN_AGENTS });
 
     const skills: Skill[] = [];
     const agents: AgentDefinition[] = [];
     const problems: string[] = [];
 
-    for (const kind of ["skill", "agent"] as const) {
-      const dir = vscode.Uri.joinPath(folder.uri, DIR, kind === "skill" ? "skills" : "agents");
-      let entries: [string, vscode.FileType][];
-      try {
-        entries = await vscode.workspace.fs.readDirectory(dir);
-      } catch {
-        continue; // No such directory: this workspace simply has none.
-      }
-      for (const [name, type] of entries.slice(0, MAX_FILES)) {
-        if (type !== vscode.FileType.File || !name.endsWith(".md")) continue;
-        const uri = vscode.Uri.joinPath(dir, name);
-        const source = `${DIR}/${kind === "skill" ? "skills" : "agents"}/${name}`;
+    // Personal first, the repository second: `dedupe` keeps the first of a name, so the project's
+    // own definition is the one that must arrive last to win. A window with no folder open reads
+    // the personal ones and nothing else, which is the whole point of their existing.
+    const roots: Array<{ base: vscode.Uri; relative: boolean }> = [{ base: personalRoot(), relative: false }];
+    if (folder) roots.push({ base: vscode.Uri.joinPath(folder.uri, DIR), relative: true });
+
+    for (const { base, relative } of roots) {
+      for (const kind of ["skill", "agent"] as const) {
+        const leaf = kind === "skill" ? "skills" : "agents";
+        const dir = vscode.Uri.joinPath(base, leaf);
+        let entries: [string, vscode.FileType][];
         try {
-          const text = new TextDecoder().decode(await vscode.workspace.fs.readFile(uri));
-          const { definition, problems: found } = parseDefinition(kind, source, text);
-          problems.push(...found);
-          if (definition?.kind === "skill") skills.push(definition);
-          else if (definition?.kind === "agent") agents.push(definition);
-        } catch (error) {
-          problems.push(`${source}: ${error instanceof Error ? error.message : String(error)}`);
+          entries = await vscode.workspace.fs.readDirectory(dir);
+        } catch {
+          continue; // No such directory: this workspace, or this user, simply has none.
+        }
+        for (const [name, type] of entries.slice(0, MAX_FILES)) {
+          if (type !== vscode.FileType.File || !name.endsWith(".md")) continue;
+          const uri = vscode.Uri.joinPath(dir, name);
+          // A repository's definition is named by its path within the repository; a personal one by
+          // its absolute path, because there is nothing to be relative to. Whoever opens it tells
+          // the two apart with `isAbsolute`.
+          const source = relative ? `${DIR}/${leaf}/${name}` : uri.fsPath;
+          try {
+            const text = new TextDecoder().decode(await vscode.workspace.fs.readFile(uri));
+            const { definition, problems: found } = parseDefinition(kind, source, text);
+            problems.push(...found);
+            if (definition?.kind === "skill") skills.push(definition);
+            else if (definition?.kind === "agent") agents.push(definition);
+          } catch (error) {
+            problems.push(`${source}: ${error instanceof Error ? error.message : String(error)}`);
+          }
         }
       }
     }
@@ -268,10 +317,28 @@ export function buildDefinitionTools(deps: DefinitionDeps, definitions: Definiti
  */
 export async function createDefinition(kind: "skill" | "agent"): Promise<void> {
   const folder = vscode.workspace.workspaceFolders?.[0];
-  if (!folder) {
-    void vscode.window.showWarningMessage(t("Open a folder first: definitions live in the repository."));
-    return;
+
+  // Where it goes, asked only when there is a choice.
+  //
+  // "Open a folder first" was the answer to every attempt in a window without one, which made the
+  // whole feature unreachable there — and even with a folder open it forced a habit of your own
+  // into somebody's repository before you could use it. With a folder there are two honest
+  // answers and the question is one keystroke; without one, there is nothing to ask.
+  let base = personalRoot();
+  if (folder) {
+    const here = t("This repository");
+    const mine = t("Everywhere");
+    const where = await vscode.window.showQuickPick(
+      [
+        { label: "$(repo) " + here, detail: t("In .hiveycode/ — committed, and your team gets it too"), id: here },
+        { label: "$(account) " + mine, detail: t("In ~/.hiveycode/ — yours, in every project you open"), id: mine },
+      ],
+      { placeHolder: kind === "skill" ? t("Where does this skill live?") : t("Where does this sub-agent live?") },
+    );
+    if (!where) return;
+    if (where.id === here) base = vscode.Uri.joinPath(folder.uri, DIR);
   }
+
   const name = await vscode.window.showInputBox({
     prompt: kind === "skill" ? t("Name of the skill — what you will type after the slash") : t("Name of the sub-agent"),
     placeHolder: kind === "skill" ? "review-rpg" : "db-explorer",
@@ -282,7 +349,7 @@ export async function createDefinition(kind: "skill" | "agent"): Promise<void> {
   });
   if (!name) return;
 
-  const dir = vscode.Uri.joinPath(folder.uri, DIR, kind === "skill" ? "skills" : "agents");
+  const dir = vscode.Uri.joinPath(base, kind === "skill" ? "skills" : "agents");
   const uri = vscode.Uri.joinPath(dir, `${name.trim()}.md`);
   try {
     await vscode.workspace.fs.stat(uri);

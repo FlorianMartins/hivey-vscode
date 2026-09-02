@@ -54,7 +54,11 @@ export function button(opts: ButtonOptions): HTMLButtonElement {
  * always render, they scale, and they cost nothing.
  */
 const PATHS = {
-  send: "M2 8 14 2.5 8.5 14 7 9 2 8Z",
+  // An arrow up, not a paper plane. The plane is a mail metaphor from a mail client — it says "this
+  // goes off somewhere and you will hear back later", which is the opposite of what a chat does.
+  // Every serious assistant's composer settled on the same glyph for the same reason: the message
+  // goes UP, into the conversation above the box you are typing in.
+  send: "M8 12.75V4.25M4.25 8 8 4.25 11.75 8",
   stop: "M4 4h8v8H4z",
   add: "M8 3v10M3 8h10",
   history: "M8 3a5 5 0 1 1-4.9 4M3 3v3h3M8 5.5V8l2 1.5",
@@ -112,6 +116,11 @@ const PATHS = {
  */
 const FILLED = new Set<IconName>(["more", "sparkle"]);
 
+/* Drawn a shade heavier. On the accent-filled send button a 1.3 px stroke is a thin white scratch
+   on a saturated square; the same weight that reads as delicate among grey icons reads as unfinished
+   there. */
+const BOLD = new Set<IconName>(["send"]);
+
 export type IconName = keyof typeof PATHS;
 
 export function icon(name: IconName, className = "ico"): SVGSVGElement {
@@ -131,7 +140,7 @@ export function icon(name: IconName, className = "ico"): SVGSVGElement {
   } else {
     path.setAttribute("fill", "none");
     path.setAttribute("stroke", "currentColor");
-    path.setAttribute("stroke-width", "1.3");
+    path.setAttribute("stroke-width", BOLD.has(name) ? "1.7" : "1.3");
   }
   path.setAttribute("stroke-linecap", "round");
   path.setAttribute("stroke-linejoin", "round");

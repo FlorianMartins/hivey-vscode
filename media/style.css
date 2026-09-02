@@ -48,6 +48,18 @@ html {
 
 body {
   margin: 0;
+  /* The margins that would not go away.
+   *
+   * The panel's own side padding has been cut three times and the empty strips down both edges
+   * never moved, because they were never the panel's: VS Code prepends a stylesheet of its own to
+   * every webview document, and in it `body { padding: 0 20px }`. Forty pixels on a 280 px side
+   * bar — one seventh of the line — spent by a rule that is not in this file and that nothing here
+   * reports. Ours comes after the injected one and at equal specificity, so this is all it takes.
+   *
+   * Same trap as the grey band behind every code block, which was `code { background }` from the
+   * same stylesheet. When something in a webview will not move, read the host's CSS: it is on disk
+   * at resources/app/out/vs/workbench/contrib/webview/browser/pre/index.html. */
+  padding: 0;
   font-family: var(--vscode-font-family);
   font-size: var(--fs-body);
   line-height: 1.5;
@@ -356,6 +368,19 @@ mark.hit {
 .entry.assistant .entry-who {
   color: var(--vscode-foreground);
 }
+/* Your side, their side.
+ *
+ * A transcript of two speakers is easier to follow when the two are not stacked in the same column,
+ * and the cheapest way to say so is the label: the answer's name starts at the left margin, the
+ * question's ends at the right. `row-reverse` rather than `justify-content`, so the mark stays on
+ * the outside of the name in both — the pair is mirrored, not merely pushed. */
+.entry.user .entry-head {
+  flex-direction: row-reverse;
+}
+/* And what you can do to your own message sits under its own side. */
+.entry-block.user .entry-actions {
+  justify-content: flex-end;
+}
 .entry-meta {
   font-size: var(--fs-meta);
   color: var(--muted);
@@ -398,15 +423,15 @@ mark.hit {
   /* No gap. The buttons are squares that already carry their own air, and a gap on top of that is
      what put thirteen pixels between two glyphs. See the sizing rule further down. */
   gap: 0;
-  margin-top: 0;
-  max-height: 0;
-  overflow: hidden;
+  margin-top: 2px;
+  /* Its height is held whether or not anything is visible in it. Opening the row on hover removed
+     the empty band, and paid for it with the answer below sliding down every time the pointer
+     crossed a message — which is worse: a transcript that moves under the cursor cannot be read.
+     The band is small now because the row sits OUTSIDE the message rather than inside it, so it
+     costs the message nothing and the pair still reads as a pair. */
   opacity: 0;
   pointer-events: none;
-  transition:
-    opacity 100ms ease,
-    max-height 120ms ease,
-    margin-top 120ms ease;
+  transition: opacity 100ms ease;
 }
 
 /* The user's own words sit in a tinted card; the assistant's answer is the page itself. That
@@ -1499,13 +1524,21 @@ pre.code {
  * like focus rather than like a slightly different border.
  */
 
-.entry + .entry {
-  border-top: none;
+/* The control strip lines up with the message it belongs to. A pinned entry carries a 3 px edge and
+   its own padding, so its text starts five pixels in — and buttons that ignored that sat visibly
+   left of everything they act on. */
+.entry-block.pinned .entry-actions {
+  padding-left: 5px;
+}
+.entry-block + .entry-block {
   /* Tight, because the pair below this gap is a question and the answer to it. What separates one
      exchange from the next is the rule above the next question, not this margin: spacing every
      entry apart by the same amount made a question sit as far from its own reply as from a
      different conversation turn. */
   margin-top: var(--sp-1);
+}
+.entry + .entry {
+  border-top: none;
 }
 .entry {
   padding: var(--sp-1) 0;
@@ -1567,9 +1600,30 @@ pre.code {
   margin-left: auto;
   flex: 0 0 auto;
 }
+/* An arrow, not a blue tile.
+ *
+ * `primary` fills a button with the workbench accent, which is right for "Restore" in a dialog and
+ * wrong at the end of a row of six flat icon buttons: a saturated square there is the loudest thing
+ * on the screen, and the loudest thing on the screen should not be the button you press when you
+ * have finished typing. The editor's own composer draws its send as an icon like the others, in the
+ * accent COLOUR, and lets the fill appear on hover — which also makes the disabled state legible,
+ * because a greyed-out tile and an enabled tile differ only in saturation. */
 .btn.primary.send {
   border-radius: var(--radius);
-  padding: 3px var(--sp-2);
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  justify-content: center;
+  background: none;
+  border-color: transparent;
+  color: var(--vscode-textLink-foreground, var(--vscode-button-background));
+}
+.btn.primary.send:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--vscode-textLink-foreground, var(--vscode-button-background)) 16%, transparent);
+  color: var(--vscode-textLink-foreground, var(--vscode-button-background));
+}
+.btn.primary.send:disabled {
+  color: var(--muted);
 }
 
 /* The identity mark on each turn: a dot for the question, a diamond for the answer. Two shapes
@@ -2596,20 +2650,22 @@ pre.code::-webkit-scrollbar-track {
      answer. Reserving the space is the only arrangement where it cannot overlap anything, because
      nothing else is ever drawn there. */
   /* Centred in the whole gap, which is bigger than the strip.
-     The button is 23 px (11 px text, 3 px padding, 1 px border, twice over). The strip the
+     The button is 19 px (10 px text, 2 px padding, 1 px border, twice over). The strip the
      transcript reserves is 26, and the composer adds 4 px of its own padding under it — so the
      space the eye reads is 30, not 26, and centring in the strip alone left the button sitting on
-     the last line of the answer with seven pixels of nothing below it. At `bottom: 0` there are
-     three pixels above it and four below: the middle of the gap that is actually there. */
-  bottom: 0;
+     the last line of the answer with seven pixels of nothing below it. At `bottom: 1px` there are
+     five and a half pixels above it and five below: the middle of the gap that is actually there.
+     It is a way back, not a call to action: small enough to ignore while reading. */
+  bottom: 1px;
   z-index: 5;
-  padding: 3px var(--sp-3);
+  padding: 2px var(--sp-2);
   border-radius: 999px;
   border: 1px solid var(--border-strong);
   background: var(--vscode-editorWidget-background, var(--surface));
   color: var(--vscode-foreground);
   box-shadow: 0 2px 8px color-mix(in srgb, var(--vscode-widget-shadow, transparent) 80%, transparent);
-  font-size: var(--fs-meta);
+  font-size: 10px;
+  gap: 3px;
 }
 .jump-to-end:hover {
   background: var(--hover);
@@ -2618,6 +2674,8 @@ pre.code::-webkit-scrollbar-track {
   /* The chevron points down; it is drawn pointing down already, so nothing to rotate — but it must
      lead the label, which is the direction of travel. */
   order: -1;
+  width: 12px;
+  height: 12px;
 }
 
 /* Restoring a checkpoint is the one action in the row that changes files on disk, so it is the one
@@ -2751,24 +2809,19 @@ pre.code::-webkit-scrollbar-track {
  * else, which is the editor's own chat behaviour and the reason its transcripts read as prose
  * rather than as a table of controls.
  *
- * The space opens under the message the pointer is on, and closes again when it leaves. Nothing
- * above the cursor moves — only what follows — so the message being acted on stays exactly where
- * it was read, which is the one thing that would make these buttons unusable if it failed.
+ * The hover is on the BLOCK — the message and its control strip together — so moving the pointer
+ * off the text and onto the buttons does not make them disappear on the way.
  */
-.entry:hover .entry-actions,
+.entry-block:hover .entry-actions,
 .entry-actions:focus-within {
   opacity: 1;
   pointer-events: auto;
-  max-height: 24px;
-  margin-top: var(--sp-1);
 }
 /* Keyboard users never hover. Without this the buttons are unreachable by tab, which would make
    the whole row mouse-only. */
-.entry:focus-within .entry-actions {
+.entry-block:focus-within .entry-actions {
   opacity: 1;
   pointer-events: auto;
-  max-height: 24px;
-  margin-top: var(--sp-1);
 }
 
 /* The model and the price are a receipt, not a headline: worth checking, never worth reading on
@@ -2778,8 +2831,8 @@ pre.code::-webkit-scrollbar-track {
   opacity: 0;
   transition: opacity 100ms ease;
 }
-.entry:hover .entry-meta,
-.entry:focus-within .entry-meta {
+.entry-block:hover .entry-meta,
+.entry-block:focus-within .entry-meta {
   opacity: 1;
 }
 
@@ -3435,20 +3488,25 @@ pre.code code {
  * the eye was reading as untidy.
  */
 .entry-actions .btn.icon-only {
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   padding: 0;
   justify-content: center;
   border-radius: var(--radius);
-  color: color-mix(in srgb, var(--vscode-foreground) 72%, transparent);
+  /* Nearly the full foreground. At 72 % the glyphs were a shade of the background as much as of the
+     text, and shrinking the box around them took away the last of what made them findable: a row
+     you have to look for is a row you do not use. They are only drawn when the pointer is already
+     on the message, so there is nothing for them to compete with. */
+  color: color-mix(in srgb, var(--vscode-foreground) 90%, transparent);
 }
 .entry-actions .btn.icon-only:hover {
   color: var(--vscode-foreground);
   background: var(--hover);
 }
 .entry-actions .btn.icon-only .ico {
-  width: 13px;
-  height: 13px;
+  width: 14px;
+  height: 14px;
+  opacity: 1;
 }
 /* Deleting and restoring are the two that change something outside the conversation, so they are
    the two that take a colour on hover — not before, because a red icon sitting in a row of grey
@@ -3562,12 +3620,12 @@ pre.code code {
  * given back to the line.
  */
 .transcript {
-  padding-left: var(--sp-1);
-  padding-right: var(--sp-1);
+  padding-left: var(--sp-2);
+  padding-right: var(--sp-2);
 }
 .composer {
-  padding-left: 2px;
-  padding-right: 2px;
+  padding-left: var(--sp-1);
+  padding-right: var(--sp-1);
 }
 .screen-lede,
 .screen-note {

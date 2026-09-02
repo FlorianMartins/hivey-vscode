@@ -33,7 +33,7 @@ import { detectIbmiLanguage, ibmiPrompt } from "../core/ibmi/languages.js";
 import { parsePrompt, participantDirective, type MentionKind, type Participant } from "../core/session/mentions.js";
 import { resolveMentions } from "./mentions.js";
 import { instructionFiles, instructionsPrompt } from "./instructions.js";
-import { buildDefinitionTools, createDefinition, DefinitionStore, type SubAgentRun } from "./definitions.js";
+import { buildDefinitionTools, createDefinition, definitionUri, DefinitionStore, type SubAgentRun } from "./definitions.js";
 import { skillsPrompt } from "../core/agent/definitions.js";
 import { autoApprove } from "../core/agent/autoApprove.js";
 import { matchGlob } from "../core/util/glob.js";
@@ -625,9 +625,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           break;
         }
         case "openSkill": {
-          const folder = vscode.workspace.workspaceFolders?.[0];
-          if (!folder) break;
-          await vscode.window.showTextDocument(vscode.Uri.joinPath(folder.uri, m.source));
+          const uri = definitionUri(m.source);
+          if (uri) await vscode.window.showTextDocument(uri);
           break;
         }
         case "shareSkills":

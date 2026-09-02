@@ -310,6 +310,14 @@ function wizardFoot(deps: ChatDeps, onNext: (() => void) | undefined, label: str
 }
 
 function renderEntry(entry: UiEntry, state: UiState, deps: ChatDeps): HTMLElement {
+  // The message, and next to it the things you can do to the message.
+  //
+  // They used to be one element, and the give-away was pinning: a pinned answer paints a tint
+  // across its whole block, and the tint ran under the buttons — because as far as the DOM was
+  // concerned the buttons WERE part of the answer. They are not. They are a control strip that
+  // belongs to the message the way a scrollbar belongs to a list, so they sit outside the article
+  // and inside a wrapper that carries the hover.
+  const block = el("div", `entry-block ${entry.role}${entry.pinned ? " pinned" : ""}`);
   const wrap = el(
     "article",
     `entry ${entry.role}${entry.included ? "" : " muted"}${entry.error ? " failed" : ""}${entry.pinned ? " pinned" : ""}`,
@@ -435,8 +443,8 @@ function renderEntry(entry: UiEntry, state: UiState, deps: ChatDeps): HTMLElemen
     actions.append(receipt);
   }
 
-  wrap.append(actions);
-  return wrap;
+  block.append(wrap, actions);
+  return block;
 }
 
 /**
