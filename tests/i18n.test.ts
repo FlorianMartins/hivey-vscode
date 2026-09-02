@@ -64,8 +64,18 @@ test("every string the source translates has a French entry", () => {
     if (file.includes("i18n")) continue;
     const source = readFileSync(file, "utf8");
     // `t("…")`, but not `test(`, `.get(`, `import(` — the boundary matters more than it looks.
-    for (const m of source.matchAll(/(?<![A-Za-z0-9_.$])t\(\s*"((?:[^"\\]|\\.)*)"/g)) {
-      const key = m[1]!.replace(/\\"/g, '"').replace(/\\n/g, "\n");
+    //
+    // The whole argument, not its first line. A long sentence is written across several source
+    // lines joined by `+`, and `t()` receives the CONCATENATION — so a test that read only the
+    // first fragment was checking a key that never exists at runtime, and passed while the French
+    // interface showed a paragraph of English. Found on a screenshot, which is the only place it
+    // could be found.
+    for (const m of source.matchAll(/(?<![A-Za-z0-9_.$])t\(\s*("(?:[^"\\]|\\.)*"(?:\s*\+\s*"(?:[^"\\]|\\.)*")*)/g)) {
+      const key = [...m[1]!.matchAll(/"((?:[^"\\]|\\.)*)"/g)]
+        .map((part) => part[1]!)
+        .join("")
+        .replace(/\\"/g, '"')
+        .replace(/\\n/g, "\n");
       if (key.trim()) keys.add(key);
     }
   }

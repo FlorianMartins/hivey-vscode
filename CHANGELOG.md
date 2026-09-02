@@ -2,6 +2,18 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.18.1 — 2026-09-02
+
+### Fixed
+
+- **Four paragraphs of the French interface were in English** — the permissions screen's rule about
+  the shape of an action, the note that a refusal beats an authorisation, and both explanations in
+  the egress and cost reports. Each was translated; each translation was unreachable. A sentence
+  written across several source lines joined by `+` reaches `t()` as ONE string, while the coverage
+  test read only the first fragment — so it checked a key that never exists at runtime and passed
+  while the interface showed English. The test now joins the fragments, which is what found these
+  four. Seen first on a screenshot: nothing else was ever going to notice.
+
 ## 0.18.0 — 2026-09-02
 
 ### Added
