@@ -91,6 +91,22 @@ test("a pinned turn survives trimming", () => {
   assert.ok(sent.includes("the spec:"));
 });
 
+test("rewinding to a question drops it and everything after, and hands the question back", () => {
+  // A rewind is not a deletion: the question comes back so it can be asked differently. And it does
+  // not depend on a file checkpoint — a turn that wrote nothing to disk is still a place in the
+  // conversation to return to, which is the common case in chat and plan mode.
+  const s = seeded();
+  const second = s.entries[2]!.id;
+
+  const text = s.rewindTo(second);
+
+  assert.equal(text, "and write one?", "the question is handed back for the composer");
+  assert.equal(s.entries.length, 2, "that question and the answer after it are gone");
+  assert.equal(s.entries[1]!.text, "use fs.readFile", "the exchange before it is untouched");
+  assert.equal(s.rewindTo("nope"), undefined, "an id that is not there rewinds nothing");
+  assert.equal(s.entries.length, 2);
+});
+
 test("attachments travel in a fenced block, not glued to the sentence", () => {
   const e: Entry = {
     id: "1",

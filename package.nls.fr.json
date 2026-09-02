@@ -86,5 +86,6 @@
   "config.section.permissions": "Permissions",
   "config.section.context": "Contexte",
   "config.section.completion": "Complétion en ligne",
-  "command.attachOpenEditors.title": "Joindre tous les éditeurs ouverts à la conversation"
+  "command.attachOpenEditors.title": "Joindre tous les éditeurs ouverts à la conversation",
+  "command.pinLastAnswer.title": "Épingler ou désépingler la dernière réponse"
 }

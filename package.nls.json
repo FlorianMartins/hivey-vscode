@@ -86,5 +86,6 @@
   "config.section.permissions": "Permissions",
   "config.section.context": "Context",
   "config.section.completion": "Inline completion",
-  "command.attachOpenEditors.title": "Attach all open editors to the conversation"
+  "command.attachOpenEditors.title": "Attach all open editors to the conversation",
+  "command.pinLastAnswer.title": "Pin or unpin the last answer"
 }

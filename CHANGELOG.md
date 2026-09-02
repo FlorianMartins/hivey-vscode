@@ -2,6 +2,41 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.18.0 — 2026-09-02
+
+### Added
+
+- **A rule between one exchange and the next, carrying the way back.** A transcript is a stack of
+  question-and-answer pairs and nothing said so: every message was separated from the next by the
+  same amount of space, so a question sat as far from its own answer as from a different turn. The
+  line is now drawn at the boundary that matters — above a question, never between a question and
+  its reply — and the restore rides on it, the way the editor's own chat marks a restore point.
+  There used to be two lines at every boundary, one under the answer and one above the next
+  question, both restoring to different points; there is one.
+- **A turn that changed no file can be rewound too.** Restoring refused unless something had been
+  written to disk, which made the restore point an agent-mode feature — while the thing most people
+  want to undo is a question that sent the answer off in the wrong direction, which costs nothing on
+  disk and everything in context. Every boundary now carries the restore, and the confirmation says
+  which of the two it is about to do.
+- **Making a skill or a sub-agent is back in the menu that lists them.** It had become reachable
+  only from the command palette, which means reachable only by someone who already knew it was
+  there. **New skill…**, **New sub-agent…** and **Share with the team** sit under a rule in
+  *Skills and sub-agents*, and "no sub-agent is defined" now offers the button that defines one
+  instead of being a dead end.
+- **`Hivey Code: Pin or unpin the last answer`**, so pinning can go on a keybinding — and so the
+  path can be driven by a test. The button lives in a hover row, which nothing but a person can
+  press, which is why it was reported twice as doing nothing.
+
+### Changed
+
+- **A question and its answer are pulled together.** The gap inside a pair is halved; the space
+  goes to the boundary between pairs, where the rule is.
+- **A pinned answer is unmistakable.** An edge, a tint across the whole block and a badge in the
+  header — three signals, because the two before them went unnoticed: what pinning showed for
+  itself was a word in the muted colour inside the row that fades when the pointer leaves. The pin
+  button also keeps the accent while the state is on, so the answer to "did that work?" is under
+  the pointer that just clicked.
+
 ## 0.17.1 — 2026-09-01
 
 ### Added

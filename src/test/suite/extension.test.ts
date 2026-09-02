@@ -152,6 +152,16 @@ suite("Hivey Code", () => {
     }
   });
 
+  test("pinning is a command, and says nothing to pin when there is nothing to pin", async () => {
+    // The button lives in a hover row, which no test can press — the same shape of blind spot that
+    // let three separate failures ship in "attach all open editors". As a command the path is
+    // reachable: here for the empty case, and in the screenshot run for the real one, where a model
+    // has actually answered.
+    await vscode.commands.executeCommand("hiveyCode.newSession");
+    const pinned = await vscode.commands.executeCommand<boolean | undefined>("hiveyCode.pinLastAnswer");
+    assert.equal(pinned, undefined, "an empty conversation has no answer to pin");
+  });
+
   test("the reports open without a script and without a model", async () => {
     await vscode.commands.executeCommand("hiveyCode.showEgress");
     await vscode.commands.executeCommand("hiveyCode.showCosts");
@@ -264,6 +274,32 @@ suite("Screenshot", () => {
       await new Promise((r) => setTimeout(r, 2500));
       await vscode.commands.executeCommand("hiveyCode.newSession");
       await vscode.commands.executeCommand("hiveyCode.askWith", "Does this function round correctly? What should change?");
+      // A SECOND exchange, because one is not a transcript. What separates one turn from the next
+      // — the rule above a question, carrying the way back to before it — only exists at a
+      // boundary, and a photograph of a single question and its answer contains no boundary to
+      // look at. This is the frame that shows whether a pair reads as a pair.
+      //
+      // Long enough for the first answer to finish: asked while the previous turn was still
+      // streaming, the second question was dropped, and the frame came back with one exchange in
+      // it and nothing to see.
+      await new Promise((r) => setTimeout(r, 12_000));
+      await vscode.commands.executeCommand("hiveyCode.askWith", "And the rounding of the VAT itself?");
+      await new Promise((r) => setTimeout(r, 12_000));
+      // Pinned, so the photograph carries the answer to "how do I know it is pinned?" — reported
+      // twice as a button that does nothing, because what it did was invisible.
+      const pinned = await vscode.commands.executeCommand<boolean | undefined>("hiveyCode.pinLastAnswer");
+      assert.equal(pinned, true, "the last answer should now be pinned");
+
+      // What is actually in the transcript, said by the transcript. A photograph shows a scroll
+      // position, not a conversation: the frame that was supposed to prove a second exchange had
+      // arrived was equally consistent with one exchange and a scrollbar, and there was no way to
+      // tell from the picture which it was. The export is the product's own answer to the question.
+      await vscode.commands.executeCommand("hiveyCode.exportSession");
+      const exported = vscode.window.activeTextEditor?.document.getText() ?? "";
+      await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
+      assert.ok(exported.includes("round correctly"), "the first question is in the transcript");
+      assert.ok(exported.includes("rounding of the VAT"), `the second question is missing:\n${exported.slice(0, 600)}`);
+
       await announce("conversation");
 
       // A screen showing what an attachment actually looks like. Three separate fixes to "attach

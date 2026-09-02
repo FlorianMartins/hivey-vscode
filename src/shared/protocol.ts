@@ -32,8 +32,6 @@ export interface UiEntry {
   checkpointFiles?: number;
   /** True when the checkpoint could not hold everything the turn changed. */
   checkpointPartial?: boolean;
-  /** On an ANSWER: the id of the question it can be rolled back to. */
-  restoreId?: string;
   /** The to-do list the agent kept while answering this turn. */
   plan?: Plan;
   /** What the model thought before answering, when a reasoning effort was asked for. */

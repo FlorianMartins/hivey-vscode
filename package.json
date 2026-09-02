@@ -2,7 +2,7 @@
   "name": "hivey-code",
   "displayName": "Hivey Code",
   "description": "%extension.description%",
-  "version": "0.17.1",
+  "version": "0.18.0",
   "publisher": "hivey",
   "license": "Apache-2.0",
   "repository": {
@@ -266,6 +266,12 @@
         "title": "%command.attachOpenEditors.title%",
         "category": "Hivey Code",
         "icon": "$(files)"
+      },
+      {
+        "command": "hiveyCode.pinLastAnswer",
+        "title": "%command.pinLastAnswer.title%",
+        "category": "Hivey Code",
+        "icon": "$(pin)"
       }
     ],
     "menus": {

@@ -232,9 +232,12 @@ guarantee. In plan mode the sub-agent above gets `read_file` and nothing else, q
 it does goes through the same approval dialogs and the same egress gate as anything else — being
 called by a sub-agent is not a way around a question.
 
-`Hivey Code: Create a skill` writes a working example and opens it. A file with a broken header is
-reported, not skipped: a skill that silently vanishes makes the assistant ignore instructions it
-never received, and leaves nobody able to find out why.
+**Skills and sub-agents** under the composer opens the same menu that lists them: areas, skills,
+sub-agents, and — under a rule, because making one is the same thought as choosing one — **New
+skill…**, **New sub-agent…** and **Share with the team**. Either writes a working example and opens
+it. (`Hivey Code: Create a skill` and `Hivey Code: Create a sub-agent` do the same from the command
+palette.) A file with a broken header is reported, not skipped: a skill that silently vanishes makes
+the assistant ignore instructions it never received, and leaves nobody able to find out why.
 
 ## Install
 

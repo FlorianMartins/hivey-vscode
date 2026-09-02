@@ -95,6 +95,11 @@ export function activate(context: vscode.ExtensionContext): void {
       return chat.attachOpenEditors();
     }),
 
+    vscode.commands.registerCommand("hiveyCode.pinLastAnswer", async () => {
+      await chat.reveal();
+      return chat.togglePinLastAnswer();
+    }),
+
     vscode.commands.registerCommand("hiveyCode.newSpecialisedSession", async () => {
       await chat.reveal();
       chat.startWizard();

@@ -52,6 +52,19 @@ const ANSWER =
       "Two things worth settling next: which rounding rule applies (half-up or banker's), and whether " +
       "`prixUnitaire` is stored in cents in the database.";
 
+/**
+ * And what it answers the SECOND question.
+ *
+ * Short on purpose. The panel scrolls to the newest message, so whatever answers last is what
+ * fills the frame — and with two long answers the thing the picture was taken for, the rule
+ * between one exchange and the next, sat above the top of the viewport every time. A brief reply
+ * leaves the boundary on screen. It is a fixture either way; only its length is a decision.
+ */
+const SHORT =
+  locale === "fr"
+    ? "Même règle, appliquée une seule fois : arrondissez la TVA au niveau de la facture, pas ligne par ligne — sinon les centimes dérivent."
+    : "Same rule, applied once: round the VAT on the invoice, not line by line — otherwise the cents drift apart.";
+
 const MODELS = [
   { id: "qwen2.5-coder:7b", name: "Qwen2.5 Coder 7B" },
   { id: "deepseek-coder-v2:16b", name: "DeepSeek Coder V2 16B" },
@@ -71,8 +84,14 @@ const server = createServer((req, res) => {
   }
   // Stream the fixture the way a real endpoint would, so the panel's streaming path is what is
   // photographed rather than a shortcut that only exists for screenshots.
+  let body = "";
+  req.on("data", (chunk) => (body += chunk));
+  req.on("end", () => reply(body));
+
+  function reply(sent) {
   res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });
-  const chunks = ANSWER.match(/[\s\S]{1,24}/g) ?? [];
+  const answer = /VAT|TVA/i.test(sent) ? SHORT : ANSWER;
+  const chunks = answer.match(/[\s\S]{1,24}/g) ?? [];
   let i = 0;
   const timer = setInterval(() => {
     if (i >= chunks.length) {
@@ -84,6 +103,7 @@ const server = createServer((req, res) => {
     }
     res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: chunks[i++] } }] })}\n\n`);
   }, 12);
+  }
 });
 
 // Port 0 rather than a fixed one, and not out of tidiness: a stub left running from an earlier

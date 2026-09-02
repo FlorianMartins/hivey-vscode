@@ -61,9 +61,15 @@ function transcript(state: UiState, deps: ChatDeps): HTMLElement {
     return list;
   }
   const matches = new Set(state.matches);
+  let first = true;
   for (const entry of state.session.entries) {
     if (state.searchQuery && !matches.has(entry.id)) continue;
+    // The rule belongs to the transcript, not to either message it separates — it is emitted
+    // between them rather than inside the question, so that a pinned answer's tint and a muted
+    // turn's fade stop at the message and do not swallow the way back out of it.
+    if (!first && entry.role === "user") list.append(turnRule(entry, deps));
     list.append(renderEntry(entry, state, deps));
+    first = false;
   }
   if (state.searchQuery && !matches.size) {
     list.append(el("p", "empty", t("No message contains “{0}”.", state.searchQuery)));
@@ -309,16 +315,6 @@ function renderEntry(entry: UiEntry, state: UiState, deps: ChatDeps): HTMLElemen
     `entry ${entry.role}${entry.included ? "" : " muted"}${entry.error ? " failed" : ""}${entry.pinned ? " pinned" : ""}`,
   );
 
-  // The way back to before this question: a rule across the transcript with the action on it,
-  // ABOVE the question rather than in the hover row below it. The position is the meaning — a line
-  // drawn between two turns is a place in the conversation you can return to, which is exactly what
-  // a checkpoint is. As a small icon among mute, pin, copy and delete it read as a fifth thing you
-  // could do to a message, and the one action there that changes files on disk should not be the
-  // hardest of the five to notice.
-  if (entry.role === "user" && entry.checkpointFiles) {
-    wrap.append(checkpointRule(entry, deps));
-  }
-
   const head = el("div", "entry-head");
   // A small mark before the name, the way the editor's own chat does it. It is not decoration:
   // when an answer is long enough to scroll, the mark is what tells you at a glance whether the
@@ -440,19 +436,6 @@ function renderEntry(entry: UiEntry, state: UiState, deps: ChatDeps): HTMLElemen
   }
 
   wrap.append(actions);
-  // And under the answer, where the reader is when they decide the whole direction was wrong.
-  if (entry.role === "assistant" && entry.restoreId) {
-    wrap.append(
-      checkpointRule(
-        {
-          id: entry.restoreId,
-          checkpointFiles: entry.checkpointFiles ?? 0,
-          ...(entry.checkpointPartial ? { checkpointPartial: true } : {}),
-        },
-        deps,
-      ),
-    );
-  }
   return wrap;
 }
 
@@ -518,22 +501,34 @@ const MARKS: Record<string, string> = {
 };
 
 /**
- * The line between two turns that you can go back to.
+ * The line between two turns, and the way back to before the one it introduces.
  *
- * A horizontal rule with the action sitting on it, the way the editor's chat marks a restore point.
- * It is visible without hovering — unlike everything else attached to a message — because it is the
- * only one that puts files back, and something that overwrites the working tree should never be
- * discovered by accident.
+ * Drawn above every question but the transcript's first, because that is where one exchange ends
+ * and the next starts. A transcript is a stack of question-and-answer pairs, and until now nothing
+ * said so: every entry was separated from the next by the same amount of space, so a question sat
+ * as far from its own answer as from a different turn entirely. The space now goes at the
+ * boundary, and the reply is pulled up close to what it answers, so a pair reads as one block.
+ *
+ * When the turn changed files the line carries the restore, sitting on it the way the editor's
+ * chat marks a restore point — visible without hovering, unlike everything else attached to a
+ * message, because it is the only one that puts files back and something that overwrites the
+ * working tree should never be discovered by accident.
  */
-function checkpointRule(entry: Pick<UiEntry, "id" | "checkpointFiles" | "checkpointPartial">, deps: ChatDeps): HTMLElement {
-  const wrap = el("div", "checkpoint-rule");
+function turnRule(entry: Pick<UiEntry, "id" | "checkpointFiles" | "checkpointPartial">, deps: ChatDeps): HTMLElement {
+  const files = entry.checkpointFiles ?? 0;
+  const wrap = el("div", `turn-rule${files ? "" : " bare"}`);
   const action = button({
     icon: ICON.restore,
     label: t("Restore checkpoint"),
     className: "btn tiny checkpoint-btn",
+    // Three different promises, and each says which one it is making before it is pressed. A turn
+    // that wrote nothing to disk is still a point to come back to — that is the common case in
+    // chat and plan mode, and refusing it there made the restore point look like an agent feature.
     title: entry.checkpointPartial
-      ? t("Restore {0} file(s) — some changes were too large to record", entry.checkpointFiles ?? 0)
-      : t("Put the {0} file(s) this turn changed back, and rewind the conversation here", entry.checkpointFiles ?? 0),
+      ? t("Restore {0} file(s) — some changes were too large to record", files)
+      : files
+        ? t("Put the {0} file(s) this turn changed back, and rewind the conversation here", files)
+        : t("Rewind the conversation to before this question — that turn changed no file"),
     onClick: () => deps.send({ type: "restoreCheckpoint", id: entry.id }),
   });
   if (entry.checkpointPartial) action.classList.add("partial");

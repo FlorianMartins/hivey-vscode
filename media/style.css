@@ -1490,12 +1490,14 @@ pre.code {
 
 .entry + .entry {
   border-top: none;
-  /* Wider than any gap inside an answer. Turns separated by less space than paragraphs read as one
-     long document by one author, which is exactly what a transcript is not. */
-  margin-top: var(--sp-5);
+  /* Tight, because the pair below this gap is a question and the answer to it. What separates one
+     exchange from the next is the rule above the next question, not this margin: spacing every
+     entry apart by the same amount made a question sit as far from its own reply as from a
+     different conversation turn. */
+  margin-top: var(--sp-2);
 }
 .entry {
-  padding: var(--sp-2) 0;
+  padding: var(--sp-1) 0;
 }
 
 /* Superseded by the single ring defined with the composer below: two focus rules of different
@@ -2775,27 +2777,34 @@ pre.code code {
   min-height: 0;
 }
 
-/* ── The restore point ────────────────────────────────────────────────────────────────────────
+/* ── The boundary between two exchanges, and the restore point on it ──────────────────────────
  *
- * A rule across the transcript with the action on it, above the question it returns to. Visible
- * without hovering, unlike every other per-message control: it is the only one that writes to the
- * working tree, and something that overwrites files should not be discovered by accident.
+ * A rule across the transcript above each question but the first — that is where one exchange ends
+ * and the next begins, and a pair separated by no more space than a question and its own answer is
+ * not a pair anybody can see. When the turn changed files the rule carries the way back, sitting
+ * on the line. Visible without hovering, unlike every other per-message control: it is the only
+ * one that writes to the working tree, and something that overwrites files should not be
+ * discovered by accident.
  */
-.checkpoint-rule {
+.turn-rule {
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: var(--sp-2) 0 var(--sp-4);
+  /* Asymmetric on purpose: more air above the line than below it, so the rule belongs to the
+     question that follows rather than floating between two turns. */
+  margin: var(--sp-5) 0 var(--sp-4);
   position: relative;
+  min-height: 1px;
 }
-.checkpoint-rule::before {
+.turn-rule::before {
   content: "";
   position: absolute;
   left: 0;
   right: 0;
   top: 50%;
-  border-top: 1px dashed var(--border-strong);
+  border-top: 1px solid var(--border);
 }
+
 .checkpoint-btn {
   position: relative;
   z-index: 1;
@@ -3392,16 +3401,30 @@ pre.code code {
  * pressed. That is why the button "did nothing": it did, invisibly.
  */
 .entry.pinned {
-  border-left: 2px solid var(--vscode-textLink-foreground, var(--vscode-focusBorder));
-  padding-left: var(--sp-2);
-  margin-left: -2px;
+  /* Three signals, because two were not enough to be noticed: an edge down the side, a tint across
+     the whole block, and a badge in the header. A pinned answer is the one thing in the transcript
+     that survives a summary, and it should be findable while scrolling past at speed — the edge is
+     what you catch out of the corner of your eye, the tint is what confirms it without reading. */
+  border-left: 3px solid var(--vscode-textLink-foreground, var(--vscode-focusBorder));
+  background: color-mix(in srgb, var(--vscode-textLink-foreground, var(--vscode-focusBorder)) 7%, transparent);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  padding-left: var(--sp-3);
+  padding-right: var(--sp-2);
+  margin-left: -3px;
 }
 .entry-pin {
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  font-size: var(--fs-meta);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0 5px;
+  border-radius: 10px;
   color: var(--vscode-textLink-foreground, var(--vscode-foreground));
+  border: 1px solid color-mix(in srgb, var(--vscode-textLink-foreground, var(--vscode-focusBorder)) 45%, transparent);
+  background: color-mix(in srgb, var(--vscode-textLink-foreground, var(--vscode-focusBorder)) 14%, transparent);
   /* Never faded with the receipt: this one is a state of the message, not a reading about it. */
   opacity: 1;
 }
@@ -3409,9 +3432,12 @@ pre.code code {
   width: 11px;
   height: 11px;
 }
+/* The button that turned the state on carries the state too, so the answer to "did that work?" is
+   under the pointer that just clicked, not somewhere else on the screen. */
 .entry-actions .btn.icon-only.active {
   color: var(--vscode-textLink-foreground, var(--vscode-foreground));
-  background: var(--hover);
+  background: color-mix(in srgb, var(--vscode-textLink-foreground, var(--vscode-focusBorder)) 18%, transparent);
+  border-radius: var(--radius);
 }
 
 /* ── The permission lists ─────────────────────────────────────────────────────────────────── */

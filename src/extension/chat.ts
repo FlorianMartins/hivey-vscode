@@ -33,7 +33,7 @@ import { detectIbmiLanguage, ibmiPrompt } from "../core/ibmi/languages.js";
 import { parsePrompt, participantDirective, type MentionKind, type Participant } from "../core/session/mentions.js";
 import { resolveMentions } from "./mentions.js";
 import { instructionFiles, instructionsPrompt } from "./instructions.js";
-import { buildDefinitionTools, DefinitionStore, type SubAgentRun } from "./definitions.js";
+import { buildDefinitionTools, createDefinition, DefinitionStore, type SubAgentRun } from "./definitions.js";
 import { skillsPrompt } from "../core/agent/definitions.js";
 import { autoApprove } from "../core/agent/autoApprove.js";
 import { matchGlob } from "../core/util/glob.js";
@@ -295,11 +295,6 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       ...(e.checkpoint?.length ? { checkpointFiles: e.checkpoint.length } : {}),
       ...(e.checkpointPartial ? { checkpointPartial: true } : {}),
       ...(e.plan ? { plan: e.plan } : {}),
-      // An assistant entry carries the id of the question it answered, when that question has a
-      // checkpoint. The rule is then drawn under the ANSWER as well as above the question: the
-      // answer is where the reader is when they decide the whole thing was the wrong direction,
-      // and asking them to scroll up to the request to undo it is asking them to look for it.
-      ...this.restoreTarget(e),
       reasoning: e.reasoning,
       steps: e.steps,
       context: e.context?.map((c) => ({ kind: c.kind, label: c.label, tokens: estimateTokens(c.body) })),
@@ -1159,6 +1154,32 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   }
 
   /**
+   * Pin or unpin the last answer, and say what it became.
+   *
+   * A command rather than only a button, for the reason "attach all open editors" became one: a
+   * click handler inside a hover row is not something a test can press, so the only thing that
+   * ever checked pinning was a person — twice, and both times what they reported was that it did
+   * nothing. It does something; it now also says so out loud.
+   */
+  togglePinLastAnswer(): boolean | undefined {
+    for (let i = this.session.entries.length - 1; i >= 0; i--) {
+      const entry = this.session.entries[i]!;
+      if (entry.role !== "assistant" || entry.error) continue;
+      const pinned = !entry.pinned;
+      this.session.setPinned(entry.id, pinned);
+      this.persist();
+      this.sendState();
+      this.post({
+        type: "status",
+        text: pinned ? t("Answer pinned — it stays when the context is trimmed or summarised.") : t("Answer unpinned."),
+      });
+      return pinned;
+    }
+    void vscode.window.showInformationMessage(t("There is no answer to pin yet."));
+    return undefined;
+  }
+
+  /**
    * Attach every open tab, and say how many landed.
    *
    * A command as well as a menu row, for two reasons. It is worth having on a keybinding — it is
@@ -1244,30 +1265,6 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       active: active.has(g.id),
       suggested: suggested.has(g.id),
     }));
-  }
-
-  /**
-   * The question an answer belongs to, when that question can be rolled back.
-   *
-   * The checkpoint lives on the user entry — that is where the rewind goes to — but the affordance
-   * has to appear on both, because "undo that" is a thought people have while looking at the reply.
-   */
-  private restoreTarget(entry: Entry): { restoreId?: string; checkpointFiles?: number; checkpointPartial?: boolean } {
-    if (entry.role !== "assistant") return {};
-    const i = this.session.entries.findIndex((e) => e.id === entry.id);
-    for (let j = i - 1; j >= 0; j--) {
-      const previous = this.session.entries[j]!;
-      if (previous.role !== "user") continue;
-      // The count travels with the id. Without it the rule under the answer said "0 files", which
-      // is both wrong and exactly the kind of number that stops anyone trusting the button.
-      if (!previous.checkpoint?.length) return {};
-      return {
-        restoreId: previous.id,
-        checkpointFiles: previous.checkpoint.length,
-        ...(previous.checkpointPartial ? { checkpointPartial: true } : {}),
-      };
-    }
-    return {};
   }
 
   /**
@@ -1671,31 +1668,69 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const skillsOn = skills.filter((sk) => sk.enabled).length;
     const agentsOn = found.agents.filter((a) => !settings.agents.disabled.includes(a.name)).length;
 
-    const chosen = await vscode.window.showQuickPick(
+    // Choosing and making are the same menu.
+    //
+    // Writing a skill was reachable only from the command palette, which means it was reachable
+    // only by someone who already knew it existed. The place a person looks for "make one" is the
+    // place that lists the ones there are — so the two live together, separated by a rule rather
+    // than by a search box.
+    type Row = vscode.QuickPickItem & {
+      id?: "families" | "skills" | "agents" | "newSkill" | "newAgent" | "share";
+    };
+    const chosen = await vscode.window.showQuickPick<Row>(
       [
         {
           label: "$(folder) " + t("Areas"),
           description: activeFamilies ? t("{0} chosen", activeFamilies) : t("none chosen"),
           detail: t("Which languages and subjects this conversation is about"),
-          id: "families" as const,
+          id: "families",
         },
         {
           label: "$(symbol-event) " + t("Skills"),
           description: t("{0} in play", skillsOn),
           detail: t("The `/` commands offered, within the areas you chose"),
-          id: "skills" as const,
+          id: "skills",
         },
         {
           label: "$(person) " + t("Sub-agents"),
           description: t("{0} in play", agentsOn),
           detail: t("Each runs on its own, with its own tools, and reports back"),
-          id: "agents" as const,
+          id: "agents",
+        },
+        { label: t("Your own"), kind: vscode.QuickPickItemKind.Separator },
+        {
+          label: "$(add) " + t("New skill…"),
+          description: found.skills.length ? t("{0} in this repository", found.skills.length) : undefined,
+          detail: t("A Markdown file in .hiveycode/skills/ — opens ready to write"),
+          id: "newSkill",
+        },
+        {
+          label: "$(add) " + t("New sub-agent…"),
+          description: found.agents.length ? t("{0} in this repository", found.agents.length) : undefined,
+          detail: t("A Markdown file in .hiveycode/agents/ — opens ready to write"),
+          id: "newAgent",
+        },
+        {
+          label: "$(export) " + t("Share with the team"),
+          detail: t("They travel with the repository; copy them to send them further"),
+          id: "share",
         },
       ],
       { placeHolder: t("What Hivey Code may reach for") },
     );
     // Escape at the top level is the way out.
     if (!chosen) return false;
+
+    if (chosen.id === "newSkill" || chosen.id === "newAgent") {
+      await createDefinition(chosen.id === "newSkill" ? "skill" : "agent");
+      // Not back to the menu: the new file is now open and being written in, and a picker over it
+      // would be in the way of the only thing that can happen next.
+      return false;
+    }
+    if (chosen.id === "share") {
+      await this.shareSkills();
+      return true;
+    }
 
     const config = vscode.workspace.getConfiguration(SECTION);
 
@@ -1770,7 +1805,18 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     }
 
     if (!found.agents.length) {
-      void vscode.window.showInformationMessage(t("No sub-agent is defined."));
+      // A dead end told you what was missing and left you to work out how to fix it. The answer to
+      // "none defined" is the one button that defines one.
+      const make = t("Create a sub-agent");
+      const answer = await vscode.window.showInformationMessage(
+        t("No sub-agent is defined."),
+        { modal: false, detail: t("A sub-agent is a Markdown file in .hiveycode/agents/ describing a job, its tools and its limits.") },
+        make,
+      );
+      if (answer === make) {
+        await createDefinition("agent");
+        return false;
+      }
       return true;
     }
     const picked = await vscode.window.showQuickPick(
@@ -1914,29 +1960,43 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
   private async restoreCheckpoint(id: string): Promise<void> {
     const entry = this.session.get(id);
-    if (!entry?.checkpoint?.length) return;
+    if (!entry || entry.role !== "user") return;
+    // A turn that changed no file is still a place in the conversation you can go back to. Refusing
+    // to rewind unless something was written to disk made the restore point exist only in agent
+    // mode — while the thing most people want to undo is a question that sent the answer off in the
+    // wrong direction, which costs nothing on disk and everything in context.
+    const snapshots = entry.checkpoint ?? [];
     const folder = vscode.workspace.workspaceFolders?.[0];
-    if (!folder) {
+    if (snapshots.length && !folder) {
       void vscode.window.showWarningMessage(t("Restoring needs the folder these files belong to open."));
       return;
     }
 
-    const detail = describeRestore(entry.checkpoint, Boolean(entry.checkpointPartial), {
-      files: (n) => t("{0} file(s) go back to how they were.", n),
-      created: (n) => t("{0} file(s) created by that turn are deleted.", n),
-      partial: t("Some changes were too large to record and will NOT be undone."),
-    });
+    const detail = snapshots.length
+      ? describeRestore(snapshots, Boolean(entry.checkpointPartial), {
+          files: (n) => t("{0} file(s) go back to how they were.", n),
+          created: (n) => t("{0} file(s) created by that turn are deleted.", n),
+          partial: t("Some changes were too large to record and will NOT be undone."),
+        })
+      : t("That turn changed no file, so nothing on disk moves.");
     const go = t("Restore");
     const answer = await vscode.window.showWarningMessage(
       t("Go back to before “{0}”?", entry.text.trim().split("\n")[0]!.slice(0, 60)),
-      { modal: true, detail: `${detail}\n\n${t("Anything you changed by hand in those files since is overwritten. Ctrl+Z undoes this.")}` },
+      {
+        modal: true,
+        detail: `${detail}\n\n${
+          snapshots.length
+            ? t("Anything you changed by hand in those files since is overwritten. Ctrl+Z undoes this.")
+            : t("Everything said after this point leaves the conversation, and the question comes back to the composer.")
+        }`,
+      },
       go,
     );
     if (answer !== go) return;
 
     const edit = new vscode.WorkspaceEdit();
-    for (const snap of entry.checkpoint) {
-      const uri = vscode.Uri.joinPath(folder.uri, snap.path);
+    for (const snap of snapshots) {
+      const uri = vscode.Uri.joinPath(folder!.uri, snap.path);
       if (snap.before === undefined) {
         // The turn created it, so going back means it is not there. `ignoreIfNotExists` covers the
         // file having already been deleted by hand, which must not fail the whole restore.
@@ -1955,12 +2015,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       }
     }
 
-    if (!(await vscode.workspace.applyEdit(edit))) {
+    if (snapshots.length && !(await vscode.workspace.applyEdit(edit))) {
       void vscode.window.showErrorMessage(t("The files could not be restored; the conversation is unchanged."));
       return;
     }
 
-    const restoredFiles = entry.checkpoint.length;
+    const restoredFiles = snapshots.length;
     // The question comes back to the composer. Restoring is a rewind, not a deletion: the thing you
     // most often want next is the same question, asked differently.
     const text = this.session.rewindTo(id);
@@ -1968,7 +2028,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this.persist();
     this.sendState();
     if (text) this.post({ type: "restoreDraft", text });
-    this.post({ type: "status", text: t("{0} file(s) restored. The conversation is back to that point.", restoredFiles) });
+    this.post({
+      type: "status",
+      text: restoredFiles
+        ? t("{0} file(s) restored. The conversation is back to that point.", restoredFiles)
+        : t("The conversation is back to that point. No file needed restoring."),
+    });
   }
 
   private async shareSkills(): Promise<void> {
