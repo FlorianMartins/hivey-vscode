@@ -17,6 +17,19 @@ import type { ToExtension, UiRuntime, UiState } from "../shared/protocol.js";
 const drafts: Record<string, { key: string; url: string }> = {};
 let expanded: string | undefined;
 let openGateway: string | undefined;
+
+/**
+ * Open this screen already showing one provider's card.
+ *
+ * Called when someone picks a provider they have not set up: the point of sending them here is the
+ * one field they are missing, and a screen that arrives with every card folded shut asks them to
+ * find it again. For "on this machine" there is no card to expand — the local section is always
+ * open — so nothing is expanded and the probe below it is what they came for.
+ */
+export function focusGateway(id: string | undefined): void {
+  openGateway = id;
+  showServerForm = false;
+}
 let showServerForm = false;
 const serverDraft = { name: "", url: "" };
 
@@ -270,29 +283,61 @@ function runtimeCard(runtime: UiRuntime, state: UiState, send: (m: ToExtension) 
   return card;
 }
 
+/**
+ * Which model to pull, when the answer is "I do not know, what have you got?"
+ *
+ * Three, not thirty. The point of this list is to end the decision, not to open it: someone who has
+ * just learned they need a model server does not also want to compare quantisations. They are
+ * ordered by what the machine can take, because that is the only question the user can actually
+ * answer about themselves, and the sizes are the download — the number that decides whether this
+ * happens now or "later".
+ */
+const LOCAL_MODELS: Array<{ id: string; size: string; hint: string }> = [
+  { id: "qwen2.5-coder:1.5b", size: "~1 GB", hint: t("A laptop with no discrete GPU. Completions and short answers.") },
+  { id: "qwen2.5-coder:7b", size: "~4.7 GB", hint: t("The one to take if the machine allows it. Good at code, runs on 8 GB of VRAM.") },
+  { id: "deepseek-coder-v2:16b", size: "~9 GB", hint: t("A workstation or a GPU box. Closer to what a gateway gives you.") },
+];
+
 function nothingFound(send: (m: ToExtension) => void): HTMLElement {
   const box = el("div", "runtime empty");
   box.append(el("p", "setup-status", t("Nothing is listening on this machine yet.")));
   box.append(
-    el("p", "setup-note", t("Ollama is the shortest path: install it, then pull a coding model. About 5 GB.")),
+    el(
+      "p",
+      "setup-note",
+      t("Two steps: install Ollama, then pull a model. Nothing else to configure — it is found the moment it is running."),
+    ),
   );
-  const cmd = el("div", "setup-command");
-  cmd.append(el("code", "", "ollama pull qwen2.5-coder:7b"));
-  cmd.append(
-    button({
-      icon: ICON.copy,
-      title: t("Copy"),
-      className: "btn icon-only",
-      onClick: () => send({ type: "copy", text: "ollama pull qwen2.5-coder:7b" }),
-    }),
-  );
-  box.append(cmd);
   box.append(
     button({
-      label: t("Get Ollama"),
-      className: "btn tiny ghost",
+      label: t("1. Get Ollama"),
+      className: "btn tiny",
       onClick: () => send({ type: "openExternal", url: "https://ollama.com/download" }),
     }),
+  );
+  box.append(el("p", "setup-note", t("2. Then pull one of these, in a terminal:")));
+
+  for (const model of LOCAL_MODELS) {
+    const row = el("div", "setup-model");
+    const head = el("div", "setup-model-head");
+    head.append(el("code", "setup-model-id", model.id));
+    head.append(el("span", "setup-model-size", model.size));
+    head.append(el("div", "spacer"));
+    head.append(
+      button({
+        icon: ICON.copy,
+        title: t("Copy the command"),
+        className: "btn icon-only",
+        onClick: () => send({ type: "copy", text: `ollama pull ${model.id}` }),
+      }),
+    );
+    row.append(head);
+    row.append(el("p", "setup-model-hint", model.hint));
+    box.append(row);
+  }
+
+  box.append(
+    el("p", "setup-note", t("Then press “Search again”. Nothing leaves the machine, and none of it is billed.")),
   );
   return box;
 }

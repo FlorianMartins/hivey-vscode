@@ -1870,6 +1870,41 @@ pre.code {
   overflow-x: auto;
   white-space: nowrap;
 }
+
+/* ── The three models offered when nothing is installed ───────────────────────────────────────
+ *
+ * A row each: the name, what it weighs, a copy button, and one line on the machine it suits. The
+ * weight is given the same prominence as the name because it is the number that decides whether
+ * this happens now or "later", and the sentence under it answers the only question the reader can
+ * actually answer about themselves — what is this machine.
+ */
+.setup-model {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--sp-2);
+  margin-top: var(--sp-2);
+  background: color-mix(in srgb, var(--vscode-foreground) 4%, transparent);
+}
+.setup-model-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.setup-model-id {
+  font-family: var(--vscode-editor-font-family);
+  font-size: var(--fs-meta);
+  color: var(--vscode-foreground);
+}
+.setup-model-size {
+  font-size: var(--fs-meta);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.setup-model-hint {
+  margin: var(--sp-1) 0 0;
+  font-size: var(--fs-meta);
+  color: var(--muted);
+}
 .setup-row,
 .setup-links,
 .setup-card-foot,

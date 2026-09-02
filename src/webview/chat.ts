@@ -10,6 +10,7 @@ import { button, closeMenu, el, formatTokens, icon, ICON, menu, menuItem, menuTi
 import { markdown } from "./markdown.js";
 import { t } from "../shared/i18n.js";
 import { closeModelCombo, isModelComboOpen, openModelCombo } from "./modelCombo.js";
+import { focusGateway } from "./setup.js";
 import type { Mode, Reasoning, ToExtension, UiEntry, UiSkill, UiState } from "../shared/protocol.js";
 import { applySuggestion, suggestionsFor, type Suggestion } from "../core/session/mentions.js";
 import { BUILTIN_SKILLS, type BuiltinSkill } from "../core/session/skills.js";
@@ -1076,6 +1077,28 @@ const PROVIDERS: Array<{ id: string; short: string; label: string; hint: string 
 ];
 
 /**
+ * Is there anything behind this choice yet?
+ *
+ * "On this machine" needs a server that answered the probe; a gateway needs a key; a gateway whose
+ * address the user supplies needs both. The panel already knows all of it — the setup screen is
+ * drawn from the same `state.setup` — it simply was not being consulted at the moment the choice is
+ * actually made.
+ */
+export function providerReady(id: string, state: UiState): boolean {
+  if (id === "local") return state.setup.probing || state.setup.runtimes.length > 0;
+  if (!state.setup.hasKey[id]) return false;
+  // A gateway that is only an API shape needs to be told where it lives.
+  if (id === "openai-compatible") return Boolean(state.setup.endpoints?.[id]);
+  return true;
+}
+
+function missingFor(id: string): string {
+  if (id === "local") return t("No model server found on this machine — set one up");
+  if (id === "openai-compatible") return t("Needs an address and a key — set them up");
+  return t("No key yet — set one up");
+}
+
+/**
  * Where the answer comes from: this machine, or a gateway.
  *
  * A switch rather than a settings page, because it is a decision people make several times a day —
@@ -1100,13 +1123,25 @@ function providerButton(state: UiState, deps: ChatDeps): HTMLElement {
         const panel = el("div", "menu-list");
         panel.append(menuTitle(t("Where the answer comes from")));
         for (const p of PROVIDERS) {
+          const ready = providerReady(p.id, state);
           panel.append(
             menuItem({
               label: p.label,
-              hint: p.hint,
+              // What is missing, in the place where the choice is made. Picking a gateway with no key
+              // used to switch in silence and fail one question later with an HTTP 401 — the worst
+              // moment and the worst place to learn that a key was needed.
+              hint: ready ? p.hint : missingFor(p.id),
+              detail: ready ? undefined : t("not set up"),
               selected: p.id === state.provider,
               onClick: () => {
                 deps.send({ type: "setProvider", provider: p.id });
+                // Their choice stands either way — but if there is nothing behind it yet, the next
+                // thing on screen is the field that fixes that, with the provider's own card already
+                // open, rather than an error after the next question.
+                if (!ready) {
+                  focusGateway(p.id === "local" ? undefined : p.id);
+                  deps.send({ type: "openScreen", screen: "setup" });
+                }
                 close();
               },
             }),

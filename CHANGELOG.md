@@ -2,6 +2,23 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.26.0 — 2026-09-02
+
+### Added
+
+- **Choosing a provider you have not set up now says so, and takes you there.** The menu carries
+  each one's actual state — no key yet, no model server found on this machine, needs an address and
+  a key — and picking one that has nothing behind it opens its own card on the setup screen, already
+  expanded, with the field that is missing. It used to switch in silence and fail one question later
+  with an HTTP 401: the worst moment and the worst place to learn that a key was needed. The panel
+  knew all of this already; the setup screen is drawn from the same state. It simply was not being
+  consulted at the moment the choice is made.
+- **A route into a local model rather than a single command.** Two numbered steps, then three models
+  with what they weigh and the machine each suits — a laptop with no discrete GPU, a machine with
+  8 GB of VRAM, a workstation. Three and not thirty: the point is to end the decision, not open it.
+  Somebody who has just learned they need a model server does not also want to compare
+  quantisations.
+
 ## 0.25.0 — 2026-09-02
 
 ### Added
