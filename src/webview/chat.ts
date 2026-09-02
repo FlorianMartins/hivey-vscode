@@ -645,7 +645,7 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
     const implicitAttached = state.implicit && state.attachments.some((a) => a.label === state.implicit!.label);
     if (state.implicit && !implicitAttached) {
       const chip = el("span", `chip implicit${state.implicitOn ? "" : " off"}`);
-      chip.append(icon("file", "chip-ico"));
+      chip.append(icon(fileIcon(state.implicit.label), "chip-ico"));
       const cut = state.implicit.label.lastIndexOf("/");
       chip.append(el("span", "chip-label", cut >= 0 ? state.implicit.label.slice(cut + 1) : state.implicit.label));
       if (cut > 0) chip.append(el("span", "chip-dir", state.implicit.label.slice(0, cut)));
@@ -665,7 +665,7 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
 
     for (const a of state.attachments) {
       const chip = el("span", "chip removable");
-      chip.append(icon(chipIcon(a.kind), "chip-ico"));
+      chip.append(icon(chipIcon(a.kind, a.label), "chip-ico"));
       // The file NAME, with its folder after it in the muted colour — the editor's own shape for
       // this, and the right one: `src/webview/chat.ts` truncated from the left is unreadable, and
       // truncated from the right is every file in the folder. The name identifies, the folder
@@ -892,7 +892,28 @@ function formatCost(usd: number): string {
 }
 
 /** A chip's icon, from what the attachment is. The label says which one; this says what kind. */
-function chipIcon(kind: string): Parameters<typeof icon>[0] {
+/**
+ * The mark for a file, from its extension.
+ *
+ * A row of identical page glyphs says only "these are files", which the reader can see from the
+ * names. Four marks — source, structured data, prose, picture — is as far as this can go honestly:
+ * the editor draws the language's own icon from a theme a webview cannot reach, and a logo redrawn
+ * by hand at twelve pixels is a smudge. An unknown extension keeps the page, which is the truth.
+ */
+function fileIcon(label: string): Parameters<typeof icon>[0] {
+  const ext = label.slice(label.lastIndexOf(".") + 1).toLowerCase();
+  if (/^(json|jsonc|ya?ml|toml|ini|csv|tsv|xml|sql|env|properties)$/.test(ext)) return "data";
+  if (/^(md|markdown|txt|rst|adoc|log|pdf|docx?)$/.test(ext)) return "doc";
+  if (/^(png|jpe?g|gif|svg|webp|bmp|ico|avif)$/.test(ext)) return "image";
+  if (
+    /^(ts|tsx|js|jsx|mjs|cjs|py|rb|go|rs|java|kt|c|h|cc|cpp|hpp|cs|php|swift|scala|sh|bash|zsh|ps1|lua|dart|vue|svelte|html?|css|scss|less|rpgle?|sqlrpgle|clle?|clp|dds|pf|lf|dspf|prtf|cbl|cblle|pgm|mbr)$/.test(ext)
+  ) {
+    return "code";
+  }
+  return "file";
+}
+
+function chipIcon(kind: string, label = ""): Parameters<typeof icon>[0] {
   switch (kind) {
     case "selection":
     case "symbol":
@@ -904,7 +925,7 @@ function chipIcon(kind: string): Parameters<typeof icon>[0] {
     case "changes":
       return "bringIn";
     default:
-      return "file";
+      return fileIcon(label);
   }
 }
 
@@ -912,7 +933,7 @@ function autoGrow(area: HTMLTextAreaElement): void {
   area.style.height = "auto";
   // The floor matches the stylesheet's `min-height`. Two numbers for one decision is how a box
   // ends up snapping to a different size the moment somebody types into it.
-  const height = Math.min(260, Math.max(54, area.scrollHeight));
+  const height = Math.min(260, Math.max(44, area.scrollHeight));
   area.style.height = `${height}px`;
   // The scrollbar only appears once the box has stopped growing.
   area.style.overflowY = area.scrollHeight > 260 ? "auto" : "hidden";

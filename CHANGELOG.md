@@ -2,6 +2,23 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.23.0 — 2026-09-02
+
+### Changed
+
+- **Attachments are shaped like the editor's own, and carry the kind of file they are.** The remove
+  cross used to fade in on hover while keeping its width — the worst of both, since every chip had
+  an empty slot at its end and the only control it has could not be found without discovering it.
+  It is always there now, as it is in the workbench's chat. It could also be cut off entirely: it
+  sat at the end of a box with `overflow: hidden`, behind a folder path long enough to push it out
+  of view. The folder is now the only part allowed to shrink.
+- The shape itself takes the workbench's numbers from `.chat-attached-context-attachment` — a
+  border instead of a fill, a low radius, four pixels of gap — and the icon says what the file IS:
+  source, structured data, prose or picture, from the extension, IBM i members included. Four marks
+  is as far as this goes honestly: the editor draws the language's own icon from a theme a webview
+  cannot reach, and a logo redrawn by hand at twelve pixels is a smudge.
+- **The composer is shorter**, closer to the height the editor's own chat gives itself.
+
 ## 0.22.1 — 2026-09-02
 
 ### Fixed

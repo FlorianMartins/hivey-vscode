@@ -67,6 +67,17 @@ const PATHS = {
   chevron: "M4 6.5 8 10.5 12 6.5",
   chevronLeft: "M10 3.5 5.5 8 10 12.5",
   file: "M4 2h5l3 3v9H4zM9 2v3h3",
+  // What KIND of file, not just "a file".
+  //
+  // A row of identical page glyphs tells the reader nothing they cannot already see from the name,
+  // and the editor's own attachments carry the icon of the language. A webview cannot use the file
+  // icon theme — those are a font and a set of images the workbench owns — so this is four marks
+  // that between them cover what people actually attach: source, structured data, prose, picture.
+  // The distinction earns its place because it survives at 12 px, which a language logo would not.
+  code: "M6 4.5 2.5 8 6 11.5M10 4.5 13.5 8 10 11.5",
+  data: "M8 2c2.8 0 5 .7 5 1.6S10.8 5.2 8 5.2 3 4.5 3 3.6 5.2 2 8 2ZM3 3.6v8.8c0 .9 2.2 1.6 5 1.6s5-.7 5-1.6V3.6M3 8c0 .9 2.2 1.6 5 1.6S13 8.9 13 8",
+  doc: "M4 2h5l3 3v9H4zM9 2v3h3M6 8.5h4M6 11h4",
+  image: "M2.5 3.5h11v9h-11zM5.5 7a1 1 0 1 0 0-2 1 1 0 0 0 0 2ZM2.5 10.5 6 8l3 2.5L11 9l2.5 2",
   check: "M3.5 8.5 6.5 11.5 12.5 4.5",
   cross: "M4 4l8 8M12 4l-8 8",
   mute: "M3.5 3.5l9 9M8 2.6a5.4 5.4 0 1 0 0 10.8 5.4 5.4 0 0 0 0-10.8Z",

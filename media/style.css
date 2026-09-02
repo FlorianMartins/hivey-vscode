@@ -759,24 +759,52 @@ pre.code {
   gap: var(--sp-1);
   margin-bottom: var(--sp-2);
 }
+/* An attachment, shaped like the editor's own.
+ *
+ * It was a filled pill with a 10 px radius — a badge, which is what you use for a count, not for a
+ * thing with a name and a way to remove it. The numbers here are the workbench's, read out of
+ * `.chat-attached-context-attachment`: a low radius, a border instead of a fill, four pixels of gap
+ * and a height near eighteen. A bordered outline also lets the two states this row has to tell
+ * apart — attached, and merely suggested — differ by the border alone, which is a difference you can
+ * see without reading.
+ *
+ * Everything is laid out so the CROSS never moves and never gets cut. It was there all along, at
+ * the end of a box with `overflow: hidden`, behind a folder path long enough to push it out of
+ * view: present in the DOM, absent from the screen, and the space it left behind read as a gap
+ * where a button should be. The folder is now the only part allowed to shrink. */
 .chip {
   display: inline-flex;
   align-items: center;
-  gap: var(--sp-1);
+  gap: 4px;
   font-size: var(--fs-meta);
-  color: var(--muted);
-  background: var(--vscode-badge-background);
-  border-radius: 10px;
-  padding: 1px var(--sp-2);
+  line-height: 1;
+  color: var(--vscode-foreground);
+  background: var(--vscode-input-background, transparent);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0 4px 0 6px;
+  min-height: 20px;
   max-width: 100%;
   overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
 .chip .btn.chip-x {
-  padding: 0 2px;
-  font-size: 10px;
-  color: inherit;
+  /* Never shrinks, never scrolls out: it is the only control on the chip. */
+  flex: 0 0 auto;
+  padding: 0;
+  width: 16px;
+  height: 16px;
+  justify-content: center;
+  border-radius: 3px;
+  color: var(--muted);
+}
+.chip .btn.chip-x:hover {
+  color: var(--vscode-foreground);
+  background: var(--hover);
+}
+.chip .btn.chip-x .ico {
+  width: 10px;
+  height: 10px;
 }
 
 /* ── Composer ────────────────────────────────────────────────────────────────────────────── */
@@ -797,8 +825,9 @@ pre.code {
 .composer-input {
   width: 100%;
   /* Kept in step with `autoGrow`'s floor, which is the only other place that knows this number.
-     Three rows was a paragraph of empty box on a screen where most questions are one line. */
-  min-height: 54px;
+     Three rows was a paragraph of empty box on a screen where most questions are one line; 54 was
+     still half a row more than the editor's own chat gives itself. */
+  min-height: 44px;
   overflow-y: hidden;
   max-height: 260px;
   resize: none;
@@ -3050,14 +3079,11 @@ pre.code code {
   flex: 0 0 auto;
   opacity: 0.7;
 }
+/* The label here is already just the file name — the path is split off into `.chip-dir` before it
+   is drawn — so there is nothing to reverse and nothing to cut. */
 .chip.implicit .chip-label {
   overflow: hidden;
   text-overflow: ellipsis;
-  /* The end of a path is the part that identifies it. `src/extension/…` tells you nothing that
-     `…/chat.ts` does not, and the reverse is not true. */
-  direction: rtl;
-  text-align: left;
-  unicode-bidi: plaintext;
 }
 /* Waved away: still shown, still one click from coming back. Removing it from the row entirely
    would leave no way to change your mind and no sign that anything had been decided. */
@@ -3149,11 +3175,22 @@ pre.code code {
 }
 .chip .chip-ico {
   flex: 0 0 auto;
-  opacity: 0.65;
+  width: 13px;
+  height: 13px;
+  opacity: 0.8;
 }
+/* The name identifies and is kept whole; the folder disambiguates and is what gives way. */
 .chip .chip-label {
+  flex: 0 0 auto;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.chip .chip-dir {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--muted);
   /* The end of a path identifies it; the beginning rarely does. */
   direction: rtl;
   text-align: left;
@@ -3407,18 +3444,13 @@ pre.code code {
   white-space: nowrap;
   min-width: 0;
 }
-/* The remove button appears on hover, so a row of attachments is a row of names rather than a row
-   of crosses. It stays reachable by keyboard. */
+/* The remove button is always there.
+ *
+ * It used to fade in on hover — and keep its width while invisible, which is the worst of both:
+ * every chip carried an empty slot at its end, and the one control it has could not be found
+ * without discovering it. Either the space is spent or it is not; the editor's own attachments
+ * spend it, and so does this. */
 .chip .btn.chip-x {
-  opacity: 0;
-  transition: opacity 100ms ease;
-}
-.chip:hover .btn.chip-x,
-.chip .btn.chip-x:focus-visible {
-  opacity: 1;
-}
-.chip.implicit .btn.chip-x {
-  /* The suggestion's control is the point of it: how you say "not this file". */
   opacity: 1;
 }
 
