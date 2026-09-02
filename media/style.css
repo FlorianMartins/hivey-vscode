@@ -2439,7 +2439,21 @@ pre.code {
   align-items: center;
   gap: 4px;
   flex: 0 0 auto;
-  cursor: default;
+  /* A button now, so it needs a button's reset: it opens the menu that sets the budget the arc is a
+     proportion of. */
+  cursor: pointer;
+  padding: 2px 3px;
+  border: none;
+  border-radius: var(--radius);
+  background: none;
+  font: inherit;
+}
+.context-ring:hover {
+  background: var(--hover);
+}
+.context-ring:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
 }
 .context-ring .ring {
   flex: 0 0 auto;
@@ -3016,11 +3030,27 @@ pre.code code {
      word each so that the line holds. */
   flex-wrap: nowrap;
 }
-.btn.provider.local {
-  color: var(--vscode-gitDecoration-addedResourceForeground, var(--vscode-charts-green));
+/* The same weight as everything beside it.
+ *
+ * This button was drawn at the full foreground when remote and in green when local, in a row where
+ * its two neighbours are muted — so the one control whose value changes least was the brightest
+ * thing under the composer. Where the answer comes from still deserves to be distinguishable, and
+ * it still is: the ICON carries the colour, the words do not. That is enough to tell "nothing
+ * leaves this machine" from "this is billed" at a glance, and it stops the row reading as one loud
+ * label and two quiet ones. */
+.btn.provider {
+  color: var(--muted);
 }
-.btn.provider.remote {
+.btn.provider:hover {
   color: var(--vscode-foreground);
+}
+.btn.provider.local .ico {
+  color: var(--vscode-gitDecoration-addedResourceForeground, var(--vscode-charts-green));
+  opacity: 1;
+}
+.btn.provider.remote .ico {
+  color: var(--vscode-textLink-foreground, var(--vscode-foreground));
+  opacity: 1;
 }
 /* No frames. These are two words and a chevron under the box, and a border around each turned the
    row into a pair of form fields — the heaviest thing on a panel whose whole surface is otherwise

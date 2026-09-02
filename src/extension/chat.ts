@@ -330,6 +330,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       provider: s.chat.provider,
       remote: !isLocalEndpoint(baseUrl),
       contextTokens,
+      contextBudget: budgetTokens,
+      // The window the chosen model actually has, straight from the catalogue. Zero when it is not
+      // known — a local runtime that reports no such number, most often — and the panel then offers
+      // fixed steps instead of pretending to know a ceiling.
+      modelContext: this.models.find((m) => m.id === s.chat.model)?.context ?? 0,
       contextFill: budgetTokens > 0 ? Math.min(1, contextTokens / budgetTokens) : 0,
       // Computed here rather than in the panel because the budget is a setting, and a panel that
       // guessed at it would offer to summarise a conversation that fits comfortably.
@@ -672,6 +677,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           this.savePrefs();
           this.sendState();
           break;
+        case "setContextBudget": {
+          const config = vscode.workspace.getConfiguration(SECTION);
+          await config.update("context.maxTokens", m.tokens, writeTarget());
+          this.sendState();
+          break;
+        }
         case "setModel": {
           const config = vscode.workspace.getConfiguration(SECTION);
           await config.update("chat.model", m.model, writeTarget());
@@ -1024,7 +1035,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       this.modelsLoading = false;
       this.sendState();
     }
-    if (force) this.post({ type: "status", text: t("{0} models", this.models.length) });
+    // Not into the transcript.
+    //
+    // `status` is the channel a RUNNING turn reports through — "read src/app.ts", "ran the tests" —
+    // and the panel gives anything arriving on it a live turn to sit in. So refreshing the
+    // catalogue, which is housekeeping nobody asked for in the conversation, made the panel draw an
+    // assistant turn that said "413 models" and appeared to be thinking. The count belongs where
+    // the editor puts background news, and only when the refresh was actually requested.
+    if (force) void vscode.window.setStatusBarMessage(t("Hivey Code: {0} models", this.models.length), 4000);
   }
 
   /**
@@ -1168,10 +1186,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       this.session.setPinned(entry.id, pinned);
       this.persist();
       this.sendState();
-      this.post({
-        type: "status",
-        text: pinned ? t("Answer pinned — it stays when the context is trimmed or summarised.") : t("Answer unpinned."),
-      });
+      void vscode.window.setStatusBarMessage(
+        pinned ? t("Answer pinned — it stays when the context is trimmed or summarised.") : t("Answer unpinned."),
+        4000,
+      );
       return pinned;
     }
     void vscode.window.showInformationMessage(t("There is no answer to pin yet."));
@@ -1954,7 +1972,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this.attachments.push(item);
     this.screen = "chat";
     this.sendState();
-    this.post({ type: "status", text: t("Attached here. Ask your question.") });
+    void vscode.window.setStatusBarMessage(t("Attached here. Ask your question."), 4000);
   }
 
   private async restoreCheckpoint(id: string): Promise<void> {
@@ -2027,12 +2045,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this.persist();
     this.sendState();
     if (text) this.post({ type: "restoreDraft", text });
-    this.post({
-      type: "status",
-      text: restoredFiles
+    void vscode.window.showInformationMessage(
+      restoredFiles
         ? t("{0} file(s) restored. The conversation is back to that point.", restoredFiles)
         : t("The conversation is back to that point. No file needed restoring."),
-    });
+    );
   }
 
   private async shareSkills(): Promise<void> {

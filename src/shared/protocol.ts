@@ -215,6 +215,10 @@ export interface UiState {
   provider: string;
   remote: boolean;
   contextTokens: number;
+  /** The budget the next question is measured against — `context.maxTokens`. */
+  contextBudget: number;
+  /** The selected model's own window, 0 when the catalogue does not know it. */
+  modelContext: number;
   budget: { spentTodayUsd: number; dailyUsd: number };
   /** What THIS conversation has cost so far. Distinct from the day's spend, which spans all of them. */
   sessionCostUsd: number;
@@ -306,6 +310,7 @@ export type ToExtension =
   | { type: "shareEntry"; id: string }
   | { type: "setMode"; mode: Mode }
   | { type: "setReasoning"; reasoning: Reasoning }
+  | { type: "setContextBudget"; tokens: number }
   /** `baseUrl` accompanies a model served by a machine other than the configured one. */
   | { type: "setModel"; model: string; provider: string; baseUrl?: string }
   | { type: "refreshModels" }

@@ -2,6 +2,40 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.25.0 — 2026-09-02
+
+### Added
+
+- **A context budget, sized by the model you chose.** How much of the model's window this
+  conversation may fill — offered as steps rather than a number to type, because the choice is
+  coarse and a field asking for a token count is a field asking the user to know what a token is.
+  The steps come from the catalogue's window for the model actually selected and stop at three
+  quarters of it: offering 128k on a model that holds 8k is a promise the run cannot keep, and a
+  budget equal to the window leaves nowhere for the answer. A model whose window is unknown — a
+  local runtime that reports no such number — gets fixed steps instead of an invented ceiling.
+- It is set from the ring under the composer, and from the thinking menu when the model has one.
+  The ring was already drawn, already about exactly this, and already beside the token count; a
+  control of its own in the toolbar cost 22 px, and a capture showed where they came from — the
+  model name, the one label in that row carrying something nobody can guess, went from
+  "qwen2.5-co…" to "qwen2…".
+
+### Fixed
+
+- **Changing where the answer comes from drew a fake answer.** The panel showed a Hivey Code turn,
+  apparently thinking, containing "413 models". Refreshing the catalogue reported its result on the
+  `status` channel — which is how a RUNNING turn says "read this file, ran those tests" — and the
+  panel gives anything arriving there a live turn to sit in. So a piece of housekeeping nobody asked
+  for invented a turn to announce itself in. Background news now goes where the editor puts
+  background news, and the panel refuses to build a turn for a message that arrives outside one.
+- **The support button was the brightest thing under the composer**, at full foreground while both
+  its neighbours are muted. The words are muted like theirs now and the icon carries the colour —
+  green on this machine, accent through a gateway — which is the distinction worth keeping.
+- **The search bar could not be closed.** Escape worked only while the caret was still in the field
+  — which is the one place a reader is not, once they are looking at what the search found — and the
+  magnifier reopens rather than toggles. There is a cross in the bar now, and Escape closes it from
+  anywhere; closing clears the query, because the query filters the transcript and a bar that shut
+  while still holding a word would leave messages missing with nothing on screen to say why.
+
 ## 0.24.0 — 2026-09-02
 
 ### Changed

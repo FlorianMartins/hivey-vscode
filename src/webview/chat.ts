@@ -802,7 +802,7 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
   // fifth full, because a green dot at the end of a long grey line reads as a rendering fault
   // rather than as a measurement. A ring says the same thing in fourteen pixels and says it
   // legibly when nearly empty, so it no longer has to wait until the number is worrying.
-  if (state.contextFill > 0.02) meter.append(contextRing(state.contextFill));
+  if (state.contextFill > 0.02) meter.append(contextRing(state, deps));
   meter.append(tokens);
   // The two numbers anyone actually watches, on one line: how much of the context the next question
   // will use, and what this conversation has cost so far. The day's total lives in the cost report,
@@ -931,10 +931,49 @@ function chipIcon(kind: string, label = ""): Parameters<typeof icon>[0] {
  * cannot be confused with a progress bar for something that is running, and the number it stands
  * for is only interesting when it is high, so the number itself waits until you point at it.
  */
-function contextRing(fill: number): HTMLElement {
+function contextRing(state: UiState, deps: ChatDeps): HTMLElement {
+  const fill = state.contextFill;
   const pct = Math.min(100, Math.round(fill * 100));
-  const wrap = el("div", `context-ring${fill > 0.85 ? " high" : fill > 0.6 ? " warm" : ""}`);
-  wrap.title = t("{0}% of the context budget", pct);
+  // A button, because the thing you want after reading "84 %" is to change what the 84 % is OF.
+  //
+  // The budget belongs in the reasoning menu too — it is the other half of "how much may this model
+  // spend" — but that menu only exists on a model that can think, and this setting applies to every
+  // model there is. Put in the toolbar as a control of its own it cost 22 px, and a capture showed
+  // where they came from: the model name, the one label in that row carrying something nobody can
+  // guess, went from "qwen2.5-co…" to "qwen2…". Here it costs nothing: the ring was already drawn,
+  // already about exactly this, and already in the row where the token count lives.
+  const wrap = el("button", `context-ring${fill > 0.85 ? " high" : fill > 0.6 ? " warm" : ""}`);
+  wrap.title = t("{0}% of the context budget — click to change it", pct);
+  wrap.addEventListener("click", () =>
+    menu(wrap, (close) => {
+      const panel = el("div", "menu-list");
+      panel.append(
+        menuTitle(
+          state.modelContext > 0
+            ? t("Context budget — {0} holds {1}", state.modelLabel, formatTokens(state.modelContext))
+            : t("Context budget"),
+        ),
+      );
+      const budgets = contextBudgets(state.modelContext);
+      for (const tokens of budgets) {
+        panel.append(
+          menuItem({
+            label: t("{0} tokens", formatTokens(tokens)),
+            hint:
+              tokens === budgets[budgets.length - 1] && state.modelContext > 0
+                ? t("As much as this model can take, with room left for the answer")
+                : undefined,
+            selected: tokens === state.contextBudget,
+            onClick: () => {
+              deps.send({ type: "setContextBudget", tokens });
+              close();
+            },
+          }),
+        );
+      }
+      return panel;
+    }),
+  );
 
   const NS = "http://www.w3.org/2000/svg";
   const svg = document.createElementNS(NS, "svg");
@@ -1184,8 +1223,34 @@ function modelButton(state: UiState, deps: ChatDeps): HTMLElement {
   return b;
 }
 
+/**
+ * How much of the model's window this conversation may fill.
+ *
+ * Steps, not a number to type: the choice is coarse — "keep it cheap", "let it read a lot" — and a
+ * field asking for a token count is a field asking the user to know what a token is. They are
+ * derived from the model actually chosen and stopped at ITS ceiling, because offering 128k on a
+ * model that holds 8k is a promise the run cannot keep, and the failure would arrive one question
+ * later as a truncation nobody asked for. A model whose window the catalogue does not know — a
+ * local runtime that reports no such number — gets fixed steps instead, which is the honest answer
+ * to "I do not know how big this is".
+ */
+export function contextBudgets(modelContext: number): number[] {
+  const STEPS = [4_000, 8_000, 16_000, 32_000, 64_000, 128_000, 200_000];
+  if (modelContext <= 0) return STEPS.slice(0, 5);
+  // Never the whole window: the answer has to fit in it too, and a budget equal to the window
+  // leaves nowhere for the reply.
+  const ceiling = Math.floor(modelContext * 0.75);
+  const within = STEPS.filter((n) => n <= ceiling);
+  if (!within.length) return [ceiling];
+  // The ceiling itself, when the steps stop well short of it — otherwise a 200k model offers 128k
+  // as its largest choice and the rest of the window is unreachable.
+  if (ceiling > (within[within.length - 1] ?? 0) * 1.3) within.push(ceiling);
+  return within;
+}
+
 function reasoningButton(state: UiState, deps: ChatDeps): HTMLElement {
   const current = REASONING.find((r) => r.id === state.reasoning) ?? REASONING[0]!;
+  const budgets = contextBudgets(state.modelContext);
   const b = button({
     label: current.label,
     trailingIcon: ICON.chevron,
@@ -1194,15 +1259,40 @@ function reasoningButton(state: UiState, deps: ChatDeps): HTMLElement {
     onClick: () =>
       menu(b, (close) => {
         const panel = el("div", "menu-list");
-        panel.append(menuTitle(t("Thinking budget")));
-        for (const r of REASONING) {
+        if (state.reasoningAvailable) {
+          panel.append(menuTitle(t("Thinking budget")));
+          for (const r of REASONING) {
+            panel.append(
+              menuItem({
+                label: r.label,
+                hint: r.hint,
+                selected: r.id === state.reasoning,
+                onClick: () => {
+                  deps.send({ type: "setReasoning", reasoning: r.id });
+                  close();
+                },
+              }),
+            );
+          }
+        }
+        panel.append(
+          menuTitle(
+            state.modelContext > 0
+              ? t("Context budget — {0} holds {1}", state.modelLabel, formatTokens(state.modelContext))
+              : t("Context budget"),
+          ),
+        );
+        for (const tokens of budgets) {
           panel.append(
             menuItem({
-              label: r.label,
-              hint: r.hint,
-              selected: r.id === state.reasoning,
+              label: t("{0} tokens", formatTokens(tokens)),
+              hint:
+                tokens === budgets[budgets.length - 1] && state.modelContext > 0
+                  ? t("As much as this model can take, with room left for the answer")
+                  : undefined,
+              selected: tokens === state.contextBudget,
               onClick: () => {
-                deps.send({ type: "setReasoning", reasoning: r.id });
+                deps.send({ type: "setContextBudget", tokens });
                 close();
               },
             }),

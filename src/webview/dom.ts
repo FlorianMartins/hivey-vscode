@@ -204,6 +204,11 @@ export function closeMenu(): void {
   openMenu = undefined;
 }
 
+/** Whether a popover is up, so Escape can close the innermost thing rather than everything. */
+export function menuIsOpen(): boolean {
+  return openMenu !== undefined;
+}
+
 export function menu(anchor: HTMLElement, build: (close: () => void) => HTMLElement): void {
   closeMenu();
   const panel = el("div", "menu");

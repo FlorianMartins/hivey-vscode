@@ -5,7 +5,7 @@
 // showing a muted message as active, or a model name that changed three turns ago. The only thing
 // rendered incrementally is the answer being streamed, because that one has to be.
 
-import { button, closeMenu, el, icon, ICON, searchInput } from "./dom.js";
+import { button, closeMenu, el, icon, ICON, menuIsOpen, searchInput } from "./dom.js";
 import { chatScreen, collapsible, isStreaming, planBlock, setStreaming, type ChatDeps, captureDraft, restoreDraft } from "./chat.js";
 import { historyScreen } from "./history.js";
 import { modelsScreen } from "./models.js";
@@ -205,6 +205,18 @@ function screenTitle(s: UiState): string {
   }
 }
 
+/**
+ * The way out of the search.
+ *
+ * Closing also clears the query, and that is not tidiness: the query FILTERS the transcript, so a
+ * bar that closed while it still held a word would leave messages missing from the conversation
+ * with nothing on screen to say why.
+ */
+function closeSearch(): void {
+  searchOpen = false;
+  send({ type: "search", query: "" });
+}
+
 function searchBar(s: UiState): HTMLElement {
   const wrap = el("div", "search-bar");
   wrap.append(
@@ -212,15 +224,26 @@ function searchBar(s: UiState): HTMLElement {
       value: s.searchQuery,
       placeholder: t("Search this conversation…"),
       onInput: (query) => send({ type: "search", query }),
-      onEscape: () => {
-        searchOpen = false;
-        send({ type: "search", query: "" });
-      },
+      onEscape: closeSearch,
     }),
   );
   if (s.searchQuery) {
     wrap.append(el("span", "muted", t("{0} messages", s.matches.length)));
   }
+  // A cross, because Escape only works while the caret is in the field — and the field is the one
+  // place a reader is NOT once they have started looking at what the search found. There was no
+  // other way out at all: the magnifier opens the bar and pressing it again just opens it afresh.
+  wrap.append(
+    button({
+      icon: ICON.close,
+      title: t("Close the search"),
+      className: "btn ghost icon-only search-close",
+      onClick: () => {
+        closeSearch();
+        render();
+      },
+    }),
+  );
   return wrap;
 }
 
@@ -540,6 +563,11 @@ window.addEventListener("message", (event: MessageEvent<ToPanel>) => {
       ensureLive().setPlan(m.plan);
       break;
     case "status":
+      // Only into a turn that exists. `ensureLive()` CREATES one when there is none, so a message on
+      // this channel outside a turn did not report on the conversation — it invented a turn to
+      // report in, and the panel sat there apparently thinking. Anything with news to give outside a
+      // turn has the editor's own places to give it.
+      if (!live && !isStreaming()) break;
       ensureLive().appendStatus(m.text, m.tool, m.ok);
       scrollToEnd();
       break;
@@ -580,7 +608,15 @@ window.addEventListener("message", (event: MessageEvent<ToPanel>) => {
 });
 
 document.addEventListener("keydown", (ev) => {
-  if (ev.key === "Escape") closeMenu();
+  // The innermost thing first: a menu opened over the search bar closes before the bar does.
+  if (ev.key === "Escape") {
+    if (menuIsOpen()) {
+      closeMenu();
+    } else if (searchOpen) {
+      closeSearch();
+      render();
+    }
+  }
   // The editor's own find shortcut, applied to the conversation.
   if ((ev.ctrlKey || ev.metaKey) && ev.key === "f" && state?.screen === "chat") {
     ev.preventDefault();
