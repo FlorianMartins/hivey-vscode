@@ -365,7 +365,10 @@ mark.hit {
   white-space: nowrap;
   flex: 0 0 auto;
 }
-.entry.assistant .entry-who {
+/* Both names at full strength. The muted grey was for a label that repeats on every message — but
+   it is the one word that says whose message this is, and at 60 % of the foreground the question's
+   author read as an annotation on the answer rather than as the other half of a conversation. */
+.entry-who {
   color: var(--vscode-foreground);
 }
 /* Your side, their side.
@@ -1616,11 +1619,15 @@ pre.code {
   justify-content: center;
   background: none;
   border-color: transparent;
-  color: var(--vscode-textLink-foreground, var(--vscode-button-background));
+  /* And not in the accent either. A blue glyph among six grey ones is a highlight, and a highlight
+     on the control you press last is a thing that catches the eye every time you are reading rather
+     than sending. It is the same weight as its neighbours; what tells you it is the send is the
+     arrow, and where it sits. */
+  color: var(--vscode-foreground);
 }
 .btn.primary.send:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--vscode-textLink-foreground, var(--vscode-button-background)) 16%, transparent);
-  color: var(--vscode-textLink-foreground, var(--vscode-button-background));
+  background: var(--hover);
+  color: var(--vscode-foreground);
 }
 .btn.primary.send:disabled {
   color: var(--muted);
@@ -2655,8 +2662,11 @@ pre.code::-webkit-scrollbar-track {
      space the eye reads is 30, not 26, and centring in the strip alone left the button sitting on
      the last line of the answer with seven pixels of nothing below it. At `bottom: 1px` there are
      five and a half pixels above it and five below: the middle of the gap that is actually there.
-     It is a way back, not a call to action: small enough to ignore while reading. */
-  bottom: 1px;
+     It is a way back, not a call to action: small enough to ignore while reading.
+     Below the strip rather than inside it: the transcript keeps its own eight pixels of padding
+     under the last message, so the space the button has to sit in the middle of starts higher than
+     the strip does. Measured from the wrap's edge that lands under it, not in it. */
+  bottom: -3px;
   z-index: 5;
   padding: 2px var(--sp-2);
   border-radius: 999px;
@@ -3620,12 +3630,15 @@ pre.code code {
  * given back to the line.
  */
 .transcript {
-  padding-left: var(--sp-2);
-  padding-right: var(--sp-2);
+  /* Removing the editor's injected 20 px took the content right to the frame, which reads as
+     zoomed rather than as full-width: a line of text needs a margin to be a line rather than an
+     edge. Ten pixels is what that costs — a third of what was there, and deliberate. */
+  padding-left: 10px;
+  padding-right: 10px;
 }
 .composer {
-  padding-left: var(--sp-1);
-  padding-right: var(--sp-1);
+  padding-left: 8px;
+  padding-right: 8px;
 }
 .screen-lede,
 .screen-note {

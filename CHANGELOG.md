@@ -2,6 +2,33 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.21.0 — 2026-09-02
+
+### Fixed
+
+- **Every change of state jumped the conversation to the last message.** Pinning an answer was where
+  it showed, but pinning was not the cause: the panel is rebuilt on every message from the
+  extension, and the rebuild ended at the bottom of the transcript unconditionally. Mute an
+  exchange, delete one, attach a file — same jump, away from the thing you had just acted on. The
+  reading position is kept across a rebuild now, and given up only when you were already at the end
+  or are arriving from another screen.
+
+### Changed
+
+- **A few pixels back at the edges.** Removing the 20 px the editor injects took the content right
+  to the frame, which reads as zoomed rather than as full width: a line of text needs a margin to be
+  a line rather than an edge. Ten pixels — a third of what was there, and this time deliberate.
+- **Skills sits next to the send button**, not at the end of the row on the other side. The two
+  groups are pushed apart, so "last on the left" and "next to send" are not the same place; and this
+  is the control you reach for while writing a message, not while configuring a conversation.
+- **Your name is as visible as the assistant's.** At 60 % of the foreground the question's author
+  read as an annotation on the answer rather than as the other half of a conversation.
+- **The send arrow is the same weight as its neighbours.** A blue glyph among six grey ones is a
+  highlight, and a highlight on the control you press last catches the eye every time you are
+  reading rather than sending.
+- **"Latest" sits lower**, in the middle of the space that is actually there: the transcript keeps
+  its own padding under the last message, so the gap starts higher than the strip does.
+
 ## 0.20.0 — 2026-09-02
 
 ### Fixed

@@ -767,10 +767,14 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
   // this message does, and because that is where the user asked for it.
   left.append(contextButton(state, deps), modeButton(state, deps), modelButton(state, deps));
   if (state.reasoningAvailable) left.append(reasoningButton(state, deps));
-  left.append(toolsButton(state, deps));
   bar.append(left);
 
+  // Skills sit with the send rather than at the end of the left group. On a wide panel the two
+  // groups are pushed apart by `margin-left: auto`, so "last on the left" and "next to send" are
+  // not the same place at all — and this is the control you reach for while writing the message,
+  // not while configuring the conversation.
   const right = el("div", "toolbar-group end");
+  right.append(toolsButton(state, deps));
   right.append(
     isStreaming()
       ? button({ icon: ICON.stop, title: t("Stop the answer"), className: "btn primary send", onClick: () => deps.send({ type: "stop" }) })

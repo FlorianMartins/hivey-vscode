@@ -45,6 +45,7 @@ function render(): void {
   // the draft out first and putting it back after is what stops a message arriving from the
   // extension from erasing a half-written question.
   const draft = captureDraft();
+  const place = captureScroll();
   app.textContent = "";
   app.append(header(state));
   if (searchOpen && state.screen === "chat") app.append(searchBar(state));
@@ -73,10 +74,42 @@ function render(): void {
       break;
   }
   live = undefined;
-  // A rebuilt screen starts at the end, which is where a conversation is read from. The button is
-  // dropped with the old DOM and comes back the moment the reader scrolls away again.
-  scrollToEnd(true);
+  restoreScroll(place);
   restoreDraft(draft);
+}
+
+/**
+ * Where the reader was, so that a rebuild does not move them.
+ *
+ * Every message from the extension rebuilds the panel, and the rebuild used to end at the bottom of
+ * the transcript unconditionally. That is right for a new turn and wrong for everything else: mute
+ * an exchange, delete one, attach a file, PIN an answer — and the conversation jumped to the last
+ * message, away from the thing you had just acted on. Pinning was reported as "it goes to the last
+ * message", and it was: not the pin's doing, but every rebuild's.
+ *
+ * Nothing is captured when the screen changes, because a scroll position in the history list means
+ * nothing in a transcript.
+ */
+function captureScroll(): { top: number; atEnd: boolean } | undefined {
+  const list = document.querySelector(".transcript");
+  if (!list || state?.screen !== "chat") return undefined;
+  return { top: list.scrollTop, atEnd: atBottom(list) };
+}
+
+function restoreScroll(place: { top: number; atEnd: boolean } | undefined): void {
+  // At the end, or arriving from another screen: the end is where a conversation is read from.
+  if (!place || place.atEnd) {
+    scrollToEnd(true);
+    return;
+  }
+  requestAnimationFrame(() => {
+    const list = document.querySelector(".transcript");
+    if (!list) return;
+    list.scrollTop = place.top;
+    // The rebuild dropped the button with the old DOM; the reader is still where they were, so it
+    // is still needed.
+    showJumpButton(!atBottom(list));
+  });
 }
 
 function header(s: UiState): HTMLElement {
