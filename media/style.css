@@ -819,6 +819,14 @@ pre.code {
   align-items: center;
   gap: var(--sp-1);
   min-width: 0;
+  /* A step down from the body text. These are labels on controls — the mode, the model, how hard it
+     thinks — and at the same size as the conversation they read as content sitting under the box
+     rather than as the settings of the box. Smaller is also what buys the model name its
+     characters back: it is the only label here carrying information nobody can guess. */
+  font-size: var(--fs-meta);
+}
+.composer-toolbar .btn {
+  font-size: var(--fs-meta);
 }
 .composer-toolbar.bottom {
   margin-top: var(--sp-1);
@@ -1603,35 +1611,16 @@ pre.code {
   margin-left: auto;
   flex: 0 0 auto;
 }
-/* An arrow, not a blue tile.
+/* An arrow among icons.
  *
- * `primary` fills a button with the workbench accent, which is right for "Restore" in a dialog and
- * wrong at the end of a row of six flat icon buttons: a saturated square there is the loudest thing
- * on the screen, and the loudest thing on the screen should not be the button you press when you
- * have finished typing. The editor's own composer draws its send as an icon like the others, in the
- * accent COLOUR, and lets the fill appear on hover — which also makes the disabled state legible,
- * because a greyed-out tile and an enabled tile differ only in saturation. */
-.btn.primary.send {
-  border-radius: var(--radius);
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  justify-content: center;
-  background: none;
-  border-color: transparent;
-  /* And not in the accent either. A blue glyph among six grey ones is a highlight, and a highlight
-     on the control you press last is a thing that catches the eye every time you are reading rather
-     than sending. It is the same weight as its neighbours; what tells you it is the send is the
-     arrow, and where it sits. */
-  color: var(--vscode-foreground);
-}
-.btn.primary.send:hover:not(:disabled) {
-  background: var(--hover);
-  color: var(--vscode-foreground);
-}
-.btn.primary.send:disabled {
-  color: var(--muted);
-}
+ * There is no rule here beyond the class it shares with its neighbours, and that is the point. It
+ * was `primary`, which fills a button with the workbench accent — right for "Restore" in a dialog,
+ * wrong at the end of a row of six flat icon buttons, where it was a size and a weight of its own.
+ * Then it was flat but accent-coloured, which is the same mistake in a smaller dose: a highlight on
+ * the control you press LAST catches the eye every time you are reading rather than sending. That
+ * this is the send is said by the arrow and by where it sits, which is what a toolbar has always
+ * used to say it.
+ */
 
 /* The identity mark on each turn: a dot for the question, a diamond for the answer. Two shapes
    rather than two colours, so it survives a high-contrast theme and colour-blind vision alike. */
@@ -2665,8 +2654,9 @@ pre.code::-webkit-scrollbar-track {
      It is a way back, not a call to action: small enough to ignore while reading.
      Below the strip rather than inside it: the transcript keeps its own eight pixels of padding
      under the last message, so the space the button has to sit in the middle of starts higher than
-     the strip does. Measured from the wrap's edge that lands under it, not in it. */
-  bottom: -3px;
+     the strip does. Three pixels down was too far and one up was not far enough; this is between
+     the two positions each of which was wrong in one direction. */
+  bottom: -1px;
   z-index: 5;
   padding: 2px var(--sp-2);
   border-radius: 999px;
@@ -3630,15 +3620,18 @@ pre.code code {
  * given back to the line.
  */
 .transcript {
-  /* Removing the editor's injected 20 px took the content right to the frame, which reads as
-     zoomed rather than as full-width: a line of text needs a margin to be a line rather than an
-     edge. Ten pixels is what that costs — a third of what was there, and deliberate. */
-  padding-left: 10px;
-  padding-right: 10px;
+  /* Sixteen, because that is the editor's own number.
+     Removing the injected 20 px took the content right to the frame, which reads as zoomed rather
+     than as full width: a line of text needs a margin to be a line rather than an edge. Rather than
+     guess how much to give back, this is what the workbench's chat gives its messages —
+     `.interactive-item-container { padding: 12px 16px }` in workbench.desktop.main.css. The
+     composer sits a little wider, as it does there. */
+  padding-left: 16px;
+  padding-right: 16px;
 }
 .composer {
-  padding-left: 8px;
-  padding-right: 8px;
+  padding-left: 12px;
+  padding-right: 12px;
 }
 .screen-lede,
 .screen-note {

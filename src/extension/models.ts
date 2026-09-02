@@ -180,8 +180,8 @@ export function openFileUris(): vscode.Uri[] {
   const seen = new Set<string>();
   for (const group of vscode.window.tabGroups.all) {
     for (const tab of group.tabs) {
-      const uri = (tab.input as { uri?: vscode.Uri } | undefined)?.uri;
-      if (!uri || uri.scheme !== "file" || uri.path.endsWith(".git")) continue;
+      const uri = textTabUri(tab);
+      if (!uri) continue;
       const key = uri.toString();
       if (seen.has(key)) continue;
       seen.add(key);
@@ -189,6 +189,29 @@ export function openFileUris(): vscode.Uri[] {
     }
   }
   return out;
+}
+
+/**
+ * The document a tab is showing, when it is showing one.
+ *
+ * `TabInputText` is the test, not the URI's scheme. Requiring `file:` was the fourth and last thing
+ * standing between "attach all open editors" and the people reporting it as broken, and it was
+ * invisible from here: it works perfectly on a laptop with local files, and attaches NOTHING over
+ * SSH, in WSL, in a dev container, or on an IBM i — where every member and stream file a user of
+ * this extension has open arrives under a scheme Code for IBM i registered. Reading them was never
+ * the problem: `openTextDocument` resolves any scheme with a provider, which is exactly what those
+ * are. The filter was refusing files the editor could have handed over.
+ *
+ * The type is what excludes a diff, a notebook, a settings editor and a webview — all of them tabs,
+ * none of them a document to hand a model. That is a question about the KIND of tab, which is what
+ * `TabInputText` answers, and never a question about where the bytes live.
+ */
+function textTabUri(tab: vscode.Tab): vscode.Uri | undefined {
+  if (!(tab.input instanceof vscode.TabInputText)) return undefined;
+  const uri = tab.input.uri;
+  // Git's own blob previews are text tabs pointing at a revision, not at the working tree.
+  if (uri.scheme === "git" || uri.path.endsWith(".git")) return undefined;
+  return uri;
 }
 
 export function openFiles(): Array<{ path: string; active: boolean; language: string; dirty: boolean }> {
@@ -199,11 +222,9 @@ export function openFiles(): Array<{ path: string; active: boolean; language: st
 
   for (const group of vscode.window.tabGroups.all) {
     for (const tab of group.tabs) {
-      const input = tab.input as { uri?: vscode.Uri } | undefined;
-      const uri = input?.uri;
-      // Only plain text tabs. A diff, a notebook, a webview and a settings editor are all tabs, and
-      // none of them is a file to hand a model.
-      if (!uri || uri.scheme !== "file" || uri.path.endsWith(".git")) continue;
+      // Only plain text tabs, whatever scheme they are served from — see `textTabUri`.
+      const uri = textTabUri(tab);
+      if (!uri) continue;
       const key = uri.toString();
       if (seen.has(key)) continue;
       seen.add(key);

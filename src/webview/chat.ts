@@ -776,9 +776,12 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
   const right = el("div", "toolbar-group end");
   right.append(toolsButton(state, deps));
   right.append(
+    // The same button as its neighbours, carrying a different glyph. `primary` made it a size and a
+    // weight of its own at the end of a row of six identical controls, and "the send is special"
+    // is a thing a toolbar says by position, not by paint.
     isStreaming()
-      ? button({ icon: ICON.stop, title: t("Stop the answer"), className: "btn primary send", onClick: () => deps.send({ type: "stop" }) })
-      : button({ icon: ICON.send, title: t("Send (⏎)"), className: "btn primary send", onClick: () => submit(area, deps) }),
+      ? button({ icon: ICON.stop, title: t("Stop the answer"), className: "btn ghost icon-only send", onClick: () => deps.send({ type: "stop" }) })
+      : button({ icon: ICON.send, title: t("Send (⏎)"), className: "btn ghost icon-only send", onClick: () => submit(area, deps) }),
   );
   bar.append(right);
   card.append(bar);

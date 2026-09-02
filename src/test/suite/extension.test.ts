@@ -153,6 +153,28 @@ suite("Hivey Code", () => {
     }
   });
 
+  test("open tabs are found whatever scheme serves them", async () => {
+    // The fourth report of "all open editors does nothing", and the first cause that a local file
+    // could never show: the tabs were filtered by `uri.scheme === "file"`. That is true on a laptop
+    // and false over SSH, in WSL, in a dev container, and on an IBM i — where every member a user
+    // of this extension opens arrives under the scheme Code for IBM i registered. Three fixes and
+    // an integration test had all been written against `file:` tabs, which is why none of them
+    // caught it. An untitled document is the one non-`file:` scheme available in a bare harness,
+    // and it is enough: what is being tested is that the SCHEME is not the test.
+    const untitled = await vscode.workspace.openTextDocument({ language: "typescript", content: "export const x = 1;\n" });
+    await vscode.window.showTextDocument(untitled, { preview: false });
+    try {
+      assert.notEqual(untitled.uri.scheme, "file", "the document under test is not a file: one");
+      const found = openFileUris().map((u) => u.toString());
+      assert.ok(
+        found.includes(untitled.uri.toString()),
+        `a non-file tab was skipped; found: ${found.join(", ") || "(none)"}`,
+      );
+    } finally {
+      await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
+    }
+  });
+
   test("a personal skill is found with no folder open", async () => {
     // Reported from a window with no workspace: creating a skill answered "Open a folder first", so
     // the feature did not exist there at all — and a habit of your own had to be committed to

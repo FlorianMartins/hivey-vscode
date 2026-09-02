@@ -2,6 +2,38 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.22.0 — 2026-09-02
+
+### Fixed
+
+- **"Attach all open editors" attached nothing over SSH, in WSL, in a dev container, or on an
+  IBM i.** The fourth report of this feature being broken, and the first cause a local file could
+  never show: the tabs were filtered by `uri.scheme === "file"`. That is true on a laptop and false
+  everywhere the files are not on the laptop — including every member and stream file Code for IBM i
+  opens, which arrive under the scheme it registers. Reading them was never the problem;
+  `openTextDocument` resolves any scheme with a provider. What decides now is the KIND of tab
+  (`TabInputText`), which is what excludes a diff, a notebook or a settings editor — never where the
+  bytes live. Three earlier fixes and an integration test had all been written against `file:` tabs,
+  which is why none of them caught it; the test now opens one that is not.
+
+### Changed
+
+- **The composer's labels are a step smaller than the conversation.** Mode, model and effort are
+  settings of the box you are typing in; at the size of the text above them they read as content.
+
+
+
+- **The margins are the editor's own.** Rather than guess how much to give back after removing the
+  20 px VS Code injects, this is the number the workbench's chat gives its messages:
+  `.interactive-item-container { padding: 12px 16px }`. Sixteen, with the composer a little wider,
+  as it is there.
+- **The send button has no styling of its own.** It carries the same classes as the six controls
+  beside it and a different glyph, which is the whole change. It was `primary` — an accent-filled
+  tile with its own size — and then flat but accent-coloured, which is the same mistake in a smaller
+  dose: a highlight on the control you press LAST catches the eye every time you are reading rather
+  than sending. That it is the send is said by the arrow and by where it sits.
+- **"Latest" sits between the two positions that were each wrong in one direction.**
+
 ## 0.21.0 — 2026-09-02
 
 ### Fixed
