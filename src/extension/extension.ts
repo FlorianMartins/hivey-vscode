@@ -182,28 +182,53 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
     vscode.commands.registerCommand("hiveyCode.newSkill", () => createDefinition("skill")),
     vscode.commands.registerCommand("hiveyCode.newAgent", () => createDefinition("agent")),
+    /**
+     * Skills and sub-agents: make one, or open one to change it.
+     *
+     * This entry used to only LIST them, which is the one thing the panel already does everywhere
+     * — they are in the composer, in the `/` menu, in the tools picker. What is not anywhere else
+     * is writing one, and that had ended up reachable only from the command palette. So the two
+     * ways to author come first, above a rule, and the list below them is how you edit: picking a
+     * definition opens its file.
+     */
     vscode.commands.registerCommand("hiveyCode.showDefinitions", async () => {
       const found = await definitions.load();
-      const items = [
-        ...found.skills.map((s) => ({ label: `$(sparkle) /${s.name}`, description: s.description, detail: s.source })),
+      type Row = vscode.QuickPickItem & { source?: string; make?: "skill" | "agent" };
+      const rows: Row[] = [
+        {
+          label: "$(add) " + t("New skill…"),
+          detail: t("A Markdown file in .hiveycode/skills/ — opens ready to write"),
+          make: "skill",
+        },
+        {
+          label: "$(add) " + t("New sub-agent…"),
+          detail: t("A Markdown file in .hiveycode/agents/ — opens ready to write"),
+          make: "agent",
+        },
+      ];
+      const defined: Row[] = [
+        ...found.skills.map((sk) => ({ label: `$(sparkle) /${sk.name}`, description: sk.description, detail: sk.source })),
         ...found.agents.map((a) => ({ label: `$(person) ${a.name}`, description: a.description, detail: a.source })),
         ...found.problems.map((p) => ({ label: `$(error) ${p.split(":")[0]}`, description: p, detail: p.split(":")[0] })),
       ];
-      if (!items.length) {
-        const make = t("Create a skill");
-        const answer = await vscode.window.showInformationMessage(
-          t("This repository defines no skills or sub-agents."),
-          make,
-        );
-        if (answer === make) await createDefinition("skill");
-        return;
+      if (defined.length) {
+        rows.push({ label: t("Open one to edit it"), kind: vscode.QuickPickItemKind.Separator });
+        rows.push(...defined);
       }
-      const picked = await vscode.window.showQuickPick(items, {
-        placeHolder: t("Skills and sub-agents defined in this repository. Pick one to open it."),
+
+      const picked = await vscode.window.showQuickPick(rows, {
+        placeHolder: defined.length
+          ? t("Write a skill or a sub-agent, or open one of this repository's to change it")
+          : t("This repository defines none yet — write the first"),
         matchOnDescription: true,
       });
+      if (!picked) return;
+      if (picked.make) {
+        await createDefinition(picked.make);
+        return;
+      }
       const folder = vscode.workspace.workspaceFolders?.[0];
-      if (picked?.detail && folder) {
+      if (picked.detail && folder) {
         await vscode.window.showTextDocument(vscode.Uri.joinPath(folder.uri, picked.detail));
       }
     }),

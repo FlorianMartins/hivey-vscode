@@ -90,7 +90,11 @@ const server = createServer((req, res) => {
 
   function reply(sent) {
   res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });
-  const answer = /VAT|TVA/i.test(sent) ? SHORT : ANSWER;
+  // Matched on the second question's own words, not on "VAT": the attached file is full of
+  // `tauxTVA`, and it travels with EVERY request — so a match on the subject matched the first
+  // question too, and both answers came back short. Which cost the frame its code block and its
+  // scrollbar, and with them the two things the picture was taken to check.
+  const answer = /rounding of the VAT itself|arrondi de la TVA/i.test(sent) ? SHORT : ANSWER;
   const chunks = answer.match(/[\s\S]{1,24}/g) ?? [];
   let i = 0;
   const timer = setInterval(() => {

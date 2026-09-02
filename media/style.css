@@ -386,16 +386,27 @@ mark.hit {
   padding: 0 5px;
 }
 
-/* The row's actions overlay it on hover rather than reserving space in it. Invisible buttons were
-   still taking their width, which at the side bar's default size left the model id with room for
-   one character — and "q…" tells the reader nothing at all. The editor's own lists do the same. */
+/* The controls are not part of the message; they are what you can do to it.
+ *
+ * They used to hold their height at all times so that hovering would not reflow the transcript —
+ * which meant every message in the conversation, hovered or not, carried a band of empty air the
+ * width of six invisible buttons. Twenty-six pixels between a question and its own answer, spent
+ * on nothing anybody could see. The row now takes no room until the pointer is on the message, and
+ * grows out from under it; the message being pointed at never moves, only what is below it. */
 .entry-actions {
   display: flex;
-  gap: 1px;
-  margin-top: var(--sp-2);
+  /* No gap. The buttons are squares that already carry their own air, and a gap on top of that is
+     what put thirteen pixels between two glyphs. See the sizing rule further down. */
+  gap: 0;
+  margin-top: 0;
+  max-height: 0;
+  overflow: hidden;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 100ms ease;
+  transition:
+    opacity 100ms ease,
+    max-height 120ms ease,
+    margin-top 120ms ease;
 }
 
 /* The user's own words sit in a tinted card; the assistant's answer is the page itself. That
@@ -1494,11 +1505,30 @@ pre.code {
      exchange from the next is the rule above the next question, not this margin: spacing every
      entry apart by the same amount made a question sit as far from its own reply as from a
      different conversation turn. */
-  margin-top: var(--sp-2);
+  margin-top: var(--sp-1);
 }
 .entry {
   padding: var(--sp-1) 0;
 }
+
+/* ── Why the question and its answer now touch ────────────────────────────────────────────────
+ *
+ * The margin above was already small and the gap was not, because most of it was never a margin:
+ * it was a row of buttons nobody could see. Every entry reserved the space its hover controls
+ * would occupy, so on a question that reserved row put twenty-odd pixels of nothing between the
+ * question and the answer to it. Tightening the margin could not reach it, which is why the gap
+ * kept looking wrong after the margin was already as small as it goes.
+ *
+ * A previous attempt moved the question's buttons up into its header — in CSS only. The rule was
+ * `.entry-head .entry-actions`, and nothing in the panel has ever built that: the row is appended
+ * at the end of the entry for both roles. A selector that matches nothing is never reported by
+ * anything, so the essay explaining the fix sat above a rule that did not run, and the band of
+ * empty air stayed exactly where it was.
+ *
+ * What is there now is simpler and applies to both roles: the row has no height until the pointer
+ * is on the message, then opens under it. The message being pointed at does not move — only what
+ * follows it does — and a transcript nobody is pointing at carries no reserved space at all.
+ */
 
 /* Superseded by the single ring defined with the composer below: two focus rules of different
    weights were what made the box appear to change size when it gained focus. */
@@ -2565,9 +2595,13 @@ pre.code::-webkit-scrollbar-track {
      when that grew a row, and floating at the transcript's edge it covered the last line of the
      answer. Reserving the space is the only arrangement where it cannot overlap anything, because
      nothing else is ever drawn there. */
-  /* Centred in the strip the transcript reserves, rather than sitting on its top edge. The strip
-     is 26 px and the button is about 20, so a few pixels down is the middle of it. */
-  bottom: 3px;
+  /* Centred in the whole gap, which is bigger than the strip.
+     The button is 23 px (11 px text, 3 px padding, 1 px border, twice over). The strip the
+     transcript reserves is 26, and the composer adds 4 px of its own padding under it — so the
+     space the eye reads is 30, not 26, and centring in the strip alone left the button sitting on
+     the last line of the answer with seven pixels of nothing below it. At `bottom: 0` there are
+     three pixels above it and four below: the middle of the gap that is actually there. */
+  bottom: 0;
   z-index: 5;
   padding: 3px var(--sp-3);
   border-radius: 999px;
@@ -2717,20 +2751,24 @@ pre.code::-webkit-scrollbar-track {
  * else, which is the editor's own chat behaviour and the reason its transcripts read as prose
  * rather than as a table of controls.
  *
- * Kept in the layout while hidden (`opacity`, not `display`) so the message does not jump upward
- * when the pointer arrives. A transcript that reflows under the cursor is unusable for the one
- * thing these buttons exist for: acting on a specific message.
+ * The space opens under the message the pointer is on, and closes again when it leaves. Nothing
+ * above the cursor moves — only what follows — so the message being acted on stays exactly where
+ * it was read, which is the one thing that would make these buttons unusable if it failed.
  */
 .entry:hover .entry-actions,
 .entry-actions:focus-within {
   opacity: 1;
   pointer-events: auto;
+  max-height: 24px;
+  margin-top: var(--sp-1);
 }
 /* Keyboard users never hover. Without this the buttons are unreachable by tab, which would make
    the whole row mouse-only. */
 .entry:focus-within .entry-actions {
   opacity: 1;
   pointer-events: auto;
+  max-height: 24px;
+  margin-top: var(--sp-1);
 }
 
 /* The model and the price are a receipt, not a headline: worth checking, never worth reading on
@@ -3092,11 +3130,29 @@ pre.code code {
    block, none on its header, and the `code` inside it explicitly cleared — that clear is what makes
    this possible at all. */
 .code-block {
-  background: var(--vscode-textCodeBlock-background, rgba(128, 128, 128, 0.08));
-  border-color: var(--border-strong);
+  /* A veil, not a panel.
+   *
+   * `textCodeBlock-background` is an opaque colour in most themes: it paints a solid slab that
+   * sits on the answer rather than in it, and on a light theme it is very nearly the panel's own
+   * white, so the block reads as a rectangle of border with nothing inside. A grey mixed from the
+   * foreground and left partly transparent lifts the code off whatever is behind it by the same
+   * small amount in every theme, and keeps the tint of the surface underneath — which is what
+   * makes it read as part of the answer rather than a card dropped onto it. */
+  background: color-mix(in srgb, var(--vscode-foreground) 7%, transparent);
+  border-color: color-mix(in srgb, var(--vscode-foreground) 14%, transparent);
 }
 .code-head {
   background: none;
+}
+/* The controls belong to the veil: same material, so they read as sitting ON the block rather than
+   as a second row of buttons stacked above it. */
+.code-tools .btn {
+  background: color-mix(in srgb, var(--vscode-foreground) 6%, transparent);
+  border-color: color-mix(in srgb, var(--vscode-foreground) 12%, transparent);
+}
+.code-tools .btn:hover {
+  background: color-mix(in srgb, var(--vscode-foreground) 14%, transparent);
+  border-color: color-mix(in srgb, var(--vscode-foreground) 24%, transparent);
 }
 .code-lang {
   color: var(--vscode-descriptionForeground, var(--muted));
@@ -3362,16 +3418,27 @@ pre.code code {
 
 /* ── The controls under a message ─────────────────────────────────────────────────────────────
  *
- * Bigger, and a shade brighter. They are hidden until the pointer arrives, which is right — a quiet
- * transcript should stay quiet — but the ones that then appeared were 14 px glyphs in the muted
- * colour, which is the colour this stylesheet uses for text you are not meant to read. Something
- * revealed on purpose should be legible the moment it is.
+ * Legible, and one object rather than five.
  *
- * The size comes from padding rather than from a larger glyph: the icons are drawn on a 16-unit
- * grid and scaling them past 14 px softens the strokes. What grows is the target.
+ * They are hidden until the pointer arrives, which is right — a quiet transcript should stay quiet
+ * — but the ones that then appeared were 14 px glyphs in the muted colour, which is the colour this
+ * stylesheet uses for text you are not meant to read. Making them legible was the fix; making them
+ * BIG was overshoot. Six pixels of padding either side plus the gap put thirteen pixels between one
+ * glyph and the next, which is more air than there is between two icons in any toolbar in the
+ * workbench — so the row read as five controls scattered under the message rather than as the one
+ * control row it is.
+ *
+ * A square on the editor's own 22 px toolbar grid, no gap, and the glyph left at 14 px: the icons
+ * are drawn on a 16-unit grid and scaling them past that softens the strokes, so what carries the
+ * target is the box around them. Even spacing comes for free — with the padding symmetric and the
+ * gap gone, the distance between two glyphs is the same everywhere in the row, which is the thing
+ * the eye was reading as untidy.
  */
 .entry-actions .btn.icon-only {
-  padding: var(--sp-1) var(--sp-2);
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  justify-content: center;
   border-radius: var(--radius);
   color: color-mix(in srgb, var(--vscode-foreground) 72%, transparent);
 }
@@ -3380,8 +3447,8 @@ pre.code code {
   background: var(--hover);
 }
 .entry-actions .btn.icon-only .ico {
-  width: 15px;
-  height: 15px;
+  width: 13px;
+  height: 13px;
 }
 /* Deleting and restoring are the two that change something outside the conversation, so they are
    the two that take a colour on hover — not before, because a red icon sitting in a row of grey

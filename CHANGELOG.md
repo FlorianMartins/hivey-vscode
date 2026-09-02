@@ -2,6 +2,41 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.19.0 — 2026-09-02
+
+### Changed
+
+- **The controls under a message take no room until you point at one.** Every entry reserved the
+  height its hover buttons would need — deliberately, so the transcript would not reflow — which
+  meant every message in the conversation carried a band of empty air the width of six invisible
+  buttons, and on a question that band stood between the question and its own answer. The row now
+  opens under the message the pointer is on and closes when it leaves: nothing above the cursor
+  moves, and a transcript nobody is pointing at reserves nothing at all.
+- **A question and its answer are closer still**, which is the same change seen from the other end.
+- **The buttons themselves are smaller** — a 20 px square around a 13 px glyph instead of 22 around
+  14 — so the row reads as one control rather than as six separate ones.
+- **Code blocks are a veil rather than a panel.** `textCodeBlock-background` is opaque in most
+  themes: it puts a slab on top of the answer, and on a light theme it is very nearly the panel's
+  own white, so the block read as a rectangle of border with nothing in it. A grey mixed from the
+  foreground and left partly transparent lifts the code by the same small amount in every theme and
+  keeps the tint of what is behind it. The copy and insert buttons take the same material.
+- **The way back to the end of the conversation sits in the middle of the gap it lives in.** It was
+  centred in the 26 px strip the transcript reserves, but the composer adds 4 px of its own below
+  that — so the space the eye reads is 30, and the button sat on the last line of the answer with
+  seven pixels of nothing under it.
+
+### Fixed
+
+- **Skills and sub-agents can be written from the panel's `…` menu.** That entry only ever LISTED
+  them, which is the one thing the interface already does everywhere else — they are in the
+  composer, in the `/` menu, in the tools picker. Writing one was reachable only from the command
+  palette. It now offers **New skill…** and **New sub-agent…** first, with the repository's own
+  below: opening one is how you edit it.
+- **A CSS rule that had never run.** `.entry-head .entry-actions` described moving a question's
+  buttons up into its header, at length, in a comment — and nothing in the panel has ever built
+  that element, so the rule matched nothing and the band of empty air it was meant to remove stayed
+  where it was. A selector that matches nothing is reported by nothing.
+
 ## 0.18.1 — 2026-09-02
 
 ### Fixed
