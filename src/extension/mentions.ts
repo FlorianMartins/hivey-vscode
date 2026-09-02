@@ -16,6 +16,7 @@
 //     file stays blocked whether it was picked in a dialog or named after a `#`.
 
 import * as vscode from "vscode";
+import { isDocumentUri } from "./models.js";
 import { t } from "../shared/i18n.js";
 import type { ContextItem } from "../core/session/session.js";
 import { describeMention, type Mention } from "../core/session/mentions.js";
@@ -80,8 +81,12 @@ async function resolveOne(mention: Mention, deps: ResolveDeps): Promise<ContextI
       const seen = new Set<string>();
       for (const group of vscode.window.tabGroups.all) {
         for (const tab of group.tabs) {
-          const uri = (tab.input as { uri?: vscode.Uri } | undefined)?.uri;
-          if (!uri || uri.scheme !== "file" || seen.has(uri.toString())) continue;
+          // Same rule as "attach all open editors", and for the same reason: `#open` returned
+          // nothing at all over SSH, in a container, or on an IBM i, because every tab there is
+          // served under a scheme that is not `file`.
+          if (!(tab.input instanceof vscode.TabInputText)) continue;
+          const uri = tab.input.uri;
+          if (!isDocumentUri(uri) || seen.has(uri.toString())) continue;
           seen.add(uri.toString());
           try {
             const doc = await vscode.workspace.openTextDocument(uri);

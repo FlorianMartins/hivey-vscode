@@ -6,6 +6,7 @@
 // occupies — because an assistant that indexes a monorepo on a laptop is a fan-noise generator.
 
 import * as vscode from "vscode";
+import { isDocumentUri } from "./models.js";
 import { t } from "../shared/i18n.js";
 import { buildRepoMap, isMappable, type MapFile } from "../core/context/repomap.js";
 import type { ContextItem } from "../core/session/session.js";
@@ -107,11 +108,12 @@ export class WorkspaceContext {
   activeContext(maxTokens = 3000, settings?: Settings): ContextItem | undefined {
     const ed = vscode.window.activeTextEditor;
     if (!ed) return undefined;
-    // A file, or a buffer that is not saved yet — asking about code you have just typed and not
-    // written to disk is one of the ordinary cases. What this excludes is everything else that is
-    // technically a text document: an output channel, a diff view, a settings editor, the release
-    // notes. None of those is something to hand a model unasked.
-    if (settings && ed.document.uri.scheme !== "file" && ed.document.uri.scheme !== "untitled") return undefined;
+    // What this excludes is everything that is technically a text document without being a file
+    // anybody is working on: an output channel, a settings editor, the release notes, a git
+    // revision. It used to allow `file:` and `untitled:` and refuse the rest, which meant the
+    // editor's own tab was never offered as context to anyone working over SSH, in a container, or
+    // on an IBM i — the file in front of them, refused for being somewhere other than a local disk.
+    if (settings && !isDocumentUri(ed.document.uri)) return undefined;
     const rel = relative(ed.document.uri);
     if (settings && EgressGate.isBlocked(rel, settings.privacy.blockedGlobs)) return undefined;
     if (!ed.selection.isEmpty) {

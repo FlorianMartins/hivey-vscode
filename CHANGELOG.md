@@ -2,6 +2,23 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.22.1 — 2026-09-02
+
+### Fixed
+
+- **The same scheme filter was in two more places**, found by checking the built package for the
+  string rather than trusting the fix. `#open` — the mention that hands over every open editor —
+  returned nothing over SSH, in a container or on an IBM i; and the file you are looking at was
+  never offered as context there either, refused by `activeContext` for being somewhere other than
+  a local disk. That last one is the one that matters most: the tab in front of you, silently not
+  offered, for every remote user of an extension whose reason to exist is IBM i.
+- The rule now lives in one place, `isDocumentUri`, and is written as what it EXCLUDES: an output
+  channel, a settings editor, the release notes, a git revision — documents the editor synthesises,
+  which can be listed because the editor is what makes them. An allow-list of schemes answers "is it
+  on this machine", which is a question nobody asked. The two mistakes do not cost the same: a
+  deny-list that misses something attaches an odd document once, an allow-list that misses something
+  makes the feature not exist for a whole class of user, silently.
+
 ## 0.22.0 — 2026-09-02
 
 ### Fixed

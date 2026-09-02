@@ -209,9 +209,43 @@ export function openFileUris(): vscode.Uri[] {
 function textTabUri(tab: vscode.Tab): vscode.Uri | undefined {
   if (!(tab.input instanceof vscode.TabInputText)) return undefined;
   const uri = tab.input.uri;
-  // Git's own blob previews are text tabs pointing at a revision, not at the working tree.
-  if (uri.scheme === "git" || uri.path.endsWith(".git")) return undefined;
+  if (!isDocumentUri(uri)) return undefined;
   return uri;
+}
+
+/**
+ * Is this something a person would call a file they are working on?
+ *
+ * Named by what it is NOT, and that direction is the whole point. An allow-list of schemes answers
+ * "is it on this machine", which is a question nobody asked: over SSH, in WSL, in a container, and
+ * on an IBM i the files are all somewhere else and all perfectly real. What actually has to be kept
+ * out is a short, known set of documents the editor synthesises — an output channel, the release
+ * notes, a settings editor, a git revision — and those can be listed, because the editor is the one
+ * that makes them.
+ *
+ * The cost of the two mistakes is not symmetric. A deny-list that misses something attaches an odd
+ * document once; an allow-list that misses something makes the feature not exist for a whole class
+ * of user, silently, which is what happened here three times over.
+ */
+export function isDocumentUri(uri: vscode.Uri): boolean {
+  const SYNTHETIC = new Set([
+    "output",
+    "extension-output",
+    "vscode-settings",
+    "vscode-release-notes",
+    "vscode-userdata",
+    "walkThrough",
+    "walkThroughSnippet",
+    "search-editor",
+    "comment",
+    "debug",
+    "git",
+    "gitlens",
+    "review",
+    "pr",
+  ]);
+  if (SYNTHETIC.has(uri.scheme)) return false;
+  return !uri.path.endsWith(".git");
 }
 
 export function openFiles(): Array<{ path: string; active: boolean; language: string; dirty: boolean }> {
