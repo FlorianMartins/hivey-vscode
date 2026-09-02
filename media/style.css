@@ -814,7 +814,12 @@ pre.code {
   padding: var(--sp-2) var(--sp-3) var(--sp-3);
 }
 .composer-card {
-  border: 1px solid var(--vscode-input-border, var(--border-strong));
+  /* The theme's input border when it defines one, and something very light when it does not.
+     `--border-strong` was a line drawn at the weight of a divider around a box that is already
+     separated from everything by its own background — which is why the box read as heavier than
+     the editor's own input, where the same fallback is `transparent`. A trace is kept rather than
+     nothing, so the box still has an edge on themes whose input background matches the panel. */
+  border: 1px solid var(--vscode-input-border, color-mix(in srgb, var(--vscode-foreground) 13%, transparent));
   border-radius: var(--radius-lg);
   background: var(--vscode-input-background);
   padding: var(--sp-2);
@@ -2420,24 +2425,65 @@ pre.code {
   align-items: center;
   gap: var(--sp-2);
 }
-.composer-gauge {
-  flex: 0 1 90px;
-  height: 3px;
-  border-radius: 2px;
-  background: var(--border);
+/* ── How full the context is ──────────────────────────────────────────────────────────────────
+ *
+ * Fourteen pixels where there were ninety. The row under the composer has to hold the provider, the
+ * approval setting, a token count and a price on one line in a side bar that is 280 px wide, and a
+ * bar spanning a third of it to say "22 %" was the least information per pixel on the screen. The
+ * ring is the editor's own shape for the same reading, down to the stroke width and the start at
+ * twelve o'clock, and the percentage waits behind a hover — four characters nobody needs at 12 %
+ * and everybody wants at 90.
+ */
+.context-ring {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  cursor: default;
+}
+.context-ring .ring {
+  flex: 0 0 auto;
+}
+.context-ring .ring-bg {
+  fill: none;
+  stroke: var(--vscode-disabledForeground, var(--border-strong));
+  stroke-width: 3;
+  opacity: 0.5;
+}
+.context-ring .ring-arc {
+  fill: none;
+  stroke: var(--vscode-gitDecoration-addedResourceForeground, var(--vscode-charts-green));
+  stroke-width: 3;
+  stroke-linecap: round;
+  /* Twelve o'clock, not three: a proportion that starts on the right reads as having already run
+     a quarter of the way round. */
+  transform: rotate(-90deg);
+  transform-origin: center;
+  transition: stroke-dasharray 200ms ease;
+}
+.context-ring.warm .ring-arc {
+  stroke: var(--vscode-editorWarning-foreground, var(--vscode-charts-yellow));
+}
+.context-ring.high .ring-arc {
+  stroke: var(--vscode-errorForeground, var(--vscode-charts-red));
+}
+.context-ring .ring-pct {
+  font-size: var(--fs-meta);
+  line-height: 1;
+  color: var(--muted);
+  white-space: nowrap;
+  /* Collapsed rather than hidden: `display: none` would make the row jump by four characters the
+     moment the pointer arrives. */
+  max-width: 0;
+  opacity: 0;
   overflow: hidden;
+  transition:
+    max-width 120ms ease-out,
+    opacity 120ms ease-out;
 }
-.composer-gauge-fill {
-  height: 100%;
-  border-radius: 2px;
-  background: var(--vscode-gitDecoration-addedResourceForeground, var(--vscode-charts-green));
-  transition: width 200ms ease;
-}
-.composer-gauge-fill.warm {
-  background: var(--vscode-editorWarning-foreground, var(--vscode-charts-yellow));
-}
-.composer-gauge-fill.high {
-  background: var(--vscode-errorForeground, var(--vscode-charts-red));
+.context-ring:hover .ring-pct {
+  max-width: 4em;
+  opacity: 1;
 }
 
 /* The offer to summarise. A card, not a dialog: it is a suggestion about the conversation and it
@@ -2687,7 +2733,12 @@ pre.code::-webkit-scrollbar-track {
      the two positions each of which was wrong in one direction. */
   bottom: -1px;
   z-index: 5;
-  padding: 2px var(--sp-2);
+  /* A disc, now that there is only a chevron in it: a pill around a single glyph is a pill with
+     two empty ends. */
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  justify-content: center;
   border-radius: 999px;
   border: 1px solid var(--border-strong);
   background: var(--vscode-editorWidget-background, var(--surface));

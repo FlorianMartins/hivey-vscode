@@ -485,11 +485,13 @@ function showJumpButton(show: boolean): void {
   // the same and the cause was different, which is why it kept looking unfixed.
   const host = document.querySelector<HTMLElement>(".transcript-wrap");
   if (!host) return;
+  // The chevron alone. The word beside it named the destination, which the arrow already names —
+  // and it was the widest thing in the strip between the last answer and the composer, in a panel
+  // where that strip is the one place nothing else is allowed to be.
   const jump = button({
     icon: ICON.chevron,
-    label: isStreaming() ? t("Answering…") : t("Latest"),
     className: "btn jump-to-end",
-    title: t("Go to the end of the conversation"),
+    title: isStreaming() ? t("Answering… go to the end of the conversation") : t("Go to the end of the conversation"),
     onClick: () => scrollToEnd(true),
   });
   host.append(jump);

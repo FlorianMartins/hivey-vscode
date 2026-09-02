@@ -65,19 +65,7 @@ test("every string the source translates has a French entry", () => {
     const source = readFileSync(file, "utf8");
     // `t("…")`, but not `test(`, `.get(`, `import(` — the boundary matters more than it looks.
     //
-    // The whole argument, not its first line. A long sentence is written across several source
-    // lines joined by `+`, and `t()` receives the CONCATENATION — so a test that read only the
-    // first fragment was checking a key that never exists at runtime, and passed while the French
-    // interface showed a paragraph of English. Found on a screenshot, which is the only place it
-    // could be found.
-    for (const m of source.matchAll(/(?<![A-Za-z0-9_.$])t\(\s*("(?:[^"\\]|\\.)*"(?:\s*\+\s*"(?:[^"\\]|\\.)*")*)/g)) {
-      const key = [...m[1]!.matchAll(/"((?:[^"\\]|\\.)*)"/g)]
-        .map((part) => part[1]!)
-        .join("")
-        .replace(/\\"/g, '"')
-        .replace(/\\n/g, "\n");
-      if (key.trim()) keys.add(key);
-    }
+    for (const key of translatedIn([source])) keys.add(key);
   }
 
   assert.ok(keys.size > 200, `expected the whole interface to be translated, found ${keys.size} strings`);
@@ -86,13 +74,48 @@ test("every string the source translates has a French entry", () => {
 });
 
 test("the table does not translate strings that no longer exist", () => {
-  const source = walk("src")
-    .filter((f) => f.endsWith(".ts"))
-    .map((f) => readFileSync(f, "utf8"))
-    .join("\n");
-  const stale = translationKeys("fr").filter((key) => !source.includes(key.slice(0, 40).replace(/\n/g, "\\n")));
+  // Two ways for an entry to be reachable, and it needs one of them.
+  //
+  // It used to be one loose way: the first forty characters appearing ANYWHERE in the source. That
+  // passes on a comment, and it passes on a prefix — "Answering…" survived as dead weight because a
+  // longer string starting with it had been added elsewhere. A hundred and thirty-four entries were
+  // being kept, and translated, for text the product no longer says.
+  //
+  // Strict membership alone is too tight, though: a key can be a literal in a table that `t()` is
+  // handed through a variable, and that is a real pattern here. So: passed to `t()` (fragments
+  // joined, see above), or present in the source as a literal. Anything else cannot be reached,
+  // because a key must match exactly — there is no way to build one at runtime.
+  const files = walk("src").filter((f) => f.endsWith(".ts") && !f.includes("i18n"));
+  const sources = files.map((f) => readFileSync(f, "utf8"));
+  const source = sources.join("\n");
+  const used = translatedIn(sources);
+  const stale = translationKeys("fr").filter((key) => !used.has(key) && !source.includes(`"${key.replace(/\n/g, "\\n")}"`));
   assert.deepEqual(stale, [], `entries for strings the code no longer uses:\n${stale.join("\n")}`);
 });
+
+/**
+ * Every string handed to `t()` in these sources.
+ *
+ * The whole argument, not its first line. A long sentence is written across several source lines
+ * joined by `+`, and `t()` receives the CONCATENATION — so a reader that took only the first
+ * fragment was looking for a key that never exists at runtime. That passed while the French
+ * interface showed four paragraphs of English, and it was found on a screenshot, which was the only
+ * place left to find it.
+ */
+function translatedIn(sources: string[]): Set<string> {
+  const out = new Set<string>();
+  for (const source of sources) {
+    for (const m of source.matchAll(/(?<![A-Za-z0-9_.$])t\(\s*("(?:[^"\\]|\\.)*"(?:\s*\+\s*"(?:[^"\\]|\\.)*")*)/g)) {
+      const key = [...m[1]!.matchAll(/"((?:[^"\\]|\\.)*)"/g)]
+        .map((part) => part[1]!)
+        .join("")
+        .replace(/\\"/g, '"')
+        .replace(/\\n/g, "\n");
+      if (key.trim()) out.add(key);
+    }
+  }
+  return out;
+}
 
 function walk(dir: string): string[] {
   const out: string[] = [];

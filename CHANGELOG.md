@@ -2,6 +2,31 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.24.0 — 2026-09-02
+
+### Changed
+
+- **How full the context is, as a ring.** Fourteen pixels where there were ninety. The row under the
+  composer holds the provider, the approval setting, a token count and a price on one line in a
+  side bar 280 px wide, and a bar spanning a third of it to say "22 %" was the least information per
+  pixel on the screen. The ring is the editor's own shape for the same reading — background circle,
+  arc starting at twelve o'clock — and the percentage waits behind a hover, four characters nobody
+  needs at 12 % and everybody wants at 90. It no longer has to hide below a fifth full, either: a
+  ring is legible when nearly empty, which a long grey line with a dot on the end was not.
+- **"Latest" is the chevron alone.** The word named the destination the arrow already names, and it
+  was the widest thing in the one strip where nothing else is allowed to be.
+- **The composer's outline is a trace rather than a rule.** It was drawn at the weight of a divider
+  around a box already separated from everything by its own background, which is why it read as
+  heavier than the editor's own input — where the same fallback is `transparent`.
+
+### Fixed
+
+- **134 French entries for text the product no longer says.** The test that exists to catch exactly
+  this was looking for the key as a substring ANYWHERE in the source, so a mention in a comment kept
+  an entry alive, and so did being the prefix of a longer string. It now asks whether the key is
+  passed to `t()` — fragments joined — or present as a literal, which are the only two ways a key
+  can be reached.
+
 ## 0.23.0 — 2026-09-02
 
 ### Changed

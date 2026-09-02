@@ -797,18 +797,12 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
   meter.append(el("div", "spacer"));
   const tokens = el("span", "composer-tokens", t("{0} tokens", formatTokens(state.contextTokens)));
   tokens.title = t("What the next question will send, once muted exchanges are removed.");
-  // A bar rather than a percentage, and only once there is something to watch. At 3 % it drew a
-  // green dot at the end of a grey line — which reads as a rendering fault, not as a measurement,
-  // and put a permanent smudge above the composer for the first twenty exchanges of every
-  // conversation. Below a fifth the token count alone says everything true.
-  if (state.contextFill >= 0.2) {
-    const gauge = el("div", "composer-gauge");
-    const fill = el("div", `composer-gauge-fill${state.contextFill > 0.85 ? " high" : state.contextFill > 0.6 ? " warm" : ""}`);
-    fill.style.width = `${Math.round(state.contextFill * 100)}%`;
-    gauge.append(fill);
-    gauge.title = t("{0}% of the context budget", Math.round(state.contextFill * 100));
-    meter.append(gauge);
-  }
+  // A ring rather than a bar. The bar was ninety pixels of a row that has to hold the provider, the
+  // approval setting, a token count and a price on one line at 280 px — and it was hidden below a
+  // fifth full, because a green dot at the end of a long grey line reads as a rendering fault
+  // rather than as a measurement. A ring says the same thing in fourteen pixels and says it
+  // legibly when nearly empty, so it no longer has to wait until the number is worrying.
+  if (state.contextFill > 0.02) meter.append(contextRing(state.contextFill));
   meter.append(tokens);
   // The two numbers anyone actually watches, on one line: how much of the context the next question
   // will use, and what this conversation has cost so far. The day's total lives in the cost report,
@@ -927,6 +921,50 @@ function chipIcon(kind: string, label = ""): Parameters<typeof icon>[0] {
     default:
       return fileIcon(label);
   }
+}
+
+/**
+ * How full the context is, as a ring.
+ *
+ * The shape the editor's own chat uses for this — a circle of background with an arc drawn over it,
+ * starting at twelve o'clock. Same reasons: it is the smallest honest way to show a proportion, it
+ * cannot be confused with a progress bar for something that is running, and the number it stands
+ * for is only interesting when it is high, so the number itself waits until you point at it.
+ */
+function contextRing(fill: number): HTMLElement {
+  const pct = Math.min(100, Math.round(fill * 100));
+  const wrap = el("div", `context-ring${fill > 0.85 ? " high" : fill > 0.6 ? " warm" : ""}`);
+  wrap.title = t("{0}% of the context budget", pct);
+
+  const NS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(NS, "svg");
+  svg.setAttribute("viewBox", "0 0 16 16");
+  svg.setAttribute("width", "14");
+  svg.setAttribute("height", "14");
+  svg.setAttribute("aria-hidden", "true");
+  svg.setAttribute("class", "ring");
+
+  const R = 6;
+  const CIRCUMFERENCE = 2 * Math.PI * R;
+  for (const kind of ["ring-bg", "ring-arc"] as const) {
+    const c = document.createElementNS(NS, "circle");
+    c.setAttribute("cx", "8");
+    c.setAttribute("cy", "8");
+    c.setAttribute("r", String(R));
+    c.setAttribute("class", kind);
+    if (kind === "ring-arc") {
+      // Drawn as a dash long enough to cover the fraction, with the gap covering the rest. The
+      // rotation that puts the start at the top is in the stylesheet, where the rest of the shape
+      // is.
+      c.setAttribute("stroke-dasharray", `${(pct / 100) * CIRCUMFERENCE} ${CIRCUMFERENCE}`);
+    }
+    svg.append(c);
+  }
+  wrap.append(svg);
+  // The number, revealed by pointing at the ring. It is four characters that nobody needs on screen
+  // at 12 % and everybody wants at 90.
+  wrap.append(el("span", "ring-pct", `${pct}%`));
+  return wrap;
 }
 
 function autoGrow(area: HTMLTextAreaElement): void {
