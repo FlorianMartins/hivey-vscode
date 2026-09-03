@@ -2,6 +2,19 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.29.1 — 2026-09-03
+
+### Fixed
+
+- **Picking a library said "No source physical file" and stopped there.** The step listed `*FILE`
+  objects and kept the ones whose attribute was exactly `PF-SRC` — a heuristic, with nothing behind
+  it when it missed. The library was full of source files; the panel simply failed to recognise
+  them, and then told the user their library was empty. The match is loose now, Db2 for i is asked
+  when the extension's answer is empty, and — the part that actually matters — **there is always a
+  way to type the name**. A picker built on discovery has to let you say what you already know.
+- The same applies to the member: the list is searchable by typing, and when there is no list, the
+  name can be typed instead of the step ending.
+
 ## 0.29.0 — 2026-09-03
 
 ### Added

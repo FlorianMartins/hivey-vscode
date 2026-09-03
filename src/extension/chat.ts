@@ -1486,40 +1486,74 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         { location: vscode.ProgressLocation.Window, title: t("Reading {0}…", libraryName) },
         () => ibmiSourceFiles(libraryName),
       );
-      if (!files.length) {
-        void vscode.window.showInformationMessage(t("No source physical file in {0}.", libraryName));
-        return;
-      }
-      const file = await vscode.window.showQuickPick(
-        files.map((f) => ({ label: f.name, description: f.text ?? "" })),
-        { placeHolder: t("Which source file?"), matchOnDescription: true },
+      // A way to type the name, always — not only when the listing came back empty.
+      //
+      // The listing is a convenience built on a heuristic: it asks the extension for `*FILE` objects
+      // and keeps the ones whose attribute says source. When that does not match, the step used to
+      // end in "no source physical file in LIB", which is both wrong and a dead end — the library
+      // has source files, the panel just failed to recognise them. The user knows the name of the
+      // file they work in every day, and the field is the one route that cannot fail.
+      const typeIt = { label: "$(edit) " + t("Type a source file name…"), description: "", other: true };
+      const chosen = await vscode.window.showQuickPick(
+        files.length ? [...files.map((f) => ({ label: f.name, description: f.text ?? "" })), typeIt] : [typeIt],
+        {
+          placeHolder: files.length
+            ? t("Which source file?")
+            : t("Nothing could be listed in {0} — type the name", libraryName),
+          matchOnDescription: true,
+        },
       );
-      if (!file) return;
+      if (!chosen) return;
+      const fileName = (chosen as { other?: boolean }).other
+        ? (await vscode.window.showInputBox({ prompt: t("Source file name"), placeHolder: "QRPGLESRC" }))
+            ?.trim()
+            .toUpperCase()
+        : chosen.label;
+      if (!fileName) return;
+      const file = { label: fileName };
 
-      const members = await vscode.window.withProgress(
-        { location: vscode.ProgressLocation.Window, title: t("Reading {0}/{1}…", libraryName, file.label) },
-        () => ibmiMembers(libraryName, file.label),
-      );
-      if (!members.length) {
-        void vscode.window.showInformationMessage(t("{0}/{1} has no members.", libraryName, file.label));
-        return;
+      let members: Array<{ name: string; extension: string; text?: string; lines?: number }> = [];
+      try {
+        members = await vscode.window.withProgress(
+          { location: vscode.ProgressLocation.Window, title: t("Reading {0}/{1}…", libraryName, file.label) },
+          () => ibmiMembers(libraryName, file.label),
+        );
+      } catch {
+        // A source file that is not there, or a listing the API refused. Either way the next step
+        // still works if the user knows the member's name.
       }
+      // The list is searchable by typing — that is what a quick pick does — and the last row is the
+      // way through when the member is not in it, or when there is no list at all.
+      const typeMember = { label: "$(edit) " + t("Type a member name…"), description: "", detail: "", name: "", other: true };
       const picked = await vscode.window.showQuickPick(
-        members.map((m) => ({
-          label: `${m.name}.${m.extension}`,
-          description: m.lines ? t("{0} lines", m.lines) : "",
-          detail: m.text ?? "",
-          name: m.name,
-        })),
-        { placeHolder: t("Which member?"), matchOnDescription: true, matchOnDetail: true },
+        [
+          ...members.map((m) => ({
+            label: `${m.name}.${m.extension}`,
+            description: m.lines ? t("{0} lines", m.lines) : "",
+            detail: m.text ?? "",
+            name: m.name,
+          })),
+          typeMember,
+        ],
+        {
+          placeHolder: members.length
+            ? t("Which member? Type to search {0}", members.length)
+            : t("Nothing could be listed in {0}/{1} — type the name", libraryName, file.label),
+          matchOnDescription: true,
+          matchOnDetail: true,
+        },
       );
       if (!picked) return;
+      const memberName = (picked as { other?: boolean }).other
+        ? (await vscode.window.showInputBox({ prompt: t("Member name"), placeHolder: "CUSTMAINT" }))?.trim().toUpperCase()
+        : picked.name;
+      if (!memberName) return;
 
       if (!withDependencies) {
-        const text = await readMemberText(libraryName, file.label, picked.name);
+        const text = await readMemberText(libraryName, file.label, memberName);
         this.pushContext({
           kind: "member",
-          label: `${libraryName}/${file.label}(${picked.name})`,
+          label: `${libraryName}/${file.label}(${memberName})`,
           body: headToTokens(text, 6000),
           untrusted: true,
         });
@@ -1530,8 +1564,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       // shows what was actually brought in and any of it can be taken back out. A single item
       // labelled "and 7 others" is a context nobody can correct.
       const { root, found, missing } = await vscode.window.withProgress(
-        { location: vscode.ProgressLocation.Notification, title: t("Following what {0} uses…", picked.name) },
-        () => collectMemberContext(libraryName, file.label, picked.name),
+        { location: vscode.ProgressLocation.Notification, title: t("Following what {0} uses…", memberName) },
+        () => collectMemberContext(libraryName, file.label, memberName),
       );
       this.pushContext({ kind: "member", label: root.ref, body: headToTokens(root.text, 6000), untrusted: true });
       for (const dep of found) {

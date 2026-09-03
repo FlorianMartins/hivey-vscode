@@ -124,11 +124,38 @@ export function ibmiLibraryList(): string[] {
 
 /** Source physical files in a library, so the second step of the picker is a list and not a guess. */
 export async function ibmiSourceFiles(library: string): Promise<Array<{ name: string; text?: string }>> {
-  const objects = await connection()
-    .getContent()
-    .getObjectList({ library: library.toUpperCase(), types: ["*FILE"] });
-  // `*FILE` covers physical, logical and source physical files; only the source ones hold members.
-  return objects.filter((o) => (o.attribute ?? "").toUpperCase() === "PF-SRC").map((o) => ({ name: o.name, text: o.text }));
+  const lib = library.toUpperCase();
+  const content = connection().getContent();
+
+  // First: ask the extension. `*FILE` covers physical, logical and source physical files, and only
+  // the source ones hold members — but the attribute is matched loosely on purpose. It was compared
+  // to exactly "PF-SRC", which is what the platform prints and not necessarily what every version
+  // of the API returns, and a mismatch there produced an empty list and a dead end.
+  try {
+    const objects = await content.getObjectList({ library: lib, types: ["*FILE"] });
+    const source = objects.filter((o) => /SRC/i.test(o.attribute ?? ""));
+    if (source.length) return source.map((o) => ({ name: o.name, text: o.text }));
+  } catch {
+    // Fall through: an API shape that does not match is a reason to ask the system directly, not a
+    // reason to tell the user their library is empty.
+  }
+
+  // Then: ask Db2 for i, which knows regardless of how the extension spells things. This is the
+  // documented way to enumerate objects, and it costs one statement.
+  try {
+    const rows = await content.runSQL(
+      `SELECT OBJNAME, OBJTEXT FROM TABLE(QSYS2.OBJECT_STATISTICS('${lib}', '*FILE')) X ` +
+        `WHERE OBJATTRIBUTE = 'PF-SRC' ORDER BY OBJNAME`,
+    );
+    return rows.map((r) => ({
+      name: String(r["OBJNAME"] ?? "").trim(),
+      text: r["OBJTEXT"] ? String(r["OBJTEXT"]).trim() : undefined,
+    }));
+  } catch {
+    // Both ways failed. The caller offers the field, which is the one route that cannot fail: the
+    // user knows the name of the source file they work in every day.
+    return [];
+  }
 }
 
 /** The members of a source file, with what they are and how big. */
