@@ -2,6 +2,28 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.27.0 — 2026-09-03
+
+### Fixed
+
+- **The context budget offered numbers that belonged to a ladder, not to the model.** The steps were
+  absolute — 4k, 8k, 16k and up — and merely filtered by the model's window, which failed at both
+  ends of the same mistake: on a model holding 200k the first offer was 4 000 tokens, which is not a
+  choice anybody would make, and the ladder stopped at 200k however large the model was, so three
+  quarters of a 200k window and most of a million-token one could not be chosen at all. They are
+  fractions of the selected model's window now — an eighth, a quarter, a half, three quarters — so
+  Claude offers 25k · 50k · 100k · 150k and a million-token model offers 125k · 250k · 500k · 750k.
+  The largest is still three quarters: the answer has to fit in the window too.
+- The numbers are rounded to ones a person would say. An eighth of 131 072 is 16 384, which is
+  arithmetic rather than a choice; the step widens with the size, because nobody distinguishes 147k
+  from 150k and everybody distinguishes 500 from 600.
+
+### Changed
+
+- **Token counts read as counts again.** "200.0 k" claimed a decimal place nobody measured, and a
+  window of "1000.0 k" had to be converted in the head before it meant anything: whole thousands
+  lose the decimal, and millions get their own unit.
+
 ## 0.26.1 — 2026-09-02
 
 ### Fixed

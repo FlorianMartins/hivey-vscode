@@ -312,7 +312,13 @@ export function locale(): string {
 }
 
 export function formatTokens(n: number): string {
-  return n >= 1000 ? `${(n / 1000).toFixed(1)} k` : String(n);
+  // A trailing ".0" is noise on a number that is already an approximation: "200 k" is what people
+  // say, and "200.0 k" reads as a measurement to one decimal place that nobody made. Millions get
+  // their own unit for the same reason — a window of "1000.0 k" is a number you have to convert in
+  // your head before it means anything.
+  const trim = (value: number): string => value.toFixed(1).replace(/\.0$/, "");
+  if (n >= 1_000_000) return `${trim(n / 1_000_000)} M`;
+  return n >= 1000 ? `${trim(n / 1000)} k` : String(n);
 }
 
 /** Prices are per million tokens; below a cent they need three decimals to mean anything. */

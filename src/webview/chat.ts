@@ -1270,26 +1270,41 @@ function modelButton(state: UiState, deps: ChatDeps): HTMLElement {
 /**
  * How much of the model's window this conversation may fill.
  *
- * Steps, not a number to type: the choice is coarse — "keep it cheap", "let it read a lot" — and a
- * field asking for a token count is a field asking the user to know what a token is. They are
- * derived from the model actually chosen and stopped at ITS ceiling, because offering 128k on a
- * model that holds 8k is a promise the run cannot keep, and the failure would arrive one question
- * later as a truncation nobody asked for. A model whose window the catalogue does not know — a
- * local runtime that reports no such number — gets fixed steps instead, which is the honest answer
- * to "I do not know how big this is".
+ * Fractions of THAT model's window, not a fixed ladder filtered by it. The ladder was absolute —
+ * 4k, 8k, 16k and so on — and filtering it by the window produced two failures at once: on a model
+ * that holds 200k the first offer was 4k, which is not a choice anybody would make, and the top of
+ * the ladder stopped at 128k, so three quarters of a 200k window and most of a million-token one
+ * were simply unreachable. Both come from the same mistake: the numbers described the ladder rather
+ * than the model.
+ *
+ * An eighth, a quarter, a half, three quarters. Four options, meaningful at every size — 25k to
+ * 150k on Claude, 1k to 6k on a small local model, 125k to 750k on a million — and the largest is
+ * always three quarters, because the answer has to fit in the window too and a budget equal to it
+ * leaves nowhere to put one.
+ *
+ * A window the catalogue does not know — a local runtime that reports no such number — gets fixed
+ * steps instead, which is the honest answer to "I do not know how big this is".
  */
 export function contextBudgets(modelContext: number): number[] {
-  const STEPS = [4_000, 8_000, 16_000, 32_000, 64_000, 128_000, 200_000];
-  if (modelContext <= 0) return STEPS.slice(0, 5);
-  // Never the whole window: the answer has to fit in it too, and a budget equal to the window
-  // leaves nowhere for the reply.
-  const ceiling = Math.floor(modelContext * 0.75);
-  const within = STEPS.filter((n) => n <= ceiling);
-  if (!within.length) return [ceiling];
-  // The ceiling itself, when the steps stop well short of it — otherwise a 200k model offers 128k
-  // as its largest choice and the rest of the window is unreachable.
-  if (ceiling > (within[within.length - 1] ?? 0) * 1.3) within.push(ceiling);
-  return within;
+  if (modelContext <= 0) return [4_000, 8_000, 16_000, 32_000, 64_000];
+  const out: number[] = [];
+  for (const fraction of [1 / 8, 1 / 4, 1 / 2, 3 / 4]) {
+    const rounded = roundTokens(modelContext * fraction);
+    if (rounded > 0 && !out.includes(rounded)) out.push(rounded);
+  }
+  return out;
+}
+
+/**
+ * A number somebody would say out loud.
+ *
+ * An eighth of 200 000 is 25 000, which is fine, and an eighth of 131 072 is 16 384, which is a
+ * number only a machine would offer. The step widens with the size because that is how precision
+ * works in reading: nobody distinguishes 147k from 150k, and everybody distinguishes 500 from 600.
+ */
+function roundTokens(n: number): number {
+  const step = n < 1000 ? 100 : n < 10_000 ? 500 : n < 100_000 ? 1000 : 5000;
+  return Math.round(n / step) * step;
 }
 
 function reasoningButton(state: UiState, deps: ChatDeps): HTMLElement {
