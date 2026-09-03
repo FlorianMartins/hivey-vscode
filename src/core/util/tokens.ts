@@ -33,3 +33,20 @@ export function headToTokens(text: string, maxTokens: number): string {
   if (estimateTokens(text) <= maxTokens) return text;
   return text.slice(0, Math.floor(maxTokens * 3.2));
 }
+
+/**
+ * How much of one attached file is kept.
+ *
+ * It was four thousand tokens, flat, and that was the right number when the context budget itself
+ * was eight: half the budget on one file is already generous. It stopped being right the moment the
+ * budget followed the model — a two-hundred-thousand-token window with a four-thousand-token cap
+ * per file throws away most of every source file and labels it "truncated", which reads as a fault
+ * and is in fact a setting from another era.
+ *
+ * Two fifths of the budget, with the old number as the floor. One attachment may be most of the
+ * conversation when the conversation is about one file; it may not be all of it, because the
+ * question and the answer have to fit beside it.
+ */
+export function perFileBudget(contextBudget: number): number {
+  return Math.max(4000, Math.floor(contextBudget * 0.4));
+}

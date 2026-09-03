@@ -10,9 +10,11 @@ import { isDocumentUri } from "./models.js";
 import { t } from "../shared/i18n.js";
 import { buildRepoMap, isMappable, type MapFile } from "../core/context/repomap.js";
 import type { ContextItem } from "../core/session/session.js";
-import { estimateTokens, headToTokens } from "../core/util/tokens.js";
+import { estimateTokens, headToTokens, perFileBudget } from "../core/util/tokens.js";
 import { EgressGate } from "./egress.js";
 import type { Settings } from "./config.js";
+
+
 
 const MAX_FILES = 1500;
 const MAX_FILE_BYTES = 200_000;
@@ -152,7 +154,7 @@ export class WorkspaceContext {
   }
 
   /** Turn a path the user picked into a context item, refusing the ones policy forbids. */
-  async fileContext(uri: vscode.Uri, settings: Settings, maxTokens = 4000): Promise<ContextItem | undefined> {
+  async fileContext(uri: vscode.Uri, settings: Settings, maxTokens = perFileBudget(settings.context.maxTokens)): Promise<ContextItem | undefined> {
     const rel = relative(uri);
     if (EgressGate.isBlocked(rel, settings.privacy.blockedGlobs)) {
       void vscode.window.showWarningMessage(t("Hivey Code: {0} is excluded by the privacy policy and will not be attached.", rel));
@@ -162,7 +164,10 @@ export class WorkspaceContext {
     const text = doc.getText();
     return {
       kind: "file",
-      label: `${rel}${estimateTokens(text) > maxTokens ? t(" (truncated)") : ""}`,
+      // How much was kept, not just that something was lost. "(truncated)" tells the reader a
+      // decision was made and nothing about whether it matters; the numbers let them judge, and
+      // raise the context budget if it does.
+      label: `${rel}${estimateTokens(text) > maxTokens ? t(" (first {0} of {1} tokens)", maxTokens, estimateTokens(text)) : ""}`,
       body: headToTokens(text, maxTokens),
       untrusted: true,
     };
@@ -176,7 +181,7 @@ export class WorkspaceContext {
    * nobody asked about. The label carries the line numbers, so the model — and the user reading the
    * chip — knows this is an excerpt rather than the file.
    */
-  async rangeContext(uri: vscode.Uri, range: vscode.Range, settings: Settings, maxTokens = 4000): Promise<ContextItem | undefined> {
+  async rangeContext(uri: vscode.Uri, range: vscode.Range, settings: Settings, maxTokens = perFileBudget(settings.context.maxTokens)): Promise<ContextItem | undefined> {
     const rel = relative(uri);
     if (EgressGate.isBlocked(rel, settings.privacy.blockedGlobs)) {
       void vscode.window.showWarningMessage(t("Hivey Code: {0} is excluded by the privacy policy and will not be attached.", rel));

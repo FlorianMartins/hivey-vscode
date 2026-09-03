@@ -2,6 +2,31 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.32.0 — 2026-09-03
+
+### Fixed
+
+- **Typing `531` in the member list also matched `5331`.** That is the quick pick's own filter,
+  which is fuzzy: it accepts the characters in order with gaps between them. Right for a command
+  palette, where you are half-remembering a name; wrong for a list of members, where 531 and 5331
+  are two different programs. The list is now filtered with the same rule as the search box —
+  contains, or the glob if there is a `*` in it.
+- **A file attached from the editor said "(truncated)" almost every time.** The cap was four
+  thousand tokens, flat — the right number when the whole context budget was eight, and a setting
+  from another era once the budget started following the model. It is two fifths of the budget now,
+  with the old number as the floor, so a 200k window keeps 80k of a file rather than 4k. And the
+  label says how much was kept rather than only that something was lost, because "truncated" with no
+  number is a warning nobody can act on.
+
+### Added
+
+- **ARCAD: the same member across versions.** Back in the `+` menu, and asking the question that
+  suits it: the component's name first, then which libraries to look in — the reverse of the other
+  flow, because when two versions are on the table you already know the name. Every match comes back
+  ticked, since having asked for one component in several versions, wanting all of them is the
+  ordinary case. It does not guess which library is which version: that mapping lives in the ARCAD
+  repository and Elias publishes no way to read it.
+
 ## 0.31.1 — 2026-09-03
 
 ### Added

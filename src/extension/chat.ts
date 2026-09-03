@@ -15,6 +15,7 @@ import { route } from "../core/router/route.js";
 import { Session, type ContextItem, type Entry, type SessionData } from "../core/session/session.js";
 import { headToTokens } from "../core/util/tokens.js";
 import { matchesName } from "../core/ibmi/sql.js";
+import { arcadInstalled } from "./integrations/arcad.js";
 import {
   collectMemberContext,
   ibmiAllLibraries,
@@ -1552,21 +1553,21 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         }));
 
       if (withDependencies) {
-        const one = await vscode.window.showQuickPick(rows, {
+        const one = await this.pickFiltered(rows, {
           placeHolder: t("{0} found — which one to follow?", rows.length),
-          matchOnDescription: true,
-          matchOnDetail: true,
+          many: false,
+          nameOf: (row) => row.hit.name,
         });
-        if (!one) return;
-        await this.attachWithDependencies(one.hit.library, one.hit.sourceFile, one.hit.name);
+        if (!one?.length) return;
+        const hit = one[0]!.hit;
+        await this.attachWithDependencies(hit.library, hit.sourceFile, hit.name);
         return;
       }
 
-      const picked = await vscode.window.showQuickPick(rows, {
-        canPickMany: true,
+      const picked = await this.pickFiltered(rows, {
         placeHolder: t("{0} found — tick the ones to attach", rows.length),
-        matchOnDescription: true,
-        matchOnDetail: true,
+        many: true,
+        nameOf: (row) => row.hit.name,
       });
       if (!picked?.length) return;
       for (const one of picked) {
@@ -1585,6 +1586,144 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     } catch (error) {
       void vscode.window.showWarningMessage(`Hivey Code: ${(error as Error).message}`);
     }
+  }
+
+  /**
+   * One component, in every version that has it.
+   *
+   * The other flow asks "what is in this library"; this one asks "where is this member", which is
+   * the question when two versions are on the table. The order of the questions is the difference:
+   * the name first, because you already know it, then the libraries to look in.
+   *
+   * What it cannot do is tell you which library is which version. That mapping lives in the ARCAD
+   * repository and Elias publishes no way to read it, so guessing at library naming conventions
+   * would produce an integration that works at one customer and misleads at the next.
+   */
+  private async pickAcrossVersions(): Promise<void> {
+    try {
+      const pattern = await vscode.window.showInputBox({
+        prompt: t("Which component? A name, or part of one"),
+        placeHolder: "CUSTMAINT",
+      });
+      if (!pattern?.trim()) return;
+
+      const libraries = await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Window, title: t("Reading the libraries…") },
+        () => ibmiAllLibraries(),
+      );
+      const chosen = await this.pickFiltered(
+        libraries.map((l) => ({
+          label: l.name,
+          description: l.inList ? t("in your library list") : (l.text ?? ""),
+        })),
+        {
+          placeHolder: t("Which version libraries? {0} on this system", libraries.length),
+          many: true,
+          nameOf: (row) => row.label,
+        },
+      );
+      if (!chosen?.length) return;
+
+      const hits: Array<{ library: string; sourceFile: string; name: string; extension: string; text?: string }> = [];
+      await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: t("Looking for {0}…", pattern) },
+        async (progress) => {
+          for (const library of chosen) {
+            progress.report({ message: t("{0} — {1} found", library.label, hits.length) });
+            try {
+              for (const member of await ibmiAllMembers(library.label)) {
+                if (matchesName(member.name, pattern)) hits.push({ library: library.label, ...member });
+              }
+            } catch {
+              // A library that cannot be read is one fewer version looked in, not a failed search.
+            }
+          }
+        },
+      );
+
+      if (!hits.length) {
+        void vscode.window.showInformationMessage(
+          t("Nothing matching “{0}” in {1}.", pattern, chosen.map((c) => c.label).join(", ")),
+        );
+        return;
+      }
+
+      // Ticked by default: having asked for one component in several versions, wanting all of them
+      // is the ordinary case, and untickng one is easier than ticking five.
+      const rows = hits.map((h) => ({
+        label: `${h.library} — ${h.name}${h.extension ? `.${h.extension}` : ""}`,
+        description: h.sourceFile,
+        detail: h.text ?? "",
+        picked: true,
+        hit: h,
+      }));
+      const picked = await this.pickFiltered(rows, {
+        placeHolder: t("{0} versions of “{1}” — untick any you do not want", rows.length, pattern),
+        many: true,
+        nameOf: (row) => row.hit.library,
+      });
+      if (!picked?.length) return;
+
+      for (const one of picked) {
+        try {
+          const text = await readMemberText(one.hit.library, one.hit.sourceFile, one.hit.name);
+          this.pushContext({
+            kind: "member",
+            label: `${one.hit.library}/${one.hit.sourceFile}(${one.hit.name})`,
+            body: headToTokens(text, picked.length > 2 ? 4000 : 6000),
+            untrusted: true,
+          });
+        } catch (error) {
+          void vscode.window.showWarningMessage(`Hivey Code: ${(error as Error).message}`);
+        }
+      }
+    } catch (error) {
+      void vscode.window.showWarningMessage(`Hivey Code: ${(error as Error).message}`);
+    }
+  }
+
+  /**
+   * A tick-list whose filter means what it says.
+   *
+   * The quick pick's own filter is fuzzy: typing `531` matches `5331`, because it accepts the
+   * characters in order with gaps between them. That is right for a command palette, where you are
+   * half-remembering a name, and wrong for a list of members, where 531 and 5331 are two different
+   * programs and picking the wrong one is a real mistake.
+   *
+   * So the items are recomputed on every keystroke with the same rule the search box uses —
+   * "contains", or the glob if there is a `*` in it. VS Code still runs its own filter over what it
+   * is given, but everything given to it already matches, so nothing extra survives and nothing
+   * that should is hidden.
+   */
+  private async pickFiltered<T extends vscode.QuickPickItem>(
+    all: T[],
+    options: { placeHolder: string; many: boolean; nameOf: (item: T) => string },
+  ): Promise<T[] | undefined> {
+    const picker = vscode.window.createQuickPick<T>();
+    picker.placeholder = options.placeHolder;
+    picker.canSelectMany = options.many;
+    picker.matchOnDescription = true;
+    picker.matchOnDetail = true;
+    picker.items = all;
+    picker.onDidChangeValue((value) => {
+      const wanted = value.trim();
+      picker.items = wanted ? all.filter((item) => matchesName(options.nameOf(item), wanted)) : all;
+    });
+    return new Promise<T[] | undefined>((resolve) => {
+      let done = false;
+      picker.onDidAccept(() => {
+        done = true;
+        // `selectedItems` is what is ticked when many are allowed, and the highlighted row when one
+        // is: the same property means both, which is the only reason this works for both shapes.
+        resolve([...picker.selectedItems]);
+        picker.hide();
+      });
+      picker.onDidHide(() => {
+        if (!done) resolve(undefined);
+        picker.dispose();
+      });
+      picker.show();
+    });
   }
 
   /** One member and everything it reaches, each piece its own attachment. */
@@ -1764,6 +1903,17 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           run: () => this.pickMembers(true),
         });
         rows.push({ label: "$(file-directory) " + t("Stream file (IFS)…"), run: () => this.attachStreamFile() });
+        // ARCAD keeps each version in its own set of libraries, so the versions of a component are
+        // members of the same name in different libraries. Nothing here knows which library belongs
+        // to which version — Elias exposes no API for that mapping — so the libraries are named by
+        // the person who knows them, and the search does the rest.
+        if (arcadInstalled()) {
+          rows.push({
+            label: "$(versions) " + t("The same member across versions…"),
+            description: t("ARCAD keeps each version in its own libraries"),
+            run: () => this.pickAcrossVersions(),
+          });
+        }
       });
     }
 
