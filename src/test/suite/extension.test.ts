@@ -353,6 +353,45 @@ suite("Hivey Code", () => {
     }
   });
 
+  /**
+   * Stop while the send confirmation is on screen.
+   *
+   * This is the window every question passes through — `privacy.confirmSend` is "always" by default
+   * — and the card was waiting on a promise with no second way out. Cancelling travelled to a turn
+   * parked on a question nobody was going to answer: the turn never ended, the panel kept its stop
+   * button, and pressing it again aborted an already-aborted controller. A dead button for the rest
+   * of the conversation, with nothing in any log to say why.
+   *
+   * Found by CI failing where a developer machine passed, because the profile there had answered
+   * this card once with "always" years of test runs ago.
+   */
+  test("stopping while the send confirmation is up ends the turn", async () => {
+    const ext = vscode.extensions.getExtension(ID)!;
+    await ext.activate();
+    const stub = await streamingStub();
+    const restore = await useStub(stub.port, "always");
+
+    try {
+      const turn = vscode.commands.executeCommand("hiveyCode.askWith", "a question nobody confirms");
+
+      let stopped = false;
+      for (let i = 0; i < 60 && !stopped; i++) {
+        await delay(50);
+        stopped = Boolean(await vscode.commands.executeCommand<boolean>("hiveyCode.stopAnswer"));
+      }
+      assert.ok(stopped, "the turn never started");
+
+      const ended = await Promise.race([turn.then(() => "ended"), delay(4000).then(() => "still running")]);
+      assert.equal(ended, "ended", "the turn is parked on a confirmation nobody will answer");
+
+      // And nothing was sent: the card is answered "no" by the stop, not left to fall through.
+      assert.equal(stub.open(), 0, "a request went out despite the stop");
+    } finally {
+      await restore();
+      stub.close();
+    }
+  });
+
   test("quick fixes are offered on a diagnostic", async () => {
     const doc = await vscode.workspace.openTextDocument({ language: "plaintext", content: "ligne en erreur\n" });
     const collection = vscode.languages.createDiagnosticCollection("hivey-code-test");
@@ -568,20 +607,31 @@ async function streamingStub(opts: { delayAfterFirst?: number } = {}): Promise<{
   };
 }
 
-/** Points the extension at the stub, and hands back the way to put the settings as they were. */
-async function useStub(port: number): Promise<() => Promise<void>> {
+/**
+ * Points the extension at the stub, and hands back the way to put the settings as they were.
+ *
+ * `confirmSend` is set explicitly rather than left at whatever the profile holds, and that is not
+ * tidiness: it defaults to "always", so a turn stops at a card before it ever reaches the model.
+ * A test that does not say which it wants is testing a different code path on a fresh profile than
+ * on a used one — which is precisely what happened: these tests passed on a developer machine and
+ * failed in CI, and the difference was this setting.
+ */
+async function useStub(port: number, confirmSend: "always" | "never" = "never"): Promise<() => Promise<void>> {
   const config = vscode.workspace.getConfiguration(SECTION);
   const before = {
     provider: config.get("chat.provider"),
     model: config.get("chat.model"),
     endpoint: config.get("endpoints.local"),
+    confirmSend: config.get("privacy.confirmSend"),
   };
   await config.update("chat.provider", "local", vscode.ConfigurationTarget.Global);
   await config.update("chat.model", "stub-model", vscode.ConfigurationTarget.Global);
   await config.update("endpoints.local", `http://127.0.0.1:${port}/v1`, vscode.ConfigurationTarget.Global);
+  await config.update("privacy.confirmSend", confirmSend, vscode.ConfigurationTarget.Global);
   return async () => {
     await config.update("chat.provider", before.provider, vscode.ConfigurationTarget.Global);
     await config.update("chat.model", before.model, vscode.ConfigurationTarget.Global);
     await config.update("endpoints.local", before.endpoint, vscode.ConfigurationTarget.Global);
+    await config.update("privacy.confirmSend", before.confirmSend, vscode.ConfigurationTarget.Global);
   };
 }

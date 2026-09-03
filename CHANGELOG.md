@@ -2,6 +2,25 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.34.2 — 2026-09-03
+
+### Fixed
+
+- **The stop button was dead whenever the send confirmation had been on screen — the actual cause.**
+  Every question passes through that card (`privacy.confirmSend` is "always" by default), and the
+  card waited on a promise with no second way out. Press stop in that window and the cancellation
+  travelled to a turn parked on a question nobody was going to answer: the turn never ended, the
+  panel kept its stop button, and pressing it again aborted a controller that was already aborted.
+  A dead button for the rest of the conversation, and nothing in any log to say why. The two other
+  cards in the panel — approval and egress — always had the listener that answers them on
+  cancellation; this one, the one everybody sees, did not. Answering "no" had a second version of
+  the same fault: it returned from a point the turn's own cleanup never reaches, so the panel was
+  told the answer had ended while the extension still held a live turn for it.
+  It was found by CI failing where this machine passed, and the difference between them was that
+  setting — a profile here had answered the card "always" long ago. The test now says which it
+  wants, and there is a new one that stops with the card up and refuses to finish until the turn
+  does.
+
 ## 0.34.1 — 2026-09-03
 
 ### Fixed

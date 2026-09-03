@@ -1284,6 +1284,19 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     return this.turn !== undefined;
   }
 
+  /**
+   * End a turn from a path that never reaches the block whose `finally` ends it.
+   *
+   * Guarded on identity, like that `finally`: a turn abandoned before it started must not clear a
+   * turn that has since begun.
+   */
+  private endTurnEarly(ctl: AbortController): void {
+    if (this.turn !== ctl) return;
+    this.turn = undefined;
+    this.post({ type: "turnEnd" });
+    this.sendState();
+  }
+
   /** Whatever is highlighted in the editor, attached without a question asked about it. */
   async attachSelection(): Promise<void> {
     await this.reveal();
@@ -2886,10 +2899,22 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           choices: ["once", "always", "no"],
           detail,
         });
+        // Stopping while this card is up must answer it. Without this the promise had no second way
+        // out: the abort travelled, found nothing waiting on it, and the turn stayed parked on a
+        // question nobody was going to answer — for the rest of the conversation, with the panel
+        // showing a stop button over it. The other two cards in this file always had this listener;
+        // this one, the card every question opens by default, did not.
+        ctl.signal.addEventListener("abort", () => {
+          if (this.approvals.delete(id)) resolve("no");
+        });
       });
       if (answer === "no") {
-        this.post({ type: "status", text: t("Not sent.") });
-        this.post({ type: "turnEnd" });
+        // Answering "no" — or stopping — ends the turn here, before the block whose `finally` does
+        // the ending. Said explicitly, because a `return` from this point used to leave the turn
+        // marked as running: the panel was told the turn had ended while the extension still held a
+        // controller for it, and from then on the two disagreed about whether anything was running.
+        this.post({ type: "status", text: ctl.signal.aborted ? t("Stopped.") : t("Not sent.") });
+        this.endTurnEarly(ctl);
         return;
       }
       if (answer === "always") {
