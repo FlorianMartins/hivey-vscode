@@ -83,3 +83,24 @@ export function formatRows(rows: Array<Record<string, unknown>>, maxRows = 200):
   if (rows.length > shown.length) out.push(`… ${rows.length - shown.length} more rows`);
   return out.join("\n");
 }
+
+/**
+ * Does this object name match what the user typed?
+ *
+ * IBM i's own rule is the generic name: `CUST*` means "starts with CUST", and that is all it means —
+ * the platform has no way to say "contains". People do want to say it, so `*` is honoured wherever
+ * it appears, which makes `*531*` the search that the system itself cannot express.
+ *
+ * A pattern with no `*` at all is treated as "contains" rather than as an exact name. That is a
+ * deliberate departure: someone typing `531` into a box labelled search means "find me the ones
+ * with 531 in them", and answering nothing because no member is called exactly `531` is the kind of
+ * literal-mindedness that makes a search feel broken.
+ */
+export function matchesName(name: string, pattern: string): boolean {
+  const wanted = pattern.trim().toUpperCase();
+  if (!wanted || wanted === "*") return true;
+  const subject = name.trim().toUpperCase();
+  const escaped = wanted.replace(/[.+?^${}()|[\]\\]/g, "\\$&");
+  const body = escaped.includes("*") ? escaped.replace(/\*/g, ".*") : `.*${escaped}.*`;
+  return new RegExp(`^${body}$`).test(subject);
+}

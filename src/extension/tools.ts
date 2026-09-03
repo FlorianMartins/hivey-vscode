@@ -18,7 +18,8 @@ import { EgressGate } from "./egress.js";
 import type { Settings } from "./config.js";
 import { relative } from "./workspace.js";
 import { buildGitTools, gitAvailable } from "./integrations/git.js";
-import { buildIbmiTools, ibmiExtensionInstalled } from "./integrations/ibmi.js";
+import { buildIbmiTools, ibmiEnabled } from "./integrations/ibmi.js";
+import { readSettings } from "./config.js";
 import { arcadInstalled, buildArcadTools, type ArcadDeps } from "./integrations/arcad.js";
 import type { McpManager } from "./integrations/mcp.js";
 
@@ -274,7 +275,9 @@ export function buildTools(deps: ToolDeps): Tool[] {
   // said for free. Absence is the clearest way to say a system is not there.
   const integrations: Tool[] = [
     ...(gitAvailable() ? buildGitTools() : []),
-    ...(ibmiExtensionInstalled() ? buildIbmiTools() : []),
+    // The same gate as the menu: a model that is told it can read source members on a machine with
+    // no partition will try, and spend a turn discovering what the settings already knew.
+    ...(ibmiEnabled(readSettings().ibmi.integration) ? buildIbmiTools() : []),
     ...(arcadInstalled() && deps.arcad ? buildArcadTools(deps.arcad) : []),
     ...(deps.mcp?.tools() ?? []),
   ];

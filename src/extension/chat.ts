@@ -16,7 +16,8 @@ import { Session, type ContextItem, type Entry, type SessionData } from "../core
 import { headToTokens } from "../core/util/tokens.js";
 import {
   collectMemberContext,
-  ibmiConnected,
+  ibmiEnabled,
+  ibmiFindMembers,
   ibmiInstance,
   ibmiLibraryList,
   ibmiMembers,
@@ -1493,17 +1494,26 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       // end in "no source physical file in LIB", which is both wrong and a dead end — the library
       // has source files, the panel just failed to recognise them. The user knows the name of the
       // file they work in every day, and the field is the one route that cannot fail.
+      const searchAll = { label: "$(search) " + t("Search every source file…"), description: t("By name, {0} for anything", "*531*"), search: true };
       const typeIt = { label: "$(edit) " + t("Type a source file name…"), description: "", other: true };
       const chosen = await vscode.window.showQuickPick(
-        files.length ? [...files.map((f) => ({ label: f.name, description: f.text ?? "" })), typeIt] : [typeIt],
+        [...files.map((f) => ({ label: f.name, description: f.text ?? "" })), searchAll, typeIt],
         {
+          // The count, always. Not knowing whether the step found anything is worse than it finding
+          // nothing, and this list looked identical in both cases.
           placeHolder: files.length
-            ? t("Which source file?")
-            : t("Nothing could be listed in {0} — type the name", libraryName),
+            ? t("{0} source files in {1} — or search", files.length, libraryName)
+            : t("Nothing could be listed in {0} — search or type the name", libraryName),
           matchOnDescription: true,
         },
       );
       if (!chosen) return;
+
+      if ((chosen as { search?: boolean }).search) {
+        await this.searchMembers(libraryName, withDependencies);
+        return;
+      }
+
       const fileName = (chosen as { other?: boolean }).other
         ? (await vscode.window.showInputBox({ prompt: t("Source file name"), placeHolder: "QRPGLESRC" }))
             ?.trim()
@@ -1537,7 +1547,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         ],
         {
           placeHolder: members.length
-            ? t("Which member? Type to search {0}", members.length)
+            ? t("{0} members in {1}/{2} — type to filter", members.length, libraryName, file.label)
             : t("Nothing could be listed in {0}/{1} — type the name", libraryName, file.label),
           matchOnDescription: true,
           matchOnDetail: true,
@@ -1581,7 +1591,180 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  /** A stream file, by path. There is no list to offer: the IFS is a file system, not a catalogue. */
+  /**
+   * The same search, across several libraries at once.
+   *
+   * Which is what "compare two versions" means on this platform: ARCAD keeps each version in its
+   * own set of libraries, so the versions of a component are members of the same name in different
+   * libraries. Nothing here knows which library belongs to which version — that mapping lives in
+   * the ARCAD repository and is not something to guess at — but once you know the names, finding
+   * the same member in all of them is one search rather than three.
+   */
+  private async searchLibraries(): Promise<void> {
+    const known = ibmiLibraryList();
+    const picked = await vscode.window.showQuickPick(
+      [
+        ...known.map((name) => ({ label: name, description: t("in your library list") })),
+        { label: "$(edit) " + t("Type library names…"), description: t("Separated by spaces or commas"), other: true },
+      ],
+      { placeHolder: t("Which libraries?"), canPickMany: true },
+    );
+    if (!picked?.length) return;
+
+    const libraries = picked.filter((p) => !(p as { other?: boolean }).other).map((p) => p.label);
+    if (picked.some((p) => (p as { other?: boolean }).other)) {
+      const typed = await vscode.window.showInputBox({
+        prompt: t("Library names"),
+        placeHolder: "ARCADV1 ARCADV2",
+      });
+      for (const name of (typed ?? "").split(/[\s,;]+/).filter(Boolean)) libraries.push(name.toUpperCase());
+    }
+    if (!libraries.length) return;
+
+    const pattern = await vscode.window.showInputBox({
+      prompt: t("Member name, or part of one"),
+      placeHolder: "*531*",
+      value: "*",
+    });
+    if (!pattern?.trim()) return;
+
+    const all: Array<{ library: string; sourceFile: string; name: string; extension: string; text?: string }> = [];
+    await vscode.window.withProgress(
+      { location: vscode.ProgressLocation.Notification, title: t("Searching {0} libraries…", libraries.length) },
+      async (progress) => {
+        for (const library of libraries) {
+          progress.report({ message: t("{0} — {1} found", library, all.length) });
+          try {
+            const { hits } = await ibmiFindMembers(library, pattern, 100);
+            for (const hit of hits) all.push({ library, sourceFile: hit.sourceFile, name: hit.name, extension: hit.extension, text: hit.text });
+          } catch {
+            // One library that cannot be read is one fewer looked in, not a failed search.
+          }
+        }
+      },
+    );
+
+    if (!all.length) {
+      void vscode.window.showInformationMessage(
+        t("Nothing matching “{0}” in {1}.", pattern, libraries.join(", ")),
+      );
+      return;
+    }
+
+    // Several may be ticked, because the point of searching across libraries is usually to hold two
+    // versions of the same member side by side and ask what changed.
+    const chosen = await vscode.window.showQuickPick(
+      all.map((h) => ({
+        label: `${h.library}/${h.sourceFile}(${h.name})`,
+        description: h.extension ? `.${h.extension}` : "",
+        detail: h.text ?? "",
+        hit: h,
+      })),
+      {
+        placeHolder: t("{0} found — tick the ones to attach", all.length),
+        canPickMany: true,
+        matchOnDescription: true,
+        matchOnDetail: true,
+      },
+    );
+    if (!chosen?.length) return;
+
+    for (const one of chosen) {
+      try {
+        const text = await readMemberText(one.hit.library, one.hit.sourceFile, one.hit.name);
+        this.pushContext({
+          kind: "member",
+          label: `${one.hit.library}/${one.hit.sourceFile}(${one.hit.name})`,
+          body: headToTokens(text, 4000),
+          untrusted: true,
+        });
+      } catch (error) {
+        void vscode.window.showWarningMessage(`Hivey Code: ${(error as Error).message}`);
+      }
+    }
+  }
+
+  /**
+   * Find a member anywhere in a library, by a name pattern.  /**
+   * Find a member anywhere in a library, by a name pattern.
+   *
+   * The step that walks library, then source file, then member assumes you know which source file
+   * it is in. Often nobody does — the question is "where is the program with 531 in its name" —
+   * and the platform cannot answer it either: `*531*` is not a generic name, so the filtering
+   * happens here, one source file at a time. Which is slow enough to be worth saying out loud,
+   * hence the progress, and worth capping, hence the limit.
+   */
+  private async searchMembers(library: string, withDependencies: boolean): Promise<void> {
+    const pattern = await vscode.window.showInputBox({
+      prompt: t("Member name, or part of one"),
+      placeHolder: "*531*",
+      value: "*",
+    });
+    if (!pattern?.trim()) return;
+
+    const { hits, searched, capped } = await vscode.window.withProgress(
+      { location: vscode.ProgressLocation.Notification, title: t("Searching {0}…", library), cancellable: false },
+      (progress) =>
+        ibmiFindMembers(library, pattern, 200, (file, found) =>
+          progress.report({ message: t("{0} — {1} found", file, found) }),
+        ),
+    );
+
+    if (!hits.length) {
+      // Said, not left to be inferred from an empty list. The number of source files looked in is
+      // the difference between "there is nothing like that here" and "nothing could be read".
+      void vscode.window.showInformationMessage(
+        searched
+          ? t("Nothing matching “{0}” in {1} source files of {2}.", pattern, searched, library)
+          : t("No source file could be listed in {0}.", library),
+      );
+      return;
+    }
+
+    const picked = await vscode.window.showQuickPick(
+      hits.map((h) => ({
+        label: `${h.sourceFile}(${h.name})`,
+        description: h.extension ? `.${h.extension}` : "",
+        detail: h.text ?? "",
+        hit: h,
+      })),
+      {
+        placeHolder: capped
+          ? t("First {0} matching “{1}” — narrow the pattern to see the rest", hits.length, pattern)
+          : t("{0} matching “{1}” in {2}", hits.length, pattern, library),
+        matchOnDescription: true,
+        matchOnDetail: true,
+      },
+    );
+    if (!picked) return;
+
+    if (withDependencies) {
+      const { root, found, missing } = await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: t("Following what {0} uses…", picked.hit.name) },
+        () => collectMemberContext(library, picked.hit.sourceFile, picked.hit.name),
+      );
+      this.pushContext({ kind: "member", label: root.ref, body: headToTokens(root.text, 6000), untrusted: true });
+      for (const dep of found) {
+        this.pushContext({ kind: "member", label: dep.ref, body: headToTokens(dep.text, 2500), untrusted: true });
+      }
+      if (missing.length) {
+        void vscode.window.showInformationMessage(
+          t("Attached {0} of {1}. Not found: {2}", found.length + 1, found.length + 1 + missing.length, missing.join(", ")),
+        );
+      }
+      return;
+    }
+
+    const text = await readMemberText(library, picked.hit.sourceFile, picked.hit.name);
+    this.pushContext({
+      kind: "member",
+      label: `${library}/${picked.hit.sourceFile}(${picked.hit.name})`,
+      body: headToTokens(text, 6000),
+      untrusted: true,
+    });
+  }
+
+  /** A stream file, by path. There is no list to offer: the IFS is a file system, not a catalogue. */  /** A stream file, by path. There is no list to offer: the IFS is a file system, not a catalogue. */
   private async attachStreamFile(): Promise<void> {
     const home = ibmiInstance()?.getConnection()?.getConfig()?.homeDirectory;
     const path = await vscode.window.showInputBox({
@@ -1727,7 +1910,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     // workspace: a member is fetched through Code for IBM i's connection and a stream file through
     // the file system it registers, so nothing has to be downloaded, opened in a tab, or checked
     // out first. That is the whole point — the source of truth for these files is the partition.
-    if (ibmiConnected()) {
+    if (ibmiEnabled(readSettings().ibmi.integration)) {
       group(() => {
         rows.push(sep(t("IBM i")));
         rows.push({ label: "$(server) " + t("Source member…"), run: () => this.attachMember() });
@@ -1735,6 +1918,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         rows.push({
           label: "$(references) " + t("Member and what it uses…"),
           run: () => this.attachMember(true),
+        });
+        rows.push({
+          label: "$(library) " + t("Search across libraries…"),
+          description: t("Several at once — an ARCAD version is a set of libraries"),
+          run: () => this.searchLibraries(),
         });
       });
     }

@@ -17,7 +17,7 @@ import * as vscode from "vscode";
 import { t } from "../../shared/i18n.js";
 import type { Tool, ToolResult } from "../../core/agent/loop.js";
 import { headToTokens } from "../../core/util/tokens.js";
-import { formatRows, isReadOnlySql, parseMemberRef } from "../../core/ibmi/sql.js";
+import { formatRows, isReadOnlySql, matchesName, parseMemberRef } from "../../core/ibmi/sql.js";
 import { extractCalledPrograms, extractCopyDirectives } from "../../core/ibmi/symbols.js";
 
 const EXTENSION_ID = "halcyontechltd.code-for-ibmi";
@@ -72,6 +72,20 @@ export function ibmiConnected(): boolean {
 
 export function ibmiExtensionInstalled(): boolean {
   return Boolean(vscode.extensions.getExtension(EXTENSION_ID));
+}
+
+/**
+ * Should this extension show its IBM i side at all?
+ *
+ * Off by absence rather than by default: on a machine without Code for IBM i there is nothing here
+ * that could work, so there is nothing to show, and the setting exists for the two cases detection
+ * cannot decide — someone who wants the entries while disconnected, and someone who has the
+ * extension for other reasons and does not want this.
+ */
+export function ibmiEnabled(mode: "auto" | "on" | "off" = "auto"): boolean {
+  if (mode === "off") return false;
+  if (!ibmiExtensionInstalled()) return false;
+  return mode === "on" || ibmiConnected();
 }
 
 function connection(): IBMiConnection {
@@ -158,14 +172,74 @@ export async function ibmiSourceFiles(library: string): Promise<Array<{ name: st
   }
 }
 
-/** The members of a source file, with what they are and how big. */
-export async function ibmiMembers(
+export interface MemberRow {
+  name: string;
+  extension: string;
+  text?: string;
+  lines?: number;
+}
+
+/**
+ * The members of a source file, asked for twice if the first way comes back with nothing.
+ *
+ * Same shape as the source-file listing above and for the same reason: one route is a convenience
+ * that can be wrong about a particular system, and a step with a single route has no answer when it
+ * is. The SQL uses three columns and no more — every column named is a column that can be missing.
+ */
+export async function ibmiMembers(library: string, sourceFile: string): Promise<MemberRow[]> {
+  const lib = library.toUpperCase();
+  const file = sourceFile.toUpperCase();
+  const content = connection().getContent();
+  try {
+    const members = await content.getMemberList({ library: lib, sourceFile: file });
+    if (members.length) return members;
+  } catch {
+    // Fall through to SQL rather than report an empty source file.
+  }
+  try {
+    const rows = await content.runSQL(
+      `SELECT TABLE_PARTITION, SOURCE_TYPE FROM QSYS2.SYSPARTITIONSTAT ` +
+        `WHERE TABLE_SCHEMA = '${lib}' AND TABLE_NAME = '${file}' ORDER BY TABLE_PARTITION`,
+    );
+    return rows.map((r) => ({
+      name: String(r["TABLE_PARTITION"] ?? "").trim(),
+      extension: String(r["SOURCE_TYPE"] ?? "").trim(),
+    }));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Every member in a library whose name matches, across all its source files.
+ *
+ * This is the search the platform cannot do: `*531*` is not a generic name, so it cannot be pushed
+ * down into `getMemberList` and the filtering happens here. The cost is one listing per source
+ * file, which is why the caller reports progress and why there is a cap — a library with forty
+ * source files and no cap is a spinner with no end.
+ */
+export async function ibmiFindMembers(
   library: string,
-  sourceFile: string,
-): Promise<Array<{ name: string; extension: string; text?: string; lines?: number }>> {
-  return connection()
-    .getContent()
-    .getMemberList({ library: library.toUpperCase(), sourceFile: sourceFile.toUpperCase() });
+  pattern: string,
+  limit = 200,
+  onProgress?: (file: string, found: number) => void,
+): Promise<{ hits: Array<MemberRow & { sourceFile: string }>; searched: number; capped: boolean }> {
+  const files = await ibmiSourceFiles(library);
+  const hits: Array<MemberRow & { sourceFile: string }> = [];
+  let searched = 0;
+  for (const file of files) {
+    if (hits.length >= limit) return { hits, searched, capped: true };
+    searched += 1;
+    onProgress?.(file.name, hits.length);
+    try {
+      for (const member of await ibmiMembers(library, file.name)) {
+        if (matchesName(member.name, pattern)) hits.push({ ...member, sourceFile: file.name });
+      }
+    } catch {
+      // A source file that cannot be listed is one fewer place looked, not a failed search.
+    }
+  }
+  return { hits, searched, capped: false };
 }
 
 /**

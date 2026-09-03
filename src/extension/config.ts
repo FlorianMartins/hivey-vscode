@@ -38,6 +38,15 @@ export interface Settings {
   };
   budget: { perRequestUsd: number; dailyUsd: number };
   context: { maxTokens: number; repoMap: boolean };
+  /**
+   * Whether the IBM i surface is offered at all.
+   *
+   * `auto` is a connection, not an installation: on a machine where nobody uses the platform there
+   * is nothing to see, and on one where somebody does, the entries appear when they can actually
+   * work. `on` is for the case `auto` cannot cover — wanting the rows visible while disconnected,
+   * to be told to connect rather than to wonder where they went.
+   */
+  ibmi: { integration: "auto" | "on" | "off" };
   /** Which families are in play, and which individual skills are off inside them. */
   skills: SkillPolicy;
   /** Which sub-agents the user has switched off, by name. */
@@ -104,6 +113,7 @@ export function readSettings(scope?: vscode.Uri): Settings {
       maxTokens: c.get<number>("context.maxTokens", 8000),
       repoMap: c.get<boolean>("context.repoMap", true),
     },
+    ibmi: { integration: c.get<"auto" | "on" | "off">("ibmi.integration", "auto") },
     skills: {
       // Families are opt-in and default to the ones that apply whatever is open. Everything else
       // arrives switched off, which is the difference between offering a choice and pre-answering

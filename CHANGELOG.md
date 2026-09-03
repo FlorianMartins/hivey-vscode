@@ -2,6 +2,36 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.30.0 — 2026-09-03
+
+### Added
+
+- **Search for a member by name, with `*` anywhere.** `*531*` finds every member with 531 in its
+  name — a search the platform itself cannot express, since a generic name on IBM i only ever means
+  "starts with". A pattern with no star at all is treated as "contains", because typing `531` into
+  a search box and being told nothing exists — as no member is *called* 531 — is how a search comes
+  to feel broken. Searching runs across every source file in the library, and says which file it is
+  looking in while it does.
+- **Search across several libraries at once**, ticking the results you want. That is what comparing
+  versions means on this platform: ARCAD keeps each version in its own set of libraries, so the
+  versions of a component are members of the same name in different libraries. Nothing here guesses
+  which library belongs to which version — that mapping lives in the ARCAD repository — but once the
+  names are known, finding the same member in all of them is one search.
+- **A setting for whether the IBM i side appears at all** (`hiveyCode.ibmi.integration`). `auto`, the
+  default, shows it when Code for IBM i is connected — nothing for anyone who does not use the
+  platform. `on` shows it whenever that extension is installed; `off` never. It governs the `+` menu
+  and the tools the model is given, together.
+
+### Fixed
+
+- **Every step now says how many things it found.** A list that came back empty looked exactly like
+  a list that had not loaded, which is why "it finds nothing" and "I cannot tell whether it found
+  anything" were the same report. Counts in the placeholder, the source file being searched in the
+  progress, and an explicit message naming the pattern and the number of source files looked in when
+  a search comes back with nothing.
+- **Members are asked for twice when the first answer is empty**, the same way source files already
+  were: the extension's own listing, then Db2 for i.
+
 ## 0.29.2 — 2026-09-03
 
 ### Fixed
