@@ -269,6 +269,8 @@ export interface UiState {
   suggestCompact: boolean;
   /** How much of the model's context the conversation currently occupies, 0–1, for the meter. */
   contextFill: number;
+  /** True when summarising happens by itself at the threshold instead of being offered. */
+  autoCompact: boolean;
 }
 
 /** Panel → extension. */
@@ -311,6 +313,7 @@ export type ToExtension =
   | { type: "setMode"; mode: Mode }
   | { type: "setReasoning"; reasoning: Reasoning }
   | { type: "setContextBudget"; tokens: number }
+  | { type: "setAutoCompact"; on: boolean }
   /** `baseUrl` accompanies a model served by a machine other than the configured one. */
   | { type: "setModel"; model: string; provider: string; baseUrl?: string }
   | { type: "refreshModels" }

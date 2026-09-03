@@ -37,7 +37,7 @@ export interface Settings {
     customTerms: string[];
   };
   budget: { perRequestUsd: number; dailyUsd: number };
-  context: { maxTokens: number; repoMap: boolean };
+  context: { maxTokens: number; repoMap: boolean; autoCompact: boolean };
   /**
    * Whether the IBM i surface is offered at all.
    *
@@ -112,6 +112,7 @@ export function readSettings(scope?: vscode.Uri): Settings {
     context: {
       maxTokens: c.get<number>("context.maxTokens", 8000),
       repoMap: c.get<boolean>("context.repoMap", true),
+      autoCompact: c.get<boolean>("context.autoCompact", false),
     },
     ibmi: { integration: c.get<"auto" | "on" | "off">("ibmi.integration", "auto") },
     skills: {

@@ -14,6 +14,7 @@ import type { ChatViewProvider } from "./chat.js";
 import { endpointFor, providerFor, readSettings, redactionPolicy, type Keys } from "./config.js";
 import { COMMIT_PROMPT, INLINE_EDIT_PROMPT } from "../core/prompts.js";
 import { relative, type WorkspaceContext } from "./workspace.js";
+import { selectionActions, type SelectionAction } from "../core/agent/selection.js";
 
 export interface EditorDeps {
   chat: ChatViewProvider;
@@ -36,42 +37,16 @@ export function registerEditorCommands(context: vscode.ExtensionContext, deps: E
       await deps.chat.focusWithPrompt(question, item);
     }),
 
-    vscode.commands.registerCommand("hiveyCode.editSelection", async () => {
-      const editor = vscode.window.activeTextEditor;
-      if (!editor) return;
-      const range = editor.selection.isEmpty ? editor.document.lineAt(editor.selection.active.line).range : editor.selection;
-      const original = editor.document.getText(range);
-      const instruction = await vscode.window.showInputBox({
-        prompt: t("Edit {0} ({1} line(s))", relative(editor.document.uri), range.end.line - range.start.line + 1),
-        placeHolder: t("extract a function, handle the error, add the types…"),
-        ignoreFocusOut: true,
-      });
-      if (!instruction) return;
+    vscode.commands.registerCommand("hiveyCode.editSelection", () => rewriteSelection(deps)),
 
-      const replacement = await vscode.window.withProgress(
-        { location: vscode.ProgressLocation.Notification, title: t("Hivey Code: rewriting…"), cancellable: true },
-        (_p, token) =>
-          oneShot(
-            deps,
-            INLINE_EDIT_PROMPT,
-            [
-              `Language: ${editor.document.languageId}`,
-              `Instruction: ${instruction}`,
-              "",
-              "Fragment:",
-              original,
-            ].join("\n"),
-            token,
-          ),
-      );
-      if (!replacement) return;
+    // One catalogue entry, run. Separate from `editSelection` because the instruction is already
+    // known: asking for it again, prefilled, would be a dialog whose only useful answer is Enter.
+    vscode.commands.registerCommand("hiveyCode.rewriteWith", (instruction: string) => rewriteSelection(deps, instruction)),
 
-      const cleaned = stripFence(replacement);
-      await editor.edit((b) => b.replace(range, cleaned));
-      // The user reviews it as a normal edit: it is in the undo stack and in the SCM diff.
-      void vscode.window.showInformationMessage(t("Change applied — Ctrl+Z to undo."), t("See the diff")).then((c) => {
-        if (c === t("See the diff")) void vscode.commands.executeCommand("workbench.view.scm");
-      });
+    vscode.commands.registerCommand("hiveyCode.selectionActions", () => selectionMenu(deps)),
+
+    vscode.commands.registerCommand("hiveyCode.addSelectionToChat", async () => {
+      await deps.chat.attachSelection();
     }),
 
     vscode.commands.registerCommand("hiveyCode.generateCommitMessage", async () => {
@@ -156,6 +131,100 @@ export function registerEditorCommands(context: vscode.ExtensionContext, deps: E
       });
     }),
   );
+}
+
+/**
+ * Everything on offer for a highlighted fragment, in one list.
+ *
+ * The right-click menu holds four rows because a context menu with a dozen is a context menu nobody
+ * reads. This is where the rest live, and it is a quick pick rather than more submenus for the
+ * reason the guided start is a submenu rather than a quick pick: a list opened from a keystroke
+ * belongs in the middle of the screen, and a list opened from a click belongs under the click.
+ *
+ * Separated by where the result lands, because that is the only distinction that changes what
+ * happens to your file — and the destination is written into the row, not left to be discovered.
+ */
+async function selectionMenu(deps: EditorDeps): Promise<void> {
+  const editor = vscode.window.activeTextEditor;
+  if (!editor) {
+    void vscode.window.showWarningMessage(t("Open a file and select the code you want to work on."));
+    return;
+  }
+
+  const all = selectionActions();
+  const rows: Array<vscode.QuickPickItem & { action?: SelectionAction; ask?: boolean }> = [];
+  for (const where of ["chat", "file"] as const) {
+    rows.push({
+      label: where === "chat" ? t("Answered in the conversation") : t("Rewritten in the file"),
+      kind: vscode.QuickPickItemKind.Separator,
+    });
+    for (const action of all.filter((a) => a.where === where)) {
+      rows.push({ label: action.label, action });
+    }
+  }
+  rows.push({ label: "", kind: vscode.QuickPickItemKind.Separator });
+  rows.push({ label: t("Ask something else…"), ask: true });
+
+  const lines = editor.selection.isEmpty ? 0 : editor.selection.end.line - editor.selection.start.line + 1;
+  const picked = await vscode.window.showQuickPick(rows, {
+    // Says what it is about to act on. An action aimed at the wrong lines is the one mistake this
+    // list can make on the user's behalf, and the selection is not visible while the list is open.
+    placeHolder: lines
+      ? t("{0}, {1} line(s) selected", relative(editor.document.uri), lines)
+      : t("{0} — nothing selected, the current line is used", relative(editor.document.uri)),
+    matchOnDescription: true,
+  });
+  if (!picked) return;
+  if (picked.ask) {
+    await vscode.commands.executeCommand("hiveyCode.askAboutSelection");
+    return;
+  }
+  const action = picked.action;
+  if (!action) return;
+  if (action.where === "file") await rewriteSelection(deps, action.instruction);
+  else await deps.chat.focusWithPrompt(action.instruction, deps.workspace.activeContext());
+}
+
+/**
+ * Rewrite what is highlighted, in place.
+ *
+ * With no instruction it asks for one — that is Ctrl+I. With one, it does not ask: the row that was
+ * clicked already said what it would do, and a prefilled dialog whose only sensible answer is Enter
+ * is a step, not a confirmation. Nothing is lost either way, because the result arrives as an
+ * ordinary edit: undo takes it back and the diff shows it.
+ */
+async function rewriteSelection(deps: EditorDeps, fixed?: string): Promise<void> {
+  const editor = vscode.window.activeTextEditor;
+  if (!editor) return;
+  const range = editor.selection.isEmpty ? editor.document.lineAt(editor.selection.active.line).range : editor.selection;
+  const original = editor.document.getText(range);
+  const instruction =
+    fixed ??
+    (await vscode.window.showInputBox({
+      prompt: t("Edit {0} ({1} line(s))", relative(editor.document.uri), range.end.line - range.start.line + 1),
+      placeHolder: t("extract a function, handle the error, add the types…"),
+      ignoreFocusOut: true,
+    }));
+  if (!instruction) return;
+
+  const replacement = await vscode.window.withProgress(
+    { location: vscode.ProgressLocation.Notification, title: t("Hivey Code: rewriting…"), cancellable: true },
+    (_p, token) =>
+      oneShot(
+        deps,
+        INLINE_EDIT_PROMPT,
+        [`Language: ${editor.document.languageId}`, `Instruction: ${instruction}`, "", "Fragment:", original].join("\n"),
+        token,
+      ),
+  );
+  if (!replacement) return;
+
+  const cleaned = stripFence(replacement);
+  await editor.edit((b) => b.replace(range, cleaned));
+  // The user reviews it as a normal edit: it is in the undo stack and in the SCM diff.
+  void vscode.window.showInformationMessage(t("Change applied — Ctrl+Z to undo."), t("See the diff")).then((c) => {
+    if (c === t("See the diff")) void vscode.commands.executeCommand("workbench.view.scm");
+  });
 }
 
 /**

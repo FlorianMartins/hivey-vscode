@@ -96,6 +96,8 @@ export function activate(context: vscode.ExtensionContext): void {
       return chat.attachOpenEditors();
     }),
 
+    vscode.commands.registerCommand("hiveyCode.compactConversation", () => chat.compactConversation()),
+
     // An instrument rather than another guess. Listings came back empty on a real partition, and
     // there is none here to try anything against, so each fix was a hypothesis handed to somebody
     // else to test. This says what every step returned on the machine that has the problem.

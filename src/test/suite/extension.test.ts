@@ -119,6 +119,24 @@ suite("Hivey Code", () => {
     assert.ok(commands.every((c) => c.title.length > 2));
   });
 
+  test("every submenu referenced by a menu exists, and every submenu has rows", async () => {
+    // A submenu is declared in one place and filled in another, keyed by a string. Get the string
+    // wrong in either and there is no error anywhere: the right-click menu simply has one fewer
+    // entry, or an entry that opens onto nothing. Nobody notices until somebody goes looking for a
+    // feature they were told exists — which is how this one was asked for in the first place.
+    const ext = vscode.extensions.getExtension(ID)!;
+    const menus = ext.packageJSON.contributes.menus as Record<string, Array<{ submenu?: string }>>;
+    const declared = new Set(
+      (ext.packageJSON.contributes.submenus as Array<{ id: string }>).map((sm) => sm.id),
+    );
+
+    const referenced = new Set<string>();
+    for (const rows of Object.values(menus)) for (const row of rows) if (row.submenu) referenced.add(row.submenu);
+
+    assert.deepEqual([...referenced].filter((id) => !declared.has(id)), [], "submenus referenced but never declared");
+    assert.deepEqual([...declared].filter((id) => !menus[id]?.length), [], "submenus declared but never filled");
+  });
+
   test("settings read back with the defaults the manifest declares", () => {
     const c = vscode.workspace.getConfiguration(SECTION);
     assert.equal(c.get("chat.provider"), "local");
@@ -213,6 +231,26 @@ suite("Hivey Code", () => {
   test("the reports open without a script and without a model", async () => {
     await vscode.commands.executeCommand("hiveyCode.showEgress");
     await vscode.commands.executeCommand("hiveyCode.showCosts");
+  });
+
+  test("the selection offers are on the lightbulb, and the way to the rest is with them", async () => {
+    // The catalogue is unit-tested; what cannot be unit-tested is whether the editor ever asks for
+    // it. This asks the way the editor does, over a real selection with no diagnostic in sight —
+    // the case the provider used to answer with nothing at all.
+    const doc = await vscode.workspace.openTextDocument({ language: "javascript", content: "function f(a) {\n  return a + 1;\n}\n" });
+    await vscode.window.showTextDocument(doc);
+    const range = new vscode.Range(0, 0, 2, 1);
+
+    const actions = await vscode.commands.executeCommand<vscode.CodeAction[]>("vscode.executeCodeActionProvider", doc.uri, range);
+    const ours = (actions ?? []).filter((a) => a.command?.command?.startsWith("hiveyCode."));
+    const commands = ours.map((a) => a.command!.command);
+
+    // Each row must carry a command that exists, or it is a menu entry that does nothing when
+    // clicked — silent, and only findable by clicking it.
+    const registered = await vscode.commands.getCommands(true);
+    assert.deepEqual(commands.filter((c) => !registered.includes(c)), [], `unregistered: ${commands.join(", ")}`);
+    assert.ok(commands.includes("hiveyCode.selectionActions"), `no way to the full list among: ${commands.join(" | ")}`);
+    assert.ok(ours.length >= 3, `only ${ours.length} offers on a selection`);
   });
 
   test("quick fixes are offered on a diagnostic", async () => {

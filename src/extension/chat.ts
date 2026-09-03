@@ -322,9 +322,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     // because it follows the active tab; the block list applies, so a file the policy excludes
     // simply does not appear.
     const implicit = this.workspace.activeContext(3000, s);
-    const contextTokens = this.session.entries
-      .filter((e) => e.included)
-      .reduce((sum, e) => sum + estimateTokens(e.text) + (e.context ?? []).reduce((a, c) => a + estimateTokens(c.body), 0), 0);
+    const contextTokens = this.contextTokens();
     const budgetTokens = s.context.maxTokens;
 
     const state: UiState = {
@@ -351,11 +349,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       contextFill: budgetTokens > 0 ? Math.min(1, contextTokens / budgetTokens) : 0,
       // Computed here rather than in the panel because the budget is a setting, and a panel that
       // guessed at it would offer to summarise a conversation that fits comfortably.
-      suggestCompact: shouldSuggestCompact(
-        contextTokens,
-        budgetTokens,
-        this.session.entries.filter((e) => e.included).length,
-      ),
+      // No offer when it happens by itself: a banner proposing what is already scheduled to
+      // happen at that exact threshold is a question with one answer.
+      suggestCompact:
+        !s.context.autoCompact &&
+        shouldSuggestCompact(contextTokens, budgetTokens, this.session.entries.filter((e) => e.included).length),
+      autoCompact: s.context.autoCompact,
       budget: { spentTodayUsd: this.gate.budget.spentToday(), dailyUsd: s.budget.dailyUsd },
       sessionCostUsd: this.session.totalCostUsd(),
       skills: this.uiSkills(),
@@ -702,6 +701,16 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         case "setContextBudget": {
           const config = vscode.workspace.getConfiguration(SECTION);
           await config.update("context.maxTokens", m.tokens, writeTarget());
+          this.sendState();
+          break;
+        }
+        case "setAutoCompact": {
+          const config = vscode.workspace.getConfiguration(SECTION);
+          await config.update("context.autoCompact", m.on, writeTarget());
+          // Turning it on after one failure switched it off: the user has said, explicitly, to try
+          // again, and refusing on the strength of an earlier failure would be a setting that does
+          // nothing when set.
+          if (m.on) this.autoCompactOff = false;
           this.sendState();
           break;
         }
@@ -1231,6 +1240,54 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const before = this.attachments.length;
     await this.attach("openFiles");
     return this.attachments.length - before;
+  }
+
+  /** Whatever is highlighted in the editor, attached without a question asked about it. */
+  async attachSelection(): Promise<void> {
+    await this.reveal();
+    await this.attach("selection");
+  }
+
+  /**
+   * Compacting, asked for rather than offered.
+   *
+   * The machinery has been here since the offer banner was written, and the banner was the only way
+   * to reach it: it appears at two thirds of the budget and nowhere else, so wanting the summary
+   * earlier — or having dismissed the offer once — left `/compact` typed into the composer as the
+   * only route. A feature reachable only by knowing its name is a feature most people do not have.
+   */
+  async compactConversation(): Promise<void> {
+    await this.reveal();
+    await this.compact();
+  }
+
+  /** What the conversation currently costs to re-send: the entries still in the prompt. */
+  private contextTokens(): number {
+    return this.session.entries
+      .filter((e) => e.included)
+      .reduce((sum, e) => sum + estimateTokens(e.text) + (e.context ?? []).reduce((a, c) => a + estimateTokens(c.body), 0), 0);
+  }
+
+  /** Switched off for the rest of the session after one failure, rather than failing every turn. */
+  private autoCompactOff = false;
+
+  /**
+   * Summarise before asking, when the setting says to and the conversation has grown enough.
+   *
+   * Called BEFORE the new question is recorded, and that ordering is the whole subtlety: compacting
+   * mutes everything it summarises, so a question added first would be summarised and muted in the
+   * same breath — asked, replaced by a summary of itself, and never answered.
+   *
+   * One failure switches it off for the session. The alternative is an error before every question
+   * from here on, which is a worse conversation than a full one: the thing the user came to do
+   * still works, and the thing that did not is not going to start working by being retried on a
+   * timer.
+   */
+  private async autoCompactIfFull(settings: Settings): Promise<void> {
+    if (!settings.context.autoCompact || this.autoCompactOff) return;
+    const included = this.session.entries.filter((e) => e.included).length;
+    if (!shouldSuggestCompact(this.contextTokens(), settings.context.maxTokens, included)) return;
+    if (!(await this.compact())) this.autoCompactOff = true;
   }
 
   /**
@@ -2476,12 +2533,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  private async compact(): Promise<void> {
+  private async compact(): Promise<boolean> {
     const settings = readSettings();
     const covered = this.session.entries.filter((e) => e.included && !e.error && e.text.trim());
     if (covered.length < 2) {
       void vscode.window.showInformationMessage(t("There is not enough conversation to summarise yet."));
-      return;
+      return false;
     }
 
     this.screen = "chat";
@@ -2516,7 +2573,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       const prepared = await this.gate.prepare(messages, settings, { provider: providerId, model, baseUrl, isLocal }, vault);
       if (!prepared) {
         this.post({ type: "status", text: t("Request cancelled.") });
-        return;
+        return false;
       }
 
       let streamed = "";
@@ -2538,7 +2595,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       const summary = (result.text || streamed).trim();
       if (!summary) {
         this.post({ type: "error", message: t("The summary came back empty; nothing was changed.") });
-        return;
+        return false;
       }
 
       // Mute FIRST, add SECOND. The other order mutes the summary along with everything else,
@@ -2590,10 +2647,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         ),
       });
       this.persist();
+      return true;
     } catch (err) {
       const message = (err as Error).message;
       this.post({ type: "error", message });
       this.log.appendLine(`[compact] ${message}`);
+      return false;
     } finally {
       this.turn = undefined;
       this.post({ type: "turnEnd" });
@@ -2611,6 +2670,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const parsed = parsePrompt(text);
     this.participant = parsed.participant;
     const settings = readSettings();
+    await this.autoCompactIfFull(settings);
     const resolved = parsed.mentions.length
       ? await resolveMentions(parsed.mentions, {
           workspace: this.workspace,

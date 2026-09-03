@@ -862,6 +862,19 @@ function compactOffer(state: UiState, deps: ChatDeps): HTMLElement | undefined {
         deps.send({ type: "compact" });
       },
     }),
+    // Answering the question the offer raises the second time it appears: "must I keep saying yes?"
+    // Putting the setting here rather than only in the settings file is the difference between a
+    // preference and a preference anyone finds.
+    button({
+      label: t("Always"),
+      className: "btn tiny",
+      title: t("Summarise by itself from now on, at this same point."),
+      onClick: () => {
+        compactDismissedAt = undefined;
+        deps.send({ type: "setAutoCompact", on: true });
+        deps.send({ type: "compact" });
+      },
+    }),
     button({
       icon: ICON.close,
       title: t("Not now"),
@@ -952,6 +965,32 @@ function contextRing(state: UiState, deps: ChatDeps): HTMLElement {
     menu(wrap, (close) => {
       const panel = el("div", "menu-list");
       panel.append(...contextBudgetSection(state, deps, close));
+      // Summarising lives here, under the number it moves.
+      //
+      // It was briefly a row in the view's ⋯ menu, which was wrong for a reason worth writing down:
+      // that menu holds the things that are true of the extension — where the panel sits, what left
+      // the machine, what it costs, the settings — while this acts on ONE conversation, the one
+      // whose fill the ring is showing. The place you look after reading "84 %" is the 84 %.
+      panel.append(separator(), menuTitle(t("This conversation")));
+      panel.append(
+        menuItem({
+          label: t("Summarise it now"),
+          hint: t("{0} in the prompt. The summary replaces them and nothing leaves the screen.", formatTokens(state.contextTokens)),
+          onClick: () => {
+            deps.send({ type: "compact" });
+            close();
+          },
+        }),
+        menuItem({
+          label: t("Summarise automatically"),
+          hint: t("At two thirds of the budget, without asking. Costs one request each time."),
+          selected: state.autoCompact,
+          onClick: () => {
+            deps.send({ type: "setAutoCompact", on: !state.autoCompact });
+            close();
+          },
+        }),
+      );
       return panel;
     }),
   );

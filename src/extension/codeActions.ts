@@ -8,6 +8,7 @@
 
 import * as vscode from "vscode";
 import { t } from "../shared/i18n.js";
+import { selectionActions } from "../core/agent/selection.js";
 
 export class HiveyCodeActions implements vscode.CodeActionProvider {
   static readonly kinds = [vscode.CodeActionKind.QuickFix, vscode.CodeActionKind.RefactorRewrite];
@@ -39,15 +40,23 @@ export class HiveyCodeActions implements vscode.CodeActionProvider {
       actions.push(explain);
     }
 
+    // On a selection, the two rows the catalogue marks for the lightbulb, and a way to the rest.
+    //
+    // Two, not eight: the lightbulb is shared with every other extension and with the editor's own
+    // refactorings, and a provider that puts its whole menu there buries theirs. The full list is
+    // one keystroke away, and it is the same list — both are built from `selectionActions`, so an
+    // option cannot exist in one surface and be missing from the other.
     if (!range.isEmpty) {
-      for (const [title, instruction] of [
-        [t("Write a test for this selection"), t("Write a test for this code, in the style of the tests already in this repository.")],
-        [t("Document this selection"), t("Add concise documentation above this code, in the language and style of the file.")],
-      ] as const) {
-        const action = new vscode.CodeAction(title, vscode.CodeActionKind.RefactorRewrite);
-        action.command = { command: "hiveyCode.askWith", title, arguments: [instruction] };
+      for (const offer of selectionActions().filter((a) => a.lightbulb)) {
+        const action = new vscode.CodeAction(offer.label, vscode.CodeActionKind.RefactorRewrite);
+        const command = offer.where === "file" ? "hiveyCode.rewriteWith" : "hiveyCode.askWith";
+        action.command = { command, title: offer.label, arguments: [offer.instruction] };
         actions.push(action);
       }
+
+      const more = new vscode.CodeAction(t("More with Hivey Code…"), vscode.CodeActionKind.RefactorRewrite);
+      more.command = { command: "hiveyCode.selectionActions", title: t("More with Hivey Code…") };
+      actions.push(more);
     }
 
     return actions;

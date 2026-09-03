@@ -2,7 +2,7 @@
   "name": "hivey-code",
   "displayName": "Hivey Code",
   "description": "%extension.description%",
-  "version": "0.33.1",
+  "version": "0.34.0",
   "publisher": "hivey",
   "license": "Apache-2.0",
   "repository": {
@@ -97,12 +97,14 @@
       {
         "command": "hiveyCode.showEgress",
         "title": "%command.showEgress.title%",
-        "category": "Hivey Code"
+        "category": "Hivey Code",
+        "icon": "$(radio-tower)"
       },
       {
         "command": "hiveyCode.showCosts",
         "title": "%command.showCosts.title%",
-        "category": "Hivey Code"
+        "category": "Hivey Code",
+        "icon": "$(graph)"
       },
       {
         "command": "hiveyCode.toggleCompletions",
@@ -274,6 +276,24 @@
         "icon": "$(pulse)"
       },
       {
+        "command": "hiveyCode.compactConversation",
+        "title": "%command.compactConversation.title%",
+        "category": "Hivey Code",
+        "icon": "$(fold)"
+      },
+      {
+        "command": "hiveyCode.selectionActions",
+        "title": "%command.selectionActions.title%",
+        "category": "Hivey Code",
+        "icon": "$(sparkle)"
+      },
+      {
+        "command": "hiveyCode.addSelectionToChat",
+        "title": "%command.addSelectionToChat.title%",
+        "category": "Hivey Code",
+        "icon": "$(add)"
+      },
+      {
         "command": "hiveyCode.pinLastAnswer",
         "title": "%command.pinLastAnswer.title%",
         "category": "Hivey Code",
@@ -282,6 +302,51 @@
     ],
     "menus": {
       "view/title": [
+        {
+          "command": "hiveyCode.exportSession",
+          "when": "view == hiveyCode.chat || view == hiveyCode.chatSide",
+          "group": "1_conversation@0"
+        },
+        {
+          "command": "hiveyCode.showEgress",
+          "when": "view == hiveyCode.chat || view == hiveyCode.chatSide",
+          "group": "2_inspect@0"
+        },
+        {
+          "command": "hiveyCode.showCosts",
+          "when": "view == hiveyCode.chat || view == hiveyCode.chatSide",
+          "group": "2_inspect@1"
+        },
+        {
+          "command": "hiveyCode.showPermissions",
+          "when": "view == hiveyCode.chat || view == hiveyCode.chatSide",
+          "group": "2_inspect@2"
+        },
+        {
+          "command": "hiveyCode.showDefinitions",
+          "when": "view == hiveyCode.chat || view == hiveyCode.chatSide",
+          "group": "2_inspect@3"
+        },
+        {
+          "command": "hiveyCode.showMcp",
+          "when": "view == hiveyCode.chat || view == hiveyCode.chatSide",
+          "group": "2_inspect@4"
+        },
+        {
+          "command": "hiveyCode.moveToSecondarySideBar",
+          "when": "view == hiveyCode.chat || view == hiveyCode.chatSide",
+          "group": "3_layout@0"
+        },
+        {
+          "command": "hiveyCode.setLanguage",
+          "when": "view == hiveyCode.chat || view == hiveyCode.chatSide",
+          "group": "9_settings@0"
+        },
+        {
+          "command": "hiveyCode.openSettings",
+          "when": "view == hiveyCode.chat || view == hiveyCode.chatSide",
+          "group": "9_settings@1"
+        },
         {
           "command": "hiveyCode.searchConversation",
           "when": "view == hiveyCode.chat || view == hiveyCode.chatSide",
@@ -298,66 +363,38 @@
           "group": "navigation@2"
         },
         {
-          "command": "hiveyCode.moveToSecondarySideBar",
-          "when": "view == hiveyCode.chat || view == hiveyCode.chatSide",
-          "group": "9_layout@1"
-        },
-        {
-          "command": "hiveyCode.showEgress",
-          "when": "view == hiveyCode.chat || view == hiveyCode.chatSide",
-          "group": "9_more@0"
-        },
-        {
-          "command": "hiveyCode.showCosts",
-          "when": "view == hiveyCode.chat || view == hiveyCode.chatSide",
-          "group": "9_more@1"
-        },
-        {
-          "command": "hiveyCode.showPermissions",
-          "when": "view == hiveyCode.chat || view == hiveyCode.chatSide",
-          "group": "9_more@2"
-        },
-        {
-          "command": "hiveyCode.showDefinitions",
-          "when": "view == hiveyCode.chat || view == hiveyCode.chatSide",
-          "group": "9_more@3"
-        },
-        {
-          "command": "hiveyCode.showMcp",
-          "when": "view == hiveyCode.chat || view == hiveyCode.chatSide",
-          "group": "9_more@4"
-        },
-        {
           "command": "hiveyCode.setup",
           "when": "view == hiveyCode.chat || view == hiveyCode.chatSide",
           "group": "navigation@4"
-        },
-        {
-          "command": "hiveyCode.exportSession",
-          "when": "view == hiveyCode.chat || view == hiveyCode.chatSide",
-          "group": "9_more@6"
-        },
-        {
-          "command": "hiveyCode.openSettings",
-          "when": "view == hiveyCode.chat || view == hiveyCode.chatSide",
-          "group": "9_more@7"
-        },
-        {
-          "command": "hiveyCode.setLanguage",
-          "when": "view == hiveyCode.chat || view == hiveyCode.chatSide",
-          "group": "9_more@8"
         }
       ],
       "editor/context": [
         {
-          "command": "hiveyCode.askAboutSelection",
-          "when": "editorHasSelection",
+          "submenu": "hiveyCode.selection",
+          "when": "editorTextFocus",
           "group": "hivey-code@1"
-        },
+        }
+      ],
+      "hiveyCode.selection": [
         {
           "command": "hiveyCode.editSelection",
           "when": "editorTextFocus",
-          "group": "hivey-code@2"
+          "group": "1_here@0"
+        },
+        {
+          "command": "hiveyCode.askAboutSelection",
+          "when": "editorTextFocus",
+          "group": "1_here@1"
+        },
+        {
+          "command": "hiveyCode.addSelectionToChat",
+          "when": "editorTextFocus",
+          "group": "2_context@0"
+        },
+        {
+          "command": "hiveyCode.selectionActions",
+          "when": "editorTextFocus",
+          "group": "3_more@0"
         }
       ],
       "scm/title": [
@@ -767,6 +804,11 @@
             "type": "boolean",
             "default": true,
             "description": "%config.context.repoMap%"
+          },
+          "hiveyCode.context.autoCompact": {
+            "type": "boolean",
+            "default": false,
+            "markdownDescription": "%config.context.autoCompact%"
           }
         }
       },
@@ -814,6 +856,11 @@
       }
     ],
     "submenus": [
+      {
+        "id": "hiveyCode.selection",
+        "label": "%submenu.selection.label%",
+        "icon": "$(sparkle)"
+      },
       {
         "id": "hiveyCode.newConversation",
         "label": "%submenu.newConversation.label%",

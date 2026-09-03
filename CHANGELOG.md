@@ -2,6 +2,52 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.34.0 — 2026-09-03
+
+### Added
+
+- **What to do with a selection, as a menu.** Right-click in the editor and there is now a **Hivey
+  Code** submenu: rewrite the selection in place, ask about it, add it to the conversation without
+  asking anything, or open the full list — explain it, find problems in it, write a test for it,
+  document it, show where it is called from, simplify it, handle the failures, add the types. Each
+  row says where the answer lands, because that is the only difference that touches your file: the
+  questions are answered in the conversation, the rewrites arrive as an ordinary edit that undo
+  takes back and the diff shows. The lightbulb (`Ctrl+.`) carries two of them plus a way to the
+  rest, and it is the same list — both surfaces are built from one catalogue in `core`, so an option
+  cannot exist in one and be missing from the other. Which is also what let it be tested: every
+  previous version of these offers was a closure inside a quick pick, and a quick pick cannot be
+  driven from a test.
+- **Summarising happens by itself, if you say so.** `hiveyCode.context.autoCompact`, off by
+  default: with it on, a conversation that reaches two thirds of its budget is summarised before the
+  next question is sent, instead of an offer appearing. It is set from the offer itself — the
+  **Always** button — or from the ring, and one failure switches it off for the rest of the session
+  rather than putting an error in front of every question from then on. The ordering matters and is
+  worth stating: the summary is taken **before** the new question is recorded, because compacting
+  mutes what it summarises, and a question added first would be summarised and muted in the same
+  breath.
+- **The context ring is where summarising lives.** Click the ring by the token count and under the
+  budget steps there is now *This conversation*: summarise it now, or summarise automatically. The
+  panel's `⋯` menu holds the things that are true of the extension — where it sits, what left the
+  machine, what it cost, the settings — while this acts on one conversation, the one whose fill the
+  ring is showing. The place to look after reading "84 %" is the 84 %.
+
+### Changed
+
+- **The `⋯` menu is grouped, with the settings last.** Four groups with a rule between them: the
+  conversation, then what can be inspected (outgoing data, cost, permissions, definitions, MCP),
+  then where the panel sits, then language and settings at the bottom. Ordering and separators are
+  all a manifest can ask for here: a VS Code menu item has one slot on its left and it belongs to
+  the checkmark, so **no icon can be shown in that dropdown** — verified in the editor's own
+  stylesheet rather than assumed. Command icons still exist for every row, and they do appear when
+  a command is promoted to the title bar.
+
+### Fixed
+
+- **A submenu can be declared and never filled, and nothing says so.** Both halves are strings in
+  the manifest, matched by name, so getting one wrong removes a menu entry silently. There is now a
+  test, in a real editor, that every submenu a menu points at exists and has rows in it — and
+  another that the offers on a selection all carry a command that is actually registered.
+
 ## 0.33.1 — 2026-09-03
 
 ### Fixed
