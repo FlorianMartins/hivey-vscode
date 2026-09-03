@@ -2,7 +2,7 @@
   "name": "hivey-code",
   "displayName": "Hivey Code",
   "description": "%extension.description%",
-  "version": "0.31.0",
+  "version": "0.31.1",
   "publisher": "hivey",
   "license": "Apache-2.0",
   "repository": {
@@ -266,6 +266,12 @@
         "title": "%command.attachOpenEditors.title%",
         "category": "Hivey Code",
         "icon": "$(files)"
+      },
+      {
+        "command": "hiveyCode.diagnoseIbmi",
+        "title": "%command.diagnoseIbmi.title%",
+        "category": "Hivey Code",
+        "icon": "$(pulse)"
       },
       {
         "command": "hiveyCode.pinLastAnswer",

@@ -2,6 +2,20 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.31.1 — 2026-09-03
+
+### Added
+
+- **`Hivey Code: Diagnose the IBM i connection`.** Listings were coming back empty on a real
+  partition, and there is none here to try anything against — so every fix was a hypothesis handed
+  to somebody else to test, three times over. This runs each step in turn and reports what came
+  back: whether the extension is connected, what its own object listing returned and with which
+  attributes, whether there is an SQL job at all, and what the two catalogue views answered —
+  **including the raw column names as the driver spelled them**. That last one cannot be inferred
+  from a distance and is the likeliest cause: asking for `TABLE_NAME` when the answer says
+  `table_name` yields undefined for every row, and a list of blank rows looks exactly like a list of
+  none. It reads and never writes.
+
 ## 0.31.0 — 2026-09-03
 
 ### Changed

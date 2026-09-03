@@ -91,5 +91,6 @@
   "config.ibmi.integration": "Si les outils IBM i et les entrées IBM i du menu « + » apparaissent. Ils reposent sur **Code for IBM i** ; rien ici ne fonctionne sans lui.",
   "config.ibmi.integration.auto": "Seulement quand Code for IBM i est connecté — rien à voir pour qui ne s’en sert pas.",
   "config.ibmi.integration.on": "Dès que Code for IBM i est installé, connecté ou non.",
-  "config.ibmi.integration.off": "Jamais, même si Code for IBM i est présent."
+  "config.ibmi.integration.off": "Jamais, même si Code for IBM i est présent.",
+  "command.diagnoseIbmi.title": "Diagnostiquer la connexion IBM i"
 }

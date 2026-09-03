@@ -16,6 +16,7 @@ import { WorkspaceContext } from "./workspace.js";
 import { McpManager } from "./integrations/mcp.js";
 import { watchInstructions } from "./instructions.js";
 import { createDefinition, definitionUri, DefinitionStore } from "./definitions.js";
+import { ibmiDiagnose, ibmiLibraryList } from "./integrations/ibmi.js";
 
 export function activate(context: vscode.ExtensionContext): void {
   // The editor knows which language the user reads, unless they said otherwise.
@@ -93,6 +94,24 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("hiveyCode.attachOpenEditors", async () => {
       await chat.reveal();
       return chat.attachOpenEditors();
+    }),
+
+    // An instrument rather than another guess. Listings came back empty on a real partition, and
+    // there is none here to try anything against, so each fix was a hypothesis handed to somebody
+    // else to test. This says what every step returned on the machine that has the problem.
+    vscode.commands.registerCommand("hiveyCode.diagnoseIbmi", async () => {
+      const library = await vscode.window.showInputBox({
+        prompt: t("Which library is not listing? Its name goes into every query below."),
+        placeHolder: "MYLIB",
+        value: ibmiLibraryList()[0] ?? "",
+      });
+      if (!library?.trim()) return;
+      const report = await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: t("Asking the partition…") },
+        () => ibmiDiagnose(library.trim()),
+      );
+      const doc = await vscode.workspace.openTextDocument({ language: "markdown", content: report });
+      await vscode.window.showTextDocument(doc);
     }),
 
     vscode.commands.registerCommand("hiveyCode.pinLastAnswer", async () => {

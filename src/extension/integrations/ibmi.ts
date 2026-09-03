@@ -369,6 +369,87 @@ export async function collectMemberContext(
   return { root, found, missing };
 }
 
+/**
+ * What each step of the IBM i bridge actually returns, on THIS system.
+ *
+ * Written because the alternative was another guess. Listings were coming back empty on a real
+ * partition and there is no partition here to try anything against, so every fix was a hypothesis
+ * shipped to somebody else to test. This runs each call in turn and reports what came back —
+ * including the raw column names, which are the one thing that cannot be inferred from a distance
+ * and the likeliest cause: a driver that answers `table_name` where the code asked for `TABLE_NAME`
+ * hands back undefined for every row, and a list of blank rows looks exactly like a list of none.
+ *
+ * It reads and never writes.
+ */
+export async function ibmiDiagnose(library: string): Promise<string> {
+  const lines: string[] = [`# Hivey Code — IBM i diagnosis`, "", `Library asked for: **${library}**`, ""];
+  const step = async (title: string, run: () => Promise<string>): Promise<void> => {
+    lines.push(`## ${title}`, "");
+    try {
+      lines.push(await run());
+    } catch (error) {
+      lines.push(`FAILED: ${(error as Error).message}`);
+    }
+    lines.push("");
+  };
+  const describe = (rows: Array<Record<string, unknown>>): string => {
+    if (!rows.length) return "0 rows.";
+    const keys = Object.keys(rows[0]!);
+    return [
+      `${rows.length} rows.`,
+      `Column names as the driver returned them: ${keys.join(", ")}`,
+      "First row:",
+      "```",
+      keys.map((k) => `${k} = ${JSON.stringify(rows[0]![k])}`).join("\n"),
+      "```",
+    ].join("\n");
+  };
+
+  lines.push(
+    `Extension installed: ${ibmiExtensionInstalled()}`,
+    `Connected: ${ibmiConnected()}`,
+    `Library list: ${ibmiLibraryList().join(", ") || "(empty)"}`,
+    "",
+  );
+  if (!ibmiConnected()) return lines.join("\n");
+
+  const content = connection().getContent();
+  const lib = library.toUpperCase();
+
+  await step("getObjectList (the extension's own listing)", async () => {
+    const objects = await content.getObjectList({ library: lib, types: ["*FILE"] });
+    if (!objects.length) return "0 objects.";
+    return [
+      `${objects.length} objects of type *FILE.`,
+      `Attributes seen: ${[...new Set(objects.map((o) => o.attribute ?? "(none)"))].join(", ")}`,
+      `First: ${JSON.stringify(objects[0])}`,
+    ].join("\n");
+  });
+
+  await step("runSQL (is there an SQL job at all)", async () =>
+    describe(await content.runSQL("SELECT 1 AS ONE FROM SYSIBM.SYSDUMMY1")),
+  );
+
+  await step("OBJECT_STATISTICS (source files in the library)", async () =>
+    describe(await content.runSQL(`SELECT * FROM TABLE(QSYS2.OBJECT_STATISTICS('${lib}', '*FILE')) X FETCH FIRST 5 ROWS ONLY`)),
+  );
+
+  await step("SYSPARTITIONSTAT (members in the library)", async () =>
+    describe(await content.runSQL(`SELECT * FROM QSYS2.SYSPARTITIONSTAT WHERE TABLE_SCHEMA = '${lib}' FETCH FIRST 5 ROWS ONLY`)),
+  );
+
+  await step("What Hivey Code makes of it", async () => {
+    const files = await ibmiSourceFiles(lib);
+    const members = await ibmiAllMembers(lib);
+    return [
+      `Source files found: ${files.length}${files.length ? ` — ${files.slice(0, 10).map((f) => f.name).join(", ")}` : ""}`,
+      `Members found: ${members.length}${members.length ? ` — ${members.slice(0, 10).map((m) => `${m.sourceFile}(${m.name})`).join(", ")}` : ""}`,
+    ].join("\n");
+  });
+
+  return lines.join("\n");
+}
+
 export function buildIbmiTools(): Tool[] {
   const sql: Tool = {
     schema: {
