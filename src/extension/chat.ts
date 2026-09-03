@@ -15,6 +15,7 @@ import { route } from "../core/router/route.js";
 import { Session, type ContextItem, type Entry, type SessionData } from "../core/session/session.js";
 import { headToTokens } from "../core/util/tokens.js";
 import {
+  collectMemberContext,
   ibmiConnected,
   ibmiInstance,
   ibmiLibraryList,
@@ -1463,7 +1464,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    * list comes first in the first step for the same reason — it is what this user works in today,
    * and typing a library they never use is the rare case, not the common one.
    */
-  private async attachMember(): Promise<void> {
+  private async attachMember(withDependencies = false): Promise<void> {
     try {
       const libraries = ibmiLibraryList();
       const library = await vscode.window.showQuickPick(
@@ -1514,13 +1515,33 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       );
       if (!picked) return;
 
-      const text = await readMemberText(libraryName, file.label, picked.name);
-      this.pushContext({
-        kind: "member",
-        label: `${libraryName}/${file.label}(${picked.name})`,
-        body: headToTokens(text, 6000),
-        untrusted: true,
-      });
+      if (!withDependencies) {
+        const text = await readMemberText(libraryName, file.label, picked.name);
+        this.pushContext({
+          kind: "member",
+          label: `${libraryName}/${file.label}(${picked.name})`,
+          body: headToTokens(text, 6000),
+          untrusted: true,
+        });
+        return;
+      }
+
+      // Each dependency is its own attachment rather than one block, so the row above the composer
+      // shows what was actually brought in and any of it can be taken back out. A single item
+      // labelled "and 7 others" is a context nobody can correct.
+      const { root, found, missing } = await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: t("Following what {0} uses…", picked.name) },
+        () => collectMemberContext(libraryName, file.label, picked.name),
+      );
+      this.pushContext({ kind: "member", label: root.ref, body: headToTokens(root.text, 6000), untrusted: true });
+      for (const dep of found) {
+        this.pushContext({ kind: "member", label: dep.ref, body: headToTokens(dep.text, 2500), untrusted: true });
+      }
+      if (missing.length) {
+        void vscode.window.showInformationMessage(
+          t("Attached {0} of {1}. Not found: {2}", found.length + 1, found.length + 1 + missing.length, missing.join(", ")),
+        );
+      }
     } catch (error) {
       void vscode.window.showWarningMessage(`Hivey Code: ${(error as Error).message}`);
     }
@@ -1666,6 +1687,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         rows.push(sep(t("IBM i")));
         rows.push({ label: "$(server) " + t("Source member…"), run: () => this.attachMember() });
         rows.push({ label: "$(file-directory) " + t("Stream file (IFS)…"), run: () => this.attachStreamFile() });
+        rows.push({
+          label: "$(references) " + t("Member and what it uses…"),
+          run: () => this.attachMember(true),
+        });
       });
     }
 

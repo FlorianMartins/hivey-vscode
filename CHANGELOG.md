@@ -2,6 +2,32 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.29.0 — 2026-09-03
+
+### Added
+
+- **A member and everything it uses, in one step.** `ibmi_program_context` for the assistant and
+  **Member and what it uses…** in the `+` menu: the member is read, its `/COPY` copybooks and the
+  programs it calls are pulled out of the source, and each is fetched from the partition across the
+  library list. Every one arrives as its own attachment, so you can see what came in and take any of
+  it back out — a single item labelled "and 7 others" is a context nobody can correct.
+- Dependencies are read from the SOURCE rather than from a catalogue, and the difference is the
+  point: a cross-reference file says what the compiled object binds, the source says what the
+  programmer wrote — including the copybook carrying the data structure the whole program is about.
+  The other direction, *who calls this program*, is not something source can answer; that stays with
+  `ibmi_sql` and `ibmi_command`, where the shop's own DSPPGMREF or ARCAD cross-references can be
+  named rather than guessed at.
+
+### Fixed
+
+- **The context budget stopped short of the model's own window.** It was capped at three quarters,
+  on the reasoning that the answer needs room too — which is true, and is not this setting's decision
+  to make. A model with a million tokens of context has a million; a menu that refuses to say so is
+  arguing with the number printed beside it. The window is on the list now, and the entry says what
+  it costs instead of hiding the option.
+- **The budget menu existed twice** and the two copies had drifted: one still promised "room left
+  for the answer" after the other had stopped capping. One section, used in both places.
+
 ## 0.28.0 — 2026-09-03
 
 ### Added

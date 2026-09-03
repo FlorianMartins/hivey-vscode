@@ -18,6 +18,7 @@ import { t } from "../../shared/i18n.js";
 import type { Tool, ToolResult } from "../../core/agent/loop.js";
 import { headToTokens } from "../../core/util/tokens.js";
 import { formatRows, isReadOnlySql, parseMemberRef } from "../../core/ibmi/sql.js";
+import { extractCalledPrograms, extractCopyDirectives } from "../../core/ibmi/symbols.js";
 
 const EXTENSION_ID = "halcyontechltd.code-for-ibmi";
 const MAX_ROWS = 200;
@@ -140,6 +141,94 @@ export async function ibmiMembers(
     .getMemberList({ library: library.toUpperCase(), sourceFile: sourceFile.toUpperCase() });
 }
 
+/**
+ * The source files a name might live in, when the directive did not say.
+ *
+ * `/COPY CUSTPR` means "the source file I am in", and a called program's source is wherever the
+ * shop keeps it. Rather than scan every file in every library — which is a lot of round trips to
+ * answer a question nobody asked — this is the short list of names the platform has used for
+ * thirty years, with the member's own file first because that is the directive's actual meaning.
+ */
+function candidateSourceFiles(own: string): string[] {
+  const usual = ["QRPGLESRC", "QRPGSRC", "QCPYSRC", "QCLSRC", "QCLLESRC", "QDDSSRC", "QSQLSRC", "QCBLLESRC", "QSRVSRC"];
+  return [own.toUpperCase(), ...usual.filter((f) => f !== own.toUpperCase())];
+}
+
+export interface ResolvedSource {
+  ref: string;
+  text: string;
+}
+
+/**
+ * Everything a member needs, fetched from the partition.
+ *
+ * The dependencies are read out of the SOURCE — copybooks, called programs — rather than out of a
+ * catalogue, and that choice is worth defending. A cross-reference file says what the compiled
+ * object binds; the source says what the programmer wrote, including the copybook that carries the
+ * data structure the whole program is about. Both are useful, and only one of them can be had
+ * without inventing catalogue views whose column names differ between releases. The other half —
+ * who calls THIS program, which is the direction source cannot answer — stays with `ibmi_sql` and
+ * `ibmi_command`, where the shop's own DSPPGMREF or ARCAD cross-references can be used by name.
+ *
+ * Searching is bounded on purpose: the library list, the usual source files, and a cap on how many
+ * members come back. An unbounded walk of an IBM i program reaches the whole shop in three hops.
+ */
+export async function collectMemberContext(
+  library: string,
+  sourceFile: string,
+  member: string,
+  limit = 10,
+): Promise<{ root: ResolvedSource; found: ResolvedSource[]; missing: string[] }> {
+  const content = connection().getContent();
+  const rootText = await content.downloadMemberContent(library, sourceFile, member);
+  const root: ResolvedSource = { ref: `${library}/${sourceFile}(${member})`, text: rootText };
+
+  const wanted: Array<{ name: string; library?: string; sourceFile?: string }> = [
+    ...extractCopyDirectives(rootText).map((c) => ({ name: c.member, library: c.library, sourceFile: c.sourceFile })),
+    ...extractCalledPrograms(rootText).map((name) => ({ name })),
+  ];
+
+  const libraries = [library.toUpperCase(), ...ibmiLibraryList().map((l) => l.toUpperCase())];
+  const found: ResolvedSource[] = [];
+  const missing: string[] = [];
+  const seen = new Set<string>([`${library}/${sourceFile}/${member}`.toUpperCase()]);
+
+  for (const want of wanted) {
+    if (found.length >= limit) {
+      missing.push(`${want.name} (${t("not fetched: the limit of {0} was reached", limit)})`);
+      continue;
+    }
+    const inLibraries = want.library ? [want.library.toUpperCase()] : [...new Set(libraries)];
+    const inFiles = want.sourceFile ? [want.sourceFile.toUpperCase()] : candidateSourceFiles(sourceFile);
+    let resolved = false;
+    outer: for (const lib of inLibraries) {
+      for (const file of inFiles) {
+        const key = `${lib}/${file}/${want.name}`.toUpperCase();
+        if (seen.has(key)) {
+          resolved = true;
+          break outer;
+        }
+        try {
+          const members = await content.getMemberList({ library: lib, sourceFile: file, members: want.name });
+          const hit = members.find((m) => m.name.toUpperCase() === want.name.toUpperCase());
+          if (!hit) continue;
+          seen.add(key);
+          const text = await content.downloadMemberContent(lib, file, hit.name);
+          found.push({ ref: `${lib}/${file}(${hit.name})`, text });
+          resolved = true;
+          break outer;
+        } catch {
+          // A source file that does not exist in that library is the ordinary case here, not a
+          // failure: this is a search, and most of the places looked in will not have it.
+        }
+      }
+    }
+    if (!resolved) missing.push(want.name);
+  }
+
+  return { root, found, missing };
+}
+
 export function buildIbmiTools(): Tool[] {
   const sql: Tool = {
     schema: {
@@ -222,6 +311,46 @@ export function buildIbmiTools(): Tool[] {
       const text = await connection().getContent().downloadMemberContent(library, sourceFile, member);
       ctx.report(t("read {0}/{1}({2})", library, sourceFile, member));
       return { content: headToTokens(text, MAX_TOKENS) };
+    },
+  };
+
+  const programContext: Tool = {
+    schema: {
+      name: "ibmi_program_context",
+      description:
+        "Read a source member AND the members it depends on — its copybooks and the programs it calls — " +
+        "resolved across the library list. Use this instead of ibmi_member when the question is about how a " +
+        "program works rather than about one line of it. It does not answer 'who calls this program': that is " +
+        "the other direction, and it comes from DSPPGMREF or the shop's cross-reference tool via ibmi_sql.",
+      parameters: {
+        type: "object",
+        properties: {
+          member: { type: "string", description: "LIB/SRCFILE(MEMBER)" },
+          limit: { type: "number", description: "How many dependencies to fetch. Default 10." },
+        },
+        required: ["member"],
+      },
+    },
+    approval: () => false,
+    async run(args, ctx): Promise<ToolResult> {
+      const { library, sourceFile, member } = parseMemberRef(String(args["member"] ?? ""));
+      const limit = Math.min(20, Math.max(1, Number(args["limit"] ?? 10)));
+      const { root, found, missing } = await collectMemberContext(library, sourceFile, member, limit);
+      ctx.report(t("{0} and {1} of its dependencies", root.ref, found.length));
+      // A budget per member rather than one for the whole answer: the root is what was asked for and
+      // must survive whole, and a copybook truncated in the middle is still worth more than a
+      // dependency dropped without saying so.
+      const parts = [
+        `--- ${root.ref}\n${headToTokens(root.text, 6000)}`,
+        ...found.map((f) => `--- ${f.ref}\n${headToTokens(f.text, 2500)}`),
+      ];
+      if (missing.length) {
+        parts.push(
+          `--- ${t("Not found on this system")}\n${missing.join(", ")}\n` +
+            t("These may be procedures local to the module, objects without source here, or in a library outside the list."),
+        );
+      }
+      return { content: parts.join("\n\n") };
     },
   };
 
@@ -309,5 +438,5 @@ export function buildIbmiTools(): Tool[] {
     },
   };
 
-  return [sql, command, readMember, listMembers, listObjects, libraryList];
+  return [sql, command, readMember, programContext, listMembers, listObjects, libraryList];
 }

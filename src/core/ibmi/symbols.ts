@@ -165,3 +165,72 @@ export function extractIbmiReferences(path: string, text: string): string[] {
   }
   return [...out];
 }
+
+/**
+ * The copybooks a member pulls in, with where they live.
+ *
+ * `/COPY` carries more than a name and the difference decides whether it can be found:
+ * `/COPY MEMBER` means "the same source file as me", `/COPY QCPYSRC,MEMBER` names the file, and
+ * `/COPY MYLIB/QCPYSRC,MEMBER` names both. The reference extractor above flattens all three into a
+ * bag of words, which is right for ranking a map and useless for going to fetch one — a comma is
+ * not a word boundary there, so `QCPYSRC,MEMBER` came out as `QCPYSRC`, the file, never the member.
+ *
+ * `/INCLUDE` is the same directive under the name the SQL precompiler uses.
+ */
+export interface CopyRef {
+  library?: string;
+  sourceFile?: string;
+  member: string;
+}
+
+export function extractCopyDirectives(text: string): CopyRef[] {
+  const out: CopyRef[] = [];
+  const seen = new Set<string>();
+  // Free-form and fixed alike: the directive may be preceded by columns of specification, and in
+  // fixed-format RPG it sits after a `C` or in the comment area, which is why the anchor is the
+  // slash rather than the start of the line.
+  // Horizontal whitespace only. With `\s` the optional separators reached across the newline, so
+  // two consecutive `/COPY A` lines parsed as one reference to `A/COPY` — a directive on the next
+  // line being read as the continuation of this one.
+  const re = /\/(?:copy|include)[^\S\n]+([\w$#@.]+)(?:[^\S\n]*\/[^\S\n]*([\w$#@.]+))?(?:[^\S\n]*,[^\S\n]*([\w$#@.]+))?/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text))) {
+    const parts = [m[1], m[2], m[3]].filter(Boolean).map((p) => p!.toUpperCase());
+    if (!parts.length) continue;
+    // One part is a bare member; two are file,member; three are library/file,member.
+    const ref: CopyRef =
+      parts.length >= 3
+        ? { library: parts[0]!, sourceFile: parts[1]!, member: parts[2]! }
+        : parts.length === 2
+          ? { sourceFile: parts[0]!, member: parts[1]! }
+          : { member: parts[0]! };
+    const key = `${ref.library ?? ""}/${ref.sourceFile ?? ""}/${ref.member}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(ref);
+  }
+  return out;
+}
+
+/**
+ * The programs a member calls, by name.
+ *
+ * Separated from the general reference bag because a called program is followed differently from a
+ * file: what is wanted is its source, and its source is a member somewhere in the library list.
+ */
+export function extractCalledPrograms(text: string): string[] {
+  const out = new Set<string>();
+  for (const re of [
+    /\bcall(?:p|b)?\s*\(?\s*['"]([A-Za-z_][\w$#@]*)['"]/gi,
+    /^\s*CALL\s+(?:PGM\()?['"]?([A-Za-z_][\w$#@]*)['"]?/gim,
+  ]) {
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(text))) {
+      const name = m[1]?.toUpperCase();
+      // `CALLP` on a prototype is a procedure call, not a program; those resolve to nothing on the
+      // partition and would fill the report with names that are simply local.
+      if (name && name.length <= 10) out.add(name);
+    }
+  }
+  return [...out];
+}

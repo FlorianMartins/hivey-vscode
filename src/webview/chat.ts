@@ -951,30 +951,7 @@ function contextRing(state: UiState, deps: ChatDeps): HTMLElement {
   wrap.addEventListener("click", () =>
     menu(wrap, (close) => {
       const panel = el("div", "menu-list");
-      panel.append(
-        menuTitle(
-          state.modelContext > 0
-            ? t("Context budget — {0} holds {1}", state.modelLabel, formatTokens(state.modelContext))
-            : t("Context budget"),
-        ),
-      );
-      const budgets = contextBudgets(state.modelContext);
-      for (const tokens of budgets) {
-        panel.append(
-          menuItem({
-            label: t("{0} tokens", formatTokens(tokens)),
-            hint:
-              tokens === budgets[budgets.length - 1] && state.modelContext > 0
-                ? t("As much as this model can take, with room left for the answer")
-                : undefined,
-            selected: tokens === state.contextBudget,
-            onClick: () => {
-              deps.send({ type: "setContextBudget", tokens });
-              close();
-            },
-          }),
-        );
-      }
+      panel.append(...contextBudgetSection(state, deps, close));
       return panel;
     }),
   );
@@ -1268,6 +1245,41 @@ function modelButton(state: UiState, deps: ChatDeps): HTMLElement {
 }
 
 /**
+ * The context-budget section, built once and used in both places that offer it.
+ *
+ * It is reachable from the ring under the composer and from the thinking menu, and for a while it
+ * was written out twice — which is how one copy came to say "as much as this model can take, with
+ * room left for the answer" after the other had stopped capping it. Two renderings of one setting
+ * drift, and the one nobody is looking at is the one that drifts.
+ */
+function contextBudgetSection(state: UiState, deps: ChatDeps, close: () => void): HTMLElement[] {
+  const out: HTMLElement[] = [
+    menuTitle(
+      state.modelContext > 0
+        ? t("Context budget — {0} holds {1}", state.modelLabel, formatTokens(state.modelContext))
+        : t("Context budget"),
+    ),
+  ];
+  for (const tokens of contextBudgets(state.modelContext)) {
+    out.push(
+      menuItem({
+        label: t("{0} tokens", formatTokens(tokens)),
+        hint:
+          tokens === state.modelContext && state.modelContext > 0
+            ? t("The whole window. The answer needs room in it too.")
+            : undefined,
+        selected: tokens === state.contextBudget,
+        onClick: () => {
+          deps.send({ type: "setContextBudget", tokens });
+          close();
+        },
+      }),
+    );
+  }
+  return out;
+}
+
+/**
  * How much of the model's window this conversation may fill.
  *
  * Fractions of THAT model's window, not a fixed ladder filtered by it. The ladder was absolute —
@@ -1277,10 +1289,14 @@ function modelButton(state: UiState, deps: ChatDeps): HTMLElement {
  * were simply unreachable. Both come from the same mistake: the numbers described the ladder rather
  * than the model.
  *
- * An eighth, a quarter, a half, three quarters. Four options, meaningful at every size — 25k to
- * 150k on Claude, 1k to 6k on a small local model, 125k to 750k on a million — and the largest is
- * always three quarters, because the answer has to fit in the window too and a budget equal to it
- * leaves nowhere to put one.
+ * An eighth, a quarter, a half, three quarters, and the whole thing. Five options, meaningful at
+ * every size — 25k to 200k on Claude, 1k to 8k on a small local model, 125k to 1M on a million.
+ *
+ * The window itself is on the list. It was capped at three quarters on the reasoning that the answer
+ * needs room too, which is true and is not this setting's decision to make: a model with a million
+ * tokens of context has a million, and a menu that refuses to say so is a menu arguing with the
+ * number printed beside it. The trade-off belongs to whoever is paying for the tokens, and the entry
+ * says what it costs rather than hiding the option.
  *
  * A window the catalogue does not know — a local runtime that reports no such number — gets fixed
  * steps instead, which is the honest answer to "I do not know how big this is".
@@ -1288,9 +1304,11 @@ function modelButton(state: UiState, deps: ChatDeps): HTMLElement {
 export function contextBudgets(modelContext: number): number[] {
   if (modelContext <= 0) return [4_000, 8_000, 16_000, 32_000, 64_000];
   const out: number[] = [];
-  for (const fraction of [1 / 8, 1 / 4, 1 / 2, 3 / 4]) {
-    const rounded = roundTokens(modelContext * fraction);
-    if (rounded > 0 && !out.includes(rounded)) out.push(rounded);
+  for (const fraction of [1 / 8, 1 / 4, 1 / 2, 3 / 4, 1]) {
+    // The whole window is used exactly, not rounded: rounding 1 000 000 up would offer more than
+    // the model holds, and rounding it down would print a number nobody recognises.
+    const value = fraction === 1 ? modelContext : roundTokens(modelContext * fraction);
+    if (value > 0 && !out.includes(value)) out.push(value);
   }
   return out;
 }
@@ -1309,7 +1327,6 @@ function roundTokens(n: number): number {
 
 function reasoningButton(state: UiState, deps: ChatDeps): HTMLElement {
   const current = REASONING.find((r) => r.id === state.reasoning) ?? REASONING[0]!;
-  const budgets = contextBudgets(state.modelContext);
   const b = button({
     label: current.label,
     trailingIcon: ICON.chevron,
@@ -1334,29 +1351,7 @@ function reasoningButton(state: UiState, deps: ChatDeps): HTMLElement {
             );
           }
         }
-        panel.append(
-          menuTitle(
-            state.modelContext > 0
-              ? t("Context budget — {0} holds {1}", state.modelLabel, formatTokens(state.modelContext))
-              : t("Context budget"),
-          ),
-        );
-        for (const tokens of budgets) {
-          panel.append(
-            menuItem({
-              label: t("{0} tokens", formatTokens(tokens)),
-              hint:
-                tokens === budgets[budgets.length - 1] && state.modelContext > 0
-                  ? t("As much as this model can take, with room left for the answer")
-                  : undefined,
-              selected: tokens === state.contextBudget,
-              onClick: () => {
-                deps.send({ type: "setContextBudget", tokens });
-                close();
-              },
-            }),
-          );
-        }
+        panel.append(...contextBudgetSection(state, deps, close));
         return panel;
       }),
   });

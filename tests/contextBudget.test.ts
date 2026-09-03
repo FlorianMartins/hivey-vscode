@@ -18,11 +18,23 @@ test("never offers more than the model can hold", () => {
   }
 });
 
-test("leaves room for the answer", () => {
-  // A budget equal to the window fills it with the question alone. Three quarters, with rounding
-  // allowed to nudge it: the point is that a reply still fits, not that the fraction is exact.
+test("the whole window is on the list", () => {
+  // It was capped at three quarters, on the reasoning that the answer needs room too. That is true
+  // and it is not this setting's decision: a model with a million tokens has a million, and a menu
+  // that will not say so argues with the number printed beside it.
   for (const window of WINDOWS) {
-    for (const offered of contextBudgets(window)) assert.ok(offered <= window * 0.79);
+    const offered = contextBudgets(window);
+    assert.equal(offered[offered.length - 1], window, `the window itself is missing for ${window}`);
+  }
+});
+
+test("and there is still a smaller option for people paying per token", () => {
+  // The full window as the ONLY offer would be a different mistake: on a paid model the budget is
+  // the bill, and most questions do not need the whole thing.
+  for (const window of WINDOWS) {
+    const offered = contextBudgets(window);
+    assert.ok(offered.length >= 2, `only ${offered.length} option for ${window}`);
+    assert.ok(offered[0]! <= window * 0.2, `the smallest option for ${window} is ${offered[0]}`);
   }
 });
 
@@ -49,9 +61,12 @@ test("most of a large window is reachable", () => {
 });
 
 test("the numbers are ones a person would say", () => {
-  // An eighth of 131 072 is 16 384. Offering that is offering arithmetic, not a choice.
+  // An eighth of 131 072 is 16 384. Offering that is offering arithmetic, not a choice. The window
+  // itself is the exception and has to be: rounding it up would offer more than the model holds,
+  // and rounding it down would print a number nobody recognises as their model's size.
   for (const window of WINDOWS) {
     for (const offered of contextBudgets(window)) {
+      if (offered === window) continue;
       const step = offered < 1000 ? 100 : offered < 10_000 ? 500 : offered < 100_000 ? 1000 : 5000;
       assert.equal(offered % step, 0, `${offered} is not a round number at its size`);
     }
@@ -61,7 +76,7 @@ test("the numbers are ones a person would say", () => {
 test("a short list, and never an empty one", () => {
   for (const window of WINDOWS) {
     const offered = contextBudgets(window);
-    assert.ok(offered.length >= 1 && offered.length <= 5, `${offered.length} options for ${window}`);
+    assert.ok(offered.length >= 1 && offered.length <= 6, `${offered.length} options for ${window}`);
   }
 });
 
