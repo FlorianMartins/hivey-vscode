@@ -286,7 +286,7 @@ export const FR: Record<string, string> = {
   "Where does this sub-agent live?": "Où vit ce sous-agent ?",
   "Which component? A name, or part of one": "Quel composant ? Un nom, ou une partie",
   "Which key to clear?": "Quelle clé effacer ?",
-  "Which libraries? {0} on this system — type to filter": "Quelles bibliothèques ? {0} sur ce système — tapez pour filtrer",
+  "Which libraries? {0} on this system — {1} to filter": "Quelles bibliothèques ? {0} sur ce système — {1} pour filtrer",
   "Which library is not listing? Its name goes into every query below.": "Quelle bibliothèque ne se liste pas ? Son nom sera utilisé dans chaque requête ci-dessous.",
   "Which provider?": "Pour quel fournisseur ?",
   "Which version libraries? {0} on this system": "Quelles bibliothèques de version ? {0} sur ce système",

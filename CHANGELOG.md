@@ -2,6 +2,24 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.32.1 — 2026-09-03
+
+### Fixed
+
+- **The library list stopped at your own library list.** When the catalogue query came back empty
+  the only libraries left were the ones Code for IBM i already had — which is indistinguishable from
+  a machine that has no others, and is exactly what it looked like. There are two queries now: the
+  object catalogue first, because it carries the text descriptions and a screen of bare names is a
+  screen nobody can choose from, then the SQL schemas, which answer on systems where the first does
+  not. The diagnosis command reports both, and how many libraries the extension ends up with.
+- **`ARC*` matched nothing in the library picker.** That step still used the built-in filter, which
+  is fuzzy and takes the star as a character to find — so the one syntax anybody would reach for
+  here was the one that could not work. It uses the same rule as everywhere else now: `ARC*` finds
+  ARCAD_ENG, and `arc` on its own finds it too.
+- **The "type a name" row no longer disappears when you type.** It was filtered along with
+  everything else, so it vanished precisely when nothing matched — which is the moment it exists
+  for.
+
 ## 0.32.0 — 2026-09-03
 
 ### Fixed

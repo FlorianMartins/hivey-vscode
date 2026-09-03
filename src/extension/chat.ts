@@ -1477,26 +1477,22 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         { location: vscode.ProgressLocation.Window, title: t("Reading the libraries…") },
         () => ibmiAllLibraries(),
       );
-      const typeLibraries = {
-        label: "$(edit) " + t("Type library names…"),
-        description: t("Separated by spaces or commas"),
-        other: true,
-      };
-      const chosenLibraries = await vscode.window.showQuickPick(
+      // The same filter as everywhere else, so `ARC*` finds ARCAD_ENG. The built-in one is fuzzy and
+      // takes the star literally, which means the one syntax people reach for here matches nothing.
+      const chosenLibraries = await this.pickFiltered(
         [
           ...libraries.map((l) => ({
             label: l.name,
             description: l.inList ? t("in your library list") : (l.text ?? ""),
-            picked: false,
           })),
-          typeLibraries,
+          { label: "$(edit) " + t("Type library names…"), description: t("Separated by spaces or commas"), other: true },
         ],
         {
-          canPickMany: true,
           placeHolder: libraries.length
-            ? t("Which libraries? {0} on this system — type to filter", libraries.length)
+            ? t("Which libraries? {0} on this system — {1} to filter", libraries.length, "ARC*")
             : t("No library could be listed — type the names"),
-          matchOnDescription: true,
+          many: true,
+          nameOf: (row) => row.label,
         },
       );
       if (!chosenLibraries?.length) return;
@@ -1707,7 +1703,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     picker.items = all;
     picker.onDidChangeValue((value) => {
       const wanted = value.trim();
-      picker.items = wanted ? all.filter((item) => matchesName(options.nameOf(item), wanted)) : all;
+      // The escape hatch always survives the filter. A row that says "type a name" is the one row
+      // that has to be there precisely when nothing else matched what you typed.
+      picker.items = wanted
+        ? all.filter((item) => (item as { other?: boolean }).other || matchesName(options.nameOf(item), wanted))
+        : all;
     });
     return new Promise<T[] | undefined>((resolve) => {
       let done = false;

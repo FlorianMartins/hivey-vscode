@@ -151,18 +151,38 @@ export function ibmiLibraryList(): string[] {
 export async function ibmiAllLibraries(): Promise<Array<{ name: string; text?: string; inList: boolean }>> {
   const inList = new Set(ibmiLibraryList().map((l) => l.toUpperCase()));
   const out = [...inList].map((name) => ({ name, text: undefined as string | undefined, inList: true }));
-  try {
-    const rows = await connection()
-      .getContent()
-      .runSQL(`SELECT * FROM TABLE(QSYS2.OBJECT_STATISTICS('QSYS', '*LIB')) X ORDER BY 1`);
-    for (const row of rows) {
-      const name = cell(row, "OBJNAME", "OBJECT_NAME");
-      if (!name || inList.has(name.toUpperCase())) continue;
-      out.push({ name, text: cell(row, "OBJTEXT", "TEXT_DESCRIPTION") || undefined, inList: false });
+  const content = connection().getContent();
+
+  // Two ways of asking, because one of them coming back empty is indistinguishable from a machine
+  // with no libraries — and what the user sees then is their own library list and nothing else,
+  // which looks exactly like "it only takes my library list". It was that.
+  const attempts = [
+    // Objects of type *LIB live in QSYS. This carries the text description, which is why it is
+    // first: a screen of library names with no descriptions is a screen nobody can choose from.
+    `SELECT * FROM TABLE(QSYS2.OBJECT_STATISTICS('QSYS', '*LIB')) X ORDER BY 1`,
+    // Every library is an SQL schema. Fewer columns, but it answers on systems where the object
+    // catalogue does not — and a name alone is still a name you can pick.
+    `SELECT * FROM QSYS2.SYSSCHEMAS ORDER BY 1`,
+  ];
+  for (const statement of attempts) {
+    try {
+      const rows = await content.runSQL(statement);
+      let added = 0;
+      for (const row of rows) {
+        const name = cell(row, "OBJNAME", "OBJECT_NAME", "SCHEMA_NAME", "SYSTEM_SCHEMA_NAME");
+        if (!name || inList.has(name.toUpperCase())) continue;
+        inList.add(name.toUpperCase());
+        out.push({
+          name,
+          text: cell(row, "OBJTEXT", "TEXT_DESCRIPTION", "SCHEMA_TEXT") || undefined,
+          inList: false,
+        });
+        added += 1;
+      }
+      if (added) break;
+    } catch {
+      // Try the next one. The library list alone is still a list, and the caller offers a field.
     }
-  } catch {
-    // No catalogue, or no SQL job. The library list alone is still a list, and the caller offers a
-    // field for a name that is not in it.
   }
   return out;
 }
@@ -437,6 +457,22 @@ export async function ibmiDiagnose(library: string): Promise<string> {
   await step("SYSPARTITIONSTAT (members in the library)", async () =>
     describe(await content.runSQL(`SELECT * FROM QSYS2.SYSPARTITIONSTAT WHERE TABLE_SCHEMA = '${lib}' FETCH FIRST 5 ROWS ONLY`)),
   );
+
+  await step("Listing the libraries (both ways)", async () => {
+    const parts: string[] = [];
+    for (const [name, statement] of [
+      ["OBJECT_STATISTICS('QSYS','*LIB')", `SELECT * FROM TABLE(QSYS2.OBJECT_STATISTICS('QSYS', '*LIB')) X FETCH FIRST 3 ROWS ONLY`],
+      ["SYSSCHEMAS", `SELECT * FROM QSYS2.SYSSCHEMAS FETCH FIRST 3 ROWS ONLY`],
+    ] as const) {
+      try {
+        parts.push(`### ${name}`, describe(await content.runSQL(statement)));
+      } catch (error) {
+        parts.push(`### ${name}`, `FAILED: ${(error as Error).message}`);
+      }
+    }
+    parts.push(`Hivey Code ends up with ${(await ibmiAllLibraries()).length} libraries.`);
+    return parts.join("\n\n");
+  });
 
   await step("What Hivey Code makes of it", async () => {
     const files = await ibmiSourceFiles(lib);
