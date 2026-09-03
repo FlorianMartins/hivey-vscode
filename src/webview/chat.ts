@@ -545,16 +545,30 @@ function turnRule(entry: Pick<UiEntry, "id" | "checkpointFiles" | "checkpointPar
   return wrap;
 }
 
-export function stepList(steps: Array<{ tool: string; summary: string; ok: boolean }>): HTMLElement {
+export function stepList(steps: Array<{ tool: string; summary: string; ok: boolean; call?: string }>): HTMLElement {
   const list = el("div", "steps");
-  for (const s of steps) {
-    const row = el("div", `step${s.ok ? "" : " failed"}`);
-    row.append(icon(s.ok ? "check" : "cross", "step-ico"));
-    row.append(el("span", "step-tool", s.tool));
-    row.append(el("span", "step-summary", s.summary));
-    list.append(row);
-  }
+  for (const s of steps) list.append(stepRow(s));
   return list;
+}
+
+/**
+ * One line of what the agent did: the tool, what it was asked to do, and how it went.
+ *
+ * The call is set in the monospace of the rest of the product, because it is a command, a path or a
+ * query — data, not prose — and it is the half somebody re-reading the turn is looking for. The
+ * result summary follows it when it adds something: for most tools it repeats what the call already
+ * said, and a line that says the same thing twice is a line nobody finishes reading.
+ */
+export function stepRow(s: { tool: string; summary: string; ok: boolean; call?: string }): HTMLElement {
+  const row = el("div", `step${s.ok ? "" : " failed"}`);
+  row.append(icon(s.ok ? "check" : "cross", "step-ico"));
+  row.append(el("span", "step-tool", s.tool));
+  if (s.call) row.append(el("code", "step-call", s.call));
+  const summary = s.call && s.summary.startsWith(s.call) ? "" : s.summary;
+  if (summary) row.append(el("span", "step-summary", summary));
+  // The whole of both, for a line the panel had to cut.
+  row.title = [s.call, s.summary].filter(Boolean).join("\n");
+  return row;
 }
 
 export function collapsible(title: string, body: string): HTMLElement {

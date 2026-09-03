@@ -6,7 +6,7 @@
 // rendered incrementally is the answer being streamed, because that one has to be.
 
 import { button, closeMenu, el, icon, ICON, menuIsOpen, searchInput } from "./dom.js";
-import { chatScreen, collapsible, isStreaming, planBlock, setStreaming, type ChatDeps, captureDraft, restoreDraft } from "./chat.js";
+import { chatScreen, collapsible, isStreaming, planBlock, setStreaming, stepRow, type ChatDeps, captureDraft, restoreDraft } from "./chat.js";
 import { historyScreen } from "./history.js";
 import { modelsScreen } from "./models.js";
 import { permissionsScreen } from "./permissions.js";
@@ -277,6 +277,38 @@ class LiveTurn {
   }
 
   /**
+   * How much of what has arrived is on screen.
+   *
+   * A model does not send words, it sends whatever fits in a packet: three tokens, then eleven,
+   * then one. Painting each arrival is what makes an answer land in blocks — and reading is a
+   * continuous act, so a text that arrives in jumps reads as a text that keeps interrupting itself.
+   * Releasing characters at a steady rate costs nothing and turns the same stream into writing.
+   *
+   * Paced by the backlog, never by a fixed speed: a sixth of what is waiting per frame, so a fast
+   * model is not held behind an animation and a slow one still moves. The reader is never made to
+   * wait for the interface — which is the only rule that matters here, since this is decoration and
+   * the answer is the point.
+   */
+  private shown = 0;
+  private typing = false;
+
+  private drain(): void {
+    if (this.typing) return;
+    this.typing = true;
+    const step = (): void => {
+      const backlog = this.buffer.length - this.shown;
+      if (backlog <= 0) {
+        this.typing = false;
+        return;
+      }
+      this.shown = Math.min(this.buffer.length, this.shown + Math.max(3, Math.ceil(backlog / 6)));
+      this.renderBuffer();
+      requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }
+
+  /**
    * Render the answer AS IT ARRIVES, not once it has finished.
    *
    * The panel used to show raw markdown while streaming and swap in the formatted version at the
@@ -294,12 +326,20 @@ class LiveTurn {
   private pending = false;
 
   private scheduleRender(): void {
-    if (this.pending) return;
-    this.pending = true;
-    requestAnimationFrame(() => {
-      this.pending = false;
-      this.renderBuffer();
-    });
+    // Someone who has asked for less movement gets the text as it arrives, with no pacing at all.
+    // The animation is a nicety; motion sickness is not.
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+      this.shown = this.buffer.length;
+      if (this.pending) return;
+      this.pending = true;
+      requestAnimationFrame(() => {
+        this.pending = false;
+        this.shown = this.buffer.length;
+        this.renderBuffer();
+      });
+      return;
+    }
+    this.drain();
   }
 
   private renderBuffer(): void {
@@ -308,7 +348,7 @@ class LiveTurn {
     if (selection && !selection.isCollapsed && this.text.contains(selection.anchorNode)) return;
     // No code actions while streaming: Copy and Compare on a block that is still being written
     // would act on half of it. They arrive with `finish()`, on the finished answer.
-    const rendered = markdown(closeOpenFence(this.buffer));
+    const rendered = markdown(closeOpenFence(this.buffer.slice(0, this.shown)));
     rendered.className = "md live";
     this.text.replaceChildren(...Array.from(rendered.childNodes));
   }
@@ -340,16 +380,37 @@ class LiveTurn {
     this.planNode = next;
   }
 
-  appendStatus(text: string, tool?: string, ok?: boolean): void {
-    const row = el("div", `step${ok === false ? " failed" : ""}`);
-    if (tool) {
-      row.append(icon(ok === false ? "cross" : "check", "step-ico"));
-      row.append(el("span", "step-tool", tool));
-    } else {
-      row.append(el("span", "step-ico dot", "·"));
+  /**
+   * A step, and always above the answer.
+   *
+   * It used to be appended to the end of the turn, so the steps sat wherever the writing happened
+   * to be: text started, a step landed under it, more text went back above it. And at the end the
+   * turn is redrawn from the record, where steps are drawn ABOVE the answer — so everything moved
+   * one last time, exactly when the reader had settled on it. One container, placed once, and
+   * nothing shifts.
+   */
+  private steps?: HTMLElement;
+
+  private stepsHost(): HTMLElement {
+    if (!this.steps) {
+      this.steps = el("div", "steps");
+      if (this.text) this.body.insertBefore(this.steps, this.text);
+      else this.body.append(this.steps);
     }
-    row.append(el("span", "step-summary", text));
-    this.body.append(row);
+    return this.steps;
+  }
+
+  appendStatus(text: string, tool?: string, ok?: boolean, call?: string): void {
+    if (!tool) {
+      // Progress from a tool that is still running, not the result of one. It is a passing remark,
+      // so it replaces the last one rather than stacking.
+      const row = el("div", "step");
+      row.append(el("span", "step-ico dot", "·"));
+      row.append(el("span", "step-summary", text));
+      this.stepsHost().append(row);
+      return;
+    }
+    this.stepsHost().append(stepRow({ tool, summary: text, ok: ok !== false, ...(call ? { call } : {}) }));
   }
 
   appendError(message: string): void {
@@ -418,6 +479,10 @@ class LiveTurn {
 
   /** The authoritative render: the finished text, with the actions that act on it. */
   finish(): void {
+    // Whatever is still queued lands at once. An answer that has finished arriving is finished, and
+    // an animation still typing it out would be the interface pretending to think.
+    this.shown = this.buffer.length;
+    this.typing = false;
     if (this.text && this.buffer) {
       const rendered = markdown(this.buffer, {
         onCopy: (code) => send({ type: "copy", text: code }),
@@ -571,7 +636,7 @@ window.addEventListener("message", (event: MessageEvent<ToPanel>) => {
       // report in, and the panel sat there apparently thinking. Anything with news to give outside a
       // turn has the editor's own places to give it.
       if (!live && !isStreaming()) break;
-      ensureLive().appendStatus(m.text, m.tool, m.ok);
+      ensureLive().appendStatus(m.text, m.tool, m.ok, m.call);
       scrollToEnd();
       break;
     case "approval":

@@ -28,6 +28,13 @@ export interface BuiltinSkill {
   /** True when the active file (or selection) should ride along with it. */
   attach?: boolean;
   /**
+   * A feature this skill depends on. Offered only when that feature is on.
+   *
+   * Not the same thing as a group: a group is a language somebody chose not to work in today, and
+   * this is machinery that is switched off — invoking it would reach for tools that are not there.
+   */
+  needs?: "knowledge";
+  /**
    * Which family it belongs to, so a whole language can be switched on or off in one gesture.
    *
    * The group is the answer to a real problem rather than a filing system: with every skill on, the
@@ -96,6 +103,21 @@ export const SKILL_GROUPS: Array<{ id: SkillGroup; label: string; hint: string }
 export const BUILTIN_SKILLS: BuiltinSkill[] = [
   // ── Any language ────────────────────────────────────────────────────────────────────────────
   { group: "general", name: "/compact", hint: t("summarise the conversation and free the context"), action: "compact" },
+  {
+    group: "general",
+    name: "/remember",
+    needs: "knowledge",
+    hint: t("record what we established in the knowledge base"),
+    prompt: t(
+      "Record in the knowledge base what this conversation established that will still be true next month.\n\n" +
+        "Work like a librarian, not like a scribe:\n" +
+        "1. Search first. Something on this subject may already exist, and the right move is almost always to correct it rather than to add a second note.\n" +
+        "2. Write what is true of the system, the business or the team — never what happened in this conversation. “The settlement job runs before the batch” is knowledge; “we looked at the settlement job” is not.\n" +
+        "3. One subject per note, with a title somebody scanning a list would recognise, and say where it came from.\n" +
+        "4. If something recorded turned out to be wrong, retire it and say why.\n\n" +
+        "If nothing durable came out of this conversation, say so and record nothing. A base full of nearly-nothing is worse than a small one.",
+    ),
+  },
   { group: "general", name: t("/explain"), hint: t("explain the file or the selection"), prompt: t("Explain this code: what it does, how it fits into the rest, and what deserves attention."), attach: true },
   { group: "general", name: "/tests", hint: t("write tests"), prompt: t("Write tests for this code, in the style and with the tools already used in this repository. Cover the edge cases."), attach: true },
   { group: "general", name: t("/fix"), hint: t("find and fix the problem"), prompt: t("Find the defect in this code and fix it. Say in one sentence what was wrong."), attach: true },

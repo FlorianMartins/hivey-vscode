@@ -2,7 +2,7 @@
   "name": "hivey-code",
   "displayName": "Hivey Code",
   "description": "%extension.description%",
-  "version": "0.34.2",
+  "version": "0.35.0",
   "publisher": "hivey",
   "license": "Apache-2.0",
   "repository": {
@@ -276,6 +276,12 @@
         "icon": "$(pulse)"
       },
       {
+        "command": "hiveyCode.showKnowledge",
+        "title": "%command.showKnowledge.title%",
+        "category": "Hivey Code",
+        "icon": "$(book)"
+      },
+      {
         "command": "hiveyCode.stopAnswer",
         "title": "%command.stopAnswer.title%",
         "category": "Hivey Code",
@@ -334,9 +340,14 @@
           "group": "2_inspect@3"
         },
         {
-          "command": "hiveyCode.showMcp",
+          "command": "hiveyCode.showKnowledge",
           "when": "view == hiveyCode.chat || view == hiveyCode.chatSide",
           "group": "2_inspect@4"
+        },
+        {
+          "command": "hiveyCode.showMcp",
+          "when": "view == hiveyCode.chat || view == hiveyCode.chatSide",
+          "group": "2_inspect@5"
         },
         {
           "command": "hiveyCode.moveToSecondarySideBar",
@@ -815,6 +826,36 @@
             "type": "boolean",
             "default": false,
             "markdownDescription": "%config.context.autoCompact%"
+          },
+          "hiveyCode.knowledge.enabled": {
+            "type": "boolean",
+            "default": false,
+            "markdownDescription": "%config.knowledge.enabled%"
+          },
+          "hiveyCode.knowledge.scope": {
+            "type": "string",
+            "enum": [
+              "project",
+              "personal",
+              "both"
+            ],
+            "enumDescriptions": [
+              "%config.knowledge.scope.project%",
+              "%config.knowledge.scope.personal%",
+              "%config.knowledge.scope.both%"
+            ],
+            "default": "both",
+            "markdownDescription": "%config.knowledge.scope%"
+          },
+          "hiveyCode.knowledge.endpoint": {
+            "type": "string",
+            "default": "",
+            "markdownDescription": "%config.knowledge.endpoint%"
+          },
+          "hiveyCode.knowledge.indexTokens": {
+            "type": "number",
+            "default": 1200,
+            "markdownDescription": "%config.knowledge.indexTokens%"
           }
         }
       },

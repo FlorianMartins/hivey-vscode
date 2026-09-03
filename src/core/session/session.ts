@@ -49,7 +49,14 @@ export interface Entry {
   /** What the model thought before answering. Kept for the user, never sent back to the model. */
   reasoning?: string;
   /** The tools this answer ran, for the transcript and the audit trail. */
-  steps?: Array<{ tool: string; summary: string; ok: boolean }>;
+  /**
+   * What the agent did, one line per call.
+   *
+   * `call` is what it was asked to do — the command, the path, the query — and `summary` is what
+   * came back. Both, because a step showing only the result is unreadable a day later: six
+   * `run_command` lines saying "started in the terminal" name no command between them.
+   */
+  steps?: Array<{ tool: string; summary: string; ok: boolean; call?: string }>;
   /** Set on an assistant entry that failed, so it is never replayed as if it were an answer. */
   error?: string;
   /**

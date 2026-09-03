@@ -7,6 +7,8 @@
 // it is deliberately the only place that knows about all of them.
 
 import * as vscode from "vscode";
+import { callSignature } from "../core/agent/callSignature.js";
+import { knowledgeAmbient } from "./knowledge.js";
 import { language, t } from "../shared/i18n.js";
 import { runTurn, type Tool } from "../core/agent/loop.js";
 import { Permissions, commandPrefix, type PermissionStore, type Rule } from "../core/agent/permissions.js";
@@ -1380,7 +1382,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const policy = readSettings().skills;
     // Only the families in play. A picker listing seventy skills of which sixty belong to languages
     // this project does not contain is a picker nobody reads to the end.
-    const builtins = BUILTIN_SKILLS.filter((sk) => policy.groups.includes(sk.group)).map((sk) => ({
+    // A skill whose machinery is switched off is not offered: `/remember` with no knowledge base
+    // would reach for tools that are not in the turn, and the model would explain that it cannot.
+    const available = (sk: (typeof BUILTIN_SKILLS)[number]): boolean =>
+      sk.needs !== "knowledge" || readSettings().knowledge.enabled;
+    const builtins = BUILTIN_SKILLS.filter((sk) => policy.groups.includes(sk.group) && available(sk)).map((sk) => ({
       name: sk.name,
       description: sk.hint,
       enabled: isSkillEnabled(sk.name, policy),
@@ -2780,6 +2786,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     // The repository's own rules, if it has any. They sit in the cacheable prefix, which is where
     // text that is identical on every turn belongs.
     const houseRules = await instructionsPrompt();
+    // The knowledge base's table of contents, and only that. It sits in the cacheable prefix with
+    // the house rules because it is the same kind of text: identical from one turn to the next, and
+    // about the work rather than about the question.
+    const learned = await knowledgeAmbient(settings);
     const ambient =
       mode !== "chat" && settings.context.repoMap
         ? await this.workspace.repoMap(Math.floor(settings.context.maxTokens * 0.4))
@@ -2832,6 +2842,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         workspaceNote() +
         dialectNote() +
         houseRules +
+        (learned ? `\n\n${learned}\n` : "") +
         (mode === "chat"
           ? ""
           : skillsPrompt(
@@ -2982,9 +2993,23 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         },
         onToolResult: ({ call, result }) => {
           const summary = String(result.content).split("\n")[0]?.slice(0, 120) ?? "";
-          steps.push({ tool: call.name, summary, ok: !result.isError });
+          // What it was asked to do, alongside what came back. Without the first half a turn reads
+          // as six identical lines: the result of a command says nothing about which command.
+          let signature = "";
+          try {
+            signature = callSignature(call.name, JSON.parse(call.args || "{}") as Record<string, unknown>);
+          } catch {
+            signature = "";
+          }
+          steps.push({ tool: call.name, summary, ok: !result.isError, ...(signature ? { call: signature } : {}) });
           if (ctl.signal.aborted) return;
-          this.post({ type: "status", text: summary, tool: call.name, ok: !result.isError });
+          this.post({
+            type: "status",
+            text: summary,
+            tool: call.name,
+            ok: !result.isError,
+            ...(signature ? { call: signature } : {}),
+          });
         },
         report: (msg) => {
           if (ctl.signal.aborted) return;

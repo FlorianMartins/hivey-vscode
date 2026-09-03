@@ -219,5 +219,8 @@ export class WorkspaceContext {
 export function relative(uri: vscode.Uri): string {
   const folder = vscode.workspace.getWorkspaceFolder(uri);
   if (!folder) return uri.fsPath;
-  return vscode.workspace.asRelativePath(uri, false);
+  // The folder's name is included as soon as there is more than one, because without it the path is
+  // ambiguous — `src/index.ts` exists in both halves of a two-folder workspace, and the model, the
+  // transcript and the tool that has to find the file again all get the same name for two files.
+  return vscode.workspace.asRelativePath(uri, (vscode.workspace.workspaceFolders?.length ?? 0) > 1);
 }

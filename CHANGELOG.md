@@ -2,6 +2,66 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.35.0 — 2026-09-03
+
+### Added
+
+- **A knowledge base the agent keeps for itself.** Optional and off by default
+  (`hiveyCode.knowledge.enabled`). What it is for decides everything about it: an assistant that is
+  new to a business every morning spends the first half of every conversation being told what it was
+  told yesterday — which library holds the production programmes, that amounts are stored in cents,
+  that nobody touches the settlement job before the batch. That knowledge changes slowly, which is
+  exactly the kind worth writing down once.
+  - **Files, not a black box.** One note per subject, Markdown with a header, in
+    `.hiveycode/knowledge/` — versioned, reviewed and arriving with a clone, the argument that made
+    skills files rather than settings — or in `~/.hiveycode/knowledge/` for what is true of you
+    across projects. A base nobody can read is a base nobody can correct, and the first time it says
+    something false about the business, correcting it is the only thing that matters. It can also
+    live on a server you plug in (`hiveyCode.knowledge.endpoint`, four routes, small enough to
+    implement in an afternoon).
+  - **The index is ambient; the knowledge is not.** Each question carries a list of titles — about a
+    dozen tokens a note, capped and honest about what it left out — and nothing else. A note is read
+    when the model decides it needs it. A base that put itself in every prompt would cost more than
+    it saves by the fiftieth note.
+  - **It is curated, not accumulated.** Writing a note whose subject already exists is refused, with
+    the notes that cover it, so the model updates the right one instead of leaving the next reader
+    to choose between three versions of a rule. Retiring moves a note to `.archive/` with the reason
+    and the date: a base that can only grow is useless, and one that can quietly lose things is
+    worse.
+  - **`/remember`** records what a conversation established, working like a librarian rather than a
+    scribe — searching first, writing what is true of the system rather than what happened in the
+    chat, and recording nothing when nothing durable came out of it.
+  - **Show the knowledge base** (palette, and the panel's `⋯`) lists every note and opens the file,
+    or writes a new one with its header already in place.
+
+### Changed
+
+- **The agent's steps say what it did, not only what came back.** A step showed the first line of the
+  result, so six commands in a row read as six identical lines saying "started in the terminal",
+  naming none of them. Each line now carries the call itself — the command, the path, the query — in
+  the font the rest of the product writes data in, with the result after it when it adds something.
+- **The steps stay above the answer.** They were appended wherever the writing happened to be, so
+  text started, a step landed under it, more text went back above it — and at the end the turn was
+  redrawn from the record, where steps sit above the answer, so everything moved one last time
+  exactly when the reader had settled on it. One container, placed once.
+- **The answer is written rather than dropped in blocks.** A model does not send words, it sends
+  whatever fits in a packet: three tokens, then eleven, then one. The characters are now released at
+  a steady rate, paced by how much is waiting, so a fast model is never held behind an animation.
+  Anyone who has asked their system for less movement gets the text as it arrives, unpaced.
+- The button back to the end of the conversation sits one pixel higher: at its old place it grazed
+  the composer's edge, and a control touching another control reads as attached to it.
+
+### Fixed
+
+- **"The agent said my folder was not open, and it is."** Two causes, both real. In a window with
+  files open and no folder — ordinary when they come from a remote or an IBM i partition — every
+  file tool answered "No folder is open", which to somebody looking at their open files reads as the
+  extension having lost the workspace; the open tabs are now the workspace in that case. And in a
+  multi-root workspace, paths were resolved against the FIRST folder only, while the paths the model
+  is shown carry the folder name — so every file outside the first folder was unreachable, and said
+  so in words that sound like a missing folder. Paths now name their folder when there is more than
+  one, and are resolved against it.
+
 ## 0.34.2 — 2026-09-03
 
 ### Fixed

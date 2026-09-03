@@ -2,6 +2,7 @@
 // its capabilities is one file long and a reviewer can read it in a minute.
 
 import * as vscode from "vscode";
+import { showKnowledge } from "./knowledge.js";
 import { setLanguage, t } from "../shared/i18n.js";
 import { Budget } from "../core/router/budget.js";
 import { isLocalEndpoint } from "../core/redaction/index.js";
@@ -101,6 +102,8 @@ export function activate(context: vscode.ExtensionContext): void {
     // Returns whether a turn was actually stopped, so a test can tell "stopped it" from "nothing
     // was running" — the two cases behind "the stop button does nothing".
     vscode.commands.registerCommand("hiveyCode.stopAnswer", () => chat.stopTurn()),
+
+    vscode.commands.registerCommand("hiveyCode.showKnowledge", () => showKnowledge()),
 
     // An instrument rather than another guess. Listings came back empty on a real partition, and
     // there is none here to try anything against, so each fix was a hypothesis handed to somebody

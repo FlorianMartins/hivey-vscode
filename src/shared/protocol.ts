@@ -371,7 +371,7 @@ export type ToPanel =
   | { type: "state"; state: UiState }
   | { type: "delta"; text: string }
   | { type: "reasoning"; text: string }
-  | { type: "status"; text: string; tool?: string; ok?: boolean }
+  | { type: "status"; text: string; tool?: string; ok?: boolean; call?: string }
   | { type: "turnStart" }
   | { type: "turnEnd" }
   | {

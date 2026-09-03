@@ -38,6 +38,14 @@ export interface Settings {
   };
   budget: { perRequestUsd: number; dailyUsd: number };
   context: { maxTokens: number; repoMap: boolean; autoCompact: boolean };
+  knowledge: {
+    enabled: boolean;
+    scope: "project" | "personal" | "both";
+    /** A base served over HTTP. Empty means the files on this machine. */
+    endpoint: string;
+    /** Ceiling for the list of titles that rides on every turn. */
+    indexTokens: number;
+  };
   /**
    * Whether the IBM i surface is offered at all.
    *
@@ -113,6 +121,12 @@ export function readSettings(scope?: vscode.Uri): Settings {
       maxTokens: c.get<number>("context.maxTokens", 8000),
       repoMap: c.get<boolean>("context.repoMap", true),
       autoCompact: c.get<boolean>("context.autoCompact", false),
+    },
+    knowledge: {
+      enabled: c.get<boolean>("knowledge.enabled", false),
+      scope: c.get<"project" | "personal" | "both">("knowledge.scope", "both"),
+      endpoint: c.get<string>("knowledge.endpoint", ""),
+      indexTokens: c.get<number>("knowledge.indexTokens", 1200),
     },
     ibmi: { integration: c.get<"auto" | "on" | "off">("ibmi.integration", "auto") },
     skills: {

@@ -596,10 +596,30 @@ pre.code {
   color: var(--vscode-foreground);
   flex: 0 0 auto;
 }
+/* What the call was: a command, a path, a query. In the font data is written in throughout this
+   product, and allowed to take the room the summary does not need — it is the half worth reading. */
+.step-call {
+  font-family: var(--vscode-editor-font-family);
+  font-size: var(--fs-meta);
+  color: var(--vscode-foreground);
+  background: color-mix(in srgb, var(--vscode-foreground) 7%, transparent);
+  border-radius: var(--radius);
+  padding: 0 4px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.step.failed .step-call {
+  color: var(--vscode-errorForeground);
+}
 .step-summary {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  /* Second in line for the space: when both are long the call is cut last. */
+  flex: 0 1 auto;
+  opacity: 0.85;
 }
 
 .collapsible {
@@ -2800,8 +2820,10 @@ pre.code::-webkit-scrollbar-track {
      Below the strip rather than inside it: the transcript keeps its own eight pixels of padding
      under the last message, so the space the button has to sit in the middle of starts higher than
      the strip does. Three pixels down was too far and one up was not far enough; this is between
-     the two positions each of which was wrong in one direction. */
-  bottom: -1px;
+     the two positions each of which was wrong in one direction.
+     Then one pixel higher again, asked for on a real panel: at -1 the disc grazed the composer's
+     top edge, and a control that touches another control reads as attached to it. */
+  bottom: 0;
   z-index: 5;
   /* A disc, now that there is only a chevron in it: a pill around a single glyph is a pill with
      two empty ends. */

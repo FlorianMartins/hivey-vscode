@@ -6,7 +6,9 @@ import * as vscode from "vscode";
 import * as fs from "node:fs/promises";
 // The settings namespace has one definition; a test that repeats it as a literal is a test that
 // keeps passing after a rename has broken the product.
-import { SECTION } from "../../extension/config.js";
+import { SECTION, readSettings } from "../../extension/config.js";
+import { buildTools } from "../../extension/tools.js";
+import { buildKnowledgeTools, knowledgeAmbient } from "../../extension/knowledge.js";
 import { openFileUris } from "../../extension/models.js";
 import { DefinitionStore } from "../../extension/definitions.js";
 import { join } from "node:path";
@@ -389,6 +391,117 @@ suite("Hivey Code", () => {
     } finally {
       await restore();
       stub.close();
+    }
+  });
+
+  /**
+   * "The agent said my folder was not open, and it is."
+   *
+   * This harness opens no folder, which is the case itself: a window with files in it and no folder
+   * — ordinary when the files come from a remote or an IBM i partition. Every file tool used to
+   * answer "No folder is open", which to somebody looking at their open files reads as the
+   * extension having lost the workspace.
+   */
+  test("a file tool finds an open file when no folder is open", async () => {
+    const ext = vscode.extensions.getExtension(ID)!;
+    await ext.activate();
+    assert.equal(vscode.workspace.workspaceFolders, undefined, "the case under test is: no folder");
+
+    const dir = await fs.mkdtemp(join(tmpdir(), "hivey-code-nofolder-"));
+    const file = join(dir, "facture.ts");
+    await fs.writeFile(file, "export const tva = 0.21;\n", "utf8");
+    const doc = await vscode.workspace.openTextDocument(file);
+    await vscode.window.showTextDocument(doc);
+
+    try {
+      const read = buildTools({ settings: () => readSettings() }).find((t) => t.schema.name === "read_file");
+      assert.ok(read, "read_file is not among the tools");
+      const result = await read!.run({ path: "facture.ts" }, { report: () => {} });
+      assert.ok(result.content.includes("tva"), `read_file answered: ${result.content}`);
+
+      // And a name nothing matches says what is actually available rather than blaming the folder.
+      const missing = await read!.run({ path: "nowhere.ts" }, { report: () => {} }).catch((e: Error) => ({
+        content: e.message,
+      }));
+      assert.match(missing.content, /open file|Ask the user to open/i, missing.content);
+    } finally {
+      await vscode.commands.executeCommand("workbench.action.closeAllEditors");
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  /**
+   * The knowledge base, end to end, against a real filesystem.
+   *
+   * The core is unit-tested; what only a real editor can settle is whether the files are written
+   * where the store says they are, read back as notes, and taken out of the base when retired.
+   */
+  test("a note can be recorded, found, and retired", async () => {
+    const ext = vscode.extensions.getExtension(ID)!;
+    await ext.activate();
+
+    const home = await fs.mkdtemp(join(tmpdir(), "hivey-code-knowledge-"));
+    const realHome = process.env["HOME"];
+    process.env["HOME"] = home;
+
+    const config = vscode.workspace.getConfiguration(SECTION);
+    const before = { enabled: config.get("knowledge.enabled"), scope: config.get("knowledge.scope") };
+    await config.update("knowledge.enabled", true, vscode.ConfigurationTarget.Global);
+    await config.update("knowledge.scope", "personal", vscode.ConfigurationTarget.Global);
+
+    try {
+      const tools = buildKnowledgeTools(() => readSettings());
+      const tool = (name: string) => tools.find((t) => t.schema.name === name)!;
+      const ctx = { report: () => {} };
+
+      const written = await tool("knowledge_write").run(
+        {
+          id: "finance/invoice-settlement",
+          title: "How an invoice is settled",
+          body: "The settlement job runs before the nightly batch. Amounts are in cents.",
+          tags: "finance, batch",
+        },
+        ctx,
+      );
+      assert.equal(written.isError, undefined, written.content);
+
+      // On disk, where the setting says, and readable by a person.
+      const file = join(home, ".hiveycode", "knowledge", "finance", "invoice-settlement.md");
+      const text = await fs.readFile(file, "utf8");
+      assert.match(text, /title: How an invoice is settled/);
+      assert.match(text, /nightly batch/);
+
+      const found = await tool("knowledge_search").run({ query: "settlement" }, ctx);
+      assert.match(found.content, /finance\/invoice-settlement/);
+
+      // The same subject under another name is refused, with what already covers it.
+      const again = await tool("knowledge_write").run(
+        { id: "finance/settlement-of-invoices", title: "Invoice settlement", body: "..." },
+        ctx,
+      );
+      assert.equal(again.isError, true, "a second note on the same subject was accepted");
+      assert.match(again.content, /finance\/invoice-settlement/);
+
+      // The index the model sees on every turn lists it.
+      const ambient = await knowledgeAmbient(readSettings());
+      assert.ok(ambient?.includes("How an invoice is settled"), ambient ?? "(no index)");
+
+      // Retiring takes it out of the base and keeps it on disk.
+      const gone = await tool("knowledge_retire").run({ id: "finance/invoice-settlement", reason: "the job was replaced" }, ctx);
+      assert.equal(gone.isError, undefined, gone.content);
+      await assert.rejects(fs.readFile(file, "utf8"), "the note is still where it was");
+      const archived = await fs.readFile(
+        join(home, ".hiveycode", "knowledge", ".archive", "finance", "invoice-settlement.md"),
+        "utf8",
+      );
+      assert.match(archived, /retired-because: the job was replaced/);
+      assert.equal(await knowledgeAmbient(readSettings()), undefined, "a retired note is still in the index");
+    } finally {
+      if (realHome === undefined) delete process.env["HOME"];
+      else process.env["HOME"] = realHome;
+      await config.update("knowledge.enabled", before.enabled, vscode.ConfigurationTarget.Global);
+      await config.update("knowledge.scope", before.scope, vscode.ConfigurationTarget.Global);
+      await fs.rm(home, { recursive: true, force: true });
     }
   });
 

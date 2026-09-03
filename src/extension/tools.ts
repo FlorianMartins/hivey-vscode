@@ -17,10 +17,12 @@ import { headToTokens } from "../core/util/tokens.js";
 import { EgressGate } from "./egress.js";
 import type { Settings } from "./config.js";
 import { relative } from "./workspace.js";
+import { openFileUris } from "./models.js";
 import { buildGitTools, gitAvailable } from "./integrations/git.js";
 import { buildIbmiTools, ibmiEnabled } from "./integrations/ibmi.js";
 import { readSettings } from "./config.js";
 import { arcadInstalled, buildArcadTools, type ArcadDeps } from "./integrations/arcad.js";
+import { buildKnowledgeTools } from "./knowledge.js";
 import type { McpManager } from "./integrations/mcp.js";
 
 const MAX_READ_TOKENS = 6000;
@@ -32,6 +34,23 @@ function root(): vscode.Uri {
   return folder.uri;
 }
 
+/**
+ * A path the model named, turned into the file it meant.
+ *
+ * Three cases, and only the first used to work.
+ *
+ *   ONE FOLDER      join and go.
+ *   SEVERAL         the paths the model was shown come from `relative()`, which prefixes the folder
+ *                   name when there is more than one. Joining that onto the FIRST folder produced a
+ *                   path pointing nowhere — in a multi-root workspace every file outside the first
+ *                   folder was unreadable, and the model was told so in words that sound like the
+ *                   folder is missing.
+ *   NONE            a window with files open and no folder — which is ordinary when the files come
+ *                   from a remote, an IBM i partition or a drag-and-drop. Every tool answered "No
+ *                   folder is open", and the user, looking at their open files, reads that as the
+ *                   extension having lost the workspace. The tabs ARE the workspace here, so a path
+ *                   is matched against them.
+ */
 function resolve(path: string, settings: Settings): vscode.Uri {
   const clean = path.replace(/^\.\//, "");
   // A tool call is model output, and model output can be steered by a file it just read. Escaping
@@ -42,7 +61,25 @@ function resolve(path: string, settings: Settings): vscode.Uri {
   if (EgressGate.isBlocked(clean, settings.privacy.blockedGlobs)) {
     throw new Error(`Refused: “${path}” is excluded by the privacy policy.`);
   }
-  return vscode.Uri.joinPath(root(), clean);
+
+  const folders = vscode.workspace.workspaceFolders ?? [];
+  if (folders.length > 1) {
+    const named = folders.find((f) => clean === f.name || clean.startsWith(`${f.name}/`));
+    if (named) {
+      const rest = clean.slice(named.name.length).replace(/^\//, "");
+      return rest ? vscode.Uri.joinPath(named.uri, rest) : named.uri;
+    }
+  }
+  if (folders.length) return vscode.Uri.joinPath(folders[0]!.uri, clean);
+
+  const open = openFileUris().find((uri) => uri.path === `/${clean}` || uri.path.endsWith(`/${clean}`));
+  if (open) return open;
+  const tabs = openFileUris().length;
+  throw new Error(
+    tabs
+      ? `No folder is open, and none of the ${tabs} open file(s) is “${path}”. Name one of them, or ask the user to open the folder.`
+      : `No folder is open and no file is open. Ask the user to open the folder this question is about.`,
+  );
 }
 
 export interface ToolDeps {
@@ -279,6 +316,10 @@ export function buildTools(deps: ToolDeps): Tool[] {
     // no partition will try, and spend a turn discovering what the settings already knew.
     ...(ibmiEnabled(readSettings().ibmi.integration) ? buildIbmiTools() : []),
     ...(arcadInstalled() && deps.arcad ? buildArcadTools(deps.arcad) : []),
+    // Same gate as the rest: a model told it can consult a knowledge base that is switched off
+    // spends a call finding out. Off by default, because a base nobody asked for is a folder of
+    // files appearing in somebody's repository.
+    ...(readSettings().knowledge.enabled ? buildKnowledgeTools(() => deps.settings()) : []),
     ...(deps.mcp?.tools() ?? []),
   ];
 
