@@ -646,8 +646,22 @@ pre.code {
 
 /* ── Approval ────────────────────────────────────────────────────────────────────────────── */
 
+/* One colour per box, on the edge that says which kind.
+ *
+ * The frame was `inputValidation-warningBorder` on all four sides — the colour a text field turns
+ * when what you typed is wrong, which is not what "confirm this" means, and it made a routine
+ * question the loudest thing in the transcript. Worse, the egress variant then drew a blue leading
+ * edge over one side of that orange box: two colours on one card, which reads as a rendering fault
+ * rather than as a distinction.
+ *
+ * So: the panel's own quiet frame, and a leading edge carrying the one colour that matters. That is
+ * the same language the rest of the panel already speaks — a pinned answer, a refusal in the
+ * permission lists — so the edge is read as "which kind of thing is this" without a legend. */
 .approval {
-  border: 1px solid var(--vscode-inputValidation-warningBorder, var(--border-strong));
+  /* The stronger of the two panel borders: this card is a question that stops the turn, so it has
+     to read as a card and not as a paragraph with a coloured edge. */
+  border: 1px solid var(--border-strong);
+  border-left: 2px solid var(--vscode-editorWarning-foreground, var(--vscode-charts-yellow));
   background: var(--surface);
   border-radius: var(--radius-lg);
   padding: var(--sp-3);
@@ -2110,10 +2124,15 @@ pre.code {
   min-height: 14px;
 }
 
-/* An egress card is about what leaves the machine rather than about what the agent may do, so it
-   reads differently: the accent border says "this one is about the outside". */
+/* An egress card is about what leaves the machine rather than about what the agent may do, so its
+   edge takes the colour the workbench uses for a link out: the same shape saying a different thing,
+   rather than a second border fighting the first. */
 .approval.egress {
-  border-left: 2px solid var(--vscode-charts-blue, var(--vscode-focusBorder));
+  border-left-color: var(--vscode-textLink-foreground, var(--vscode-charts-blue));
+}
+/* And its icon follows, so the card is one colour rather than a blue edge above a yellow mark. */
+.approval.egress .approval-ico {
+  color: var(--vscode-textLink-foreground, var(--vscode-charts-blue));
 }
 .approval-detail {
   font-size: var(--fs-meta);

@@ -2,6 +2,20 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.33.1 — 2026-09-03
+
+### Fixed
+
+- **The approval and egress cards had two border colours at once.** The frame was
+  `inputValidation-warningBorder` on all four sides — the colour a text field turns when what you
+  typed is wrong, which is not what "confirm this" means, and it made a routine question the loudest
+  thing in the transcript. The egress card then drew a blue leading edge over one side of that
+  orange box: two colours on one card, which reads as a rendering fault rather than as a
+  distinction. Now it is the panel's own frame plus a leading edge carrying the one colour that
+  matters — warning for something the agent wants to do, the link colour for something leaving the
+  machine, and the icon follows the edge. That is the language the rest of the panel already speaks,
+  so the edge says which kind of card it is without a legend.
+
 ## 0.33.0 — 2026-09-03
 
 ### Added
