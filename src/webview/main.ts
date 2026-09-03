@@ -541,6 +541,9 @@ window.addEventListener("message", (event: MessageEvent<ToPanel>) => {
   switch (m.type) {
     case "state":
       state = m.state;
+      // The extension is the authority on whether a turn is running. A panel that believed its own
+      // flag could sit on a stop button for the rest of the conversation with nothing behind it.
+      setStreaming(m.state.busy);
       render();
       break;
     case "turnStart":

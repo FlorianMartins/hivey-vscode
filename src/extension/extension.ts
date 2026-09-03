@@ -98,6 +98,10 @@ export function activate(context: vscode.ExtensionContext): void {
 
     vscode.commands.registerCommand("hiveyCode.compactConversation", () => chat.compactConversation()),
 
+    // Returns whether a turn was actually stopped, so a test can tell "stopped it" from "nothing
+    // was running" — the two cases behind "the stop button does nothing".
+    vscode.commands.registerCommand("hiveyCode.stopAnswer", () => chat.stopTurn()),
+
     // An instrument rather than another guess. Listings came back empty on a real partition, and
     // there is none here to try anything against, so each fix was a hypothesis handed to somebody
     // else to test. This says what every step returned on the machine that has the problem.

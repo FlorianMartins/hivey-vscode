@@ -271,6 +271,16 @@ export interface UiState {
   contextFill: number;
   /** True when summarising happens by itself at the threshold instead of being offered. */
   autoCompact: boolean;
+  /**
+   * Whether a turn is running, according to the side that runs it.
+   *
+   * The panel used to decide this alone, from `turnStart` and `turnEnd`. Two events, one flag, and
+   * no way back: any turn whose end did not arrive left the composer showing a stop button over a
+   * conversation where nothing was running — a button that could not work, because there was
+   * nothing left to stop. Carrying it on every state message makes the extension the authority and
+   * the panel self-correcting.
+   */
+  busy: boolean;
 }
 
 /** Panel → extension. */

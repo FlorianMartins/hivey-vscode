@@ -270,6 +270,7 @@ export const FR: Record<string, string> = {
   "Stop asking for {0} until the next conversation": "Ne plus demander pour {0} jusqu'à la prochaine conversation",
   "Stop the answer": "Interrompre la réponse",
   "Stopped after the maximum number of steps.": "Arrêté après le nombre maximal d'étapes.",
+  "Stopped.": "Arrêté.",
   "Stream file (IFS)…": "Fichier de flux (IFS)…",
   "Suggestions requested this session: {0} · accepted: {1}": "Suggestions demandées cette session : {0} · acceptées : {1}",
   "Summarise automatically": "Résumer automatiquement",

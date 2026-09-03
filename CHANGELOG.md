@@ -2,6 +2,47 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.34.1 — 2026-09-03
+
+### Fixed
+
+- **Stopping an answer.** Reported as "the stop button does not work", and the first thing built was
+  not a fix but a way to find out: a test that runs a real turn against a server which starts
+  answering and never stops, presses stop, and asserts that the turn ends and the connection to the
+  model closes. It passes — so the wiring from the button to the abort was sound — and getting there
+  turned up four things around it that were not:
+  - **A stop is now instant.** It used to end the turn only once the cancellation had finished
+    travelling. Most of a turn cancels in a millisecond; a query on a partition, a REST call to a
+    server that is thinking, or a command behind somebody else's API cancels when it is ready — and
+    waiting for those is exactly what makes a stop button feel broken, since the reason anyone
+    presses it is that something is already taking too long. The panel is released immediately and
+    the rest unwinds on its own time.
+  - **A stopped turn can no longer disturb the next one.** Its cleanup used to clear the current
+    turn unconditionally — including a turn started since — which left nothing for the next stop to
+    abort. Its callbacks are silenced too: no text, status, plan or error from a turn the user gave
+    up on arriving under the question that followed it.
+  - **The panel no longer decides on its own whether an answer is running.** That state was two
+    events and a local flag, with no way back: a turn whose end never arrived left a stop button
+    over a conversation where nothing was running — a button that could not work. The extension now
+    says so on every state message, so the panel corrects itself.
+  - **It says "Stopped."** Cancellation takes a moment, and in that moment the only thing telling
+    "stopping" from "the button is broken" is a line saying which one it is. The words already
+    streamed stay: the answer is kept on the entry as it arrives, so stopping shows what was said
+    rather than an empty bubble.
+- **Cancelling a request now covers its whole life.** `fetch` resolves when the response headers
+  arrive, and the bridge from the caller's cancellation was taken down at that moment — so from the
+  first byte on, nothing could cancel the request. In practice the stream readers were dropping the
+  connection anyway, which is why nobody saw it; it mattered for everything that is not a stream,
+  where a stop had no effect at all. One listener per signal rather than one per request, so a
+  twenty-step turn does not trip Node's leak warning.
+
+### Added
+
+- **Stop the answer, as a command.** In the palette, and returning whether anything was actually
+  stopped — which is what made the behaviour testable at all: a click cannot be driven from a test,
+  and "stopped it" versus "nothing was running" are the two states worth telling apart when the
+  complaint is that a button does nothing.
+
 ## 0.34.0 — 2026-09-03
 
 ### Added

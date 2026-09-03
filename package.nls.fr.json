@@ -89,6 +89,7 @@
   "config.section.completion": "Complétion en ligne",
   "command.attachOpenEditors.title": "Joindre tous les éditeurs ouverts à la conversation",
   "submenu.selection.label": "Hivey Code",
+  "command.stopAnswer.title": "Arrêter la réponse",
   "command.compactConversation.title": "Résumer la conversation pour libérer le contexte",
   "command.selectionActions.title": "Que faire de la sélection…",
   "command.addSelectionToChat.title": "Ajouter la sélection à la conversation",

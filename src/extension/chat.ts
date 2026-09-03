@@ -355,6 +355,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         !s.context.autoCompact &&
         shouldSuggestCompact(contextTokens, budgetTokens, this.session.entries.filter((e) => e.included).length),
       autoCompact: s.context.autoCompact,
+      busy: this.turn !== undefined,
       budget: { spentTodayUsd: this.gate.budget.spentToday(), dailyUsd: s.budget.dailyUsd },
       sessionCostUsd: this.session.totalCostUsd(),
       skills: this.uiSkills(),
@@ -507,7 +508,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           await this.ask(m.text);
           break;
         case "stop":
-          this.turn?.abort();
+          this.stopTurn();
           break;
         case "renameSession":
           // An empty name hands the title back to the assistant's guess rather than leaving the
@@ -1240,6 +1241,47 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const before = this.attachments.length;
     await this.attach("openFiles");
     return this.attachments.length - before;
+  }
+
+  /**
+   * Stop the answer.
+   *
+   * A method rather than two lines inside the message switch, and a command rather than only a
+   * button, for the reason "attach all open editors" became one: what a button does cannot be
+   * driven from a test, so the one thing anybody would want to check about a stop button — that
+   * pressing it ends the turn — could not be checked at all.
+   *
+   * Returns whether there was something to stop, which is what makes it observable: a caller can
+   * tell "stopped it" from "nothing was running", and those are the two states worth telling apart
+   * when the complaint is that the button does nothing.
+   */
+  stopTurn(): boolean {
+    const ctl = this.turn;
+    if (!ctl) return false;
+    ctl.abort();
+
+    // The turn is over for the user NOW, not when the abort finishes travelling.
+    //
+    // Most of what a turn is doing can be cancelled in a millisecond. Some of it cannot: a query on
+    // a partition, a REST call to a server that is thinking, a command someone else's API will
+    // return from when it is ready. Waiting for those to notice is what makes a stop button feel
+    // broken — the one thing this control cannot afford, because the reason people press it is that
+    // something is already taking too long.
+    //
+    // So the panel is released here, and the rest unwinds on its own time. It cannot disturb what
+    // comes next: every callback on the turn checks the signal before posting, and the cleanup only
+    // runs if the turn it belongs to is still the current one.
+    this.turn = undefined;
+    this.post({ type: "status", text: t("Stopped.") });
+    this.post({ type: "turnEnd" });
+    this.persist();
+    this.sendState();
+    return true;
+  }
+
+  /** True while a turn is running. */
+  get busy(): boolean {
+    return this.turn !== undefined;
   }
 
   /** Whatever is highlighted in the editor, attached without a question asked about it. */
@@ -2585,7 +2627,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         maxTokens: 2048,
         temperature: 0.2,
         onDelta: (d) => {
-          if (!d.text) return;
+          if (!d.text || ctl.signal.aborted) return;
           streamed += d.text;
           this.post({ type: "delta", text: vault.restore(d.text) });
         },
@@ -2654,9 +2696,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       this.log.appendLine(`[compact] ${message}`);
       return false;
     } finally {
-      this.turn = undefined;
-      this.post({ type: "turnEnd" });
-      this.sendState();
+      // Only if this turn is still the current one. See `runTurn` — same trap, same guard.
+      if (this.turn === ctl) {
+        this.turn = undefined;
+        this.post({ type: "turnEnd" });
+        this.sendState();
+      }
     }
   }
 
@@ -2732,6 +2777,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       // The plan goes to the panel as it is written and onto the answer when the turn ends, so it
       // is both a live progress display and part of the record.
       onPlan: (plan) => {
+        if (ctl.signal.aborted) return;
         this.plan = plan;
         this.post({ type: "plan", plan });
       },
@@ -2888,9 +2934,18 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         signal: ctl.signal,
         maxTokens: 4096,
         reasoning: this.reasoning,
+        // Nothing from a stopped turn reaches the panel. Cancellation unwinds through a provider
+        // and a tool, and anything still in flight would otherwise stream into whatever turn is on
+        // screen by then — text from the question the user gave up on, appearing under the next one.
         onDelta: (d) => {
+          if (ctl.signal.aborted) return;
           if (d.text) {
             streamed += d.text;
+            // Kept on the entry as it arrives, not only at the end. What is on screen during a turn
+            // is a live element the next redraw discards; the entry is what survives one. Without
+            // this, stopping — which redraws immediately — showed an empty answer under the
+            // question, and the words the model had already said came back only later, if at all.
+            answer.text = vault.restore(streamed);
             // Placeholders are resolved as they stream, so the user never reads their own data
             // through a marker.
             this.post({ type: "delta", text: vault.restore(d.text) });
@@ -2903,9 +2958,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         onToolResult: ({ call, result }) => {
           const summary = String(result.content).split("\n")[0]?.slice(0, 120) ?? "";
           steps.push({ tool: call.name, summary, ok: !result.isError });
+          if (ctl.signal.aborted) return;
           this.post({ type: "status", text: summary, tool: call.name, ok: !result.isError });
         },
-        report: (msg) => this.post({ type: "status", text: msg }),
+        report: (msg) => {
+          if (ctl.signal.aborted) return;
+          this.post({ type: "status", text: msg });
+        },
         approve: (req) => this.askApproval(req),
         // Redaction runs on EVERY step, because a tool result is new text that never went through
         // the gate — a file the agent just read can contain the credential the first prompt did not.
@@ -2953,19 +3012,38 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       this.persist();
     } catch (err) {
       const message = (err as Error).message;
-      const last = this.session.entries[this.session.entries.length - 1];
-      if (last?.role === "assistant" && !last.text) last.error = message;
-      this.post({ type: "error", message });
       this.log.appendLine(`[turn] ${message}`);
+      // A turn the user stopped has no error to report. Cancellation surfaces as a failure at
+      // whatever layer noticed first, and showing that to someone who pressed stop tells them their
+      // own decision went wrong.
+      if (!ctl.signal.aborted) {
+        const last = this.session.entries[this.session.entries.length - 1];
+        if (last?.role === "assistant" && !last.text) last.error = message;
+        this.post({ type: "error", message });
+      }
     } finally {
-      this.turn = undefined;
       this.checkpointFor = undefined;
       // Old checkpoints give up their file contents here rather than at write time: the cap is
       // about what is STORED, and this is the moment just before the conversation is stored.
       this.session.entries = trimCheckpoints(this.session.entries);
       this.persist();
-      this.post({ type: "turnEnd" });
-      this.sendState();
+      // Only when this turn is STILL the current one, and this guard is the whole bug behind "the
+      // stop button does nothing".
+      //
+      // A turn that is stopped does not finish here immediately: the abort unwinds through a
+      // provider, a tool, a sub-agent, and lands in this block some milliseconds later. If the user
+      // has asked something else in between — which is exactly what someone does after pressing
+      // stop — the new turn has already put ITS controller in `this.turn`, and this line used to
+      // throw it away. From then on `stopTurn` had nothing to abort and the button was genuinely
+      // dead, for the rest of the conversation, with nothing in any log to say why.
+      //
+      // Ending the panel's turn had the same defect from the other side: the dying turn announced
+      // `turnEnd` over a turn that was still streaming.
+      if (this.turn === ctl) {
+        this.turn = undefined;
+        this.post({ type: "turnEnd" });
+        this.sendState();
+      }
     }
   }
 

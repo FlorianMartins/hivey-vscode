@@ -12,6 +12,7 @@ import { DefinitionStore } from "../../extension/definitions.js";
 import { join } from "node:path";
 import { homedir, tmpdir } from "node:os";
 import { suite, test } from "./tiny.js";
+import { createServer, type Server } from "node:http";
 
 const ID = "hivey.hivey-code";
 
@@ -253,6 +254,105 @@ suite("Hivey Code", () => {
     assert.ok(ours.length >= 3, `only ${ours.length} offers on a selection`);
   });
 
+  /**
+   * "The stop button does nothing."
+   *
+   * Every layer of this looked right when read: the panel swaps send for stop while streaming, the
+   * message arrives, the controller is aborted, the loop checks the signal at every step, the SSE
+   * reader cancels. Reading is how the last three of these were "verified" before, and each time
+   * the feature was still broken. So this runs it: a server that streams and never stops, a real
+   * turn against it, and the assertion that the turn ENDS — not that abort was called.
+   */
+  test("stopping an answer actually ends the turn", async () => {
+    const ext = vscode.extensions.getExtension(ID)!;
+    await ext.activate();
+
+    const stub = await streamingStub();
+    const restore = await useStub(stub.port);
+
+    try {
+      // Not awaited: this promise resolves when the TURN ends, which is the thing being measured.
+      const turn = vscode.commands.executeCommand("hiveyCode.askWith", "keep talking");
+
+      let stopped = false;
+      for (let i = 0; i < 100 && !stopped; i++) {
+        await delay(50);
+        stopped = Boolean(await vscode.commands.executeCommand<boolean>("hiveyCode.stopAnswer"));
+      }
+      assert.ok(stopped, "no turn was ever running to stop");
+
+      // Released immediately, not when the abort finishes travelling: pressing stop a second time
+      // must find nothing running. A tool that ignores cancellation is why this matters — the panel
+      // cannot be left waiting on a query that will return when it feels like it.
+      assert.equal(
+        await vscode.commands.executeCommand<boolean>("hiveyCode.stopAnswer"),
+        false,
+        "the panel was still held by the stopped turn",
+      );
+
+      const ended = await Promise.race([turn.then(() => "ended"), delay(4000).then(() => "still running")]);
+      assert.equal(ended, "ended", "the turn was aborted but never finished");
+
+      // And the connection is gone, not merely ignored: an abort that leaves the model generating
+      // is still being paid for on a metered endpoint, and still holding the GPU on a local one.
+      for (let i = 0; i < 40 && stub.open() > 0; i++) await delay(50);
+      assert.equal(stub.open(), 0, "the request to the model is still open after stopping");
+    } finally {
+      await restore();
+      stub.close();
+    }
+  });
+
+  /**
+   * Stop, then ask something else — and the stop button is dead for the rest of the conversation.
+   *
+   * This is the shape the complaint actually had, and it is a race rather than a wiring mistake,
+   * which is why every reading of the wiring found nothing. A stopped turn unwinds through the
+   * provider and lands in its cleanup a few milliseconds later; the next question has already
+   * started by then, and the cleanup used to clear `this.turn` unconditionally — throwing away the
+   * NEW turn's controller. Nothing left to abort, no error anywhere, and the only symptom is a
+   * button that does nothing.
+   */
+  test("a turn started right after a stop is still stoppable", async () => {
+    const ext = vscode.extensions.getExtension(ID)!;
+    await ext.activate();
+
+    // The second request holds its headers back, so the first turn's cleanup is guaranteed to land
+    // while the second turn is running rather than before it starts. Without that the race decides
+    // the result and the test says nothing on the runs where it falls the other way.
+    const stub = await streamingStub({ delayAfterFirst: 400 });
+    const restore = await useStub(stub.port);
+
+    try {
+      const first = vscode.commands.executeCommand("hiveyCode.askWith", "first question");
+      let stopped = false;
+      for (let i = 0; i < 100 && !stopped; i++) {
+        await delay(50);
+        stopped = Boolean(await vscode.commands.executeCommand<boolean>("hiveyCode.stopAnswer"));
+      }
+      assert.ok(stopped, "the first turn never started");
+
+      // No pause: asking again immediately is precisely what someone does after pressing stop.
+      const second = vscode.commands.executeCommand("hiveyCode.askWith", "second question");
+
+      let stoppedSecond = false;
+      for (let i = 0; i < 100 && !stoppedSecond; i++) {
+        await delay(50);
+        stoppedSecond = Boolean(await vscode.commands.executeCommand<boolean>("hiveyCode.stopAnswer"));
+      }
+      assert.ok(stoppedSecond, "the second turn could not be stopped — its controller was thrown away");
+
+      const ended = await Promise.race([
+        Promise.all([first, second]).then(() => "ended"),
+        delay(5000).then(() => "still running"),
+      ]);
+      assert.equal(ended, "ended", "a turn was aborted but never finished");
+    } finally {
+      await restore();
+      stub.close();
+    }
+  });
+
   test("quick fixes are offered on a diagnostic", async () => {
     const doc = await vscode.workspace.openTextDocument({ language: "plaintext", content: "ligne en erreur\n" });
     const collection = vscode.languages.createDiagnosticCollection("hivey-code-test");
@@ -415,3 +515,73 @@ suite("Screenshot", () => {
     200_000,
   );
 });
+
+function delay(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+/**
+ * A model server that starts answering and never stops.
+ *
+ * A stub that finishes on its own would let "stopping works" pass without the stop doing anything,
+ * which is the one result these tests must not be able to produce.
+ */
+async function streamingStub(opts: { delayAfterFirst?: number } = {}): Promise<{
+  port: number;
+  open: () => number;
+  close: () => void;
+}> {
+  let open = 0;
+  let served = 0;
+  const server: Server = createServer((req, res) => {
+    if (req.url?.includes("/models")) {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ data: [{ id: "stub-model" }] }));
+      return;
+    }
+    const begin = (): void => {
+      open += 1;
+      res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });
+      const timer = setInterval(() => {
+        res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: "encore " } }] })}\n\n`);
+      }, 20);
+      // Both events fire for one aborted connection, so the bookkeeping has to be idempotent —
+      // without this the counter went to -1 and the test blamed the product for its own arithmetic.
+      let counted = true;
+      const stop = (): void => {
+        clearInterval(timer);
+        if (counted) open -= 1;
+        counted = false;
+      };
+      res.on("close", stop);
+      req.on("aborted", stop);
+    };
+    const wait = served++ === 0 ? 0 : (opts.delayAfterFirst ?? 0);
+    if (wait) setTimeout(begin, wait);
+    else begin();
+  });
+  await new Promise<void>((r) => server.listen(0, "127.0.0.1", () => r()));
+  return {
+    port: (server.address() as { port: number }).port,
+    open: () => open,
+    close: () => server.close(),
+  };
+}
+
+/** Points the extension at the stub, and hands back the way to put the settings as they were. */
+async function useStub(port: number): Promise<() => Promise<void>> {
+  const config = vscode.workspace.getConfiguration(SECTION);
+  const before = {
+    provider: config.get("chat.provider"),
+    model: config.get("chat.model"),
+    endpoint: config.get("endpoints.local"),
+  };
+  await config.update("chat.provider", "local", vscode.ConfigurationTarget.Global);
+  await config.update("chat.model", "stub-model", vscode.ConfigurationTarget.Global);
+  await config.update("endpoints.local", `http://127.0.0.1:${port}/v1`, vscode.ConfigurationTarget.Global);
+  return async () => {
+    await config.update("chat.provider", before.provider, vscode.ConfigurationTarget.Global);
+    await config.update("chat.model", before.model, vscode.ConfigurationTarget.Global);
+    await config.update("endpoints.local", before.endpoint, vscode.ConfigurationTarget.Global);
+  };
+}

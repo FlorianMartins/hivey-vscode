@@ -39,17 +39,67 @@ export async function request(url: string, opts: RequestOptions = {}): Promise<R
     timedOut = true;
     ctl.abort(new Error("timeout"));
   }, timeoutMs);
-  const onAbort = () => ctl.abort((signal as AbortSignal | undefined)?.reason);
-  signal?.addEventListener("abort", onAbort, { once: true });
+  const unlink = linkAbort(signal ?? undefined, ctl);
   try {
     return await fetch(url, { ...init, signal: ctl.signal });
   } catch (err) {
+    // The request is over; nothing is left for the caller's signal to cancel.
+    unlink();
     throw explain(err, url, label, timeoutMs, signal?.aborted === true, timedOut);
   } finally {
+    // Only the deadline. The link to the caller's signal deliberately OUTLIVES this function —
+    // see `linkAbort`.
     clearTimeout(timer);
-    signal?.removeEventListener("abort", onAbort);
   }
 }
+
+/**
+ * The caller's cancellation, wired to this request for as long as the request can be cancelled.
+ *
+ * `fetch` resolves when the response HEADERS arrive, not when the body is finished. The bridge from
+ * the caller's signal used to be removed in a `finally` on that await — so from the first byte
+ * onward, the caller's signal reached nothing. For a streamed answer that is the whole lifetime of
+ * the request.
+ *
+ * What saved it in practice is that the readers cancel their stream on abort, and cancelling the
+ * body is enough to make the client drop the connection — measured, not assumed: a test that
+ * streams forever shows the server seeing the socket close either way. So this is not the fix for a
+ * bug anyone has reported; it is the same promise kept for the cases where nothing is reading a
+ * stream — a slow `res.json()`, a request cancelled between the headers and the body — where the
+ * caller's stop had no effect at all.
+ *
+ * What it must not do is accumulate one listener per request on a signal that lives for a whole
+ * turn: twenty steps would trip Node's "possible EventTarget memory leak" warning. Hence one
+ * listener per SIGNAL, shared by every request made under it, with the controllers in a set the
+ * signal owns.
+ */
+export function linkAbort(signal: AbortSignal | undefined, ctl: AbortController): () => void {
+  if (!signal) return () => {};
+  if (signal.aborted) {
+    ctl.abort(signal.reason);
+    return () => {};
+  }
+  let group = links.get(signal);
+  if (!group) {
+    const controllers = new Set<AbortController>();
+    group = controllers;
+    links.set(signal, controllers);
+    signal.addEventListener(
+      "abort",
+      () => {
+        for (const pending of controllers) pending.abort(signal.reason);
+        controllers.clear();
+      },
+      { once: true },
+    );
+  }
+  group.add(ctl);
+  const held = group;
+  return () => held.delete(ctl);
+}
+
+/** Keyed by the caller's signal, so the whole group is collected when the turn is. */
+const links = new WeakMap<AbortSignal, Set<AbortController>>();
 
 /**
  * Node buries the useful code: `TypeError: fetch failed` with the real reason two `cause` levels

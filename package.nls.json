@@ -89,6 +89,7 @@
   "config.section.completion": "Inline completion",
   "command.attachOpenEditors.title": "Attach all open editors to the conversation",
   "submenu.selection.label": "Hivey Code",
+  "command.stopAnswer.title": "Stop the answer",
   "command.compactConversation.title": "Summarise the conversation to free the context",
   "command.selectionActions.title": "What to do with the selection…",
   "command.addSelectionToChat.title": "Add the selection to the conversation",
