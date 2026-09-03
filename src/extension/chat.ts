@@ -14,14 +14,14 @@ import { costOf, makeLookup, type Price } from "../core/router/pricing.js";
 import { route } from "../core/router/route.js";
 import { Session, type ContextItem, type Entry, type SessionData } from "../core/session/session.js";
 import { headToTokens } from "../core/util/tokens.js";
+import { matchesName } from "../core/ibmi/sql.js";
 import {
   collectMemberContext,
+  ibmiAllLibraries,
+  ibmiAllMembers,
   ibmiEnabled,
-  ibmiFindMembers,
   ibmiInstance,
   ibmiLibraryList,
-  ibmiMembers,
-  ibmiSourceFiles,
   readMemberText,
   readStreamFileText,
 } from "./integrations/ibmi.js";
@@ -1458,310 +1458,150 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    * project's own rules, or something we discussed before.
    */
   /**
-   * A source member, chosen the way somebody who works on this system thinks about it.
+   * A source member, or several, chosen from lists.
    *
-   * Library, then source file, then member: three steps, each a list rather than a field, because
-   * the point of connecting to the partition is that the names are already known there. The library
-   * list comes first in the first step for the same reason — it is what this user works in today,
-   * and typing a library they never use is the rare case, not the common one.
+   * This was three menus deep — library, then source file, then member — and each step was a list
+   * that could come back empty with a field underneath it. Three chances to end up typing a name by
+   * hand, which is both the slowest way to do this and the one most likely to be wrong: the whole
+   * point of being connected is that the names are already known over there.
+   *
+   * So: pick libraries, say what the name looks like, pick members. The source file stops being a
+   * step and becomes part of what each row says, because nobody looking for a program thinks "it is
+   * in QRPGLESRC" first — they think of its name. Libraries and members are both multi-select,
+   * which is what makes two versions of the same component a single gesture.
    */
-  private async attachMember(withDependencies = false): Promise<void> {
+  private async pickMembers(withDependencies: boolean): Promise<void> {
     try {
-      const libraries = ibmiLibraryList();
-      const library = await vscode.window.showQuickPick(
-        libraries.length
-          ? [
-              ...libraries.map((name) => ({ label: name, description: t("in your library list") })),
-              { label: t("Another library…"), description: "", other: true },
-            ]
-          : [{ label: t("Another library…"), description: "", other: true }],
-        { placeHolder: t("Which library?") },
+      const libraries = await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Window, title: t("Reading the libraries…") },
+        () => ibmiAllLibraries(),
       );
-      if (!library) return;
-      const libraryName = (library as { other?: boolean }).other
-        ? (await vscode.window.showInputBox({ prompt: t("Library name"), placeHolder: "MYLIB" }))?.trim().toUpperCase()
-        : library.label;
-      if (!libraryName) return;
-
-      const files = await vscode.window.withProgress(
-        { location: vscode.ProgressLocation.Window, title: t("Reading {0}…", libraryName) },
-        () => ibmiSourceFiles(libraryName),
-      );
-      // A way to type the name, always — not only when the listing came back empty.
-      //
-      // The listing is a convenience built on a heuristic: it asks the extension for `*FILE` objects
-      // and keeps the ones whose attribute says source. When that does not match, the step used to
-      // end in "no source physical file in LIB", which is both wrong and a dead end — the library
-      // has source files, the panel just failed to recognise them. The user knows the name of the
-      // file they work in every day, and the field is the one route that cannot fail.
-      const searchAll = { label: "$(search) " + t("Search every source file…"), description: t("By name, {0} for anything", "*531*"), search: true };
-      const typeIt = { label: "$(edit) " + t("Type a source file name…"), description: "", other: true };
-      const chosen = await vscode.window.showQuickPick(
-        [...files.map((f) => ({ label: f.name, description: f.text ?? "" })), searchAll, typeIt],
-        {
-          // The count, always. Not knowing whether the step found anything is worse than it finding
-          // nothing, and this list looked identical in both cases.
-          placeHolder: files.length
-            ? t("{0} source files in {1} — or search", files.length, libraryName)
-            : t("Nothing could be listed in {0} — search or type the name", libraryName),
-          matchOnDescription: true,
-        },
-      );
-      if (!chosen) return;
-
-      if ((chosen as { search?: boolean }).search) {
-        await this.searchMembers(libraryName, withDependencies);
-        return;
-      }
-
-      const fileName = (chosen as { other?: boolean }).other
-        ? (await vscode.window.showInputBox({ prompt: t("Source file name"), placeHolder: "QRPGLESRC" }))
-            ?.trim()
-            .toUpperCase()
-        : chosen.label;
-      if (!fileName) return;
-      const file = { label: fileName };
-
-      let members: Array<{ name: string; extension: string; text?: string; lines?: number }> = [];
-      try {
-        members = await vscode.window.withProgress(
-          { location: vscode.ProgressLocation.Window, title: t("Reading {0}/{1}…", libraryName, file.label) },
-          () => ibmiMembers(libraryName, file.label),
-        );
-      } catch {
-        // A source file that is not there, or a listing the API refused. Either way the next step
-        // still works if the user knows the member's name.
-      }
-      // The list is searchable by typing — that is what a quick pick does — and the last row is the
-      // way through when the member is not in it, or when there is no list at all.
-      const typeMember = { label: "$(edit) " + t("Type a member name…"), description: "", detail: "", name: "", other: true };
-      const picked = await vscode.window.showQuickPick(
+      const typeLibraries = {
+        label: "$(edit) " + t("Type library names…"),
+        description: t("Separated by spaces or commas"),
+        other: true,
+      };
+      const chosenLibraries = await vscode.window.showQuickPick(
         [
-          ...members.map((m) => ({
-            label: `${m.name}.${m.extension}`,
-            description: m.lines ? t("{0} lines", m.lines) : "",
-            detail: m.text ?? "",
-            name: m.name,
+          ...libraries.map((l) => ({
+            label: l.name,
+            description: l.inList ? t("in your library list") : (l.text ?? ""),
+            picked: false,
           })),
-          typeMember,
+          typeLibraries,
         ],
         {
-          placeHolder: members.length
-            ? t("{0} members in {1}/{2} — type to filter", members.length, libraryName, file.label)
-            : t("Nothing could be listed in {0}/{1} — type the name", libraryName, file.label),
+          canPickMany: true,
+          placeHolder: libraries.length
+            ? t("Which libraries? {0} on this system — type to filter", libraries.length)
+            : t("No library could be listed — type the names"),
           matchOnDescription: true,
-          matchOnDetail: true,
         },
       );
-      if (!picked) return;
-      const memberName = (picked as { other?: boolean }).other
-        ? (await vscode.window.showInputBox({ prompt: t("Member name"), placeHolder: "CUSTMAINT" }))?.trim().toUpperCase()
-        : picked.name;
-      if (!memberName) return;
+      if (!chosenLibraries?.length) return;
 
-      if (!withDependencies) {
-        const text = await readMemberText(libraryName, file.label, memberName);
-        this.pushContext({
-          kind: "member",
-          label: `${libraryName}/${file.label}(${memberName})`,
-          body: headToTokens(text, 6000),
-          untrusted: true,
-        });
+      const names = chosenLibraries.filter((l) => !(l as { other?: boolean }).other).map((l) => l.label);
+      if (chosenLibraries.some((l) => (l as { other?: boolean }).other)) {
+        const typed = await vscode.window.showInputBox({ prompt: t("Library names"), placeHolder: "ARCADV1 ARCADV2" });
+        for (const name of (typed ?? "").split(/[\s,;]+/).filter(Boolean)) names.push(name.toUpperCase());
+      }
+      if (!names.length) return;
+
+      const pattern =
+        (await vscode.window.showInputBox({
+          prompt: t("Member name, or part of one"),
+          placeHolder: "*531*",
+          value: "*",
+        })) ?? "";
+      if (!pattern.trim()) return;
+
+      const hits: Array<{ library: string; sourceFile: string; name: string; extension: string; text?: string }> = [];
+      await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: t("Searching {0}…", names.join(", ")) },
+        async (progress) => {
+          for (const library of names) {
+            progress.report({ message: t("{0} — {1} found", library, hits.length) });
+            try {
+              for (const member of await ibmiAllMembers(library)) {
+                if (matchesName(member.name, pattern)) hits.push({ library, ...member });
+              }
+            } catch {
+              // One library that cannot be read is one fewer looked in, not a failed search.
+            }
+          }
+        },
+      );
+
+      if (!hits.length) {
+        // Said plainly, with what was searched: an empty list and a failed listing look the same on
+        // screen, and telling them apart is the difference between trying another pattern and
+        // reporting a broken feature.
+        void vscode.window.showInformationMessage(
+          t("Nothing matching “{0}” in {1}.", pattern, names.join(", ")),
+        );
         return;
       }
 
-      // Each dependency is its own attachment rather than one block, so the row above the composer
-      // shows what was actually brought in and any of it can be taken back out. A single item
-      // labelled "and 7 others" is a context nobody can correct.
-      const { root, found, missing } = await vscode.window.withProgress(
-        { location: vscode.ProgressLocation.Notification, title: t("Following what {0} uses…", memberName) },
-        () => collectMemberContext(libraryName, file.label, memberName),
-      );
-      this.pushContext({ kind: "member", label: root.ref, body: headToTokens(root.text, 6000), untrusted: true });
-      for (const dep of found) {
-        this.pushContext({ kind: "member", label: dep.ref, body: headToTokens(dep.text, 2500), untrusted: true });
+      const rows = hits
+        .sort((a, b) => a.library.localeCompare(b.library) || a.name.localeCompare(b.name))
+        .map((h) => ({
+          label: `${h.name}${h.extension ? `.${h.extension}` : ""}`,
+          description: `${h.library}/${h.sourceFile}`,
+          detail: h.text ?? "",
+          hit: h,
+        }));
+
+      if (withDependencies) {
+        const one = await vscode.window.showQuickPick(rows, {
+          placeHolder: t("{0} found — which one to follow?", rows.length),
+          matchOnDescription: true,
+          matchOnDetail: true,
+        });
+        if (!one) return;
+        await this.attachWithDependencies(one.hit.library, one.hit.sourceFile, one.hit.name);
+        return;
       }
-      if (missing.length) {
-        void vscode.window.showInformationMessage(
-          t("Attached {0} of {1}. Not found: {2}", found.length + 1, found.length + 1 + missing.length, missing.join(", ")),
-        );
+
+      const picked = await vscode.window.showQuickPick(rows, {
+        canPickMany: true,
+        placeHolder: t("{0} found — tick the ones to attach", rows.length),
+        matchOnDescription: true,
+        matchOnDetail: true,
+      });
+      if (!picked?.length) return;
+      for (const one of picked) {
+        try {
+          const text = await readMemberText(one.hit.library, one.hit.sourceFile, one.hit.name);
+          this.pushContext({
+            kind: "member",
+            label: `${one.hit.library}/${one.hit.sourceFile}(${one.hit.name})`,
+            body: headToTokens(text, picked.length > 3 ? 3000 : 6000),
+            untrusted: true,
+          });
+        } catch (error) {
+          void vscode.window.showWarningMessage(`Hivey Code: ${(error as Error).message}`);
+        }
       }
     } catch (error) {
       void vscode.window.showWarningMessage(`Hivey Code: ${(error as Error).message}`);
     }
   }
 
-  /**
-   * The same search, across several libraries at once.
-   *
-   * Which is what "compare two versions" means on this platform: ARCAD keeps each version in its
-   * own set of libraries, so the versions of a component are members of the same name in different
-   * libraries. Nothing here knows which library belongs to which version — that mapping lives in
-   * the ARCAD repository and is not something to guess at — but once you know the names, finding
-   * the same member in all of them is one search rather than three.
-   */
-  private async searchLibraries(): Promise<void> {
-    const known = ibmiLibraryList();
-    const picked = await vscode.window.showQuickPick(
-      [
-        ...known.map((name) => ({ label: name, description: t("in your library list") })),
-        { label: "$(edit) " + t("Type library names…"), description: t("Separated by spaces or commas"), other: true },
-      ],
-      { placeHolder: t("Which libraries?"), canPickMany: true },
+  /** One member and everything it reaches, each piece its own attachment. */
+  private async attachWithDependencies(library: string, sourceFile: string, member: string): Promise<void> {
+    const { root, found, missing } = await vscode.window.withProgress(
+      { location: vscode.ProgressLocation.Notification, title: t("Following what {0} uses…", member) },
+      () => collectMemberContext(library, sourceFile, member),
     );
-    if (!picked?.length) return;
-
-    const libraries = picked.filter((p) => !(p as { other?: boolean }).other).map((p) => p.label);
-    if (picked.some((p) => (p as { other?: boolean }).other)) {
-      const typed = await vscode.window.showInputBox({
-        prompt: t("Library names"),
-        placeHolder: "ARCADV1 ARCADV2",
-      });
-      for (const name of (typed ?? "").split(/[\s,;]+/).filter(Boolean)) libraries.push(name.toUpperCase());
+    this.pushContext({ kind: "member", label: root.ref, body: headToTokens(root.text, 6000), untrusted: true });
+    for (const dep of found) {
+      this.pushContext({ kind: "member", label: dep.ref, body: headToTokens(dep.text, 2500), untrusted: true });
     }
-    if (!libraries.length) return;
-
-    const pattern = await vscode.window.showInputBox({
-      prompt: t("Member name, or part of one"),
-      placeHolder: "*531*",
-      value: "*",
-    });
-    if (!pattern?.trim()) return;
-
-    const all: Array<{ library: string; sourceFile: string; name: string; extension: string; text?: string }> = [];
-    await vscode.window.withProgress(
-      { location: vscode.ProgressLocation.Notification, title: t("Searching {0} libraries…", libraries.length) },
-      async (progress) => {
-        for (const library of libraries) {
-          progress.report({ message: t("{0} — {1} found", library, all.length) });
-          try {
-            const { hits } = await ibmiFindMembers(library, pattern, 100);
-            for (const hit of hits) all.push({ library, sourceFile: hit.sourceFile, name: hit.name, extension: hit.extension, text: hit.text });
-          } catch {
-            // One library that cannot be read is one fewer looked in, not a failed search.
-          }
-        }
-      },
-    );
-
-    if (!all.length) {
+    if (missing.length) {
       void vscode.window.showInformationMessage(
-        t("Nothing matching “{0}” in {1}.", pattern, libraries.join(", ")),
+        t("Attached {0} of {1}. Not found: {2}", found.length + 1, found.length + 1 + missing.length, missing.join(", ")),
       );
-      return;
     }
-
-    // Several may be ticked, because the point of searching across libraries is usually to hold two
-    // versions of the same member side by side and ask what changed.
-    const chosen = await vscode.window.showQuickPick(
-      all.map((h) => ({
-        label: `${h.library}/${h.sourceFile}(${h.name})`,
-        description: h.extension ? `.${h.extension}` : "",
-        detail: h.text ?? "",
-        hit: h,
-      })),
-      {
-        placeHolder: t("{0} found — tick the ones to attach", all.length),
-        canPickMany: true,
-        matchOnDescription: true,
-        matchOnDetail: true,
-      },
-    );
-    if (!chosen?.length) return;
-
-    for (const one of chosen) {
-      try {
-        const text = await readMemberText(one.hit.library, one.hit.sourceFile, one.hit.name);
-        this.pushContext({
-          kind: "member",
-          label: `${one.hit.library}/${one.hit.sourceFile}(${one.hit.name})`,
-          body: headToTokens(text, 4000),
-          untrusted: true,
-        });
-      } catch (error) {
-        void vscode.window.showWarningMessage(`Hivey Code: ${(error as Error).message}`);
-      }
-    }
-  }
-
-  /**
-   * Find a member anywhere in a library, by a name pattern.  /**
-   * Find a member anywhere in a library, by a name pattern.
-   *
-   * The step that walks library, then source file, then member assumes you know which source file
-   * it is in. Often nobody does — the question is "where is the program with 531 in its name" —
-   * and the platform cannot answer it either: `*531*` is not a generic name, so the filtering
-   * happens here, one source file at a time. Which is slow enough to be worth saying out loud,
-   * hence the progress, and worth capping, hence the limit.
-   */
-  private async searchMembers(library: string, withDependencies: boolean): Promise<void> {
-    const pattern = await vscode.window.showInputBox({
-      prompt: t("Member name, or part of one"),
-      placeHolder: "*531*",
-      value: "*",
-    });
-    if (!pattern?.trim()) return;
-
-    const { hits, searched, capped } = await vscode.window.withProgress(
-      { location: vscode.ProgressLocation.Notification, title: t("Searching {0}…", library), cancellable: false },
-      (progress) =>
-        ibmiFindMembers(library, pattern, 200, (file, found) =>
-          progress.report({ message: t("{0} — {1} found", file, found) }),
-        ),
-    );
-
-    if (!hits.length) {
-      // Said, not left to be inferred from an empty list. The number of source files looked in is
-      // the difference between "there is nothing like that here" and "nothing could be read".
-      void vscode.window.showInformationMessage(
-        searched
-          ? t("Nothing matching “{0}” in {1} source files of {2}.", pattern, searched, library)
-          : t("No source file could be listed in {0}.", library),
-      );
-      return;
-    }
-
-    const picked = await vscode.window.showQuickPick(
-      hits.map((h) => ({
-        label: `${h.sourceFile}(${h.name})`,
-        description: h.extension ? `.${h.extension}` : "",
-        detail: h.text ?? "",
-        hit: h,
-      })),
-      {
-        placeHolder: capped
-          ? t("First {0} matching “{1}” — narrow the pattern to see the rest", hits.length, pattern)
-          : t("{0} matching “{1}” in {2}", hits.length, pattern, library),
-        matchOnDescription: true,
-        matchOnDetail: true,
-      },
-    );
-    if (!picked) return;
-
-    if (withDependencies) {
-      const { root, found, missing } = await vscode.window.withProgress(
-        { location: vscode.ProgressLocation.Notification, title: t("Following what {0} uses…", picked.hit.name) },
-        () => collectMemberContext(library, picked.hit.sourceFile, picked.hit.name),
-      );
-      this.pushContext({ kind: "member", label: root.ref, body: headToTokens(root.text, 6000), untrusted: true });
-      for (const dep of found) {
-        this.pushContext({ kind: "member", label: dep.ref, body: headToTokens(dep.text, 2500), untrusted: true });
-      }
-      if (missing.length) {
-        void vscode.window.showInformationMessage(
-          t("Attached {0} of {1}. Not found: {2}", found.length + 1, found.length + 1 + missing.length, missing.join(", ")),
-        );
-      }
-      return;
-    }
-
-    const text = await readMemberText(library, picked.hit.sourceFile, picked.hit.name);
-    this.pushContext({
-      kind: "member",
-      label: `${library}/${picked.hit.sourceFile}(${picked.hit.name})`,
-      body: headToTokens(text, 6000),
-      untrusted: true,
-    });
   }
 
   /** A stream file, by path. There is no list to offer: the IFS is a file system, not a catalogue. */  /** A stream file, by path. There is no list to offer: the IFS is a file system, not a catalogue. */
@@ -1913,17 +1753,17 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     if (ibmiEnabled(readSettings().ibmi.integration)) {
       group(() => {
         rows.push(sep(t("IBM i")));
-        rows.push({ label: "$(server) " + t("Source member…"), run: () => this.attachMember() });
-        rows.push({ label: "$(file-directory) " + t("Stream file (IFS)…"), run: () => this.attachStreamFile() });
+        rows.push({
+          label: "$(server) " + t("Source members…"),
+          description: t("Search by name across the libraries you choose"),
+          run: () => this.pickMembers(false),
+        });
         rows.push({
           label: "$(references) " + t("Member and what it uses…"),
-          run: () => this.attachMember(true),
+          description: t("Its copybooks and the programs it calls"),
+          run: () => this.pickMembers(true),
         });
-        rows.push({
-          label: "$(library) " + t("Search across libraries…"),
-          description: t("Several at once — an ARCAD version is a set of libraries"),
-          run: () => this.searchLibraries(),
-        });
+        rows.push({ label: "$(file-directory) " + t("Stream file (IFS)…"), run: () => this.attachStreamFile() });
       });
     }
 

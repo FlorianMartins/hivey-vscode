@@ -17,7 +17,7 @@ import * as vscode from "vscode";
 import { t } from "../../shared/i18n.js";
 import type { Tool, ToolResult } from "../../core/agent/loop.js";
 import { headToTokens } from "../../core/util/tokens.js";
-import { formatRows, isReadOnlySql, matchesName, parseMemberRef } from "../../core/ibmi/sql.js";
+import { cell, formatRows, isReadOnlySql, matchesName, parseMemberRef } from "../../core/ibmi/sql.js";
 import { extractCalledPrograms, extractCopyDirectives } from "../../core/ibmi/symbols.js";
 
 const EXTENSION_ID = "halcyontechltd.code-for-ibmi";
@@ -136,6 +136,81 @@ export function ibmiLibraryList(): string[] {
   return [...new Set([...current, ...(config.libraryList ?? [])])].filter(Boolean);
 }
 
+/**
+ * Every library on the system, with the ones in the user's own list first.
+ *
+ * The library list is what somebody works in today and is the right default, but it is not the
+ * whole machine — and a picker that only ever offers it cannot reach an ARCAD version library or a
+ * colleague's playground. The rest come from the object catalogue, in one query.
+ *
+ * `SELECT *` rather than named columns, deliberately: this asks the system for whatever it has and
+ * reads it case-insensitively. Naming a column is a bet that it exists and is spelled the way this
+ * file guessed, and losing that bet produces a list of blank rows — which on screen is a list that
+ * found nothing.
+ */
+export async function ibmiAllLibraries(): Promise<Array<{ name: string; text?: string; inList: boolean }>> {
+  const inList = new Set(ibmiLibraryList().map((l) => l.toUpperCase()));
+  const out = [...inList].map((name) => ({ name, text: undefined as string | undefined, inList: true }));
+  try {
+    const rows = await connection()
+      .getContent()
+      .runSQL(`SELECT * FROM TABLE(QSYS2.OBJECT_STATISTICS('QSYS', '*LIB')) X ORDER BY 1`);
+    for (const row of rows) {
+      const name = cell(row, "OBJNAME", "OBJECT_NAME");
+      if (!name || inList.has(name.toUpperCase())) continue;
+      out.push({ name, text: cell(row, "OBJTEXT", "TEXT_DESCRIPTION") || undefined, inList: false });
+    }
+  } catch {
+    // No catalogue, or no SQL job. The library list alone is still a list, and the caller offers a
+    // field for a name that is not in it.
+  }
+  return out;
+}
+
+/**
+ * Every source member in a library, in one query.
+ *
+ * The alternative — list the source files, then list each one's members — is a round trip per file
+ * and it depends on two API shapes rather than one. `SYSPARTITIONSTAT` holds one row per member of
+ * every file in the schema, which is the whole answer in a single call, and the source files fall
+ * out of it as the distinct file names. When it is not available the per-file walk is still there.
+ */
+export async function ibmiAllMembers(
+  library: string,
+): Promise<Array<MemberRow & { sourceFile: string }>> {
+  const lib = library.toUpperCase();
+  const content = connection().getContent();
+  try {
+    const rows = await content.runSQL(
+      `SELECT * FROM QSYS2.SYSPARTITIONSTAT WHERE TABLE_SCHEMA = '${lib}' ORDER BY TABLE_NAME, TABLE_PARTITION`,
+    );
+    const out = rows
+      .map((row) => ({
+        sourceFile: cell(row, "TABLE_NAME", "SYSTEM_TABLE_NAME"),
+        name: cell(row, "TABLE_PARTITION", "SYSTEM_TABLE_MEMBER"),
+        extension: cell(row, "SOURCE_TYPE"),
+        text: cell(row, "PARTITION_TEXT", "TABLE_TEXT") || undefined,
+        lines: Number(cell(row, "NUMBER_ROWS")) || undefined,
+      }))
+      .filter((m) => m.sourceFile && m.name);
+    if (out.length) return out;
+  } catch {
+    // Fall through to the per-file walk.
+  }
+
+  const out: Array<MemberRow & { sourceFile: string }> = [];
+  for (const file of await ibmiSourceFiles(lib)) {
+    try {
+      for (const member of await content.getMemberList({ library: lib, sourceFile: file.name })) {
+        out.push({ ...member, sourceFile: file.name });
+      }
+    } catch {
+      // One file that cannot be listed is one fewer, not a failure.
+    }
+  }
+  return out;
+}
+
 /** Source physical files in a library, so the second step of the picker is a list and not a guess. */
 export async function ibmiSourceFiles(library: string): Promise<Array<{ name: string; text?: string }>> {
   const lib = library.toUpperCase();
@@ -158,13 +233,11 @@ export async function ibmiSourceFiles(library: string): Promise<Array<{ name: st
   // documented way to enumerate objects, and it costs one statement.
   try {
     const rows = await content.runSQL(
-      `SELECT OBJNAME, OBJTEXT FROM TABLE(QSYS2.OBJECT_STATISTICS('${lib}', '*FILE')) X ` +
-        `WHERE OBJATTRIBUTE = 'PF-SRC' ORDER BY OBJNAME`,
+      `SELECT * FROM TABLE(QSYS2.OBJECT_STATISTICS('${lib}', '*FILE')) X WHERE OBJATTRIBUTE = 'PF-SRC' ORDER BY 1`,
     );
-    return rows.map((r) => ({
-      name: String(r["OBJNAME"] ?? "").trim(),
-      text: r["OBJTEXT"] ? String(r["OBJTEXT"]).trim() : undefined,
-    }));
+    return rows
+      .map((r) => ({ name: cell(r, "OBJNAME", "OBJECT_NAME"), text: cell(r, "OBJTEXT", "TEXT_DESCRIPTION") || undefined }))
+      .filter((f) => f.name);
   } catch {
     // Both ways failed. The caller offers the field, which is the one route that cannot fail: the
     // user knows the name of the source file they work in every day.
@@ -198,57 +271,23 @@ export async function ibmiMembers(library: string, sourceFile: string): Promise<
   }
   try {
     const rows = await content.runSQL(
-      `SELECT TABLE_PARTITION, SOURCE_TYPE FROM QSYS2.SYSPARTITIONSTAT ` +
-        `WHERE TABLE_SCHEMA = '${lib}' AND TABLE_NAME = '${file}' ORDER BY TABLE_PARTITION`,
+      `SELECT * FROM QSYS2.SYSPARTITIONSTAT WHERE TABLE_SCHEMA = '${lib}' AND TABLE_NAME = '${file}' ORDER BY 1`,
     );
-    return rows.map((r) => ({
-      name: String(r["TABLE_PARTITION"] ?? "").trim(),
-      extension: String(r["SOURCE_TYPE"] ?? "").trim(),
-    }));
+    return rows
+      .map((r) => ({ name: cell(r, "TABLE_PARTITION", "SYSTEM_TABLE_MEMBER"), extension: cell(r, "SOURCE_TYPE") }))
+      .filter((m) => m.name);
   } catch {
     return [];
   }
 }
 
 /**
- * Every member in a library whose name matches, across all its source files.
- *
- * This is the search the platform cannot do: `*531*` is not a generic name, so it cannot be pushed
- * down into `getMemberList` and the filtering happens here. The cost is one listing per source
- * file, which is why the caller reports progress and why there is a cap — a library with forty
- * source files and no cap is a spinner with no end.
- */
-export async function ibmiFindMembers(
-  library: string,
-  pattern: string,
-  limit = 200,
-  onProgress?: (file: string, found: number) => void,
-): Promise<{ hits: Array<MemberRow & { sourceFile: string }>; searched: number; capped: boolean }> {
-  const files = await ibmiSourceFiles(library);
-  const hits: Array<MemberRow & { sourceFile: string }> = [];
-  let searched = 0;
-  for (const file of files) {
-    if (hits.length >= limit) return { hits, searched, capped: true };
-    searched += 1;
-    onProgress?.(file.name, hits.length);
-    try {
-      for (const member of await ibmiMembers(library, file.name)) {
-        if (matchesName(member.name, pattern)) hits.push({ ...member, sourceFile: file.name });
-      }
-    } catch {
-      // A source file that cannot be listed is one fewer place looked, not a failed search.
-    }
-  }
-  return { hits, searched, capped: false };
-}
-
-/**
  * The source files a name might live in, when the directive did not say.
  *
  * `/COPY CUSTPR` means "the source file I am in", and a called program's source is wherever the
- * shop keeps it. Rather than scan every file in every library — which is a lot of round trips to
- * answer a question nobody asked — this is the short list of names the platform has used for
- * thirty years, with the member's own file first because that is the directive's actual meaning.
+ * shop keeps it. Rather than scan every file in every library — a lot of round trips to answer a
+ * question nobody asked — this is the short list of names the platform has used for thirty years,
+ * with the member's own file first because that is the directive's actual meaning.
  */
 function candidateSourceFiles(own: string): string[] {
   const usual = ["QRPGLESRC", "QRPGSRC", "QCPYSRC", "QCLSRC", "QCLLESRC", "QDDSSRC", "QSQLSRC", "QCBLLESRC", "QSRVSRC"];

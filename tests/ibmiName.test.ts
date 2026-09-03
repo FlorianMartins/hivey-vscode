@@ -2,7 +2,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { matchesName } from "../src/core/ibmi/sql.js";
+import { cell, matchesName } from "../src/core/ibmi/sql.js";
 
 test("the platform's own generic name", () => {
   assert.ok(matchesName("CUSTMAINT", "CUST*"));
@@ -40,4 +40,19 @@ test("a name is not a regular expression", () => {
   assert.ok(matchesName("PGM$A", "PGM$A"));
   assert.ok(matchesName("A.B", "A.B"));
   assert.ok(!matchesName("AXB", "A.B"));
+});
+
+test("a column is read whatever case the driver used", () => {
+  // Reading `row["TABLE_NAME"]` when the driver said `table_name` returns undefined for every row,
+  // and a list of blank rows looks exactly like a query that found nothing.
+  assert.equal(cell({ TABLE_NAME: "QRPGLESRC" }, "TABLE_NAME"), "QRPGLESRC");
+  assert.equal(cell({ table_name: "QRPGLESRC" }, "TABLE_NAME"), "QRPGLESRC");
+  assert.equal(cell({ Table_Name: "QRPGLESRC" }, "table_name"), "QRPGLESRC");
+});
+
+test("several names are tried, and the value is trimmed", () => {
+  // Db2 pads CHAR columns; a member called "CUST      " is not the member the next call asks for.
+  assert.equal(cell({ OBJNAME: "CUSTMAINT   " }, "NAME", "OBJNAME"), "CUSTMAINT");
+  assert.equal(cell({}, "MISSING"), "");
+  assert.equal(cell({ X: null }, "X"), "");
 });

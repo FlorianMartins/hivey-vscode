@@ -2,6 +2,33 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.31.0 — 2026-09-03
+
+### Changed
+
+- **Attaching a member is lists, not typing.** It was three menus deep — library, then source file,
+  then member — and every step could come back empty with a field underneath it, so the way through
+  was usually to type a name by hand. That is the slowest way to do this and the one most likely to
+  be wrong: the point of being connected is that the names are already known over there. Now: pick
+  libraries, say what the name looks like, pick members from what was found. The source file stops
+  being a step and becomes part of what each row says, because nobody looking for a program thinks
+  "it is in QRPGLESRC" first — they think of its name.
+- **Every library on the system is offered**, with the ones in your library list first, rather than
+  only the library list. An ARCAD version library or a colleague's is now reachable without typing.
+- **Libraries and members are both multi-select**, which is what makes holding two versions of the
+  same component a single gesture.
+
+### Fixed
+
+- **Columns were read in the wrong case.** The SQL fallbacks asked for `TABLE_NAME` while the driver
+  may return `table_name`, which yields undefined for every row — a list of blank entries, which on
+  screen is indistinguishable from a query that found nothing. Every column is read
+  case-insensitively now, and trimmed, since Db2 pads CHAR columns and a member called `CUST      `
+  is not the member the next call asks for. This is the most likely reason listings came back empty.
+- **The member listing is one query instead of one per source file**, from `SYSPARTITIONSTAT`, which
+  holds a row per member of every file in the library. The per-file walk remains for systems where
+  that view is not available.
+
 ## 0.30.0 — 2026-09-03
 
 ### Added

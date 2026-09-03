@@ -104,3 +104,25 @@ export function matchesName(name: string, pattern: string): boolean {
   const body = escaped.includes("*") ? escaped.replace(/\*/g, ".*") : `.*${escaped}.*`;
   return new RegExp(`^${body}$`).test(subject);
 }
+
+/**
+ * One column of one row, whatever case the driver decided to use.
+ *
+ * `runSQL` hands back whatever the connection gives it, and whether the keys arrive as `TABLE_NAME`
+ * or `table_name` is not something this code gets to know. Reading them by an exact upper-case name
+ * is a coin toss: it returns undefined on half the systems and produces a list of blank rows, which
+ * on screen is indistinguishable from a query that found nothing — and that is exactly how "it
+ * finds nothing" was reported.
+ */
+export function cell(row: Record<string, unknown>, ...names: string[]): string {
+  for (const name of names) {
+    const wanted = name.toLowerCase();
+    for (const key of Object.keys(row)) {
+      if (key.toLowerCase() !== wanted) continue;
+      const value = row[key];
+      if (value === null || value === undefined) return "";
+      return String(value).trim();
+    }
+  }
+  return "";
+}
