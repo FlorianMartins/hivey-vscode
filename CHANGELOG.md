@@ -2,6 +2,20 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.28.0 — 2026-09-03
+
+### Added
+
+- **Attach a source member by browsing to it, and a stream file by path.** The `+` menu grows an
+  IBM i group when Code for IBM i is connected: **Source member** walks library, then source file,
+  then member — each a list read from the partition, the library list first because that is what
+  this user works in today — and **Stream file (IFS)** takes a path. Nothing is downloaded into the
+  workspace, nothing is checked out, and no tab is opened. A member comes through Code for IBM i's
+  own connection and a stream file through the file system it registers, so the right library list,
+  the right CCSID and the warm SQL job are the ones already negotiated.
+- Typing `#member:LIB/SRCFILE(MBR)` already worked; what was missing was finding one without
+  knowing its name, and the IFS, which had no route at all.
+
 ## 0.27.0 — 2026-09-03
 
 ### Fixed

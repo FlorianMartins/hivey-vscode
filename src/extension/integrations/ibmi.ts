@@ -84,6 +84,62 @@ function connection(): IBMiConnection {
   return conn;
 }
 
+/**
+ * A source member's text, for attaching rather than for the model to fetch.
+ *
+ * The same call the `ibmi_member` tool makes. What differs is who decides: a tool is the assistant
+ * reaching for something it thinks it needs, and this is the user putting a member in front of it
+ * before asking anything. Both go through Code for IBM i's own connection — see the note at the top
+ * of this file for why a second SSH session would be the wrong answer.
+ */
+export async function readMemberText(library: string, sourceFile: string, member: string): Promise<string> {
+  return connection().getContent().downloadMemberContent(library, sourceFile, member);
+}
+
+/**
+ * A stream file's text, through the file system Code for IBM i registers.
+ *
+ * Not through an API call, and the difference matters: `openTextDocument` on a `streamfile:` URI
+ * goes through that extension's own provider, which already knows the connection and the CCSID, and
+ * it does not open a tab. Nothing here has to be in the workspace.
+ *
+ * The scheme name is the one piece of this that comes from outside: it is what Code for IBM i
+ * registers for the IFS. If a version of it registers something else, this throws and says so
+ * rather than returning an empty file that would look like an empty member.
+ */
+export async function readStreamFileText(path: string): Promise<string> {
+  const clean = path.trim().startsWith("/") ? path.trim() : `/${path.trim()}`;
+  const uri = vscode.Uri.from({ scheme: "streamfile", path: clean });
+  const doc = await vscode.workspace.openTextDocument(uri);
+  return doc.getText();
+}
+
+/** The library list of the current connection, so a picker can start from what the user works in. */
+export function ibmiLibraryList(): string[] {
+  const config = ibmiInstance()?.getConnection()?.getConfig() ?? {};
+  const current = config.currentLibrary ? [config.currentLibrary] : [];
+  return [...new Set([...current, ...(config.libraryList ?? [])])].filter(Boolean);
+}
+
+/** Source physical files in a library, so the second step of the picker is a list and not a guess. */
+export async function ibmiSourceFiles(library: string): Promise<Array<{ name: string; text?: string }>> {
+  const objects = await connection()
+    .getContent()
+    .getObjectList({ library: library.toUpperCase(), types: ["*FILE"] });
+  // `*FILE` covers physical, logical and source physical files; only the source ones hold members.
+  return objects.filter((o) => (o.attribute ?? "").toUpperCase() === "PF-SRC").map((o) => ({ name: o.name, text: o.text }));
+}
+
+/** The members of a source file, with what they are and how big. */
+export async function ibmiMembers(
+  library: string,
+  sourceFile: string,
+): Promise<Array<{ name: string; extension: string; text?: string; lines?: number }>> {
+  return connection()
+    .getContent()
+    .getMemberList({ library: library.toUpperCase(), sourceFile: sourceFile.toUpperCase() });
+}
+
 export function buildIbmiTools(): Tool[] {
   const sql: Tool = {
     schema: {

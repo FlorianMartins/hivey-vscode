@@ -13,6 +13,16 @@ import { Permissions, commandPrefix, type PermissionStore, type Rule } from "../
 import { costOf, makeLookup, type Price } from "../core/router/pricing.js";
 import { route } from "../core/router/route.js";
 import { Session, type ContextItem, type Entry, type SessionData } from "../core/session/session.js";
+import { headToTokens } from "../core/util/tokens.js";
+import {
+  ibmiConnected,
+  ibmiInstance,
+  ibmiLibraryList,
+  ibmiMembers,
+  ibmiSourceFiles,
+  readMemberText,
+  readStreamFileText,
+} from "./integrations/ibmi.js";
 import { filterHistory, searchTranscript, upsertSession } from "../core/session/history.js";
 import { compactBrief, digestEntries, sessionAsContext, shouldSuggestCompact } from "../core/session/digest.js";
 import {
@@ -1445,6 +1455,109 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    * answering: is the thing I want open in front of me, somewhere in the repository, part of the
    * project's own rules, or something we discussed before.
    */
+  /**
+   * A source member, chosen the way somebody who works on this system thinks about it.
+   *
+   * Library, then source file, then member: three steps, each a list rather than a field, because
+   * the point of connecting to the partition is that the names are already known there. The library
+   * list comes first in the first step for the same reason — it is what this user works in today,
+   * and typing a library they never use is the rare case, not the common one.
+   */
+  private async attachMember(): Promise<void> {
+    try {
+      const libraries = ibmiLibraryList();
+      const library = await vscode.window.showQuickPick(
+        libraries.length
+          ? [
+              ...libraries.map((name) => ({ label: name, description: t("in your library list") })),
+              { label: t("Another library…"), description: "", other: true },
+            ]
+          : [{ label: t("Another library…"), description: "", other: true }],
+        { placeHolder: t("Which library?") },
+      );
+      if (!library) return;
+      const libraryName = (library as { other?: boolean }).other
+        ? (await vscode.window.showInputBox({ prompt: t("Library name"), placeHolder: "MYLIB" }))?.trim().toUpperCase()
+        : library.label;
+      if (!libraryName) return;
+
+      const files = await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Window, title: t("Reading {0}…", libraryName) },
+        () => ibmiSourceFiles(libraryName),
+      );
+      if (!files.length) {
+        void vscode.window.showInformationMessage(t("No source physical file in {0}.", libraryName));
+        return;
+      }
+      const file = await vscode.window.showQuickPick(
+        files.map((f) => ({ label: f.name, description: f.text ?? "" })),
+        { placeHolder: t("Which source file?"), matchOnDescription: true },
+      );
+      if (!file) return;
+
+      const members = await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Window, title: t("Reading {0}/{1}…", libraryName, file.label) },
+        () => ibmiMembers(libraryName, file.label),
+      );
+      if (!members.length) {
+        void vscode.window.showInformationMessage(t("{0}/{1} has no members.", libraryName, file.label));
+        return;
+      }
+      const picked = await vscode.window.showQuickPick(
+        members.map((m) => ({
+          label: `${m.name}.${m.extension}`,
+          description: m.lines ? t("{0} lines", m.lines) : "",
+          detail: m.text ?? "",
+          name: m.name,
+        })),
+        { placeHolder: t("Which member?"), matchOnDescription: true, matchOnDetail: true },
+      );
+      if (!picked) return;
+
+      const text = await readMemberText(libraryName, file.label, picked.name);
+      this.pushContext({
+        kind: "member",
+        label: `${libraryName}/${file.label}(${picked.name})`,
+        body: headToTokens(text, 6000),
+        untrusted: true,
+      });
+    } catch (error) {
+      void vscode.window.showWarningMessage(`Hivey Code: ${(error as Error).message}`);
+    }
+  }
+
+  /** A stream file, by path. There is no list to offer: the IFS is a file system, not a catalogue. */
+  private async attachStreamFile(): Promise<void> {
+    const home = ibmiInstance()?.getConnection()?.getConfig()?.homeDirectory;
+    const path = await vscode.window.showInputBox({
+      prompt: t("Path on the IFS"),
+      placeHolder: home ? `${home}/build.sh` : "/home/you/build.sh",
+      value: home ? `${home}/` : "/",
+    });
+    if (!path?.trim()) return;
+    try {
+      const text = await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Window, title: t("Reading {0}…", path) },
+        () => readStreamFileText(path),
+      );
+      this.pushContext({ kind: "file", label: path.trim(), body: headToTokens(text, 6000), untrusted: true });
+    } catch (error) {
+      void vscode.window.showWarningMessage(`Hivey Code: ${(error as Error).message}`);
+    }
+  }
+
+  /** One way in for anything attached from outside the workspace, so the rules are applied once. */
+  private pushContext(item: ContextItem): void {
+    if (this.attachments.some((a) => a.label === item.label)) {
+      void vscode.window.showInformationMessage(t("{0} is already attached.", item.label));
+      return;
+    }
+    this.attachments.push(item);
+    this.screen = "chat";
+    this.sendState();
+    void vscode.window.setStatusBarMessage(t("{0} attached.", item.label), 4000);
+  }
+
   private async contextPicker(): Promise<void> {
     type Row = vscode.QuickPickItem & { run?: () => Promise<void> | void };
     const rows: Row[] = [];
@@ -1540,6 +1653,21 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         rows.push({ label: "$(history) " + path, run: () => this.onMessage({ type: "attachPath", path }) });
       }
     });
+
+    // ── IBM i ───────────────────────────────────────────────────────────────────────────────
+    //
+    // Only when there is a connection, because every row here needs one and a menu that offers what
+    // it cannot do is worse than a menu that is short. What these attach never touches the
+    // workspace: a member is fetched through Code for IBM i's connection and a stream file through
+    // the file system it registers, so nothing has to be downloaded, opened in a tab, or checked
+    // out first. That is the whole point — the source of truth for these files is the partition.
+    if (ibmiConnected()) {
+      group(() => {
+        rows.push(sep(t("IBM i")));
+        rows.push({ label: "$(server) " + t("Source member…"), run: () => this.attachMember() });
+        rows.push({ label: "$(file-directory) " + t("Stream file (IFS)…"), run: () => this.attachStreamFile() });
+      });
+    }
 
     group(() => {
       rows.push(sep(t("The repository")));

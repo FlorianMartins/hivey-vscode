@@ -141,6 +141,7 @@ single most reliable way to get code that cannot compile.
 | **Connected** | Through **Code for IBM i**, on the connection it has already negotiated: the right library list, the right CCSID, a warm SQL job. Hivey Code opens no session of its own, because a second one would run under a different library list and get EBCDIC subtly wrong. |
 | **Under change management** | Through **ARCAD Elias**: check-out, check-in, compile, cross-references, and the Transformer RPG conversion — by calling the `arcad.*` commands Elias registers, so a change stays inside the process the shop already has. |
 | **Commands** | `/tofree` converts a fixed-format member, `/sql` writes Db2 for i rather than generic SQL, `/dds` explains a display file. `#member:LIB/SRCFILE(MBR)` and `#db2:select …` attach the real thing. |
+| **Attached without opening anything** | The `+` menu offers **Source member** — library, then source file, then member, each a list drawn from the partition — and **Stream file (IFS)** by path. Nothing is downloaded into the workspace, nothing is checked out, and no tab is opened: a member comes through Code for IBM i's connection and a stream file through the file system it registers. The source of truth stays on the partition, which is the only place it can be. |
 
 Reading is free; running a CL command is always asked; an SQL statement is asked **only if it
 writes**, because the check is on the statement rather than on the tool. In plan mode the same tool
