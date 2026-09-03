@@ -2,6 +2,20 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.29.2 — 2026-09-03
+
+### Fixed
+
+- **The `+` menu said "open editors" under two different headings.** "The editor" held *all of them*
+  and *choose among them*; "Open editors" listed them. Three routes to the same files under two
+  titles, leaving the reader to work out that they were the same files. What divides them is not one
+  editor versus several but WHICH editor: the one in front of you, or the set. The current editor's
+  selection and file stay under "The editor"; everything about the set is under "Open editors",
+  where the list already was. "The editor" is no longer drawn at all when there is no editor, since
+  a heading over nothing is worse than no heading.
+- Ticking boxes only beats picking from the list once there are several to tick, so *Choose
+  several…* appears past three open editors rather than past one.
+
 ## 0.29.1 — 2026-09-03
 
 ### Fixed

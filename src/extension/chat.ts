@@ -1633,50 +1633,61 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const active = activeEditor();
     const files = openFiles();
 
+    // One subject per heading.
+    //
+    // These were two groups that both said "open editors": the first held "all of them" and "choose
+    // among them", the second listed them. Three routes to the same files under two headings, and
+    // the reader has to work out that they are the same files. What actually divides them is not
+    // "one editor versus several" but WHICH editor: the one in front of you, or the set.
     group(() => {
-      rows.push(sep(t("The editor")));
+      const editorRows: Row[] = [];
       if (active?.hasSelection) {
-        rows.push({
+        editorRows.push({
           label: "$(selection) " + t("This selection"),
           description: `${active.path} · ${active.selectedLines} ${active.selectedLines === 1 ? t("line") : t("lines")}`,
           run: () => this.attach("selection"),
         });
       }
       if (active) {
-        rows.push({
+        editorRows.push({
           label: "$(file-code) " + t("This file"),
           description: active.path,
           run: () => this.attach("editor"),
         });
       }
-      // Always offered, and empty is said rather than hidden: a row that vanishes when there is
-      // nothing to attach is indistinguishable from a feature that has been removed, which is
-      // exactly how this was reported.
+      // A heading over nothing is worse than no heading.
+      if (!editorRows.length) return;
+      rows.push(sep(t("The editor")));
+      rows.push(...editorRows);
+    });
+
+    // The tabs themselves, and everything that acts on the whole set, under the one heading that
+    // describes them. Listing them inline matters: picking the file you are switching between is
+    // the commonest thing anyone does here, and two clicks for it was one too many.
+    group(() => {
+      rows.push(sep(files.length ? t("Open editors ({0})", files.length) : t("Open editors")));
+      // Offered even when there are none, and the reason is said rather than the row hidden: a row
+      // that vanishes when there is nothing to attach is indistinguishable from a feature that has
+      // been removed, which is exactly how this was reported once already.
       rows.push({
-        label: "$(files) " + (files.length ? t("All {0} open editors", files.length) : t("All open editors")),
+        label: "$(files) " + (files.length ? t("All {0} of them", files.length) : t("All open editors")),
         description: files.length ? t("~{0} tokens", Math.round(files.length * 1200)) : t("No editor is open"),
         ...(files.length ? { run: () => this.attach("openFiles") } : {}),
       });
-      if (files.length > 1) {
-        rows.push({
-          label: "$(list-selection) " + t("Choose from the open editors…"),
-          description: t("Tick the ones you want"),
-          run: () => this.pickOpenEditors(),
-        });
-      }
-    });
-
-    // The tabs themselves, right here. Two clicks to attach one open file was one more than the
-    // old webview menu needed, and that menu listed them inline for a reason: picking the file you
-    // are switching between is the commonest thing anyone does with this.
-    group(() => {
-      if (!files.length) return;
-      rows.push(sep(t("Open editors ({0})", files.length)));
       for (const f of files.slice(0, 15)) {
         rows.push({
           label: "$(file) " + f.path,
           description: f.active ? t("active") : f.dirty ? t("edited") : "",
           run: () => this.onMessage({ type: "attachPath", path: f.path }),
+        });
+      }
+      // Ticking boxes beats picking twice only once there are several to tick; below that the list
+      // above is faster than the dialog.
+      if (files.length > 3) {
+        rows.push({
+          label: "$(list-selection) " + t("Choose several…"),
+          description: t("Tick the ones you want"),
+          run: () => this.pickOpenEditors(),
         });
       }
     });
