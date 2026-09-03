@@ -611,6 +611,49 @@ export function buildIbmiTools(): Tool[] {
     },
   };
 
+  const whereIsMember: Tool = {
+    schema: {
+      name: "ibmi_where_is",
+      description:
+        "Find which libraries and source files hold a member with this name. The reverse of reading one: " +
+        "use it when the question is 'where is this program' rather than 'what does it do'. Accepts a generic " +
+        "name such as CUST* .",
+      parameters: {
+        type: "object",
+        properties: {
+          member: { type: "string", description: "A member name, or a generic name ending in *." },
+          library: { type: "string", description: "Optional: only look in this library." },
+        },
+        required: ["member"],
+      },
+    },
+    approval: () => false,
+    async run(args, ctx): Promise<ToolResult> {
+      const wanted = String(args["member"] ?? "").trim().toUpperCase();
+      if (!wanted) return { content: "No member name given.", isError: true };
+      const library = String(args["library"] ?? "").trim().toUpperCase();
+      // `LIKE` rather than the client-side matcher: this crosses every schema on the system, so the
+      // filtering has to happen where the rows are. A generic name is what IBM i users write.
+      const like = wanted.replace(/\*/g, "%");
+      const rows = await connection()
+        .getContent()
+        .runSQL(
+          `SELECT TABLE_SCHEMA, TABLE_NAME, TABLE_PARTITION, SOURCE_TYPE FROM QSYS2.SYSPARTITIONSTAT ` +
+            `WHERE TABLE_PARTITION LIKE '${like}'${library ? ` AND TABLE_SCHEMA = '${library}'` : ""} ` +
+            `ORDER BY TABLE_SCHEMA, TABLE_NAME FETCH FIRST ${MAX_ROWS} ROWS ONLY`,
+        );
+      ctx.report(t("{0} place(s) hold {1}", rows.length, wanted));
+      if (!rows.length) return { content: `No member matching ${wanted}.` };
+      const out = rows
+        .map((r) => {
+          const type = cell(r, "SOURCE_TYPE");
+          return `${cell(r, "TABLE_SCHEMA")}/${cell(r, "TABLE_NAME")}(${cell(r, "TABLE_PARTITION")})${type ? ` .${type}` : ""}`;
+        })
+        .join("\n");
+      return { content: out };
+    },
+  };
+
   const listMembers: Tool = {
     schema: {
       name: "ibmi_members",
@@ -695,5 +738,5 @@ export function buildIbmiTools(): Tool[] {
     },
   };
 
-  return [sql, command, readMember, programContext, listMembers, listObjects, libraryList];
+  return [sql, command, readMember, programContext, whereIsMember, listMembers, listObjects, libraryList];
 }

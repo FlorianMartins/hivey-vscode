@@ -2,6 +2,21 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.33.0 — 2026-09-03
+
+### Added
+
+- **`ibmi_where_is`: which libraries hold a member with this name.** The reverse of reading one —
+  the question is "where is this program" rather than "what does it do" — and it is one query across
+  every schema, so it can be answered directly. Generic names work: `CUST*`.
+- **`/whouses`: what on this system uses an object.** A skill rather than a tool, and the difference
+  matters. The information lives in DSPPGMREF and in catalogue views whose names and columns differ
+  between releases, so the skill tells the model how to find out instead of hard-coding what to ask:
+  run DSPPGMREF into a temporary file, `SELECT *` five rows to see what the columns are called on
+  *this* release, and only then write the query. Code that guesses those names works at one customer
+  and misleads at the next; a model that looks first does not. It is also told to say which step is
+  the evidence for each answer — a caller inferred from a naming convention is not a caller.
+
 ## 0.32.1 — 2026-09-03
 
 ### Fixed

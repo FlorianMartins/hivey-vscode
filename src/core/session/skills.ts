@@ -202,6 +202,29 @@ export const BUILTIN_SKILLS: BuiltinSkill[] = [
   { group: "rpg", name: "/ile", hint: t("review the ILE structure"), prompt: t("Review this as ILE: what belongs in a service program rather than in the program, the procedures that should be exported and their prototypes, the activation group and what it means for open files and commitment, and the binding directory this needs."), attach: true },
   { group: "rpg", name: "/rpgdoc", hint: t("document this member"), prompt: t("Document this member the way an RPG shop reads: a header saying what it is for and what calls it, a note per procedure, and the files it uses with what it does to each. Keep the column layout untouched if the member is fixed-format."), attach: true },
   { group: "db2i", name: "/journal", hint: t("review the journalling"), prompt: t("Review journalling here: which files are journalled and which are not, what the journal receivers cost and when they are detached, and what a recovery would actually be able to replay. Say what is lost if the system ends abnormally now."), },
+  {
+    group: "db2i",
+    name: "/whouses",
+    hint: t("find what uses an object"),
+    prompt: t(
+      "Find everything on this system that uses the object I name — programs that call it, files it " +
+        "reads or writes, logical files built over it, service programs that bind it.\n\n" +
+        "Work it out rather than assuming a catalogue view exists. Try these in order and use what " +
+        "answers:\n" +
+        "1. `ibmi_where_is` to establish where the object and its source actually are.\n" +
+        "2. DSPPGMREF into a temporary file, then read it: run `DSPPGMREF PGM(LIB/*ALL) OBJTYPE(*PGM) " +
+        "OUTPUT(*OUTFILE) OUTFILE(QTEMP/HCREF)` with ibmi_command, then `SELECT * FROM QTEMP.HCREF " +
+        "FETCH FIRST 5 ROWS ONLY` with ibmi_sql to see what the columns are called on THIS release, " +
+        "and only then write the query that filters on the object I asked about. Do not guess the " +
+        "column names; look at them.\n" +
+        "3. For SQL objects, the catalogue views: SYSTABLEDEP, SYSVIEWDEP, SYSROUTINEDEP, " +
+        "SYSPARTITIONINDEXES. If one does not exist on this release, say so and move on.\n" +
+        "4. For DDS logical files over a physical, the reference is in the source: search the DDS " +
+        "members for PFILE or JFILE naming it.\n\n" +
+        "Report what each step found and what it could not, and say which of them is the evidence " +
+        "for each answer. A caller you inferred from a naming convention is not a caller.",
+    ),
+  },
   { group: "db2i", name: "/qsys2", hint: t("use the catalogue instead"), prompt: t("Replace this with a QSYS2 or SYSTOOLS service where one exists — object lists, job information, journal entries, IFS objects — rather than a command whose output has to be parsed. Give the query and say what it returns that the command did not."), attach: true },
   { group: "db2i", name: "/commitctl", hint: t("review the commitment control"), prompt: t("Review the commitment control here: what is under commit and what is not, where COMMIT and ROLLBACK are issued, what happens on an unhandled error, and whether the activation group scope matches the unit of work.") },
   { group: "rpg", name: "/dbmodern", hint: t("modernise the data access"), prompt: t("Propose the SQL replacement for these native I/O operations (CHAIN, SETLL, READE): the query, whether a cursor or a single fetch is right, and what changes about record locking and about the record format the program expects. Say where native I/O should stay."), attach: true },
