@@ -1,13 +1,13 @@
 // GENERATED FILE — do not edit by hand.
 // Written by `npm run models` (scripts/update-models.mjs); a scheduled workflow commits the diff.
-// 416 priced models. Tuples: [id, name, vendor, context, $/M in, $/M out, $/M cached-in].
+// 419 priced models. Tuples: [id, name, vendor, context, $/M in, $/M out, $/M cached-in].
 //
 // A model that is absent from this table is reported as "unknown cost" rather than guessed: a
 // wrong price silently spends someone's budget.
 
 import type { Price } from "./pricing.js";
 
-export const GENERATED_AT = "2026-09-03";
+export const GENERATED_AT = "2026-09-04";
 
 export type ModelRow = [string, string, string, number, number, number, number];
 
@@ -19,12 +19,12 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["~deepseek/deepseek-v4-flash-latest","DeepSeek V4 Flash Latest","~deepseek",1310720,0.05,0.16,0.013],
   ["~google/gemini-flash-latest","Google Gemini Flash Latest","~google",1048576,0.75,3.75,0.075],
   ["~google/gemini-pro-latest","Google Gemini Pro Latest","~google",1048576,2,12,0.2],
-  ["~moonshotai/kimi-latest","MoonshotAI Kimi Latest","~moonshotai",1048576,2.55,12.75,0.256],
+  ["~moonshotai/kimi-latest","MoonshotAI Kimi Latest","~moonshotai",1048576,2.5,14,0.29],
   ["~openai/gpt-latest","OpenAI GPT Latest","~openai",1050000,2,10,0.2],
   ["~openai/gpt-mini-latest","OpenAI GPT Mini Latest","~openai",400000,0.75,4.5,0.075],
   ["~x-ai/grok-latest","Grok Latest","~x-ai",500000,2,6,0.5],
   ["~z-ai/glm-flash-latest","GLM Flash Latest","~z-ai",1310720,0.075,0.25,0.015],
-  ["~z-ai/glm-latest","GLM Latest","~z-ai",1310720,1.106,3.476,0.1817],
+  ["~z-ai/glm-latest","GLM Latest","~z-ai",1310720,1.15,3.5,0.1],
   ["aion-labs/aion-2.0","Aion-2.0","aion-labs",131072,0.8,1.6,0.2],
   ["aion-labs/aion-3.0","Aion-3.0","aion-labs",131072,3,6,0.75],
   ["aion-labs/aion-3.0-mini","Aion-3.0-Mini","aion-labs",131072,0.7,1.4,0.18],
@@ -77,9 +77,9 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["cohere/command-r-plus-08-2024","Command R+ (08-2024)","cohere",128000,2.5,10,0],
   ["cohere/command-r7b-12-2024","Command R7B (12-2024)","cohere",128000,0.0375,0.15,0],
   ["cohere/north-mini-code:free","North Mini Code (free)","cohere",256000,0,0,0],
-  ["deepseek/deepseek-chat","DeepSeek V3","deepseek",163840,0.2574,1.0287,0],
+  ["deepseek/deepseek-chat","DeepSeek V3","deepseek",163840,0.32,0.89,0],
   ["deepseek/deepseek-chat-v3-0324","DeepSeek V3 0324","deepseek",163840,0.25,1,0],
-  ["deepseek/deepseek-chat-v3.1","DeepSeek V3.1","deepseek",163840,0.25,0.95,0.13],
+  ["deepseek/deepseek-chat-v3.1","DeepSeek V3.1","deepseek",163840,0.55,1.65,0.55],
   ["deepseek/deepseek-r1","R1","deepseek",64000,0.7,2.5,0],
   ["deepseek/deepseek-r1-0528","R1 0528","deepseek",163840,0.5,2.15,0.35],
   ["deepseek/deepseek-r1-distill-llama-70b","R1 Distill Llama 70B","deepseek",8192,0.8,0.8,0],
@@ -142,6 +142,7 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["inception/mercury-2","Mercury 2","inception",128000,0.25,0.75,0.025],
   ["inception/mercury-2.5-preview","Mercury 2.5 Preview","inception",260000,0.04,0.15,0.004],
   ["inclusionai/ling-3.0-flash","Ling-3.0-flash","inclusionai",262144,0.021,0.063,0.0042],
+  ["inclusionai/ling-3.0-flash-fin","Ling 3.0 Flash Fin","inclusionai",262144,0.06,0.18,0.012],
   ["inclusionai/ling-3.0-flash-fin:free","Ling 3.0 Flash Fin (free)","inclusionai",262144,0,0,0],
   ["kwaipilot/kat-coder-pro-v2","KAT-Coder-Pro V2","kwaipilot",262144,0.3,1.2,0.06],
   ["kwaipilot/kat-coder-pro-v2.5","KAT-Coder-Pro V2.5","kwaipilot",262144,0.74,2.96,0.15],
@@ -186,7 +187,7 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["mistralai/mistral-large-2512","Mistral Large 3 2512","mistralai",262144,0.5,1.5,0.05],
   ["mistralai/mistral-medium-3","Mistral Medium 3","mistralai",131072,0.4,2,0.04],
   ["mistralai/mistral-medium-3-5","Mistral Medium 3.5","mistralai",262144,1.5,7.5,0],
-  ["mistralai/mistral-medium-3-5:batch","Mistral Medium 3.5 (batch)","mistralai",262144,0.75,3.75,0],
+  ["mistralai/mistral-medium-3-5:batch","Mistral Medium 3.5 (batch)","mistralai",32768,0.75,3.75,0],
   ["mistralai/mistral-medium-3.1","Mistral Medium 3.1","mistralai",131072,0.4,2,0.04],
   ["mistralai/mistral-nemo","Mistral Nemo","mistralai",131072,0.019,0.03,0],
   ["mistralai/mistral-saba","Saba","mistralai",32768,0.2,0.6,0.02],
@@ -216,8 +217,9 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free","Nemotron 3 Nano Omni (free)","nvidia",256000,0,0,0],
   ["nvidia/nemotron-3-super-120b-a12b","Nemotron 3 Super","nvidia",1000000,0.085,0.4,0],
   ["nvidia/nemotron-3-super-120b-a12b:free","Nemotron 3 Super (free)","nvidia",262144,0,0,0],
-  ["nvidia/nemotron-3-ultra-550b-a55b","Nemotron 3 Ultra","nvidia",262144,0.6,2.4,0.12],
+  ["nvidia/nemotron-3-ultra-550b-a55b","Nemotron 3 Ultra","nvidia",262144,0.625,3.125,0.1875],
   ["nvidia/nemotron-3-ultra-550b-a55b:free","Nemotron 3 Ultra (free)","nvidia",1000000,0,0,0],
+  ["nvidia/nemotron-3.5-content-safety","Nemotron 3.5 Content Safety","nvidia",131072,0.2,0.2,0],
   ["nvidia/nemotron-3.5-content-safety:free","Nemotron 3.5 Content Safety (free)","nvidia",128000,0,0,0],
   ["nvidia/nemotron-3.5-lightning","Nemotron 3.5 Lightning","nvidia",262144,0.08,0.2,0.04],
   ["nvidia/nemotron-3.5-lightning:free","Nemotron 3.5 Lightning (free)","nvidia",1000000,0,0,0],
@@ -325,8 +327,8 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["qwen/qwen-2.5-coder-32b-instruct","Qwen2.5 Coder 32B Instruct","qwen",32768,0.66,1,0],
   ["qwen/qwen-plus","Qwen-Plus","qwen",1000000,0.26,0.78,0.052],
   ["qwen/qwen-plus-2025-07-28","Qwen Plus 0728","qwen",1000000,0.26,0.78,0],
-  ["qwen/qwen2.5-vl-72b-instruct","Qwen2.5 VL 72B Instruct","qwen",128000,0.25,0.75,0],
-  ["qwen/qwen3-14b","Qwen3 14B","qwen",131072,0.2275,0.91,0],
+  ["qwen/qwen2.5-vl-72b-instruct","Qwen2.5 VL 72B Instruct","qwen",128000,0.8,1,0.4],
+  ["qwen/qwen3-14b","Qwen3 14B","qwen",131072,0.12,0.24,0],
   ["qwen/qwen3-235b-a22b","Qwen3 235B A22B","qwen",131072,0.455,1.82,0],
   ["qwen/qwen3-235b-a22b-2507","Qwen3 235B A22B Instruct 2507","qwen",262144,0.0875,0.35,0.0175],
   ["qwen/qwen3-235b-a22b-thinking-2507","Qwen3 235B A22B Thinking 2507","qwen",131072,0.23,2.3,0],
@@ -370,7 +372,7 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["qwen/qwen3.7-plus","Qwen3.7 Plus","qwen",1000000,0.32,1.28,0.064],
   ["qwen/qwen3.8-2.4t-a95b","Qwen3.8 2.4T A95B","qwen",1048576,2,6,0.25],
   ["qwen/qwen3.8-2.4t-a95b:batch","Qwen3.8 2.4T A95B (batch)","qwen",1010000,2,6,0.25],
-  ["qwen/qwen3.8-27b","Qwen3.8 27B","qwen",1000000,0.425,2.55,0.085],
+  ["qwen/qwen3.8-27b","Qwen3.8 27B","qwen",1000000,0.42,3,0.085],
   ["qwen/qwen3.8-flash","Qwen3.8 Flash","qwen",1000000,0.15,0.47,0.016],
   ["qwen/qwen3.8-max","Qwen3.8 Max","qwen",1000000,2,6,0.25],
   ["rekaai/reka-edge","Reka Edge","rekaai",16384,0.1,0.1,0],
@@ -400,13 +402,14 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["thinkingmachines/inkling-small:free","Inkling Small (free)","thinkingmachines",1048576,0,0,0],
   ["thinkingmachines/inkling:batch","Inkling (batch)","thinkingmachines",524288,1,4.05,0.17],
   ["thinkingmachines/inkling:free","Inkling (free)","thinkingmachines",1048576,0,0,0],
-  ["undi95/remm-slerp-l2-13b","ReMM SLERP 13B","undi95",6144,0.45,0.65,0],
+  ["undi95/remm-slerp-l2-13b","ReMM SLERP 13B","undi95",6144,0.35,0.65,0],
   ["upstage/solar-pro-3","Solar Pro 3","upstage",131072,0.15,0.6,0.015],
   ["upstage/solar-pro4","Solar Pro 4","upstage",524288,0.03,0.12,0.006],
   ["writer/palmyra-x5","Palmyra X5","writer",1040000,0.6,6,0],
   ["x-ai/grok-4.20","Grok 4.20","x-ai",2000000,1.25,2.5,0.2],
   ["x-ai/grok-4.20-multi-agent","Grok 4.20 Multi-Agent","x-ai",2000000,1.25,2.5,0.2],
   ["x-ai/grok-4.3","Grok 4.3","x-ai",1000000,1.25,2.5,0.2],
+  ["x-ai/grok-4.3:batch","Grok 4.3 (batch)","x-ai",1000000,1,2,0.16],
   ["x-ai/grok-4.5","Grok 4.5","x-ai",500000,2,6,0.3],
   ["x-ai/grok-4.6","Grok 4.6","x-ai",500000,2,6,0.5],
   ["x-ai/grok-build-0.1","Grok Build 0.1","x-ai",256000,1,2,0.2],
@@ -424,7 +427,7 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["z-ai/glm-5.1","GLM 5.1","z-ai",204800,0.966,3.036,0.1794],
   ["z-ai/glm-5.2","GLM 5.2","z-ai",1048576,0.966,3.036,0.1932],
   ["z-ai/glm-5.2:free","GLM 5.2 (free)","z-ai",256000,0,0,0],
-  ["z-ai/glm-5.3","GLM 5.3","z-ai",1310720,1.4,4.4,0.26],
+  ["z-ai/glm-5.3","GLM 5.3","z-ai",1310720,1.4,4.4,0.14],
   ["z-ai/glm-5.3-flash","GLM 5.3 Flash","z-ai",1310720,0.075,0.25,0.015],
   ["z-ai/glm-5.3-flash:batch","GLM 5.3 Flash (batch)","z-ai",1048575,0.15,0.5,0.03],
   ["z-ai/glm-5v-turbo","GLM 5V Turbo","z-ai",202752,1.2,4,0.24],
