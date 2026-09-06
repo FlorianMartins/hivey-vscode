@@ -7,7 +7,7 @@
 
 import type { Price } from "./pricing.js";
 
-export const GENERATED_AT = "2026-09-05";
+export const GENERATED_AT = "2026-09-06";
 
 export type ModelRow = [string, string, string, number, number, number, number];
 
@@ -24,7 +24,7 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["~openai/gpt-mini-latest","OpenAI GPT Mini Latest","~openai",400000,0.75,4.5,0.075],
   ["~x-ai/grok-latest","Grok Latest","~x-ai",500000,2,6,0.5],
   ["~z-ai/glm-flash-latest","GLM Flash Latest","~z-ai",1310720,0.075,0.25,0.015],
-  ["~z-ai/glm-latest","GLM Latest","~z-ai",1310720,1.15,3.5,0.1],
+  ["~z-ai/glm-latest","GLM Latest","~z-ai",1310720,1.17,3.96,0.234],
   ["aion-labs/aion-2.0","Aion-2.0","aion-labs",131072,0.8,1.6,0.2],
   ["aion-labs/aion-3.0","Aion-3.0","aion-labs",131072,3,6,0.75],
   ["aion-labs/aion-3.0-mini","Aion-3.0-Mini","aion-labs",131072,0.7,1.4,0.18],
@@ -86,11 +86,11 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["deepseek/deepseek-v3.1-terminus","DeepSeek V3.1 Terminus","deepseek",163840,0.27,1,0.135],
   ["deepseek/deepseek-v3.2","DeepSeek V3.2","deepseek",163840,0.269,0.4,0.1345],
   ["deepseek/deepseek-v3.2-exp","DeepSeek V3.2 Exp","deepseek",163840,0.27,0.41,0],
-  ["deepseek/deepseek-v4-flash","DeepSeek V4 Flash 0423","deepseek",1048576,0.0861,0.1722,0.0172],
+  ["deepseek/deepseek-v4-flash","DeepSeek V4 Flash 0423","deepseek",1048576,0.0816,0.1632,0.0163],
   ["deepseek/deepseek-v4-flash-0731","DeepSeek V4 Flash 0731","deepseek",1310720,0.065,0.18,0.016],
   ["deepseek/deepseek-v4-flash-0731:batch","DeepSeek V4 Flash 0731 (batch)","deepseek",1048576,0.14,0.28,0.03],
   ["deepseek/deepseek-v4-flash-vision-exp","DeepSeek V4 Flash Vision Exp","deepseek",1048576,0.22,0.66,0.007],
-  ["deepseek/deepseek-v4-pro","DeepSeek V4 Pro 0423","deepseek",1048576,0.9412,1.8823,0.0784],
+  ["deepseek/deepseek-v4-pro","DeepSeek V4 Pro 0423","deepseek",1048576,0.7383,1.4766,0.0615],
   ["deepseek/deepseek-v4-pro-0813","DeepSeek V4 Pro 0813","deepseek",1048576,1.1207,3.362,0.0374],
   ["deepseek/deepseek-v4-pro-0813:batch","DeepSeek V4 Pro 0813 (batch)","deepseek",1048576,1.32,3.96,0.13],
   ["dots-studio/dots-3-note-preview:free","Dots3-Note Preview (free)","dots-studio",512000,0,0,0],
@@ -359,7 +359,7 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["qwen/qwen3-vl-8b-thinking","Qwen3 VL 8B Thinking","qwen",131072,0.18,2.1,0],
   ["qwen/qwen3.5-122b-a10b","Qwen3.5-122B-A10B","qwen",262144,0.29,2.4,0],
   ["qwen/qwen3.5-27b","Qwen3.5-27B","qwen",262144,0.195,1.56,0],
-  ["qwen/qwen3.5-35b-a3b","Qwen3.5-35B-A3B","qwen",262144,0.08,0.75,0],
+  ["qwen/qwen3.5-35b-a3b","Qwen3.5-35B-A3B","qwen",262144,0.3125,1.25,0.1563],
   ["qwen/qwen3.5-397b-a17b","Qwen3.5 397B A17B","qwen",262144,0.55,3.5,0.225],
   ["qwen/qwen3.5-9b","Qwen3.5-9B","qwen",262144,0.1,0.15,0],
   ["qwen/qwen3.5-9b:batch","Qwen3.5-9B (batch)","qwen",262144,0.17,0.25,0],
