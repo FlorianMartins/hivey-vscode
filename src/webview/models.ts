@@ -12,6 +12,7 @@
 import { button, el, formatContext, formatPrice, icon, searchInput } from "./dom.js";
 import type { ToExtension, UiModel, UiState } from "../shared/protocol.js";
 import { t } from "../shared/i18n.js";
+import { HIVEY_VARIANTS, isHivey } from "../core/router/hivey.js";
 
 let query = "";
 
@@ -44,10 +45,25 @@ export function modelsScreen(state: UiState, send: (m: ToExtension) => void, rer
     (m) => !needle || m.name.toLocaleLowerCase("fr").includes(needle) || m.id.toLocaleLowerCase("fr").includes(needle),
   );
 
+  const presets = matching.filter((m) => isHivey(m.id));
   const local = matching.filter((m) => m.local);
-  const remote = matching.filter((m) => !m.local);
+  const remote = matching.filter((m) => !m.local && !isHivey(m.id));
 
   const list = el("div", "models-list");
+  // The presets first, and not because they are better: they answer a different question. Everything
+  // below is "which model", which is a question with four hundred answers and no wrong one; a preset
+  // is "how much am I willing to spend", which is a question with three. Filed under `hivey` among
+  // the vendors — which is where they landed when they were first added — they sat between Google
+  // and Meta, three rows nobody scrolling a catalogue would read as a way out of scrolling it.
+  if (presets.length) {
+    list.append(
+      sectionTitle(
+        t("Hivey"),
+        t("Not models: each sends a kind of work — a question, an agent turn, a completion, a chore — to the model that suits it."),
+      ),
+    );
+    for (const m of presets) list.append(modelRow(m, send));
+  }
   if (local.length) {
     list.append(sectionTitle(t("On your machine"), t("No cost, no data leaves.")));
     for (const m of local) list.append(modelRow(m, send));
@@ -106,10 +122,15 @@ function modelRow(model: UiModel, send: (m: ToExtension) => void): HTMLElement {
   }
   row.append(stats);
 
-  row.title = model.local
-    ? t("Served by a local endpoint: no cost, and nothing leaves.")
-    : t("Input {0} $/M · output {1} $/M", model.inUsd, model.outUsd) +
-      (model.cachedInUsd ? t(" · cached {0} $/M", model.cachedInUsd) : "");
+  // A preset has four prices, and the row can show one. It shows the ordinary turn's — the one met
+  // most often — and says so here rather than letting the figure be read as the whole bill.
+  const preset = HIVEY_VARIANTS.find((v) => v.id === model.id);
+  row.title = preset
+    ? `${preset.hint}\n${t("The figures are those of an ordinary turn; a chore costs less and a hard question more.")}`
+    : model.local
+      ? t("Served by a local endpoint: no cost, and nothing leaves.")
+      : t("Input {0} $/M · output {1} $/M", model.inUsd, model.outUsd) +
+        (model.cachedInUsd ? t(" · cached {0} $/M", model.cachedInUsd) : "");
   row.addEventListener("click", () => send({ type: "setModel", model: model.id, provider: model.provider }));
   return row;
 }

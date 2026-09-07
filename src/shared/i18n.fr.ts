@@ -5,6 +5,8 @@
 // A test keeps it honest — every `t("…")` in the source has to have an entry.
 
 export const FR: Record<string, string> = {
+  "Not models: each sends a kind of work — a question, an agent turn, a completion, a chore — to the model that suits it.": "Pas des modèles : chacun envoie un type de travail — une question, un tour d’agent, une complétion, une corvée — au modèle qui lui convient.",
+  "The figures are those of an ordinary turn; a chore costs less and a hard question more.": "Les chiffres sont ceux d’un tour ordinaire ; une corvée coûte moins, une question difficile davantage.",
   "Hivey": "Hivey",
   "Free endpoints only. Costs nothing, and is rate-limited like everything free.": "Uniquement des points d’accès gratuits. Ne coûte rien, et est limité en débit comme tout ce qui est gratuit.",
   "A strong model where you feel it, a cheap one for the plumbing.": "Un modèle solide là où ça se voit, un modèle bon marché pour la tuyauterie.",

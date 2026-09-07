@@ -7,6 +7,7 @@
 
 import { button, closeMenu, el, icon, ICON, menuIsOpen, searchInput } from "./dom.js";
 import { chatScreen, collapsible, isStreaming, planBlock, setStreaming, stepRow, type ChatDeps, captureDraft, restoreDraft } from "./chat.js";
+import { atEnd, placeAfterChange, type Viewport } from "../core/ui/scroll.js";
 import { historyScreen } from "./history.js";
 import { modelsScreen } from "./models.js";
 import { permissionsScreen } from "./permissions.js";
@@ -350,7 +351,9 @@ class LiveTurn {
     // would act on half of it. They arrive with `finish()`, on the finished answer.
     const rendered = markdown(closeOpenFence(this.buffer.slice(0, this.shown)));
     rendered.className = "md live";
-    this.text.replaceChildren(...Array.from(rendered.childNodes));
+    // Wrapped, because this runs on every frame of the typing animation: the text grows here, so
+    // this is the only place that knows where the bottom was a moment before it moved.
+    following(() => this.text!.replaceChildren(...Array.from(rendered.childNodes)));
   }
 
   appendReasoning(chunk: string): void {
@@ -375,8 +378,10 @@ class LiveTurn {
 
   setPlan(plan: Plan): void {
     const next = planBlock(plan, true);
-    if (this.planNode) this.planNode.replaceWith(next);
-    else this.body.prepend(next);
+    following(() => {
+      if (this.planNode) this.planNode.replaceWith(next);
+      else this.body.prepend(next);
+    });
     this.planNode = next;
   }
 
@@ -407,14 +412,15 @@ class LiveTurn {
       const row = el("div", "step");
       row.append(el("span", "step-ico dot", "·"));
       row.append(el("span", "step-summary", text));
-      this.stepsHost().append(row);
+      following(() => this.stepsHost().append(row));
       return;
     }
-    this.stepsHost().append(stepRow({ tool, summary: text, ok: ok !== false, ...(call ? { call } : {}) }));
+    const row = stepRow({ tool, summary: text, ok: ok !== false, ...(call ? { call } : {}) });
+    following(() => this.stepsHost().append(row));
   }
 
   appendError(message: string): void {
-    this.body.append(el("div", "error", message));
+    following(() => this.body.append(el("div", "error", message)));
   }
 
   /** The approval card: four answers, because "yes" and "yes forever" are different decisions. */
@@ -439,6 +445,10 @@ class LiveTurn {
     const actions = el("div", "approval-actions");
     const answer = (a: "once" | "session" | "always" | "no", label: string) => {
       send({ type: "approve", id, answer: a });
+      // The class, not only the contents: the frame breathes while the question is open, and a
+      // question that has been answered is not open. Replacing the children alone left a decided
+      // card pulsing at the reader for the rest of the conversation.
+      card.classList.add("answered");
       card.replaceChildren(el("div", "approval-done", label));
     };
     // Egress consent is per destination, so "this conversation" would be a promise about the wrong
@@ -473,8 +483,7 @@ class LiveTurn {
     };
     for (const choice of choices) actions.append(available[choice]!());
     card.append(actions);
-    this.body.append(card);
-    scrollToEnd();
+    following(() => this.body.append(card));
   }
 
   /** The authoritative render: the finished text, with the actions that act on it. */
@@ -490,7 +499,9 @@ class LiveTurn {
         onInsertAtCursor: (code) => send({ type: "insertCode", code, atCursor: true }),
         onApply: (code, language) => send({ type: "applyCode", code, language }),
       });
-      this.text.replaceWith(rendered);
+      // The last movement of the turn, and the one most likely to be under the reader's eyes: the
+      // whole answer is re-rendered at once, with its code actions, so it changes height.
+      following(() => this.text!.replaceWith(rendered));
       this.text = undefined;
     }
     this.root.classList.remove("streaming");
@@ -534,10 +545,41 @@ function ensureLive(): LiveTurn {
  * couple of lines because a scroll position is rarely exactly zero from the end. Once the reader
  * has left, nothing moves them again until they ask — and the button below is how they ask.
  */
-const STICK_TOLERANCE_PX = 48;
-
 function atBottom(list: Element): boolean {
-  return list.scrollHeight - list.scrollTop - list.clientHeight <= STICK_TOLERANCE_PX;
+  return atEnd(measure(list));
+}
+
+/** The three numbers the rule is made of, read off an element. */
+function measure(list: Element): Viewport {
+  return { scrollHeight: list.scrollHeight, scrollTop: list.scrollTop, clientHeight: list.clientHeight };
+}
+
+/**
+ * Make a change to the transcript while keeping the reader at the end — if that is where they were.
+ *
+ * The distinction from `scrollToEnd` is WHEN the question is asked. That one schedules a frame and
+ * then looks at where the list is, which is after the change has landed; and since the answer is
+ * now released character by character, every frame added a line or two to a list already at its
+ * end — so by the time the check ran, the reader was a line and a half above the bottom and the
+ * follow stopped. Fifty frames later they were reading the middle of an answer whose end was
+ * somewhere below. The measurement has to be taken BEFORE the text grows, and applied after.
+ *
+ * The rule itself is unchanged and is the only one that matters here: the transcript follows the
+ * answer while you are at the bottom, and never moves you once you have gone up to re-read
+ * something. Which is why this is not a setting — it is the reader's own scroll position that says
+ * which of the two they want, every time.
+ */
+function following(mutate: () => void): void {
+  const list = document.querySelector<HTMLElement>(".transcript");
+  if (!list) {
+    mutate();
+    return;
+  }
+  const before = measure(list);
+  mutate();
+  const place = placeAfterChange(before, measure(list));
+  if (place !== undefined) list.scrollTop = place;
+  showJumpButton(place === undefined);
 }
 
 function scrollToEnd(force = false): void {
@@ -566,7 +608,13 @@ function showJumpButton(show: boolean): void {
     existing?.remove();
     return;
   }
-  if (existing) return;
+  if (existing) {
+    // It is the same button, but not always saying the same thing: an answer that started arriving
+    // after the reader scrolled up has to be announced on the control that goes to it, or the only
+    // way to know something is being written is to guess.
+    markAnswering(existing);
+    return;
+  }
   // The transcript's own box, not the screen. I added that box for exactly this and then went on
   // appending to `.chat-screen`, whose bottom edge is BELOW the composer — so the button was
   // positioned against the wrong element and sat under the input. Two fixes ago the symptom was
@@ -579,10 +627,32 @@ function showJumpButton(show: boolean): void {
   const jump = button({
     icon: ICON.chevron,
     className: "btn jump-to-end",
-    title: isStreaming() ? t("Answering… go to the end of the conversation") : t("Go to the end of the conversation"),
+    title: t("Go to the end of the conversation"),
     onClick: () => scrollToEnd(true),
   });
+  markAnswering(jump);
   host.append(jump);
+}
+
+/**
+ * Say, on the button itself, that an answer is being written down there.
+ *
+ * A reader who has scrolled up loses the only signal that the turn is still going — the text
+ * growing at the bottom. The button that takes them back is the one control they are already
+ * looking for, so it is where that belongs: a ring that breathes, and a title that says why. The
+ * button does not MOVE, because it lives in a strip a few pixels tall between the last answer and
+ * the composer, and anything moving there touches one of the two.
+ */
+function markAnswering(jump: HTMLElement): void {
+  const answering = isStreaming();
+  jump.classList.toggle("answering", answering);
+  jump.title = answering ? t("Answering… go to the end of the conversation") : t("Go to the end of the conversation");
+}
+
+/** The button's state after the turn started or ended, without waiting for the reader to scroll. */
+function refreshJumpButton(): void {
+  const list = document.querySelector<HTMLElement>(".transcript");
+  if (list) showJumpButton(!atBottom(list));
 }
 
 /** Watch the reader's own scrolling, so the button appears and disappears on its own. */
@@ -615,14 +685,17 @@ window.addEventListener("message", (event: MessageEvent<ToPanel>) => {
       setStreaming(true);
       render();
       ensureLive();
+      refreshJumpButton();
       break;
     case "turnEnd":
       setStreaming(false);
       live?.finish();
+      refreshJumpButton();
       break;
     case "delta":
+      // No scroll here: the text is not on screen yet. It is released frame by frame by the typing
+      // animation, and each of those frames follows the end itself — see `following`.
       ensureLive().appendText(m.text);
-      scrollToEnd();
       break;
     case "reasoning":
       ensureLive().appendReasoning(m.text);
@@ -637,7 +710,6 @@ window.addEventListener("message", (event: MessageEvent<ToPanel>) => {
       // turn has the editor's own places to give it.
       if (!live && !isStreaming()) break;
       ensureLive().appendStatus(m.text, m.tool, m.ok, m.call);
-      scrollToEnd();
       break;
     case "approval":
       ensureLive().appendApproval(m.id, m.tool, m.description, m.command, m.choices, m.detail);

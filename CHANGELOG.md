@@ -2,6 +2,38 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.37.0 — 2026-09-07
+
+### Fixed
+
+- **The transcript follows the answer again while it is being written.** It was meant to, and the
+  rule was right: stick to the bottom while the reader is at the bottom, never move them once they
+  have gone up. What broke it was the typing animation added in 0.35 — the panel asked "is the
+  reader at the end?" *after* adding the text rather than before, and a frame that lands a code
+  block or a step row moves the end further than the tolerance allows. One frame later the reader
+  who had not moved at all counted as "gone up", and the follow stopped for the rest of the answer.
+  The measurement is now taken before the change and applied after, on every mutation of a live turn
+  — text, steps, plan, errors, approval cards and the final re-render. The other half is unchanged
+  and is the point: scroll up to re-read something and nothing pulls you back down.
+
+### Added
+
+- **The button back to the end says an answer is being written.** A reader who has scrolled up loses
+  the only sign that the turn is still going — the text growing below. The control they would use to
+  go back now carries a ring that breathes while the answer arrives, and says so in its tooltip. It
+  does not move: it lives in a strip a few pixels tall between the last answer and the composer, and
+  anything moving there touches one of the two.
+- **An open approval breathes.** An approval card stops the turn — nothing else happens until it is
+  answered — and at the bottom of a long transcript a still card is indistinguishable from the text
+  around it, so the panel looks as though it has quietly stopped. The one edge that carries meaning
+  now fades in and out over two and a half seconds: enough to catch an eye passing over it, never
+  enough to read as an alarm. It stops the moment the card is answered, and both animations are off
+  under `prefers-reduced-motion`, which states the same thing in colour instead.
+- **The Hivey presets are on the Models screen too**, in their own section at the top. Filed under
+  `hivey` among the vendors — which is where they landed when they were added an hour ago — they sat
+  between Google and Meta: three rows nobody scrolling a catalogue would read as the way out of
+  scrolling it. Found by looking at a screenshot of the real panel rather than at the code.
+
 ## 0.36.0 — 2026-09-07
 
 ### Added

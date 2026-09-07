@@ -699,6 +699,67 @@ pre.code {
   color: var(--vscode-focusBorder, var(--vscode-textLink-foreground));
   flex: 0 0 auto;
 }
+
+/* A frame that breathes while the question is open.
+ *
+ * An approval card stops the turn: nothing else happens until it is answered. When it arrives at
+ * the bottom of a long transcript — or while the reader is up in the conversation re-reading
+ * something — a still card is indistinguishable from the text around it, and the panel looks as
+ * though it has quietly stopped. So the one edge that carries meaning is the one that moves.
+ *
+ * It fades rather than travels, and slowly. A card that slid, flashed or bounced would be a card
+ * that has to be dismissed before you can read anything else, and this is a question, not an alarm.
+ * Two and a half seconds is at the edge of "did that move?" — enough to catch the eye passing over
+ * it, never enough to be read as urgency.
+ *
+ * It stops on the answer, and that is what `.answered` is for: a decided card that went on pulsing
+ * would be asking for something nobody can give it. */
+@keyframes approval-open {
+  0%,
+  100% {
+    border-left-color: var(--vscode-focusBorder, var(--vscode-textLink-foreground));
+  }
+  50% {
+    border-left-color: color-mix(
+      in srgb,
+      var(--vscode-focusBorder, var(--vscode-textLink-foreground)) 30%,
+      var(--border-strong)
+    );
+  }
+}
+@keyframes approval-open-egress {
+  0%,
+  100% {
+    border-left-color: var(--vscode-textLink-foreground, var(--vscode-charts-blue));
+  }
+  50% {
+    border-left-color: color-mix(
+      in srgb,
+      var(--vscode-textLink-foreground, var(--vscode-charts-blue)) 30%,
+      var(--border-strong)
+    );
+  }
+}
+.approval:not(.answered) {
+  animation: approval-open 2.5s ease-in-out infinite;
+}
+.approval.egress:not(.answered) {
+  animation-name: approval-open-egress;
+}
+/* And the mark on the head moves with the edge — one card, one signal. Opacity rather than colour,
+   because the icon has no border to fade and a colour animation on a glyph reads as a flicker. */
+.approval:not(.answered) .approval-ico {
+  animation: approval-mark 2.5s ease-in-out infinite;
+}
+@keyframes approval-mark {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
 .approval-head {
   display: flex;
   align-items: center;
@@ -2854,6 +2915,31 @@ pre.code::-webkit-scrollbar-track {
 .jump-to-end:hover {
   background: var(--hover);
 }
+
+/* While an answer is being written below.
+ *
+ * A reader who has scrolled up loses the one signal that the turn is still going: the text growing
+ * at the bottom. This is the control they would use to go back, so it is where that fact belongs.
+ *
+ * A ring that expands out of the disc and fades, rather than anything that moves the button: it
+ * sits in a strip a few pixels tall between the last answer and the composer, and a control that
+ * moves there touches one of the two. The ring is drawn outside the disc's own edge, so it costs
+ * no layout — it is one shadow growing, which is what makes it cheap enough to run for the whole
+ * length of an answer. */
+.jump-to-end.answering {
+  border-color: color-mix(in srgb, var(--vscode-focusBorder, var(--vscode-textLink-foreground)) 65%, var(--border-strong));
+  color: var(--vscode-focusBorder, var(--vscode-textLink-foreground));
+  animation: jump-answering 1.8s ease-out infinite;
+}
+@keyframes jump-answering {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--vscode-focusBorder, var(--vscode-textLink-foreground)) 45%, transparent);
+  }
+  70%,
+  100% {
+    box-shadow: 0 0 0 5px transparent;
+  }
+}
 .jump-to-end .ico {
   /* The chevron points down; it is drawn pointing down already, so nothing to rotate — but it must
      lead the label, which is the direction of travel. */
@@ -2969,6 +3055,18 @@ pre.code::-webkit-scrollbar-track {
 @media (prefers-reduced-motion: reduce) {
   .plan.live .plan-step.running .plan-mark {
     animation: none;
+  }
+  /* Someone who has asked for less movement still has to be able to tell an open question from a
+     decided one, and an answer being written from a finished one — so the animations stop and the
+     state they carried is stated in colour instead. Nothing is lost but the motion. */
+  .approval:not(.answered),
+  .approval.egress:not(.answered),
+  .approval:not(.answered) .approval-ico,
+  .jump-to-end.answering {
+    animation: none;
+  }
+  .jump-to-end.answering {
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--vscode-focusBorder, var(--vscode-textLink-foreground)) 35%, transparent);
   }
 }
 
