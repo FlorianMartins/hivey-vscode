@@ -5,6 +5,10 @@
 // A test keeps it honest — every `t("…")` in the source has to have an entry.
 
 export const FR: Record<string, string> = {
+  "Hivey": "Hivey",
+  "Free endpoints only. Costs nothing, and is rate-limited like everything free.": "Uniquement des points d’accès gratuits. Ne coûte rien, et est limité en débit comme tout ce qui est gratuit.",
+  "A strong model where you feel it, a cheap one for the plumbing.": "Un modèle solide là où ça se voit, un modèle bon marché pour la tuyauterie.",
+  "The best of the catalogue on the hard work, without paying it to write commit messages.": "Le meilleur du catalogue sur le travail difficile, sans le payer pour écrire des messages de commit.",
   "  (stopped at the maximum number of steps)": "  (arrêté au nombre maximal d'étapes)",
   "  {0}+{1} tokens": "  {0}+{1} jetons",
   " (first {0} of {1} tokens)": " (les {0} premiers jetons sur {1})",

@@ -11,12 +11,18 @@ import * as vscode from "vscode";
 import { t } from "../shared/i18n.js";
 import { complete, type CompletionContext as CoreCtx } from "../core/completion/engine.js";
 import { redact, Vault } from "../core/redaction/index.js";
+import { hiveyModel, isHivey } from "../core/router/hivey.js";
 import { CompletionCache } from "../core/completion/cache.js";
 import { isOllama, type Provider } from "../core/providers/index.js";
 import { EgressGate } from "./egress.js";
 import { providerFor, readSettings, redactionPolicy, type Settings } from "./config.js";
 import type { Keys } from "./config.js";
 import { relative } from "./workspace.js";
+
+/** The model completion actually runs on — a preset resolves to its own completion tier. */
+function completionModel(settings: Settings): string {
+  return hiveyModel(settings.completion.model, "completion");
+}
 
 // Enough context to be useful, small enough to stay fast. Completion latency is the feature.
 const CONTEXT_TOKENS = 1600;
@@ -97,7 +103,7 @@ export class InlineCompletionProvider implements vscode.InlineCompletionItemProv
         this.cache,
         sent,
         {
-          model: settings.completion.model,
+          model: completionModel(settings),
           maxTokens: settings.completion.maxTokens,
           multiline: settings.completion.multiline,
           contextTokens: CONTEXT_TOKENS,
@@ -145,7 +151,15 @@ export class InlineCompletionProvider implements vscode.InlineCompletionItemProv
   }
 
   private async resolveProvider(settings: Settings): Promise<Provider> {
-    const id = settings.completion.provider === "off" ? "local" : settings.completion.provider;
+    // A preset is a routing over the catalogue, and the catalogue is OpenRouter's — so choosing one
+    // for completion also chooses where it is served, whatever the provider setting says. Without
+    // this the id would be sent to whatever address the completion role points at, which is usually
+    // Ollama, and Ollama has never heard of it.
+    const id = isHivey(settings.completion.model)
+      ? "openrouter"
+      : settings.completion.provider === "off"
+        ? "local"
+        : settings.completion.provider;
     const key = `${id}|${settings.endpoints[id]}`;
     if (!this.provider || this.providerKey !== key) {
       this.provider = await providerFor(settings, this.keys, id);
@@ -161,7 +175,7 @@ export class InlineCompletionProvider implements vscode.InlineCompletionItemProv
     if (!p?.warmup) return;
     this.status.text = "$(loading~spin) Hivey Code";
     this.status.tooltip = t("Loading the local model…");
-    await p.warmup(settings.completion.model);
+    await p.warmup(completionModel(settings));
     this.updateStatus(settings);
   }
 

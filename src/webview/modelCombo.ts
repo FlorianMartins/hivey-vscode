@@ -31,6 +31,7 @@ import { t } from "../shared/i18n.js";
 import type { ToExtension, UiModel, UiState } from "../shared/protocol.js";
 import { priceTier, PRICE_TIER_ORDER, type PriceTier } from "../core/models/tiers.js";
 import { recommend } from "../core/models/recommend.js";
+import { HIVEY_VARIANTS, isHivey } from "../core/router/hivey.js";
 
 /** A row in the list, after the model has been priced and grouped. */
 interface ComboItem {
@@ -140,9 +141,17 @@ function toItems(state: UiState): ComboItem[] {
     })
     .filter((i) => i !== undefined) as ComboItem[];
 
+  // The presets, in their own group at the top. They are not a vendor and they are not four
+  // hundred rows to search through: they are the answer to "I do not want to choose a model", which
+  // is a different question from the one the rest of this list answers, and it belongs above it.
+  const hint = new Map(HIVEY_VARIANTS.map((v) => [v.id as string, v.hint]));
+  const presets = items
+    .filter((i) => isHivey(i.model.id))
+    .map((i) => ({ ...i, group: t("Hivey"), why: hint.get(i.model.id) }));
+
   const current = items.find((i) => i.current);
-  const rest = current ? items.filter((i) => i !== current) : items;
-  return [...(current ? [{ ...current, group: t("Current") }] : []), ...recommended, ...rest];
+  const rest = (current ? items.filter((i) => i !== current) : items).filter((i) => !isHivey(i.model.id));
+  return [...(current ? [{ ...current, group: t("Current") }] : []), ...presets.filter((i) => !i.current), ...recommended, ...rest];
 }
 
 function vendorLabel(vendor: string): string {

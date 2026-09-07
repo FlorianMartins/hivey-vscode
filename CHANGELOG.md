@@ -2,6 +2,60 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.36.0 — 2026-09-07
+
+### Added
+
+- **The Hivey presets, in the model picker.** Three rows above the four hundred models — **Hivey
+  Free**, **Hivey Smart**, **Hivey Pro** — each a routing rather than a model: an ordinary question,
+  an agent turn, an inline completion and a chore (a summary, a commit message) each go to the model
+  that suits them, so the one kept for the hard work is not the one writing commit messages. Brought
+  over from the Hivey sidebar and the web HiveyCode, with one deliberate difference: neither of them
+  can know what you are about to ask, so both pay a small model to classify the request first — a
+  whole round trip before the first word. This extension already knows whether it is completing a
+  line, summarising a transcript or running an agent, and already grades a hard question with the
+  router's own free classifier. The routing is read from what is happening rather than bought.
+  - **Nothing is named.** Which model each preset uses is generated daily from OpenRouter's own
+    catalogue by rule — budget, tool support, context, vendor family, recency — and committed as a
+    diff. No model version appears anywhere in this repository's source, which is the rule the two
+    sibling projects arrived at the expensive way: a hard-coded id is right the day it is written
+    and 404s a few weeks later, in silence.
+  - **A preset never reaches a provider.** `hivey/free` is not a model id and no API has heard of
+    it. It is resolved on every path out — chat, agent, sub-agent, summarising, inline edits,
+    completion — and an id retired from the presets falls back rather than being sent as it stands.
+    Proven where it counts: a test in a real editor reads what came out of the socket.
+  - **A preset decides where it is served**, so the panel's promise about what leaves the machine
+    follows the model rather than the provider setting that no longer applies.
+
+### Fixed
+
+- **Db2 for i is no longer switched on by a file extension.** Any `.sql` file — a Postgres
+  migration, a SQLite query, anything — put the whole Db2 for i dialect into the system prompt:
+  "this is Db2 for i, not Db2 LUW, not Oracle and not SQL Server", `FETCH FIRST` rather than `LIMIT`,
+  the QSYS2 catalogue. On a machine that has never seen a partition. The platform's rules now have
+  to be earned: by the IBM i side being in play at all (the same switch the IBM i tools are behind),
+  by a path that is a member, or by the source saying so — `QSYS2`, `*LIBL`, `LABEL ON`. `.rpgle`,
+  `.dspf` and the other extensions nothing else uses are unaffected; `.cmd` (a Windows batch file),
+  `.cl` (Common Lisp), `.pf` and `.table` are gated the same way as `.sql`.
+- **A three-segment path was read as a source member.** `db/migrations/0007_add_index.sql` looked
+  exactly like `LIBRARY/SOURCEFILE/MEMBER.SQL`, so it was one — the second half of the same defect,
+  and the reason the first fix was not enough. An object name on this platform is at most ten
+  characters, which is the platform's own rule and now the test.
+
+### Changed
+
+- **The approval card is the theme's colour, not a warning colour.** The frame's leading edge was
+  `editorWarning` yellow: a hue that says something has gone wrong, on a card that asks a routine
+  question and expects a routine yes — and a hue closer to this extension's own brand than to the
+  workbench it is docked in. It now takes `focusBorder`, which every theme defines as "this is what
+  you are being asked about". The egress card keeps its link colour and gains a heavier edge, so the
+  two are told apart by weight rather than by a second hue to learn.
+- **The dialect rules follow what is ATTACHED, not only the focused tab.** Reading them off the
+  active editor alone meant that attaching a source member and then looking at the README — or
+  asking about three files at once, which is how anyone asks how programs fit together — sent the
+  model into a dialect it had been told nothing about. Up to two dialects, deduplicated; each of
+  these is a paragraph of rules and, for a fixed-format one, a column ruler.
+
 ## 0.35.0 — 2026-09-03
 
 ### Added

@@ -45,6 +45,7 @@ import { capture, describeRestore, trimCheckpoints } from "../core/session/check
 import type { Plan } from "../core/agent/plan.js";
 import { promptForMode, toolsForMode } from "../core/session/modes.js";
 import { detectIbmiLanguage, ibmiPrompt } from "../core/ibmi/languages.js";
+import { hiveyLabel, hiveyModel, isHivey } from "../core/router/hivey.js";
 import { parsePrompt, participantDirective, type MentionKind, type Participant } from "../core/session/mentions.js";
 import { resolveMentions } from "./mentions.js";
 import { instructionFiles, instructionsPrompt } from "./instructions.js";
@@ -337,17 +338,27 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       },
       mode: this.session.mode,
       reasoning: this.reasoning,
-      reasoningAvailable: supportsReasoning(s.chat.model),
+      // A preset is not a model, so everything the panel wants to know about "the model" has to be
+      // asked of the one that would answer an ordinary turn — its window, whether it thinks, what
+      // it costs. The NAME stays the preset's: that is what the user chose and what they can act on.
+      reasoningAvailable: supportsReasoning(hiveyModel(s.chat.model, "everyday")),
       model: s.chat.model,
-      modelLabel: this.models.length ? labelFor(this.models, s.chat.model) : s.chat.model,
+      modelLabel: isHivey(s.chat.model)
+        ? hiveyLabel(s.chat.model)
+        : this.models.length
+          ? labelFor(this.models, s.chat.model)
+          : s.chat.model,
       provider: s.chat.provider,
-      remote: !isLocalEndpoint(baseUrl),
+      // A preset is served from the catalogue, so it is remote whatever the provider setting still
+      // says. Getting this wrong would not merely mislabel a row: this flag is what the empty
+      // conversation reads to promise that nothing leaves the machine.
+      remote: isHivey(s.chat.model) || !isLocalEndpoint(baseUrl),
       contextTokens,
       contextBudget: budgetTokens,
       // The window the chosen model actually has, straight from the catalogue. Zero when it is not
       // known — a local runtime that reports no such number, most often — and the panel then offers
       // fixed steps instead of pretending to know a ceiling.
-      modelContext: this.models.find((m) => m.id === s.chat.model)?.context ?? 0,
+      modelContext: this.models.find((m) => m.id === hiveyModel(s.chat.model, "everyday"))?.context ?? 0,
       contextFill: budgetTokens > 0 ? Math.min(1, contextTokens / budgetTokens) : 0,
       // Computed here rather than in the panel because the budget is a setting, and a panel that
       // guessed at it would offer to summarise a conversation that fits comfortably.
@@ -2609,8 +2620,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this.post({ type: "turnStart" });
     this.post({ type: "status", text: t("Summarising the conversation…") });
 
-    const providerId = settings.chat.provider;
-    const model = settings.chat.model;
+    // Summarising is a chore, not a conversation: it reads a transcript and writes a page of prose,
+    // and a preset says so — this is exactly the traffic the cheap tier exists for. On a preset the
+    // provider follows the model, because the catalogue it routes over is OpenRouter's.
+    const providerId = isHivey(settings.chat.model) ? "openrouter" : settings.chat.provider;
+    const model = hiveyModel(settings.chat.model, "chore");
     const baseUrl = safeUrl(settings, providerId);
     const isLocal = isLocalEndpoint(baseUrl);
     const vault = new Vault();
@@ -2840,7 +2854,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       systemPrompt:
         promptForMode(mode) +
         workspaceNote() +
-        dialectNote() +
+        dialectNote(this.attachments) +
         houseRules +
         (learned ? `\n\n${learned}\n` : "") +
         (mode === "chat"
@@ -3262,11 +3276,38 @@ function workspaceNote(): string {
  * like it would break the prompt cache on every file switch — it does not, because the text depends
  * on the dialect and not on the file. A conversation about RPG keeps the same prefix throughout.
  */
-function dialectNote(): string {
+function dialectNote(attached: ContextItem[] = []): string {
+  // The same switch the IBM i tools are behind. Without it the platform's rules arrived by file
+  // name alone: any `.sql` file — Postgres, SQLite, a migration in a web project — was answered
+  // with the Db2 for i dialect, on machines that have never seen a partition.
+  const onIbmi = ibmiEnabled(readSettings().ibmi.integration);
+  const sources: Array<{ path: string; text: string }> = [];
+
   const doc = vscode.window.activeTextEditor?.document;
-  if (!doc) return "";
-  const lang = detectIbmiLanguage(doc.uri.path, doc.getText().slice(0, 20_000));
-  return lang ? `\n\n${ibmiPrompt(lang)}` : "";
+  if (doc) sources.push({ path: doc.uri.path, text: doc.getText().slice(0, 20_000) });
+  // What is ATTACHED counts too, and it took a question from the user to see why: the rules were
+  // read off the focused tab alone, so attaching a source member and then reading the README — or
+  // asking about three files at once, which is the normal way to ask about how they fit together —
+  // sent the model into a dialect it had been told nothing about. The file on screen is a good
+  // guess about the subject; the files deliberately put in the conversation are better than a guess.
+  for (const item of attached) {
+    if (item.kind !== "file" && item.kind !== "selection" && item.kind !== "member") continue;
+    sources.push({ path: item.label.replace(/:\d+(?:-\d+)?$/, ""), text: item.body.slice(0, 20_000) });
+  }
+
+  const seen = new Set<string>();
+  const notes: string[] = [];
+  for (const source of sources) {
+    const lang = detectIbmiLanguage(source.path, source.text, { onIbmi });
+    if (!lang || seen.has(lang.id)) continue;
+    seen.add(lang.id);
+    notes.push(ibmiPrompt(lang));
+    // Two at most. Each of these is a paragraph of rules and, for a fixed-format dialect, a column
+    // ruler — the most expensive lines in the whole prompt. A conversation holding five dialects at
+    // once is a conversation where none of them is the subject.
+    if (notes.length === 2) break;
+  }
+  return notes.length ? `\n\n${notes.join("\n\n")}` : "";
 }
 
 function safeUrl(s: Settings, id: Settings["chat"]["provider"]): string {

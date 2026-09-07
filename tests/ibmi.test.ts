@@ -132,10 +132,40 @@ test("a fixed-format dialect ships its column ruler, a free-form one does not", 
 });
 
 test("Db2 for i is told apart from every other Db2", () => {
-  const sql = ibmiPrompt(detectIbmiLanguage("q.sql", "select 1")!);
+  const sql = ibmiPrompt(detectIbmiLanguage("q.sql", "select * from QSYS2.SYSTABLES")!);
   assert.match(sql, /FETCH FIRST/);
   assert.match(sql, /SYSIBM\.SYSDUMMY1/);
   assert.match(sql, /QSYS2/);
+});
+
+
+// ── An extension that means something else elsewhere ──────────────────────────────────────────
+//
+// `.sql` is the one the whole world uses, and claiming it unconditionally meant every Postgres
+// migration in every web project was answered with Db2 for i's rules. The dialect now has to be
+// earned: by the machine working with an IBM i at all, by the path, or by the source.
+
+test("a plain .sql file is not Db2 for i", () => {
+  assert.equal(detectIbmiLanguage("db/migrations/0007_add_index.sql", "select 1"), undefined);
+  assert.equal(
+    detectIbmiLanguage("q.sql", "SELECT id FROM users LIMIT 10"),
+    undefined,
+    "LIMIT is the tell of a database that is not this one",
+  );
+});
+
+test("a .sql file is Db2 for i when something says so", () => {
+  assert.equal(detectIbmiLanguage("q.sql", "select * from QSYS2.SYSTABLES")?.id, "db2", "the source says it");
+  assert.equal(detectIbmiLanguage("q.sql", "select 1", { onIbmi: true })?.id, "db2", "the machine says it");
+  assert.equal(detectIbmiLanguage("/MYLIB/QSQLSRC/CUSTQRY.SQL", "select 1")?.id, "db2", "the path says it");
+});
+
+test("the other borrowed extensions are gated the same way", () => {
+  assert.equal(detectIbmiLanguage("build.cmd", "@echo off\r\nnpm run build"), undefined, ".cmd is a batch file");
+  assert.equal(detectIbmiLanguage("SNDRPT.cmd", "             CMD        PROMPT('Send report')")?.id, "cmd");
+  assert.equal(detectIbmiLanguage("core.cl", "(defun square (x) (* x x))"), undefined, ".cl is Common Lisp too");
+  assert.equal(detectIbmiLanguage("START.cl", CL)?.id, "cl");
+  assert.equal(detectIbmiLanguage("F.pf", DDS_PF)?.id, "dds-pf", "a DDS A-spec is evidence enough");
 });
 
 test("every dialect says how a comment is written", () => {

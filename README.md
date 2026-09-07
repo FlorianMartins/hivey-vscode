@@ -89,6 +89,22 @@ Not a slogan — an architecture. Five levers, in order of effect:
 
 Default result: **$0**. The first cent spent is an explicit choice.
 
+### The Hivey presets
+
+When you do decide to spend, you can choose a budget instead of a model. Three rows sit at the top
+of the model picker — **Hivey Free**, **Hivey Smart**, **Hivey Pro** — and each is a routing rather
+than a model: an ordinary question, an agent turn, an inline completion and a chore (a commit
+message, a summary) each go to a different model, so the one you pay for the hard work is not the
+one writing your commit messages. It is the same idea as in the Hivey sidebar and the web HiveyCode,
+with one difference: nothing here asks a model to classify your request first. The extension already
+knows whether it is completing a line or running an agent, so the routing costs no extra call and
+adds no latency.
+
+Which model each preset uses is **generated**, never written by hand: a daily job picks it from
+OpenRouter's own catalogue by budget, capability, vendor family and recency, and commits the diff.
+No model version is named anywhere in this repository — a hard-coded id is correct the day it is
+written and returns 404 a few weeks later, silently.
+
 ## How privacy is kept
 
 Four steps, in this order, on everything bound for a remote provider:

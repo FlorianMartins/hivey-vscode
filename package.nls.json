@@ -20,7 +20,7 @@
   "command.showPermissions.title": "Agent permissions",
   "command.pickCompletionModel.title": "Pick the completion model",
   "config.chat.provider": "Provider for the **chat** model. `local` = Ollama / LM Studio / llama.cpp on your machine or your server: no data leaves the network.",
-  "config.chat.model": "Identifier of the chat model.",
+  "config.chat.model": "Identifier of the chat model, or a Hivey preset — `hivey/free`, `hivey`, `hivey/smart` — which sends each kind of work to a different model.",
   "config.completion.provider": "Provider for **inline completion**. Keep it `local`: this is the number-one cost driver elsewhere (one request per keystroke pause).",
   "config.completion.model": "Completion model (it must support fill-in-the-middle).",
   "config.completion.enabled": "Offer completions while typing.",

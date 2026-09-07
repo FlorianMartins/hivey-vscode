@@ -14,6 +14,16 @@ import { request } from "../core/util/http.js";
 import type { UiModel } from "../shared/protocol.js";
 import { endpointFor, providerFor, type Keys, type Settings } from "./config.js";
 import { shortModelName } from "../core/models/names.js";
+import { hiveyLabel, hiveyModel, HIVEY_VARIANTS, isHivey } from "../core/router/hivey.js";
+
+/** The generated catalogue, indexed by id — for the rows that describe a model without listing it. */
+function catalogue(): Map<string, { context: number; inUsd: number; outUsd: number; cachedInUsd: number }> {
+  const map = new Map<string, { context: number; inUsd: number; outUsd: number; cachedInUsd: number }>();
+  for (const [id, , , context, inUsd, outUsd, cachedInUsd] of GENERATED_MODELS) {
+    map.set(id, { context, inUsd, outUsd, cachedInUsd });
+  }
+  return map;
+}
 
 /** Models a provider is currently serving, or an empty list when it cannot be reached. */
 async function served(settings: Settings, keys: Keys, provider: Settings["chat"]["provider"]): Promise<string[]> {
@@ -69,6 +79,34 @@ async function localServers(settings: Settings): Promise<Array<{ name: string; b
 export async function listModels(settings: Settings, keys: Keys, current: string): Promise<UiModel[]> {
   const out: UiModel[] = [];
   const seen = new Set<string>();
+
+  // 0. The presets. Not models: each is a routing over the catalogue below, so that a chore is not
+  //    answered by the model kept for the hard question. They are listed first because choosing a
+  //    budget is an easier question than choosing among four hundred models, and it is the question
+  //    most people actually want to answer.
+  //
+  //    The figures shown are the ones of the model that answers an ORDINARY turn — the row cannot
+  //    carry four prices, and that is the one a user meets most often. What it must never do is
+  //    quote the cheap tier and bill the expensive one, so it quotes the middle and the hint says
+  //    the rest.
+  const priced = catalogue();
+  for (const variant of HIVEY_VARIANTS) {
+    const everyday = priced.get(hiveyModel(variant.id, "everyday"));
+    out.push({
+      id: variant.id,
+      name: variant.label,
+      vendor: "hivey",
+      context: everyday?.context ?? 0,
+      inUsd: everyday?.inUsd ?? 0,
+      outUsd: everyday?.outUsd ?? 0,
+      cachedInUsd: everyday?.cachedInUsd ?? 0,
+      provider: "openrouter",
+      local: false,
+      loopback: false,
+      current: variant.id === current,
+    });
+    seen.add(variant.id);
+  }
 
   // 1. Everything running on this machine or this network. Always first: it is the free tier, and
   //    the argument this extension exists to make.
@@ -148,6 +186,7 @@ export async function listModels(settings: Settings, keys: Keys, current: string
 
 /** A short label for the composer button: the name without the vendor, plus a price hint. */
 export function labelFor(models: UiModel[], id: string): string {
+  if (isHivey(id)) return hiveyLabel(id);
   const found = models.find((m) => m.id === id);
   return shortModelName(found?.name ?? id);
 }

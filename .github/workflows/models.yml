@@ -23,12 +23,13 @@ jobs:
       - run: node scripts/update-models.mjs
       - name: Commit when something moved
         run: |
-          FILE=src/core/router/catalog.generated.ts
-          if [[ -n "$(git status --porcelain $FILE)" ]]; then
+          # Two generated files, one job: the price catalogue, and the Hivey presets curated from it.
+          FILES="src/core/router/catalog.generated.ts src/core/router/hivey.generated.ts"
+          if [[ -n "$(git status --porcelain $FILES)" ]]; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add $FILE
-            git commit -m "chore(models): refresh the price catalogue"
+            git add $FILES
+            git commit -m "chore(models): refresh the catalogue and the Hivey presets"
             git push
           else
             echo "No change today."

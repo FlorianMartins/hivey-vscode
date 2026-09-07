@@ -15,6 +15,7 @@ import { endpointFor, providerFor, readSettings, redactionPolicy, type Keys } fr
 import { COMMIT_PROMPT, INLINE_EDIT_PROMPT } from "../core/prompts.js";
 import { relative, type WorkspaceContext } from "./workspace.js";
 import { selectionActions, type SelectionAction } from "../core/agent/selection.js";
+import { hiveyModel, isHivey } from "../core/router/hivey.js";
 
 export interface EditorDeps {
   chat: ChatViewProvider;
@@ -233,7 +234,10 @@ async function rewriteSelection(deps: EditorDeps, fixed?: string): Promise<void>
  */
 async function oneShot(deps: EditorDeps, system: string, user: string, token?: vscode.CancellationToken): Promise<string | undefined> {
   const settings = readSettings();
-  const id = settings.chat.provider;
+  // A preset resolves to the model that answers an ordinary turn, and to the catalogue that serves
+  // it. Rewriting a selection is an ordinary turn that happens to have no transcript around it.
+  const model = hiveyModel(settings.chat.model, "everyday");
+  const id = isHivey(settings.chat.model) ? "openrouter" : settings.chat.provider;
   try {
     const baseUrl = endpointFor(settings, id);
     const isLocal = isLocalEndpoint(baseUrl);
@@ -246,7 +250,7 @@ async function oneShot(deps: EditorDeps, system: string, user: string, token?: v
 
     const result = await runTurn({
       provider,
-      model: settings.chat.model,
+      model,
       messages: [
         { role: "system", content: system, cacheable: true },
         { role: "user", content: payload },

@@ -676,19 +676,27 @@ pre.code {
  *
  * So: the panel's own quiet frame, and a leading edge carrying the one colour that matters. That is
  * the same language the rest of the panel already speaks — a pinned answer, a refusal in the
- * permission lists — so the edge is read as "which kind of thing is this" without a legend. */
+ * permission lists — so the edge is read as "which kind of thing is this" without a legend.
+ *
+ * The edge itself is no longer a warning colour, and that is the point of this pass. Yellow said
+ * "something has gone wrong" about a card that asks a routine question and expects a routine yes —
+ * and it said it in a hue that belongs to this extension's own brand rather than to the theme, so
+ * it stood out against every workbench it was docked in. `focusBorder` is what the user's theme
+ * nominates for "this is what you are being asked about": present in every theme, whatever hue
+ * that theme's accent is, and already the colour the panel's own focus rings take. The card now
+ * belongs to the editor it lives in rather than to us. */
 .approval {
   /* The stronger of the two panel borders: this card is a question that stops the turn, so it has
      to read as a card and not as a paragraph with a coloured edge. */
   border: 1px solid var(--border-strong);
-  border-left: 2px solid var(--vscode-editorWarning-foreground, var(--vscode-charts-yellow));
+  border-left: 2px solid var(--vscode-focusBorder, var(--vscode-textLink-foreground));
   background: var(--surface);
   border-radius: var(--radius-lg);
   padding: var(--sp-3);
   margin: var(--sp-3) 0;
 }
 .approval-ico {
-  color: var(--vscode-charts-yellow, #cca700);
+  color: var(--vscode-focusBorder, var(--vscode-textLink-foreground));
   flex: 0 0 auto;
 }
 .approval-head {
@@ -2146,11 +2154,15 @@ pre.code {
 
 /* An egress card is about what leaves the machine rather than about what the agent may do, so its
    edge takes the colour the workbench uses for a link out: the same shape saying a different thing,
-   rather than a second border fighting the first. */
+   rather than a second border fighting the first. Now that the ordinary card carries the theme's
+   accent, the two are close relatives on most themes — which is right. They are the same question
+   asked about two different things, and the words on the card say which; a second hue would be a
+   legend to learn. What sets them apart is weight, not colour. */
 .approval.egress {
   border-left-color: var(--vscode-textLink-foreground, var(--vscode-charts-blue));
+  border-left-width: 3px;
 }
-/* And its icon follows, so the card is one colour rather than a blue edge above a yellow mark. */
+/* And its icon follows, so the card is one colour rather than a blue edge above a mark of another. */
 .approval.egress .approval-ico {
   color: var(--vscode-textLink-foreground, var(--vscode-charts-blue));
 }

@@ -15,6 +15,7 @@ import { join } from "node:path";
 import { homedir, tmpdir } from "node:os";
 import { suite, test } from "./tiny.js";
 import { createServer, type Server } from "node:http";
+import { HIVEY_ROUTING } from "../../core/router/hivey.generated.js";
 
 const ID = "hivey.hivey-code";
 
@@ -520,7 +521,55 @@ suite("Hivey Code", () => {
     );
     collection.dispose();
   });
+
+  /**
+   * A preset must never reach a provider.
+   *
+   * `hivey/free` is not a model id: no API has heard of it, and sending it verbatim is a 400 — the
+   * exact failure the sibling project shipped and had to chase. Every layer in between resolves it,
+   * so the only assertion that means anything is made on what came out of the socket. The stub is
+   * put at the OpenRouter endpoint because that is where a preset routes, and a loopback address
+   * needs no key.
+   */
+  test("a Hivey preset sends a real model id, not the preset", async () => {
+    const ext = vscode.extensions.getExtension(ID)!;
+    await ext.activate();
+
+    const stub = await streamingStub();
+    const config = vscode.workspace.getConfiguration(SECTION);
+    const before = {
+      provider: config.get("chat.provider"),
+      model: config.get("chat.model"),
+      endpoint: config.get("endpoints.openrouter"),
+      confirmSend: config.get("privacy.confirmSend"),
+    };
+    await config.update("chat.provider", "local", vscode.ConfigurationTarget.Global);
+    await config.update("chat.model", "hivey/free", vscode.ConfigurationTarget.Global);
+    await config.update("endpoints.openrouter", `http://127.0.0.1:${stub.port}/v1`, vscode.ConfigurationTarget.Global);
+    await config.update("privacy.confirmSend", "never", vscode.ConfigurationTarget.Global);
+
+    try {
+      void vscode.commands.executeCommand("hiveyCode.askWith", "hello");
+      for (let i = 0; i < 100 && !stub.asked().length; i++) await delay(50);
+      await vscode.commands.executeCommand("hiveyCode.stopAnswer");
+
+      const asked = stub.asked();
+      assert.ok(asked.length, "the preset never reached the model server at all");
+      assert.ok(!asked[0]!.startsWith("hivey"), `the preset id itself was sent: ${asked[0]}`);
+      assert.equal(asked[0], HIVEY_ROUTING["hivey/free"]!.everyday, "an ordinary question is not an everyday turn");
+      // And the provider setting still says "local": a preset decides where it is served, and the
+      // panel's promise about what leaves the machine has to follow the model, not the setting.
+      assert.equal(config.get("chat.provider"), "local");
+    } finally {
+      await config.update("chat.provider", before.provider, vscode.ConfigurationTarget.Global);
+      await config.update("chat.model", before.model, vscode.ConfigurationTarget.Global);
+      await config.update("endpoints.openrouter", before.endpoint, vscode.ConfigurationTarget.Global);
+      await config.update("privacy.confirmSend", before.confirmSend, vscode.ConfigurationTarget.Global);
+      stub.close();
+    }
+  });
 });
+
 
 // Screenshot mode. Not a test: it drives a real conversation against a stub model server, then
 // holds the window open while an outside process captures the screen. Guarded by an environment
@@ -681,16 +730,31 @@ function delay(ms: number): Promise<void> {
 async function streamingStub(opts: { delayAfterFirst?: number } = {}): Promise<{
   port: number;
   open: () => number;
+  /** Every model id this server was actually asked for, in order. */
+  asked: () => string[];
   close: () => void;
 }> {
   let open = 0;
   let served = 0;
+  const asked: string[] = [];
   const server: Server = createServer((req, res) => {
     if (req.url?.includes("/models")) {
       res.writeHead(200, { "content-type": "application/json" });
       res.end(JSON.stringify({ data: [{ id: "stub-model" }] }));
       return;
     }
+    // The body says which model the extension chose. It is read here rather than asserted on the
+    // settings, because the setting is what the user picked and this is what was SENT.
+    let body = "";
+    req.on("data", (chunk) => (body += String(chunk)));
+    req.on("end", () => {
+      try {
+        const model = JSON.parse(body).model;
+        if (typeof model === "string") asked.push(model);
+      } catch {
+        // A body this test cannot read is not this test's subject.
+      }
+    });
     const begin = (): void => {
       open += 1;
       res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });
@@ -716,6 +780,7 @@ async function streamingStub(opts: { delayAfterFirst?: number } = {}): Promise<{
   return {
     port: (server.address() as { port: number }).port,
     open: () => open,
+    asked: () => [...asked],
     close: () => server.close(),
   };
 }

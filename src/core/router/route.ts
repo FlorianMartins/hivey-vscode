@@ -17,6 +17,7 @@
 // either applies (policy `auto`), asks about (`ask`), or ignores (`never`).
 
 import type { ProviderId } from "../providers/index.js";
+import { hiveyLabel, hiveyModel, hiveyRole, isHivey } from "./hivey.js";
 
 export type TaskKind = "completion" | "chat" | "agent" | "aux" | "embed";
 export type EscalationPolicy = "never" | "ask" | "auto";
@@ -75,7 +76,17 @@ export function route(cfg: RouterConfig, input: RouteInput): Route {
   if (input.kind === "completion" || input.kind === "aux" || input.kind === "embed") {
     const p = input.kind === "completion" ? cfg.completion : { provider: cfg.completion.provider, model: cfg.completion.model };
     const provider = (p.provider === "off" ? "local" : p.provider) as ProviderId;
+    if (isHivey(p.model)) return preset(p.model, input.kind);
     return { provider, model: p.model, why: `${input.kind} never escalates: it is the high-frequency traffic` };
+  }
+
+  // A preset settles provider and model together, so none of the escalation logic below applies:
+  // there is no local model to be beyond, and nothing to ask permission to escalate to. What
+  // decides is the kind of work, and — for a chat turn — the same complexity grade the escalation
+  // path uses, so "hard" means one thing in this file rather than two.
+  if (isHivey(cfg.chat.model)) {
+    const { level } = classifyComplexity(input.prompt ?? "", input.promptTokens, cfg.localContextTokens);
+    return preset(cfg.chat.model, input.kind, input.forceRemote ? "hard" : level);
   }
 
   const base: Route = { provider: cfg.chat.provider, model: cfg.chat.model, why: "configured chat model" };
@@ -92,4 +103,21 @@ export function route(cfg: RouterConfig, input: RouteInput): Route {
     return { provider: cfg.escalateTo.provider, model: cfg.escalateTo.model, why: `escalated: ${why}` };
   }
   return { ...base, suggestEscalation: { ...cfg.escalateTo, why } };
+}
+
+/**
+ * A Hivey preset, resolved to the model that actually answers.
+ *
+ * The `why` names both the preset and the role, because those are the two facts a user needs to
+ * check the bill against: not "Hivey Pro" alone, which explains no single request, and not the
+ * model alone, which does not say why THAT model. Presets are reached through OpenRouter — that is
+ * where the catalogue they are curated from lives.
+ */
+function preset(model: string, kind: TaskKind, level?: Complexity): Route {
+  const role = hiveyRole(kind, level);
+  return {
+    provider: "openrouter",
+    model: hiveyModel(model, role),
+    why: `${hiveyLabel(model)}: ${role}`,
+  };
 }
