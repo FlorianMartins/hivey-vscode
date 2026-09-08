@@ -13,20 +13,32 @@ import { discoverLocal, rankModels } from "../core/providers/discover.js";
 import { request } from "../core/util/http.js";
 import type { UiModel } from "../shared/protocol.js";
 import { endpointFor, providerFor, type Keys, type Settings } from "./config.js";
+import { DIRECT_VENDORS, type ProviderId } from "../core/providers/vendors.js";
 import { shortModelName } from "../core/models/names.js";
 import { hiveyLabel, hiveyModel, HIVEY_VARIANTS, isHivey } from "../core/router/hivey.js";
 
-/** The generated catalogue, indexed by id — for the rows that describe a model without listing it. */
+/**
+ * The generated catalogue, indexed by id — for the rows that describe a model without listing it.
+ *
+ * Bare ids are aliased the way `GENERATED_PRICES` aliases them: the catalogue is OpenRouter's, so
+ * it calls a model `openai/gpt-5` where OpenAI's own API calls it `gpt-5`, and a row listed from a
+ * vendor's own endpoint would otherwise show a blank context and a price of zero — which reads as
+ * "free" on a model that is not.
+ */
 function catalogue(): Map<string, { context: number; inUsd: number; outUsd: number; cachedInUsd: number }> {
   const map = new Map<string, { context: number; inUsd: number; outUsd: number; cachedInUsd: number }>();
   for (const [id, , , context, inUsd, outUsd, cachedInUsd] of GENERATED_MODELS) {
     map.set(id, { context, inUsd, outUsd, cachedInUsd });
   }
+  for (const [id, , , context, inUsd, outUsd, cachedInUsd] of GENERATED_MODELS) {
+    const bare = id.includes("/") ? id.slice(id.indexOf("/") + 1) : undefined;
+    if (bare && !map.has(bare)) map.set(bare, { context, inUsd, outUsd, cachedInUsd });
+  }
   return map;
 }
 
 /** Models a provider is currently serving, or an empty list when it cannot be reached. */
-async function served(settings: Settings, keys: Keys, provider: Settings["chat"]["provider"]): Promise<string[]> {
+async function served(settings: Settings, keys: Keys, provider: ProviderId): Promise<string[]> {
   try {
     const p = await providerFor(settings, keys, provider);
     return await p.listModels();
@@ -163,7 +175,47 @@ export async function listModels(settings: Settings, keys: Keys, current: string
     }
   }
 
-  // 3. The priced catalogue. No request: it ships with the extension and refreshes by workflow.
+  // 3. The vendors the user pays directly, each one asked what it serves.
+  //
+  //    Asked rather than assumed, and asked of nobody who has not stored a key: hard-coding a
+  //    vendor's model names is the mistake this project made once already — an id written by hand
+  //    answers 404 within weeks of the vendor renaming it, and a picker full of dead names is worse
+  //    than an empty one. What a key buys is precisely the right to ask.
+  //
+  //    A vendor that serves no listing (Perplexity has no /models) contributes nothing here and its
+  //    models are still reachable: the catalogue below names them, and choosing one keeps the
+  //    provider it is chosen under.
+  const direct = await Promise.all(
+    DIRECT_VENDORS.map(async (v) => {
+      if (!(await keys.get(v.id))) return { vendor: v, models: [] as string[] };
+      return { vendor: v, models: await served(settings, keys, v.id) };
+    }),
+  );
+  for (const { vendor, models } of direct) {
+    for (const id of models) {
+      const key = `${id}@${vendor.id}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const known = priced.get(id);
+      out.push({
+        id,
+        name: id,
+        vendor: vendor.label,
+        context: known?.context ?? 0,
+        inUsd: known?.inUsd ?? 0,
+        outUsd: known?.outUsd ?? 0,
+        cachedInUsd: known?.cachedInUsd ?? 0,
+        provider: vendor.id,
+        local: false,
+        loopback: false,
+        server: vendor.label,
+        baseUrl: settings.endpoints[vendor.id],
+        current: id === current && settings.chat.provider === vendor.id,
+      });
+    }
+  }
+
+  // 4. The priced catalogue. No request: it ships with the extension and refreshes by workflow.
   for (const [id, name, vendor, context, inUsd, outUsd, cachedInUsd] of GENERATED_MODELS) {
     if (seen.has(id)) continue;
     out.push({

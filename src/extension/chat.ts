@@ -54,6 +54,7 @@ import { skillsPrompt } from "../core/agent/definitions.js";
 import { autoApprove } from "../core/agent/autoApprove.js";
 import { matchGlob } from "../core/util/glob.js";
 import { discoverLocal, rankModels, suggestPull } from "../core/providers/discover.js";
+import { endpointSettingKey, REMOTE_VENDORS, vendor, type ProviderId } from "../core/providers/vendors.js";
 import { request } from "../core/util/http.js";
 import { estimateTokens } from "../core/util/tokens.js";
 import { isLocalEndpoint, Vault } from "../core/redaction/index.js";
@@ -95,9 +96,9 @@ const SETUP_SEEN_KEY = "hiveyCode.setupSeen";
  * user meant to send. An allow-list costs one line and removes the whole question.
  */
 const ALLOWED_LINKS = [
-  "https://openrouter.ai/keys",
-  "https://console.anthropic.com/settings/keys",
-  "https://learn.microsoft.com/azure/ai-services/openai/quickstart",
+  // Built from the vendor table rather than copied out of it: a card whose "Get a key" button is
+  // not on this list is a button that does nothing, and it would be found by a user, not by us.
+  ...REMOTE_VENDORS.map((v) => v.keysUrl).filter((u): u is string => Boolean(u)),
   "https://ollama.com/download",
 ];
 
@@ -201,7 +202,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   /** Re-read what is configured and which keys exist, without touching the probe results. */
   private async refreshSetup(): Promise<void> {
     const settings = readSettings();
-    const providers = ["openrouter", "anthropic", "openai-compatible"] as const;
+    const providers = REMOTE_VENDORS.map((v) => v.id);
     const hasKey: Record<string, boolean> = {};
     for (const p of providers) hasKey[p] = Boolean(await this.keys.get(p));
     this.setup = {
@@ -925,9 +926,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
         case "setEndpoint": {
           const config = vscode.workspace.getConfiguration(SECTION);
-          // The manifest spells this one differently from the provider id, because `openai-compatible`
-          // is not a legal settings key segment.
-          const key = m.provider === "openai-compatible" ? "endpoints.openaiCompatible" : `endpoints.${m.provider}`;
+          // The manifest spells `openai-compatible` differently from the provider id, because a
+          // hyphen is not a legal settings key segment. The vendor table owns that translation.
+          const key = endpointSettingKey(m.provider as ProviderId);
           await config.update(key, m.url, vscode.ConfigurationTarget.Global);
           await this.refreshSetup();
           break;
@@ -1199,7 +1200,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const settings = readSettings();
     const provider = settings.chat.provider;
     if (provider === "local") return false;
-    if (provider === "openai-compatible" && !settings.endpoints["openai-compatible"]) return true;
+    if (vendor(provider)?.needsUrl && !settings.endpoints[provider]) return true;
     return !(await this.keys.get(provider));
   }
 

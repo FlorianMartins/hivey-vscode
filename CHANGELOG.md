@@ -2,6 +2,35 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.38.0 — 2026-09-08
+
+### Added
+
+- **Nine providers you can pay directly, instead of one gateway.** OpenRouter is one key for four
+  hundred models, and it was the only way in for anyone who was not running a model locally — which
+  told everyone already paying OpenAI, Google, DeepSeek, Qwen, Mistral, xAI, Groq or Perplexity that
+  this extension did not support them, while the wire format it has always spoken is theirs. Each is
+  now a card on the first screen with its own key, its own address, and a link to the console where
+  the key is bought; the key goes to the OS keychain like every other, and the address is a setting,
+  so a region, a proxy or an Azure deployment is a field rather than a fork. The picker asks each
+  configured provider what it serves and lists the answer under **On your own account** — nothing is
+  hard-coded, because a model id written by hand answers 404 within weeks of a rename.
+- **A request the server can correct.** "OpenAI-compatible" is a family, not a specification: OpenAI
+  refuses `max_tokens` on its reasoning models and demands `max_completion_tokens`, refuses any
+  temperature but the default on the same models, and some gateways reject a field they do not know
+  rather than ignoring it. Each of those is an HTTP 400 that ends the answer. Rather than a table of
+  which vendor refuses what — wrong the week a model is renamed — the request goes out as written,
+  and when the server names a parameter it will not take, that parameter is dropped or renamed and
+  the question asked again. At most twice, and only ever by removing something.
+
+### Changed
+
+- **The list of providers exists once.** It used to exist five times — the manifest's enums, the
+  settings reader, the setup screen, the composer's menu, and two command-palette pickers — so a
+  provider added in four of them half worked. They now all read one table, and a test fails if the
+  manifest and the table disagree. Prices and context windows for a model served by its own vendor
+  are read from the catalogue under its bare name, so a budget still applies to it.
+
 ## 0.37.0 — 2026-09-07
 
 ### Fixed

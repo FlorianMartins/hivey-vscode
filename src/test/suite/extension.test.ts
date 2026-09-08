@@ -568,6 +568,52 @@ suite("Hivey Code", () => {
       stub.close();
     }
   });
+
+  /**
+   * A provider the user pays directly is a route, not a label.
+   *
+   * The failure this guards against is quiet: the provider list grows, the panel offers OpenAI or
+   * DeepSeek, the setting takes the value — and the turn still goes to whatever endpoint the code
+   * knew about before, because the address for the new provider was declared in the manifest and
+   * never read. The only place that can be seen is the socket, so the stub is put at the vendor's
+   * address and nowhere else: if the request arrives, the whole chain resolved.
+   *
+   * No key is stored, and none is needed: the stub answers on loopback, which this extension treats
+   * as local — the endpoint decides, never the setting name.
+   */
+  test("choosing a provider sends the turn to that provider's address", async () => {
+    const ext = vscode.extensions.getExtension(ID)!;
+    await ext.activate();
+
+    const stub = await streamingStub();
+    const config = vscode.workspace.getConfiguration(SECTION);
+    const before = {
+      provider: config.get("chat.provider"),
+      model: config.get("chat.model"),
+      endpoint: config.get("endpoints.deepseek"),
+      confirmSend: config.get("privacy.confirmSend"),
+    };
+    await config.update("chat.provider", "deepseek", vscode.ConfigurationTarget.Global);
+    await config.update("chat.model", "deepseek-chat", vscode.ConfigurationTarget.Global);
+    await config.update("endpoints.deepseek", `http://127.0.0.1:${stub.port}/v1`, vscode.ConfigurationTarget.Global);
+    await config.update("privacy.confirmSend", "never", vscode.ConfigurationTarget.Global);
+
+    try {
+      void vscode.commands.executeCommand("hiveyCode.askWith", "hello");
+      for (let i = 0; i < 100 && !stub.asked().length; i++) await delay(50);
+      await vscode.commands.executeCommand("hiveyCode.stopAnswer");
+
+      const asked = stub.asked();
+      assert.ok(asked.length, "the question never reached the provider's own endpoint");
+      assert.equal(asked[0], "deepseek-chat", "the model was rewritten on the way out");
+    } finally {
+      await config.update("chat.provider", before.provider, vscode.ConfigurationTarget.Global);
+      await config.update("chat.model", before.model, vscode.ConfigurationTarget.Global);
+      await config.update("endpoints.deepseek", before.endpoint, vscode.ConfigurationTarget.Global);
+      await config.update("privacy.confirmSend", before.confirmSend, vscode.ConfigurationTarget.Global);
+      stub.close();
+    }
+  });
 });
 
 

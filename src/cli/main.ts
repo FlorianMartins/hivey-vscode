@@ -16,7 +16,7 @@ import { homedir } from "node:os";
 import { join, dirname } from "node:path";
 import { stdin, stdout } from "node:process";
 import { runTurn } from "../core/agent/loop.js";
-import { makeProvider, type ProviderId } from "../core/providers/index.js";
+import { makeProvider, PROVIDER_IDS, type ProviderId } from "../core/providers/index.js";
 import { isLocalEndpoint, redactMessages, Vault } from "../core/redaction/index.js";
 import type { RedactionLevel } from "../core/redaction/types.js";
 import { Budget, type Spend, type SpendStore } from "../core/router/budget.js";
@@ -54,8 +54,7 @@ interface CliConfig {
  */
 function providerFromEnv(): ProviderId {
   const named = process.env[ENV.provider];
-  const known: ProviderId[] = ["local", "openrouter", "openai-compatible", "anthropic"];
-  return known.find((id) => id === named) ?? "local";
+  return PROVIDER_IDS.find((id) => id === named) ?? "local";
 }
 
 const DEFAULTS: CliConfig = {

@@ -18,6 +18,7 @@ import { McpManager } from "./integrations/mcp.js";
 import { watchInstructions } from "./instructions.js";
 import { createDefinition, definitionUri, DefinitionStore } from "./definitions.js";
 import { ibmiDiagnose, ibmiLibraryList } from "./integrations/ibmi.js";
+import { REMOTE_VENDORS } from "../core/providers/vendors.js";
 
 export function activate(context: vscode.ExtensionContext): void {
   // The editor knows which language the user reads, unless they said otherwise.
@@ -145,10 +146,8 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("hiveyCode.setApiKey", async () => {
       const provider = await vscode.window.showQuickPick(
         [
-          { label: "openrouter", detail: t("Multi-model gateway") },
-          { label: "anthropic", detail: t("Claude API") },
-          { label: "openai-compatible", detail: t("Internal gateway, Azure, LiteLLM…") },
-          { label: "local", detail: t("A local server that requires a key (rare)") },
+          ...REMOTE_VENDORS.map((v) => ({ label: v.id, description: v.label, detail: v.hint })),
+          { label: "local", description: t("On this machine"), detail: t("A local server that requires a key (rare)") },
         ],
         { placeHolder: t("Which provider?") },
       );
@@ -311,7 +310,7 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
 
     vscode.commands.registerCommand("hiveyCode.clearApiKey", async () => {
-      const provider = await vscode.window.showQuickPick(["openrouter", "anthropic", "openai-compatible", "local"], {
+      const provider = await vscode.window.showQuickPick([...REMOTE_VENDORS.map((v) => v.id), "local"], {
         placeHolder: t("Which key to clear?"),
       });
       if (!provider) return;

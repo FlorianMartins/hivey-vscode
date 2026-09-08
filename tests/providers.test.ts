@@ -316,3 +316,54 @@ test("Anthropic: a tool call assembled from partial JSON", async () => {
   assert.equal(r.stopReason, "tool_calls");
   assert.deepEqual(JSON.parse(r.toolCalls[0]!.args), { path: "a.ts" });
 });
+
+test("a parameter the server refuses by name is dropped, and the question asked again", async () => {
+  // OpenAI's own API, on its reasoning models: `max_tokens` is refused and `max_completion_tokens`
+  // is demanded, and a temperature other than the default is refused outright. Both arrive as an
+  // HTTP 400 that ends the answer. Nothing here predicts which model does that — the server says
+  // what it will not take, and the request goes again without it.
+  let calls = 0;
+  const s = await serve((_req, res, body) => {
+    calls++;
+    const sent = JSON.parse(body);
+    if ("max_tokens" in sent) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(
+        JSON.stringify({
+          error: { message: "Unsupported parameter: 'max_tokens' is not supported with this model. Use 'max_completion_tokens' instead." },
+        }),
+      );
+      return;
+    }
+    sse(res, [{ choices: [{ delta: { content: "ok" } }] }]);
+  });
+  const p = new OpenAICompatibleProvider({ id: "openai", baseUrl: s.url, apiKey: "k", isLocal: false });
+  const r = await p.chat({ model: "gpt-5", messages: [{ role: "user", content: "hi" }], maxTokens: 400, temperature: 0.2 });
+  await s.close();
+
+  assert.equal(r.text, "ok", "the answer survives the correction");
+  assert.equal(calls, 2, "corrected once, not once per token");
+  const second = s.requests[1]!.body;
+  assert.equal(second.max_completion_tokens, 400, "the budget is carried over, not lost");
+  assert.equal("max_tokens" in second, false);
+  assert.equal(second.temperature, 0.2, "a field the server did not complain about is left alone");
+});
+
+test("a refusal that names no parameter is reported, not retried", async () => {
+  // Retrying a wrong model name or an empty message spends the user's time twice on the same
+  // error, and on a paid endpoint it can spend their money twice too.
+  let calls = 0;
+  const s = await serve((_req, res) => {
+    calls++;
+    res.writeHead(400, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: { message: "The model `gpt-невідомо` does not exist" } }));
+  });
+  const p = new OpenAICompatibleProvider({ id: "openai", baseUrl: s.url, apiKey: "k", isLocal: false });
+  await assert.rejects(
+    () => p.chat({ model: "nope", messages: [{ role: "user", content: "hi" }], maxTokens: 400 }),
+    /does not exist/,
+    "the server's own words reach the user",
+  );
+  await s.close();
+  assert.equal(calls, 1);
+});

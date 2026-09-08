@@ -11,6 +11,7 @@
 
 import { button, el, icon, ICON } from "./dom.js";
 import { t } from "../shared/i18n.js";
+import { REMOTE_VENDORS, type Vendor } from "../core/providers/vendors.js";
 import type { ToExtension, UiRuntime, UiState } from "../shared/protocol.js";
 
 /** Per-provider draft values. Never persisted, never sent anywhere but to the keychain. */
@@ -33,39 +34,49 @@ export function focusGateway(id: string | undefined): void {
 let showServerForm = false;
 const serverDraft = { name: "", url: "" };
 
-interface Gateway {
-  id: string;
-  label: string;
-  /** What the key looks like, so a wrong paste is visible before it is stored. */
-  placeholder: string;
-  /** Where to get one. Must also be listed in the extension's link allow-list. */
-  keysUrl?: string;
-  /** True for a gateway whose address the user supplies: Azure, LiteLLM, a corporate proxy. */
-  needsUrl?: boolean;
-}
+type Gateway = Vendor;
 
 function draft(id: string): { key: string; url: string } {
   return (drafts[id] ??= { key: "", url: "" });
 }
 
-const GATEWAYS: Gateway[] = [
-  { id: "openrouter", label: "OpenRouter", placeholder: "sk-or-v1-…", keysUrl: "https://openrouter.ai/keys" },
-  { id: "anthropic", label: "Anthropic", placeholder: "sk-ant-…", keysUrl: "https://console.anthropic.com/settings/keys" },
-  {
-    id: "openai-compatible",
-    label: "OpenAI-compatible",
-    placeholder: "sk-…",
-    keysUrl: "https://learn.microsoft.com/azure/ai-services/openai/quickstart",
-    needsUrl: true,
-  },
-];
+/**
+ * One card per provider, from the same table the composer's menu and the settings read.
+ *
+ * The first version offered only OpenRouter, which told anyone with an Anthropic account that this
+ * extension did not support them — while the code supported them all along. The second offered
+ * three, which told everyone paying OpenAI, DeepSeek or Mistral directly the same thing. The list
+ * is now the table: a provider is added in one place, or it is not added.
+ */
+const GATEWAYS: Gateway[] = REMOTE_VENDORS;
 
+/**
+ * The longer sentence, on the card that is open. `hint` is the one-liner for a menu row; here
+ * there is room to say what the choice actually buys — and, for the two that people confuse with a
+ * subscription they already pay for, to say that it is a separate API key.
+ */
 function gatewayHint(id: string): string {
   switch (id) {
     case "openrouter":
       return t("Four hundred models behind one key, billed per token. Use it for what a local model cannot do.");
     case "anthropic":
-      return t("Claude, billed directly by Anthropic. Prompt caching is supported, which is most of the bill on a long conversation.");
+      return t("Claude, billed directly by Anthropic. Prompt caching is supported, which is most of the bill on a long conversation. A Claude subscription does not include this key — it is bought in the API console.");
+    case "openai":
+      return t("GPT models, billed directly by OpenAI. A ChatGPT subscription does not include this key — it is bought in the platform console, and billed per token on top.");
+    case "google":
+      return t("Gemini, through Google AI Studio's OpenAI-compatible endpoint. The free tier is generous enough for everyday use and asks for no card.");
+    case "deepseek":
+      return t("DeepSeek, billed directly. Among the cheapest per token, strong at code, and it returns its reasoning.");
+    case "qwen":
+      return t("Alibaba's Qwen models, on the international DashScope endpoint. Change the address in the settings for the mainland-China one.");
+    case "mistral":
+      return t("Mistral, billed directly and hosted in the EU. There is a free tier for experimenting.");
+    case "xai":
+      return t("Grok, billed directly by xAI. An X subscription does not include this key — it is bought in the xAI console.");
+    case "groq":
+      return t("Open models on Groq's hardware, which answers faster than anything else on this list. Nothing to do with Grok.");
+    case "perplexity":
+      return t("Perplexity's models, which search the web while they answer and cite what they found.");
     default:
       return t("Any server that speaks the OpenAI API: Azure OpenAI, LiteLLM, vLLM behind a gateway, your company's own proxy.");
   }

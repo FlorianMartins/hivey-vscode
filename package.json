@@ -2,7 +2,7 @@
   "name": "hivey-code",
   "displayName": "Hivey Code",
   "description": "%extension.description%",
-  "version": "0.37.0",
+  "version": "0.38.0",
   "publisher": "hivey",
   "license": "Apache-2.0",
   "repository": {
@@ -500,8 +500,16 @@
             "enum": [
               "local",
               "openrouter",
-              "openai-compatible",
-              "anthropic"
+              "anthropic",
+              "openai",
+              "google",
+              "deepseek",
+              "qwen",
+              "mistral",
+              "xai",
+              "groq",
+              "perplexity",
+              "openai-compatible"
             ],
             "default": "local",
             "markdownDescription": "%config.chat.provider%"
@@ -553,6 +561,46 @@
             "default": "https://api.anthropic.com/v1",
             "description": "%config.endpoints.anthropic%"
           },
+          "hiveyCode.endpoints.openai": {
+            "type": "string",
+            "default": "https://api.openai.com/v1",
+            "description": "%config.endpoints.openai%"
+          },
+          "hiveyCode.endpoints.google": {
+            "type": "string",
+            "default": "https://generativelanguage.googleapis.com/v1beta/openai",
+            "description": "%config.endpoints.google%"
+          },
+          "hiveyCode.endpoints.deepseek": {
+            "type": "string",
+            "default": "https://api.deepseek.com/v1",
+            "description": "%config.endpoints.deepseek%"
+          },
+          "hiveyCode.endpoints.qwen": {
+            "type": "string",
+            "default": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+            "description": "%config.endpoints.qwen%"
+          },
+          "hiveyCode.endpoints.mistral": {
+            "type": "string",
+            "default": "https://api.mistral.ai/v1",
+            "description": "%config.endpoints.mistral%"
+          },
+          "hiveyCode.endpoints.xai": {
+            "type": "string",
+            "default": "https://api.x.ai/v1",
+            "description": "%config.endpoints.xai%"
+          },
+          "hiveyCode.endpoints.groq": {
+            "type": "string",
+            "default": "https://api.groq.com/openai/v1",
+            "description": "%config.endpoints.groq%"
+          },
+          "hiveyCode.endpoints.perplexity": {
+            "type": "string",
+            "default": "https://api.perplexity.ai",
+            "description": "%config.endpoints.perplexity%"
+          },
           "hiveyCode.escalation.policy": {
             "type": "string",
             "enum": [
@@ -567,8 +615,16 @@
             "type": "string",
             "enum": [
               "openrouter",
-              "openai-compatible",
-              "anthropic"
+              "anthropic",
+              "openai",
+              "google",
+              "deepseek",
+              "qwen",
+              "mistral",
+              "xai",
+              "groq",
+              "perplexity",
+              "openai-compatible"
             ],
             "default": "openrouter",
             "description": "%config.escalation.provider%"

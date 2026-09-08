@@ -13,6 +13,7 @@ import { button, el, formatContext, formatPrice, icon, searchInput } from "./dom
 import type { ToExtension, UiModel, UiState } from "../shared/protocol.js";
 import { t } from "../shared/i18n.js";
 import { HIVEY_VARIANTS, isHivey } from "../core/router/hivey.js";
+import { isDirectVendor } from "../core/providers/vendors.js";
 
 let query = "";
 
@@ -47,7 +48,11 @@ export function modelsScreen(state: UiState, send: (m: ToExtension) => void, rer
 
   const presets = matching.filter((m) => isHivey(m.id));
   const local = matching.filter((m) => m.local);
-  const remote = matching.filter((m) => !m.local && !isHivey(m.id));
+  // Served by a vendor the user pays directly. Kept out of "Remote", which is the OpenRouter
+  // catalogue: the same model appears in both, and the difference — whose account is billed — is
+  // the only thing that separates the two rows.
+  const own = matching.filter((m) => !m.local && isDirectVendor(m.provider));
+  const remote = matching.filter((m) => !m.local && !isHivey(m.id) && !isDirectVendor(m.provider));
 
   const list = el("div", "models-list");
   // The presets first, and not because they are better: they answer a different question. Everything
@@ -68,6 +73,18 @@ export function modelsScreen(state: UiState, send: (m: ToExtension) => void, rer
     list.append(sectionTitle(t("On your machine"), t("No cost, no data leaves.")));
     for (const m of local) list.append(modelRow(m, send));
   }
+  if (own.length) {
+    list.append(
+      sectionTitle(
+        t("On your own account"),
+        t("Served by a provider whose key you stored: billed by them, not through OpenRouter. Prices shown when the catalogue knows the model."),
+      ),
+    );
+    for (const [vendor, models] of byVendor(own)) {
+      list.append(el("div", "models-vendor", vendor));
+      for (const m of models) list.append(modelRow(m, send));
+    }
+  }
   if (remote.length) {
     list.append(
       sectionTitle(
@@ -75,23 +92,44 @@ export function modelsScreen(state: UiState, send: (m: ToExtension) => void, rer
         t("Prices in dollars per million tokens. What leaves is pseudonymised and counted against the budget."),
       ),
     );
-    // Cheapest first inside each vendor, vendors alphabetical: a comparison, not a catalogue dump.
-    const byVendor = new Map<string, UiModel[]>();
-    for (const m of remote) {
-      const list = byVendor.get(m.vendor) ?? [];
-      list.push(m);
-      byVendor.set(m.vendor, list);
-    }
-    for (const [vendor, models] of [...byVendor.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
-      list.append(el("div", "models-vendor", vendor.replace(/^[~_-]+/, "")));
-      for (const m of models.sort((a, b) => a.inUsd + a.outUsd - (b.inUsd + b.outUsd))) list.append(modelRow(m, send));
+    for (const [vendor, models] of byVendor(remote)) {
+      list.append(el("div", "models-vendor", vendor));
+      for (const m of models) list.append(modelRow(m, send));
     }
   }
   if (!matching.length) {
     list.append(el("p", "empty", state.modelsLoading ? t("Loading…") : t("No model matches.")));
+    // The escape hatch, and it is not a nicety: a provider is not obliged to serve a model list.
+    // Perplexity does not, some corporate gateways do not, and a private deployment serves names
+    // nobody outside has heard of. Without this the model exists, the key is stored, the provider
+    // is chosen — and there is no way in this panel to name what should answer. It is offered only
+    // once a search has failed, so it never competes with the list when the list has the answer.
+    const typed = query.trim();
+    if (typed && !state.modelsLoading) {
+      const row = el("button", "model-row");
+      const main = el("div", "model-main");
+      main.append(el("div", "model-name", t("Use “{0}” as it is typed", typed)));
+      main.append(el("div", "model-id", t("On the current provider. For an endpoint that serves no list of its models.")));
+      row.append(main);
+      row.addEventListener("click", () => send({ type: "setModel", model: typed, provider: state.provider }));
+      list.append(row);
+    }
   }
   wrap.append(list);
   return wrap;
+}
+
+/** Cheapest first inside each vendor, vendors alphabetical: a comparison, not a catalogue dump. */
+function byVendor(models: UiModel[]): Array<[string, UiModel[]]> {
+  const groups = new Map<string, UiModel[]>();
+  for (const m of models) {
+    const key = m.vendor.replace(/^[~_-]+/, "");
+    const list = groups.get(key) ?? [];
+    list.push(m);
+    groups.set(key, list);
+  }
+  for (const list of groups.values()) list.sort((a, b) => a.inUsd + a.outUsd - (b.inUsd + b.outUsd));
+  return [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0]));
 }
 
 function sectionTitle(title: string, hint: string): HTMLElement {

@@ -1,8 +1,9 @@
 # Hivey Code
 
 **A coding assistant for VS Code that does not send your code away.**
-Local models (Ollama, LM Studio, vLLM, llama.cpp) or a remote gateway (OpenRouter, Azure, LiteLLM,
-Anthropic) — your choice, per role, and **pseudonymised when it does leave**.
+Local models (Ollama, LM Studio, vLLM, llama.cpp), a gateway (OpenRouter, Azure, LiteLLM) or your own
+account with OpenAI, Anthropic, Gemini, DeepSeek, Qwen, Mistral, xAI, Groq or Perplexity — your
+choice, per role, and **pseudonymised when it does leave**.
 
 Open source (Apache-2.0), **zero runtime dependencies**, **zero telemetry**.
 
@@ -104,6 +105,26 @@ Which model each preset uses is **generated**, never written by hand: a daily jo
 OpenRouter's own catalogue by budget, capability, vendor family and recency, and commits the diff.
 No model version is named anywhere in this repository — a hard-coded id is correct the day it is
 written and returns 404 a few weeks later, silently.
+
+### Your own account, if you already pay for one
+
+OpenRouter is one key for four hundred models, which is the right default and the wrong answer for
+anyone who already has an account somewhere. So the providers are listed in full, and each is a card
+on the setup screen with its own key: **OpenAI**, **Google Gemini**, **Anthropic**, **DeepSeek**,
+**Qwen**, **Mistral**, **xAI**, **Groq**, **Perplexity**, plus any OpenAI-compatible gateway of your
+own (Azure, LiteLLM, a company proxy). The key goes to the OS keychain, the address is a setting you
+can change — a region, a proxy, Azure — and the models the picker shows for a provider are the ones
+that provider answers `/models` with, never a list written here by hand.
+
+These are API keys, billed per token by the vendor. A ChatGPT, Claude or X subscription is not one
+of them: the key is bought separately in each vendor's console, and the cards say so.
+
+One thing had to be built for this rather than declared: "OpenAI-compatible" is a family, not a
+specification. OpenAI's own API refuses `max_tokens` on its reasoning models and wants
+`max_completion_tokens`; some gateways reject a field they do not know instead of ignoring it. Rather
+than a table of which vendor refuses what — wrong the week a model is renamed — the request goes out
+as written, and if the server names a parameter it will not take, that parameter is dropped or
+renamed and the question is asked again. At most twice, and only ever by removing something.
 
 ## How privacy is kept
 
@@ -282,7 +303,8 @@ ollama serve
 Nothing else to configure: the defaults point at `http://127.0.0.1:11434/v1`.
 
 To add a remote escalation: `Hivey Code: Store a provider key`, then set `hiveyCode.escalation.model` (for
-example `anthropic/claude-sonnet-4.5`).
+example `anthropic/claude-sonnet-4.5`). The same command stores the key for any of the providers
+above; the panel's first screen does it card by card, with a link to where each key is bought.
 
 ### The terminal client
 

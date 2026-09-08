@@ -81,6 +81,43 @@ export class OpenAICompatibleProvider implements Provider {
     return h;
   }
 
+  /**
+   * Send the request, and let the server correct it.
+   *
+   * "OpenAI-compatible" is a family, not a specification. OpenAI's own API refuses `max_tokens` on
+   * its reasoning models and demands `max_completion_tokens`; it refuses any temperature but the
+   * default on the same models; several gateways reject a field they have never heard of instead of
+   * ignoring it. Each of those is an HTTP 400 that ends the answer, on the models people most want
+   * to use their own account for.
+   *
+   * The alternative to this would be a table of which vendor rejects which field for which model —
+   * a table that is wrong the week a model is renamed, and this repository has already learned what
+   * hard-coded model names cost. So nothing is predicted: the request goes out as written, and if
+   * the server names a parameter it will not take, that parameter is removed or renamed and the
+   * request goes again. At most twice, and only ever by dropping something — a retry can never add
+   * a field, so it cannot turn a refusal into a different request than the user asked for.
+   */
+  private async post(body: Record<string, unknown>, signal?: AbortSignal): Promise<Response> {
+    let attempt = body;
+    for (let tries = 0; ; tries++) {
+      const res = await request(`${this.baseUrl}/chat/completions`, {
+        method: "POST",
+        headers: this.headers(),
+        body: JSON.stringify(attempt),
+        signal,
+        timeoutMs: this.opts.timeoutMs ?? 180_000,
+        label: "chat",
+      });
+      if (res.ok || res.status !== 400 || tries >= 2) return res;
+      // The body has to be read to know what it objected to, which consumes it — so a response that
+      // teaches us nothing is rebuilt from what was read rather than returned half-drunk.
+      const detail = await res.text();
+      const fixed = adaptRequest(attempt, detail);
+      if (!fixed) return new Response(detail, { status: res.status, statusText: res.statusText });
+      attempt = fixed;
+    }
+  }
+
   async chat(req: ChatRequest, onDelta?: (d: ChatDelta) => void): Promise<ChatResult> {
     const body: Record<string, unknown> = {
       model: req.model,
@@ -120,14 +157,7 @@ export class OpenAICompatibleProvider implements Provider {
     body["stream_options"] = { include_usage: true };
     if (this.id === "openrouter") body["usage"] = { include: true };
 
-    const res = await request(`${this.baseUrl}/chat/completions`, {
-      method: "POST",
-      headers: this.headers(),
-      body: JSON.stringify(body),
-      signal: req.signal,
-      timeoutMs: this.opts.timeoutMs ?? 180_000,
-      label: "chat",
-    });
+    const res = await this.post(body, req.signal);
     if (!res.ok || !res.body) throw new Error(await describeHttpError(res));
 
     let text = "";
@@ -275,6 +305,39 @@ export class OpenAICompatibleProvider implements Provider {
     }
     return [];
   }
+}
+
+/**
+ * What to drop when a server refuses a parameter, read from what it said.
+ *
+ * Returns a new body, or `undefined` when the complaint is not about a parameter — a missing model,
+ * an empty message, a content filter — because retrying those would only spend the user's time
+ * twice on the same error.
+ */
+export function adaptRequest(body: Record<string, unknown>, error: string): Record<string, unknown> | undefined {
+  const said = error.toLowerCase();
+  const next = { ...body };
+  let changed = false;
+
+  // OpenAI's rename. Only when the server asks for it by name: elsewhere `max_tokens` is the field
+  // that works, and swapping it blindly would break every server that never renamed anything.
+  if ("max_tokens" in next && said.includes("max_completion_tokens")) {
+    next["max_completion_tokens"] = next["max_tokens"];
+    delete next["max_tokens"];
+    changed = true;
+  }
+  // Anything else it names and will not take. A temperature the model fixes at 1, a reasoning field
+  // this vendor spells differently, an accounting option an older gateway does not know.
+  for (const field of ["temperature", "reasoning_effort", "reasoning", "stream_options", "max_tokens", "tools"]) {
+    if (!(field in next)) continue;
+    if (!said.includes(field)) continue;
+    // `tools` is the one field whose removal changes the answer rather than the request, so it goes
+    // only if the server is refusing tools outright — an agent turn without them is not the turn.
+    if (field === "tools" && !/not support|unsupported|does not support/.test(said)) continue;
+    delete next[field];
+    changed = true;
+  }
+  return changed ? next : undefined;
 }
 
 export function isOllama(baseUrl: string): boolean {

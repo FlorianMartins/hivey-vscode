@@ -32,6 +32,7 @@ import type { ToExtension, UiModel, UiState } from "../shared/protocol.js";
 import { priceTier, PRICE_TIER_ORDER, type PriceTier } from "../core/models/tiers.js";
 import { recommend } from "../core/models/recommend.js";
 import { HIVEY_VARIANTS, isHivey } from "../core/router/hivey.js";
+import { isDirectVendor } from "../core/providers/vendors.js";
 
 /** A row in the list, after the model has been priced and grouped. */
 interface ComboItem {
@@ -110,7 +111,12 @@ function toItems(state: UiState): ComboItem[] {
         ? model.loopback === false
           ? t("On your network")
           : t("On your machine")
-        : vendorLabel(vendor),
+        : // A model served by the vendor's own API is not the same row as the same model behind
+          // OpenRouter: another account, another bill, another rate limit. Grouped under the
+          // account rather than under the vendor name, so the two never look like duplicates.
+          isDirectVendor(model.provider)
+          ? t("Your account: {0}", vendor)
+          : vendorLabel(vendor),
       model,
     };
   });

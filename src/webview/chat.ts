@@ -9,6 +9,7 @@
 import { button, closeMenu, el, formatTokens, icon, ICON, menu, menuItem, menuTitle, separator } from "./dom.js";
 import { markdown } from "./markdown.js";
 import { t } from "../shared/i18n.js";
+import { REMOTE_VENDORS, vendor } from "../core/providers/vendors.js";
 import { closeModelCombo, isModelComboOpen, openModelCombo } from "./modelCombo.js";
 import { focusGateway } from "./setup.js";
 import type { Mode, Reasoning, ToExtension, UiEntry, UiSkill, UiState } from "../shared/protocol.js";
@@ -1104,9 +1105,9 @@ const SCOPES: Array<{ id: UiState["policy"]["scope"]; short: string; label: stri
 
 const PROVIDERS: Array<{ id: string; short: string; label: string; hint: string }> = [
   { id: "local", short: t("Local"), label: t("On this machine"), hint: t("Nothing leaves, nothing is billed, it works offline.") },
-  { id: "openrouter", short: "OpenRouter", label: "OpenRouter", hint: t("Four hundred models behind one key, billed per token.") },
-  { id: "anthropic", short: "Anthropic", label: "Anthropic", hint: t("Claude, billed directly, with prompt caching.") },
-  { id: "openai-compatible", short: t("Gateway"), label: t("Your own gateway"), hint: t("Azure, LiteLLM, a company proxy — any OpenAI API.") },
+  // The rest come from the vendor table, in its order, so this menu cannot fall behind the setup
+  // screen — which is what happened the first time a provider was added in one and not the other.
+  ...REMOTE_VENDORS.map((v) => ({ id: v.id as string, short: v.short, label: v.label, hint: v.hint })),
 ];
 
 /**
@@ -1121,13 +1122,13 @@ export function providerReady(id: string, state: UiState): boolean {
   if (id === "local") return state.setup.probing || state.setup.runtimes.length > 0;
   if (!state.setup.hasKey[id]) return false;
   // A gateway that is only an API shape needs to be told where it lives.
-  if (id === "openai-compatible") return Boolean(state.setup.endpoints?.[id]);
+  if (vendor(id)?.needsUrl) return Boolean(state.setup.endpoints?.[id]);
   return true;
 }
 
 function missingFor(id: string): string {
   if (id === "local") return t("No model server found on this machine — set one up");
-  if (id === "openai-compatible") return t("Needs an address and a key — set them up");
+  if (vendor(id)?.needsUrl) return t("Needs an address and a key — set them up");
   return t("No key yet — set one up");
 }
 

@@ -11,6 +11,7 @@ import * as vscode from "vscode";
 import { t } from "../shared/i18n.js";
 import { DEFAULT_GROUPS, type SkillGroup, type SkillPolicy } from "../core/session/skills.js";
 import { makeProvider, type Provider, type ProviderId } from "../core/providers/index.js";
+import { defaultEndpoints, endpointSettingKey, REMOTE_VENDORS, vendor } from "../core/providers/vendors.js";
 import { isLocalEndpoint } from "../core/redaction/index.js";
 import type { RedactionLevel, RedactionPolicy } from "../core/redaction/types.js";
 import type { EscalationPolicy, RouterConfig } from "../core/router/route.js";
@@ -71,6 +72,13 @@ export interface Settings {
   escalation: { policy: EscalationPolicy; provider: ProviderId; model: string };
 }
 
+function readEndpoints(c: vscode.WorkspaceConfiguration): Record<ProviderId, string> {
+  const defaults = defaultEndpoints();
+  const out = { local: c.get<string>("endpoints.local", defaults.local) } as Record<ProviderId, string>;
+  for (const v of REMOTE_VENDORS) out[v.id] = c.get<string>(endpointSettingKey(v.id), v.baseUrl);
+  return out;
+}
+
 export function readSettings(scope?: vscode.Uri): Settings {
   const c = vscode.workspace.getConfiguration(SECTION, scope);
   const level = c.get<RedactionLevel>("privacy.redaction", "strict");
@@ -89,12 +97,10 @@ export function readSettings(scope?: vscode.Uri): Settings {
       maxTokens: c.get<number>("completion.maxTokens", 128),
       multiline: c.get<boolean>("completion.multiline", true),
     },
-    endpoints: {
-      local: c.get<string>("endpoints.local", "http://127.0.0.1:11434/v1"),
-      "openai-compatible": c.get<string>("endpoints.openaiCompatible", ""),
-      openrouter: c.get<string>("endpoints.openrouter", "https://openrouter.ai/api/v1"),
-      anthropic: c.get<string>("endpoints.anthropic", "https://api.anthropic.com/v1"),
-    },
+    // Read from the vendor table rather than listed here: a provider whose address this function
+    // forgot is a provider that silently cannot answer, and the manifest already declares them all.
+    // The gateway is the one whose default is empty — its address is the thing the user supplies.
+    endpoints: readEndpoints(c),
     // Filtered here rather than at the point of use: a half-written entry in the settings must not
     // become a probe of an empty URL, and every consumer would otherwise have to remember that.
     servers: c
@@ -242,7 +248,10 @@ export async function providerFor(s: Settings, keys: Keys, id: ProviderId): Prom
   const baseUrl = endpointFor(s, id);
   const local = isLocalEndpoint(baseUrl);
   const apiKey = local && id === "local" ? undefined : await keys.get(id);
-  if (!local && !apiKey && id !== "openai-compatible") {
+  // A gateway whose address the user supplied may well be an unauthenticated one on their own
+  // network, so a missing key there is not an error. Everywhere else it is, and saying so now is
+  // better than an HTTP 401 one question later.
+  if (!local && !apiKey && !vendor(id)?.needsUrl) {
     throw new Error(t("No API key stored for “{0}”. Run “Hivey Code: Store a provider key”.", id));
   }
   return makeProvider({ id, baseUrl, apiKey });
