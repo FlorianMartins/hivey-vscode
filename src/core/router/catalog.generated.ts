@@ -1,13 +1,13 @@
 // GENERATED FILE — do not edit by hand.
 // Written by `npm run models` (scripts/update-models.mjs); a scheduled workflow commits the diff.
-// 423 priced models. Tuples: [id, name, vendor, context, $/M in, $/M out, $/M cached-in].
+// 428 priced models. Tuples: [id, name, vendor, context, $/M in, $/M out, $/M cached-in].
 //
 // A model that is absent from this table is reported as "unknown cost" rather than guessed: a
 // wrong price silently spends someone's budget.
 
 import type { Price } from "./pricing.js";
 
-export const GENERATED_AT = "2026-09-09";
+export const GENERATED_AT = "2026-09-10";
 
 export type ModelRow = [string, string, string, number, number, number, number];
 
@@ -24,7 +24,7 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["~openai/gpt-mini-latest","OpenAI GPT Mini Latest","~openai",400000,0.75,4.5,0.075],
   ["~x-ai/grok-latest","Grok Latest","~x-ai",500000,2,6,0.5],
   ["~z-ai/glm-flash-latest","GLM Flash Latest","~z-ai",1310720,0.075,0.25,0.015],
-  ["~z-ai/glm-latest","GLM Latest","~z-ai",1310720,1.113,3.498,0.2067],
+  ["~z-ai/glm-latest","GLM Latest","~z-ai",1310720,1.092,3.432,0.2028],
   ["aion-labs/aion-2.0","Aion-2.0","aion-labs",131072,0.8,1.6,0.2],
   ["aion-labs/aion-3.0","Aion-3.0","aion-labs",131072,3,6,0.75],
   ["aion-labs/aion-3.0-mini","Aion-3.0-Mini","aion-labs",131072,0.7,1.4,0.18],
@@ -77,7 +77,7 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["cohere/command-r-plus-08-2024","Command R+ (08-2024)","cohere",128000,2.5,10,0],
   ["cohere/command-r7b-12-2024","Command R7B (12-2024)","cohere",128000,0.0375,0.15,0],
   ["cohere/north-mini-code:free","North Mini Code (free)","cohere",256000,0,0,0],
-  ["deepseek/deepseek-chat","DeepSeek V3","deepseek",163840,0.32,0.89,0],
+  ["deepseek/deepseek-chat","DeepSeek V3","deepseek",163840,0.2574,1.0287,0],
   ["deepseek/deepseek-chat-v3-0324","DeepSeek V3 0324","deepseek",163840,0.29,1.14,0.11],
   ["deepseek/deepseek-chat-v3.1","DeepSeek V3.1","deepseek",163840,0.25,0.95,0.13],
   ["deepseek/deepseek-r1","R1","deepseek",64000,0.7,2.5,0],
@@ -92,8 +92,9 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["deepseek/deepseek-v4-flash-vision-exp","DeepSeek V4 Flash Vision Exp","deepseek",1048576,0.22,0.66,0.007],
   ["deepseek/deepseek-v4-flash-vision-exp:batch","DeepSeek V4 Flash Vision Exp (batch)","deepseek",1048576,0.11,0.33,0.0035],
   ["deepseek/deepseek-v4-pro","DeepSeek V4 Pro 0423","deepseek",1048576,0.9553,1.9105,0.0796],
-  ["deepseek/deepseek-v4-pro-0813","DeepSeek V4 Pro 0813","deepseek",1048576,0.5795,1.7384,0.0184],
+  ["deepseek/deepseek-v4-pro-0813","DeepSeek V4 Pro 0813","deepseek",1048576,1.0494,3.1482,0.035],
   ["deepseek/deepseek-v4-pro-0813:batch","DeepSeek V4 Pro 0813 (batch)","deepseek",1048576,0.66,1.98,0.022],
+  ["deepseek/deepseek-v4.1-flash","DeepSeek V4.1 Flash","deepseek",1048576,0.3,1.2,0.006],
   ["dots-studio/dots-3-note-preview:free","Dots3-Note Preview (free)","dots-studio",512000,0,0,0],
   ["google/gemini-2.5-flash","Gemini 2.5 Flash","google",1048576,0.3,2.5,0.03],
   ["google/gemini-2.5-flash-image","Nano Banana (Gemini 2.5 Flash Image)","google",32768,0.3,2.5,0.03],
@@ -172,33 +173,38 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["minimax/minimax-m2","MiniMax M2","minimax",204800,0.255,1.02,0],
   ["minimax/minimax-m2-her","MiniMax M2-her","minimax",65536,0.3,1.2,0.03],
   ["minimax/minimax-m2.1","MiniMax M2.1","minimax",204800,0.3,1.2,0.03],
-  ["minimax/minimax-m2.5","MiniMax M2.5","minimax",204800,0.27,1.08,0.027],
+  ["minimax/minimax-m2.5","MiniMax M2.5","minimax",204800,0.3,1.2,0.03],
   ["minimax/minimax-m2.7","MiniMax M2.7","minimax",204800,0.3,1.2,0.06],
   ["minimax/minimax-m3","MiniMax M3","minimax",1048576,0.3,1.2,0.06],
   ["minimax/minimax-m3:batch","MiniMax M3 (batch)","minimax",524288,0.3,1.2,0.06],
   ["mistralai/codestral-2508","Codestral 2508","mistralai",256000,0.3,0.9,0.03],
+  ["mistralai/codestral-2508:batch","Codestral 2508 (batch)","mistralai",256000,0.15,0.45,0.015],
   ["mistralai/devstral-2512","Devstral 2 2512","mistralai",262144,0.4,2,0.04],
   ["mistralai/ministral-14b-2512","Ministral 3 14B 2512","mistralai",262144,0.2,0.2,0.02],
   ["mistralai/ministral-3b-2512","Ministral 3 3B 2512","mistralai",131072,0.1,0.1,0.01],
   ["mistralai/ministral-8b-2512","Ministral 3 8B 2512","mistralai",262144,0.15,0.15,0.015],
+  ["mistralai/ministral-8b-2512:batch","Ministral 3 8B 2512 (batch)","mistralai",262144,0.075,0.075,0.0075],
   ["mistralai/mistral-large","Mistral Large","mistralai",128000,2,6,0.2],
   ["mistralai/mistral-large-2407","Mistral Large 2407","mistralai",131072,2,6,0.2],
   ["mistralai/mistral-large-2512","Mistral Large 3 2512","mistralai",262144,0.5,1.5,0.05],
+  ["mistralai/mistral-large-2512:batch","Mistral Large 3 2512 (batch)","mistralai",262144,0.25,0.75,0.025],
   ["mistralai/mistral-medium-3","Mistral Medium 3","mistralai",131072,0.4,2,0.04],
   ["mistralai/mistral-medium-3-5","Mistral Medium 3.5","mistralai",262144,1.5,7.5,0],
   ["mistralai/mistral-medium-3-5:batch","Mistral Medium 3.5 (batch)","mistralai",262144,0.75,3.75,0],
   ["mistralai/mistral-medium-3.1","Mistral Medium 3.1","mistralai",131072,0.4,2,0.04],
+  ["mistralai/mistral-medium-3.1:batch","Mistral Medium 3.1 (batch)","mistralai",131072,0.2,1,0.02],
   ["mistralai/mistral-nemo","Mistral Nemo","mistralai",131072,0.019,0.03,0],
   ["mistralai/mistral-saba","Saba","mistralai",32768,0.2,0.6,0.02],
   ["mistralai/mistral-small-24b-instruct-2501","Mistral Small 3","mistralai",32768,0.05,0.08,0],
   ["mistralai/mistral-small-2603","Mistral Small 4","mistralai",262144,0.15,0.6,0.015],
+  ["mistralai/mistral-small-2603:batch","Mistral Small 4 (batch)","mistralai",262144,0.075,0.3,0.0075],
   ["mistralai/mistral-small-3.1-24b-instruct","Mistral Small 3.1 24B","mistralai",128000,0.351,0.555,0],
   ["mistralai/mistral-small-3.2-24b-instruct","Mistral Small 3.2 24B","mistralai",131072,0.075,0.2,0],
   ["mistralai/mixtral-8x22b-instruct","Mixtral 8x22B Instruct","mistralai",65536,2,6,0.2],
   ["mistralai/voxtral-small-24b-2507","Voxtral Small 24B 2507","mistralai",32768,0.1,0.3,0.01],
   ["moonshotai/kimi-k2","Kimi K2 0711","moonshotai",131072,0.57,2.3,0],
   ["moonshotai/kimi-k2-0905","Kimi K2 0905","moonshotai",262144,0.6,2.5,0],
-  ["moonshotai/kimi-k2-thinking","Kimi K2 Thinking","moonshotai",262144,0.6,2.5,0],
+  ["moonshotai/kimi-k2-thinking","Kimi K2 Thinking","moonshotai",262144,0.6,2.5,0.15],
   ["moonshotai/kimi-k2.5","Kimi K2.5","moonshotai",262144,0.45,2.25,0.07],
   ["moonshotai/kimi-k2.6","Kimi K2.6","moonshotai",262144,0.95,4,0.16],
   ["moonshotai/kimi-k2.7-code","Kimi K2.7 Code","moonshotai",262144,0.71,3.5,0.15],
@@ -211,7 +217,6 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["nousresearch/hermes-3-llama-3.1-405b","Hermes 3 405B Instruct","nousresearch",131072,1,1,0],
   ["nousresearch/hermes-3-llama-3.1-70b","Hermes 3 70B Instruct","nousresearch",131072,0.7,0.7,0],
   ["nousresearch/hermes-4-405b","Hermes 4 405B","nousresearch",131072,1,3,0],
-  ["nousresearch/hermes-4-70b","Hermes 4 70B","nousresearch",131072,0.13,0.4,0],
   ["nvidia/nemotron-3-nano-30b-a3b","Nemotron 3 Nano 30B A3B","nvidia",262144,0.05,0.2,0.03],
   ["nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free","Nemotron 3 Nano Omni (free)","nvidia",256000,0,0,0],
   ["nvidia/nemotron-3-super-120b-a12b","Nemotron 3 Super","nvidia",262144,0.085,0.4,0],
@@ -336,7 +341,7 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["qwen/qwen3-235b-a22b-2507","Qwen3 235B A22B Instruct 2507","qwen",262144,0.22,0.88,0],
   ["qwen/qwen3-235b-a22b-thinking-2507","Qwen3 235B A22B Thinking 2507","qwen",131072,0.23,2.3,0],
   ["qwen/qwen3-30b-a3b","Qwen3 30B A3B","qwen",131072,0.12,0.5,0],
-  ["qwen/qwen3-30b-a3b-instruct-2507","Qwen3 30B A3B Instruct 2507","qwen",262144,0.0481,0.193,0],
+  ["qwen/qwen3-30b-a3b-instruct-2507","Qwen3 30B A3B Instruct 2507","qwen",262144,0.09,0.3,0],
   ["qwen/qwen3-30b-a3b-thinking-2507","Qwen3 30B A3B Thinking 2507","qwen",81920,0.2,2.4,0],
   ["qwen/qwen3-32b","Qwen3 32B","qwen",131072,0.08,0.28,0],
   ["qwen/qwen3-8b","Qwen3 8B","qwen",131072,0.117,0.455,0],
@@ -356,7 +361,7 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["qwen/qwen3-vl-32b-instruct","Qwen3 VL 32B Instruct","qwen",131072,0.104,0.416,0],
   ["qwen/qwen3-vl-8b-instruct","Qwen3 VL 8B Instruct","qwen",262144,0.117,0.455,0],
   ["qwen/qwen3-vl-8b-thinking","Qwen3 VL 8B Thinking","qwen",131072,0.18,2.1,0],
-  ["qwen/qwen3.5-122b-a10b","Qwen3.5-122B-A10B","qwen",262144,0.29,2.4,0],
+  ["qwen/qwen3.5-122b-a10b","Qwen3.5-122B-A10B","qwen",262144,0.26,2.08,0],
   ["qwen/qwen3.5-27b","Qwen3.5-27B","qwen",262144,0.195,1.56,0],
   ["qwen/qwen3.5-35b-a3b","Qwen3.5-35B-A3B","qwen",262144,0.3125,1.25,0.1563],
   ["qwen/qwen3.5-397b-a17b","Qwen3.5 397B A17B","qwen",262144,0.55,3.5,0.225],
