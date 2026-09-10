@@ -24,6 +24,7 @@ import { readSettings } from "./config.js";
 import { arcadInstalled, buildArcadTools, type ArcadDeps } from "./integrations/arcad.js";
 import { buildKnowledgeTools } from "./knowledge.js";
 import type { McpManager } from "./integrations/mcp.js";
+import { runCommandInTerminal } from "./terminal.js";
 
 const MAX_READ_TOKENS = 6000;
 const MAX_MATCHES = 60;
@@ -281,27 +282,37 @@ export function buildTools(deps: ToolDeps): Tool[] {
     schema: {
       name: "run_command",
       description:
-        "Run a shell command in the workspace terminal (tests, build, git). The user approves it first and watches it run.",
+        "Run a shell command in the workspace terminal (tests, build, git) and return its output " +
+        "and exit code. The user approves it first and watches it run. On a shell without VS Code " +
+        "integration the output cannot be read, and the result says so.",
       parameters: {
         type: "object",
-        properties: { command: { type: "string" }, why: { type: "string" } },
+        properties: {
+          command: { type: "string" },
+          why: { type: "string" },
+          timeoutMs: { type: "number", description: "Give up after this long. Default 120000, maximum 600000." },
+        },
         required: ["command"],
       },
     },
     approval: (args) => t("run `{0}`", String(args["command"])),
     async run(args, ctx): Promise<ToolResult> {
       const command = String(args["command"] ?? "");
-      const terminal =
-        vscode.window.terminals.find((t) => t.name === "Hivey Code") ??
-        vscode.window.createTerminal({ name: "Hivey Code", cwd: root() });
-      terminal.show(true);
-      terminal.sendText(command, true);
-      ctx.report(t("started: {0}", command));
-      // The output belongs to the user's terminal. Claiming to have read it would be a lie: the
-      // shell integration API cannot return it reliably across every shell and platform.
+      const result = await runCommandInTerminal({
+        command,
+        // Not `root()`, which throws when no folder is open: a terminal does not need one. Someone
+        // working on a single file still gets their shell, in whatever directory it opens in.
+        cwd: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
+        timeoutMs: args["timeoutMs"] === undefined ? undefined : Number(args["timeoutMs"]),
+        signal: ctx.signal,
+        report: (m) => ctx.report(m),
+      });
       return {
-        content:
-          "The command was started in the user's terminal. Ask them for the output, or use get_diagnostics for compiler errors.",
+        content: result.content,
+        isError: result.isError,
+        // The panel shows the exit code as a badge on the step. `captured: false` is what it reads
+        // to say "started, not read" rather than claiming a result nobody has.
+        display: { captured: result.captured, exitCode: result.exitCode },
       };
     },
   };

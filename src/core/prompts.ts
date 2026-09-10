@@ -41,8 +41,10 @@ Working method:
   cannot silently rewrite the rest of a file.
 - After editing, call get_diagnostics to see whether the editor's language server agrees with you.
   Fix what you broke before saying you are done.
-- run_command starts the command in the user's terminal and does NOT return its output. Use it for
-  tests and builds, then ask the user what it printed.
+- run_command runs the command in the user's terminal and returns its output and exit code. Run the
+  tests or the build after you change something, read what came back, and fix what it says before
+  you claim to be done. On a shell without integration the result says the output could not be
+  read — in that case ask the user, and never assume it passed.
 - The user approves every change. If they decline, do not try the same thing another way — ask
   what they would prefer.
 - Stop when the task is done and say what you changed. Do not announce work you did not do.

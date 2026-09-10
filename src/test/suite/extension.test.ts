@@ -523,6 +523,153 @@ suite("Hivey Code", () => {
   });
 
   /**
+   * The loop the agent rests on: run something, read what it printed.
+   *
+   * `run_command` used to return the sentence "ask the user what it printed", which made every
+   * "run the tests and fix what fails" turn a round trip through a human — and, more often, a model
+   * that asserted success it had no evidence for. This test asks for a command whose output is
+   * known and checks that the output came back.
+   *
+   * It is deliberately tolerant of ONE thing and strict about everything else: shell integration is
+   * a property of the shell, so a machine whose shell has none is a legitimate "not captured". What
+   * is never legitimate is claiming a result. So the branch that cannot read says so in words, and
+   * the branch that can must produce the real output and the real exit code.
+   */
+  test("a command run in the editor comes back with its output and its exit code", async () => {
+    const ext = vscode.extensions.getExtension(ID)!;
+    await ext.activate();
+
+    const run = buildTools({ settings: () => readSettings() }).find((tool) => tool.schema.name === "run_command");
+    assert.ok(run, "run_command is not among the tools");
+
+    // Whether this machine's shell CAN be read is established first, and separately, because a test
+    // that accepts either answer proves nothing: with the capture removed it would still pass, on
+    // the strength of the branch that says "I could not read it". So the question is asked once,
+    // of the editor, and the answer decides which assertion is the honest one to make.
+    const probe = vscode.window.createTerminal({ name: "hivey-probe" });
+    const integrated = await new Promise<boolean>((resolve) => {
+      if (probe.shellIntegration) return resolve(true);
+      const timer = setTimeout(() => {
+        sub.dispose();
+        resolve(false);
+      }, 5000);
+      const sub = vscode.window.onDidChangeTerminalShellIntegration((ev) => {
+        if (ev.terminal !== probe) return;
+        clearTimeout(timer);
+        sub.dispose();
+        resolve(true);
+      });
+    });
+    probe.dispose();
+
+    const marker = `hivey-${Date.now().toString(36)}`;
+    // A short budget on purpose: the point of the test is what comes back, and a shell that never
+    // reports the end of a command must not hold the suite for the default two minutes.
+    const result = await run!.run({ command: `echo ${marker}`, timeoutMs: 8000 }, { report: () => {} });
+    const captured = (result.display as { captured?: boolean } | undefined)?.captured;
+
+    if (!integrated) {
+      // A shell with no integration script. The command still runs; what must never happen is a
+      // result that reads like success, so that is what is checked here.
+      assert.equal(captured, false, "the output was read on a shell that has no integration");
+      assert.match(result.content, /could not be read/i, result.content);
+      assert.match(result.content, /ask the user|Do not assume/i, result.content);
+      return;
+    }
+
+    assert.equal(captured, true, `this shell reports integration, so the output must be read: ${result.content}`);
+    assert.match(result.content, new RegExp(marker), `the output was not returned: ${result.content}`);
+    assert.match(result.content, /exit code 0/, result.content);
+    assert.ok(!result.isError, "a command that succeeded was reported as an error");
+    assert.equal((result.display as { exitCode?: number }).exitCode, 0);
+
+    // And a command that fails is reported as a failure, which is the half the agent acts on.
+    // In a sub-shell: a bare `exit 3` would end the shell the terminal is running, which is a way
+    // of failing that tells us nothing about how failures are reported.
+    const failed = await run!.run({ command: "sh -c 'exit 3'", timeoutMs: 8000 }, { report: () => {} });
+    assert.equal(failed.isError, true, `a non-zero exit was not an error: ${failed.content}`);
+    assert.match(failed.content, /exit code 3/, failed.content);
+  });
+
+  /**
+   * The escalation that is not a guess.
+   *
+   * The router's own escalation reads the QUESTION and bets. This one reads what happened: a local
+   * turn runs a command, the command fails, the turn ends anyway — and only then is a paid model
+   * asked, with the failure attached. The whole point is that the second request exists at all, and
+   * that it carries the evidence, so both are asserted on the socket rather than on a log line.
+   */
+  test("a local turn that ends on a failing check is handed to the escalation model, with the evidence", async () => {
+    const ext = vscode.extensions.getExtension(ID)!;
+    await ext.activate();
+
+    const stub = await scriptedStub([
+      // The local model runs something that fails, then answers as though it were done — which is
+      // exactly the behaviour that made "ask the user what it printed" so expensive.
+      { tool: { name: "run_command", args: { command: "sh -c 'exit 7'" } } },
+      { text: "All set." },
+      { text: "Fixed it properly." },
+    ]);
+    const config = vscode.workspace.getConfiguration(SECTION);
+    const before = {
+      provider: config.get("chat.provider"),
+      model: config.get("chat.model"),
+      local: config.get("endpoints.local"),
+      openrouter: config.get("endpoints.openrouter"),
+      policy: config.get("escalation.policy"),
+      escModel: config.get("escalation.model"),
+      escProvider: config.get("escalation.provider"),
+      confirm: config.get("privacy.confirmSend"),
+      approve: config.get("permissions.autoApprove"),
+    };
+    const url = `http://127.0.0.1:${stub.port}/v1`;
+    await config.update("chat.provider", "local", vscode.ConfigurationTarget.Global);
+    await config.update("chat.model", "small-local", vscode.ConfigurationTarget.Global);
+    await config.update("endpoints.local", url, vscode.ConfigurationTarget.Global);
+    await config.update("endpoints.openrouter", url, vscode.ConfigurationTarget.Global);
+    await config.update("escalation.policy", "auto", vscode.ConfigurationTarget.Global);
+    await config.update("escalation.provider", "openrouter", vscode.ConfigurationTarget.Global);
+    await config.update("escalation.model", "big-remote", vscode.ConfigurationTarget.Global);
+    await config.update("privacy.confirmSend", "never", vscode.ConfigurationTarget.Global);
+    await config.update("permissions.autoApprove", "all", vscode.ConfigurationTarget.Global);
+
+    try {
+      void vscode.commands.executeCommand("hiveyCode.askWith", "make the build pass");
+      for (let i = 0; i < 200 && !stub.asked().includes("big-remote"); i++) await delay(50);
+      await vscode.commands.executeCommand("hiveyCode.stopAnswer");
+
+      const asked = stub.asked();
+      assert.ok(asked.includes("small-local"), `the local model was never asked: ${asked.join(", ")}`);
+      assert.ok(
+        asked.includes("big-remote"),
+        `a turn that ended on a failing command was never handed over: ${asked.join(", ")}`,
+      );
+      assert.ok(
+        asked.indexOf("small-local") < asked.indexOf("big-remote"),
+        "the remote model was asked before the local one had failed",
+      );
+
+      // And it must arrive with the evidence. A hand-over that only says "try again" buys a second
+      // identical answer at a higher price.
+      const handover = stub.bodies().find((b) => b.includes("big-remote"));
+      assert.ok(handover, "no request body for the escalation");
+      assert.match(handover!, /smaller model already attempted/, "the evidence was not attached");
+      assert.match(handover!, /exit code 7|sh -c/, "the failure itself was not attached");
+    } finally {
+      await config.update("chat.provider", before.provider, vscode.ConfigurationTarget.Global);
+      await config.update("chat.model", before.model, vscode.ConfigurationTarget.Global);
+      await config.update("endpoints.local", before.local, vscode.ConfigurationTarget.Global);
+      await config.update("endpoints.openrouter", before.openrouter, vscode.ConfigurationTarget.Global);
+      await config.update("escalation.policy", before.policy, vscode.ConfigurationTarget.Global);
+      await config.update("escalation.model", before.escModel, vscode.ConfigurationTarget.Global);
+      await config.update("escalation.provider", before.escProvider, vscode.ConfigurationTarget.Global);
+      await config.update("privacy.confirmSend", before.confirm, vscode.ConfigurationTarget.Global);
+      await config.update("permissions.autoApprove", before.approve, vscode.ConfigurationTarget.Global);
+      stub.close();
+    }
+  });
+
+  /**
    * A preset must never reach a provider.
    *
    * `hivey/free` is not a model id: no API has heard of it, and sending it verbatim is a 400 — the
@@ -773,6 +920,72 @@ function delay(ms: number): Promise<void> {
  * A stub that finishes on its own would let "stopping works" pass without the stop doing anything,
  * which is the one result these tests must not be able to produce.
  */
+/**
+ * A model server that answers a scripted sequence: reply 0 to the first request, reply 1 to the
+ * second, and the last one for ever after.
+ *
+ * `streamingStub` streams the same word until it is stopped, which is right for testing that a turn
+ * can be interrupted and useless for testing what a turn DECIDES. A decision needs the model to say
+ * a specific thing at a specific step — a tool call, then an answer — so that the turn reaches its
+ * end and the code under test gets to look at what happened.
+ */
+async function scriptedStub(replies: Array<{ tool?: { name: string; args: unknown }; text?: string }>): Promise<{
+  port: number;
+  asked: () => string[];
+  bodies: () => string[];
+  close: () => void;
+}> {
+  const asked: string[] = [];
+  const bodies: string[] = [];
+  const server: Server = createServer((req, res) => {
+    if (req.url?.includes("/models")) {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ data: [{ id: "stub-model" }] }));
+      return;
+    }
+    let body = "";
+    req.on("data", (chunk) => (body += String(chunk)));
+    req.on("end", () => {
+      bodies.push(body);
+      try {
+        asked.push(String(JSON.parse(body).model));
+      } catch {
+        asked.push("(unreadable)");
+      }
+      const reply = replies[Math.min(asked.length - 1, replies.length - 1)] ?? {};
+      res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });
+      if (reply.tool) {
+        res.write(
+          `data: ${JSON.stringify({
+            choices: [
+              {
+                delta: {
+                  tool_calls: [
+                    { index: 0, id: "call_1", function: { name: reply.tool.name, arguments: JSON.stringify(reply.tool.args) } },
+                  ],
+                },
+              },
+            ],
+          })}\n\n`,
+        );
+        res.write(`data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: "tool_calls" }] })}\n\n`);
+      } else {
+        res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: reply.text ?? "done" } }] })}\n\n`);
+        res.write(`data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: "stop" }] })}\n\n`);
+      }
+      res.write("data: [DONE]\n\n");
+      res.end();
+    });
+  });
+  await new Promise<void>((r) => server.listen(0, "127.0.0.1", () => r()));
+  return {
+    port: (server.address() as { port: number }).port,
+    asked: () => [...asked],
+    bodies: () => [...bodies],
+    close: () => server.close(),
+  };
+}
+
 async function streamingStub(opts: { delayAfterFirst?: number } = {}): Promise<{
   port: number;
   open: () => number;

@@ -10,7 +10,7 @@
     "url": "https://github.com/FlorianMartins/hivey-vscode.git"
   },
   "engines": {
-    "vscode": "^1.90.0",
+    "vscode": "^1.93.0",
     "node": ">=18"
   },
   "categories": [
@@ -988,7 +988,7 @@
   },
   "devDependencies": {
     "@types/node": "^18.19.0",
-    "@types/vscode": "^1.90.0",
+    "@types/vscode": "^1.93.0",
     "@vscode/test-electron": "^2.5.2",
     "esbuild": "^0.25.0",
     "typescript": "^5.9.0"

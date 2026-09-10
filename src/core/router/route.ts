@@ -121,3 +121,25 @@ function preset(model: string, kind: TaskKind, level?: Complexity): Route {
     why: `${hiveyLabel(model)}: ${role}`,
   };
 }
+
+/**
+ * Where a proven failure goes next, or nowhere.
+ *
+ * Two sources, in order. An explicitly configured escalation model is the user's own answer to
+ * "what should take over", and it wins. Failing that, a Hivey preset already contains one: the
+ * `deep` role is the model the preset keeps for hard work, so a failed everyday turn has somewhere
+ * to go without anyone configuring anything.
+ *
+ * Returns nothing when the model that just failed IS the target — retrying the same model on the
+ * same evidence buys a second identical answer at full price.
+ */
+export function escalationTarget(cfg: RouterConfig, used: { provider: ProviderId; model: string }): { provider: ProviderId; model: string } | undefined {
+  if (cfg.escalateTo?.model && cfg.escalateTo.model !== used.model) {
+    return { provider: cfg.escalateTo.provider, model: cfg.escalateTo.model };
+  }
+  if (isHivey(cfg.chat.model)) {
+    const deep = hiveyModel(cfg.chat.model, "deep");
+    if (deep !== used.model) return { provider: "openrouter", model: deep };
+  }
+  return undefined;
+}

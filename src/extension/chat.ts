@@ -13,7 +13,9 @@ import { language, t } from "../shared/i18n.js";
 import { runTurn, type Tool } from "../core/agent/loop.js";
 import { Permissions, commandPrefix, type PermissionStore, type Rule } from "../core/agent/permissions.js";
 import { costOf, makeLookup, type Price } from "../core/router/pricing.js";
-import { route } from "../core/router/route.js";
+import { handoverNote, verifyTurn, type TurnStep } from "../core/router/outcome.js";
+import { unifiedDiff } from "../core/text/diff.js";
+import { escalationTarget, route } from "../core/router/route.js";
 import { Session, type ContextItem, type Entry, type SessionData } from "../core/session/session.js";
 import { headToTokens } from "../core/util/tokens.js";
 import { matchesName } from "../core/ibmi/sql.js";
@@ -2782,7 +2784,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
   // ── The turn ───────────────────────────────────────────────────────────────────────────────
 
-  private async runTurn(): Promise<void> {
+  /**
+   * A second attempt at the same question, on a bigger model, because the first one is PROVEN not
+   * to have worked. Carries the evidence, so the second model finishes rather than starts over.
+   */
+  private async runTurn(handover?: { provider: ProviderId; model: string; note: string }): Promise<void> {
     const settings = readSettings();
     const mode = this.session.mode;
     // Every file this turn is about to change gets snapshotted against the question that asked for
@@ -2879,7 +2885,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     });
     let providerId = decision.provider;
     let model = decision.model;
-    if (decision.suggestEscalation) {
+    // A hand-over has already decided where this goes: it exists because the router's first answer
+    // was tried and failed. Asking the router again would send it back to the model that just lost.
+    if (handover) {
+      providerId = handover.provider;
+      model = handover.model;
+    } else if (decision.suggestEscalation) {
       const choice = await vscode.window.showInformationMessage(
         t(
           "This question is beyond the local model ({0}). Send it to {1}?",
@@ -2899,6 +2910,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const isLocal = isLocalEndpoint(baseUrl);
     const vault = new Vault();
     const steps: Array<{ tool: string; summary: string; ok: boolean }> = [];
+    const verifierOutput = new Map<string, string>();
 
     // What this question will send, said before it is sent.
     //
@@ -2953,7 +2965,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     try {
       const provider = await providerFor(settings, this.keys, providerId);
 
-      const prepared = await this.gate.prepare(built.messages, settings, { provider: providerId, model, baseUrl, isLocal }, vault);
+      // The evidence rides at the END, after the transcript, so it is the last thing the model
+      // reads before answering — and so it stays out of the cacheable prefix, which must be
+      // identical from one turn to the next or the provider's prompt cache misses on all of it.
+      const outgoing = handover ? [...built.messages, { role: "user" as const, content: handover.note }] : built.messages;
+      const prepared = await this.gate.prepare(outgoing, settings, { provider: providerId, model, baseUrl, isLocal }, vault);
       if (!prepared) {
         this.post({ type: "status", text: t("Request cancelled.") });
         this.post({ type: "turnEnd" });
@@ -3008,6 +3024,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         },
         onToolResult: ({ call, result }) => {
           const summary = String(result.content).split("\n")[0]?.slice(0, 120) ?? "";
+          // The whole of what a check printed, not the first line of it. The step list wants one
+          // line; a model asked to fix the failure wants the error, and the error is never on the
+          // first line — "exit code 1" is, and it says nothing. Overwritten each time, so a check
+          // that failed and then passed leaves nothing to explain.
+          if (result.isError) verifierOutput.set(call.name, String(result.content).slice(0, 4000));
+          else verifierOutput.delete(call.name);
           // What it was asked to do, alongside what came back. Without the first half a turn reads
           // as six identical lines: the result of a command says nothing about which command.
           let signature = "";
@@ -3075,6 +3097,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         this.post({ type: "status", text: t("Stopped after the maximum number of steps.") });
       }
       this.persist();
+
+      // The turn is over and the evidence is in. This is the only place in the extension that
+      // decides to spend money on the strength of something that HAPPENED rather than something
+      // that was predicted — see `verifyTurn`.
+      if (!handover && !ctl.signal.aborted && mode !== "chat") {
+        await this.escalateOnFailure(steps, verifierOutput, settings, model, providerId);
+      }
     } catch (err) {
       const message = (err as Error).message;
       this.log.appendLine(`[turn] ${message}`);
@@ -3205,6 +3234,84 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    * tool machinery away — knows which entry a snapshot belongs to without every layer between
    * having to carry it.
    */
+  /**
+   * The escalation that costs nothing when it is not needed.
+   *
+   * The router's own escalation is a bet placed before the work: a regular expression reads the
+   * question, decides "architecture" is hard, and sends it to a paid model — which is wrong in both
+   * directions. It pays for easy questions that contain a scary word, and it leaves genuinely hard
+   * ones on a 7B model because they were phrased plainly. Worse, it never learns: the local attempt
+   * could fail every time and the next identical question would still go local.
+   *
+   * This is the same decision made afterwards, on evidence. The local model tries, the tests or the
+   * diagnostics say whether it worked, and only a PROVEN failure buys a remote call — which then
+   * starts from the diff and the error rather than from the question. A user who never hits a
+   * failure never pays anything, which is the whole argument of this extension applied to its own
+   * escalation.
+   */
+  private async escalateOnFailure(
+    steps: TurnStep[],
+    verifierOutput: Map<string, string>,
+    settings: Settings,
+    usedModel: string,
+    usedProvider: ProviderId,
+  ): Promise<void> {
+    if (settings.escalation.policy === "never") return;
+    const verdict = verifyTurn(steps);
+    if (verdict.kind === "none") return;
+
+    const target = escalationTarget(routerConfig(settings), { provider: usedProvider, model: usedModel });
+    if (!target) return;
+
+    // What the failed attempt left on disk. Without this the second model reads the ORIGINAL file
+    // in the transcript, writes the change that is already there, and reports success — the exact
+    // failure mode of handing a fresh model a stale conversation.
+    const diffs = await this.turnDiffs();
+    const detail = verdict.evidence.map((e) => verifierOutput.get(e.tool)).find((x) => x) ?? undefined;
+    const note = handoverNote({ verdict, diffs, ...(detail ? { detail } : {}) });
+
+    if (settings.escalation.policy === "ask") {
+      const go = await vscode.window.showWarningMessage(
+        t("The local model tried and it did not work: {0}. Hand it to {1}?", verdict.why, target.model),
+        t("Hand it over"),
+        t("Leave it"),
+      );
+      if (go !== t("Hand it over")) return;
+    }
+
+    this.post({ type: "status", text: t("Handing over to {0}: {1}", target.model, verdict.why) });
+    await this.runTurn({ ...target, note });
+  }
+
+  /**
+   * Unified diffs of everything this turn changed, against the checkpoint taken before it.
+   *
+   * The checkpoint exists already, for the undo button — it holds every touched file as it stood
+   * before the question. That makes the diff free: no watcher, no second copy, and it covers
+   * exactly the files the turn is responsible for.
+   */
+  private async turnDiffs(): Promise<string[]> {
+    const entry = this.checkpointFor ? this.session.get(this.checkpointFor) : undefined;
+    const snapshots = entry?.checkpoint ?? [];
+    const out: string[] = [];
+    let budget = 12_000;
+    for (const snap of snapshots) {
+      if (budget <= 0) break;
+      let now = "";
+      try {
+        const uri = vscode.Uri.joinPath(vscode.workspace.workspaceFolders![0]!.uri, snap.path);
+        now = Buffer.from(await vscode.workspace.fs.readFile(uri)).toString("utf8");
+      } catch {
+        // Deleted by the turn. A diff against nothing still says what happened.
+      }
+      const diff = unifiedDiff(snap.path, snap.before ?? "", now, { maxChars: budget });
+      if (!diff) continue;
+      budget -= diff.length;
+      out.push(diff);
+    }
+    return out;
+  }
+
   private checkpointFor: string | undefined;
 
   /** The plan the current turn is keeping, if it started one. Reset at the top of every turn. */
