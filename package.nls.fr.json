@@ -6,6 +6,8 @@
   "command.askAboutSelection.title": "Interroger la sélection",
   "command.showEgress.title": "Aperçu des données sortantes",
   "command.showCosts.title": "Coûts et budget",
+  "command.exportAudit.title": "Exporter le journal des sorties (JSONL ou syslog)",
+  "command.verifyAudit.title": "Vérifier que le journal des sorties n'a pas été modifié",
   "command.toggleCompletions.title": "Activer/désactiver la complétion inline",
   "command.setApiKey.title": "Enregistrer une clé de fournisseur",
   "command.clearApiKey.title": "Effacer une clé de fournisseur",

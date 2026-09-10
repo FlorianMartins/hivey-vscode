@@ -6,6 +6,8 @@
   "command.askAboutSelection.title": "Ask about the selection",
   "command.showEgress.title": "Show outgoing data",
   "command.showCosts.title": "Show cost and budget",
+  "command.exportAudit.title": "Export the egress log (JSONL or syslog)",
+  "command.verifyAudit.title": "Verify the egress log has not been altered",
   "command.toggleCompletions.title": "Turn inline completion on or off",
   "command.setApiKey.title": "Store a provider key",
   "command.clearApiKey.title": "Clear a provider key",

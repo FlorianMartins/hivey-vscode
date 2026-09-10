@@ -19,6 +19,7 @@ import { watchInstructions } from "./instructions.js";
 import { createDefinition, definitionUri, DefinitionStore } from "./definitions.js";
 import { ibmiDiagnose, ibmiLibraryList } from "./integrations/ibmi.js";
 import { REMOTE_VENDORS } from "../core/providers/vendors.js";
+import { toJsonl, toSyslog, type Chained } from "../core/audit/chain.js";
 
 export function activate(context: vscode.ExtensionContext): void {
   // The editor knows which language the user reads, unless they said otherwise.
@@ -358,6 +359,54 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("hiveyCode.showPermissions", () => chat.show("permissions")),
     vscode.commands.registerCommand("hiveyCode.showEgress", () => showEgressReport(gate, readSettings())),
     vscode.commands.registerCommand("hiveyCode.showCosts", () => showCostReport(gate, readSettings())),
+
+    /**
+     * The log, out of the editor and into whatever collects logs here.
+     *
+     * A tamper-evident log that only exists on the machine being audited is half a control: the
+     * copy that matters is the one somewhere the person being audited cannot reach. The hash and
+     * the link go out with each line, so the copy in the SIEM can be checked against the copy here.
+     */
+    vscode.commands.registerCommand("hiveyCode.exportAudit", async () => {
+      const rows = gate.ledger();
+      if (!rows.length) {
+        void vscode.window.showInformationMessage(t("Nothing has left this machine yet, so there is nothing to export."));
+        return;
+      }
+      const format = await vscode.window.showQuickPick(
+        [
+          { label: "JSONL", detail: t("One JSON object per line — Splunk, Elastic, Loki, jq") },
+          { label: "syslog", detail: t("RFC 5424 with structured data") },
+        ],
+        { placeHolder: t("Which format?") },
+      );
+      if (!format) return;
+      const chained = rows as unknown as Array<Record<string, unknown> & Chained>;
+      const body =
+        format.label === "JSONL"
+          ? toJsonl(chained)
+          : toSyslog(chained, { host: vscode.env.machineId.slice(0, 12) || "workstation" });
+      const doc = await vscode.workspace.openTextDocument({
+        content: body,
+        language: format.label === "JSONL" ? "json" : "log",
+      });
+      await vscode.window.showTextDocument(doc);
+    }),
+
+    vscode.commands.registerCommand("hiveyCode.verifyAudit", () => {
+      const verdict = gate.verifyLedger();
+      if (verdict.ok) {
+        void vscode.window.showInformationMessage(
+          t("The egress log holds: {0} entries, each linked to the one before it.", verdict.checked),
+        );
+        return;
+      }
+      // Named rather than vague. "The log is invalid" sends somebody looking through five hundred
+      // rows; a sequence number and a reason sends them to one.
+      void vscode.window.showWarningMessage(
+        t("The egress log does not hold at entry {0} ({1}). It has been altered since it was written.", verdict.brokenAt ?? 0, verdict.reason ?? ""),
+      );
+    }),
 
     vscode.commands.registerCommand("hiveyCode.indexWorkspace", async () => {
       await vscode.window.withProgress(

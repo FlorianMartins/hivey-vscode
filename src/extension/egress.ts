@@ -24,6 +24,10 @@ import { Budget, type SpendStore, type Spend } from "../core/router/budget.js";
 import { isBlockedPath, matchGlob } from "../core/util/glob.js";
 import { estimateMessageTokens } from "../core/util/tokens.js";
 import { redactionPolicy, type Settings } from "./config.js";
+import { link, verifyChain, type Chained, type ChainVerdict } from "../core/audit/chain.js";
+
+/** A ledger row: what was sent, plus its place in the chain. */
+export type LedgerEntry = EgressRecord & Chained;
 
 export interface EgressRecord {
   at: number;
@@ -163,16 +167,36 @@ export class EgressGate {
   ask?: (request: { description: string; detail: string[] }) => Promise<"once" | "always" | "no">;
 
   /** Called after a remote call completed. */
+  /**
+   * Append one request to the ledger, linked to the one before it.
+   *
+   * The link is what turns "here is what we logged" into "here is what we logged, and you can tell
+   * whether anybody changed it" — see `core/audit/chain.ts`. It costs one hash per remote request,
+   * which is nothing next to the request itself.
+   */
   record(entry: EgressRecord, settings: Settings): void {
     this.budget.record(entry.usd);
     if (!settings.privacy.auditLog) return;
-    const ledger = this.state.get<EgressRecord[]>(LEDGER_KEY, []);
-    ledger.unshift(entry);
+    const ledger = this.state.get<LedgerEntry[]>(LEDGER_KEY, []);
+    // Stored newest first, so the previous entry — the one this one links to — is at the front.
+    const linked = link(entry as unknown as Record<string, unknown>, ledger[0]) as unknown as LedgerEntry;
+    ledger.unshift(linked);
     void this.state.update(LEDGER_KEY, ledger.slice(0, LEDGER_MAX));
   }
 
-  ledger(): EgressRecord[] {
-    return this.state.get<EgressRecord[]>(LEDGER_KEY, []);
+  ledger(): LedgerEntry[] {
+    return this.state.get<LedgerEntry[]>(LEDGER_KEY, []);
+  }
+
+  /**
+   * Does the ledger still hold together?
+   *
+   * Answered on demand rather than continuously: it is the question somebody asks when they are
+   * about to rely on the log, and hashing five hundred records to draw a report nobody is reading
+   * would be work for nothing.
+   */
+  verifyLedger(): ChainVerdict {
+    return verifyChain(this.ledger() as unknown as Array<Record<string, unknown> & Chained>);
   }
 
   clearLedger(): void {

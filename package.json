@@ -107,6 +107,18 @@
         "icon": "$(graph)"
       },
       {
+        "command": "hiveyCode.exportAudit",
+        "title": "%command.exportAudit.title%",
+        "category": "Hivey Code",
+        "icon": "$(export)"
+      },
+      {
+        "command": "hiveyCode.verifyAudit",
+        "title": "%command.verifyAudit.title%",
+        "category": "Hivey Code",
+        "icon": "$(verified)"
+      },
+      {
         "command": "hiveyCode.toggleCompletions",
         "title": "%command.toggleCompletions.title%",
         "category": "Hivey Code"

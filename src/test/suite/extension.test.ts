@@ -663,6 +663,60 @@ suite("Hivey Code", () => {
   });
 
   /**
+   * A rate limit must not end the turn.
+   *
+   * The free preset routes to endpoints that are free because they are rate-limited, so a 429 was
+   * the ordinary case rather than the exceptional one — and it lost the answer. The other half is
+   * the argument no hosted assistant can make: when the network stops, there is usually a model on
+   * the machine already, so a provider that will not answer is a reason to fall back rather than a
+   * reason to stop working.
+   */
+  test("a provider that refuses with a rate limit is answered by the next endpoint down", async () => {
+    const ext = vscode.extensions.getExtension(ID)!;
+    await ext.activate();
+
+    const remote = await scriptedStub([{ status: 429 }]);
+    const local = await scriptedStub([{ text: "Answered on this machine." }]);
+    const config = vscode.workspace.getConfiguration(SECTION);
+    const before = {
+      provider: config.get("chat.provider"),
+      model: config.get("chat.model"),
+      openrouter: config.get("endpoints.openrouter"),
+      localUrl: config.get("endpoints.local"),
+      completionModel: config.get("completion.model"),
+      confirm: config.get("privacy.confirmSend"),
+    };
+    await config.update("chat.provider", "openrouter", vscode.ConfigurationTarget.Global);
+    await config.update("chat.model", "busy-remote", vscode.ConfigurationTarget.Global);
+    await config.update("endpoints.openrouter", `http://127.0.0.1:${remote.port}/v1`, vscode.ConfigurationTarget.Global);
+    await config.update("endpoints.local", `http://127.0.0.1:${local.port}/v1`, vscode.ConfigurationTarget.Global);
+    await config.update("completion.model", "on-my-machine", vscode.ConfigurationTarget.Global);
+    await config.update("privacy.confirmSend", "never", vscode.ConfigurationTarget.Global);
+
+    try {
+      void vscode.commands.executeCommand("hiveyCode.askWith", "hello");
+      for (let i = 0; i < 200 && !local.asked().length; i++) await delay(50);
+      await vscode.commands.executeCommand("hiveyCode.stopAnswer");
+
+      assert.deepEqual(remote.asked(), ["busy-remote"], "the chosen model should be tried first, once");
+      assert.deepEqual(
+        local.asked(),
+        ["on-my-machine"],
+        `the turn was not carried on by the machine: ${local.asked().join(", ")}`,
+      );
+    } finally {
+      await config.update("chat.provider", before.provider, vscode.ConfigurationTarget.Global);
+      await config.update("chat.model", before.model, vscode.ConfigurationTarget.Global);
+      await config.update("endpoints.openrouter", before.openrouter, vscode.ConfigurationTarget.Global);
+      await config.update("endpoints.local", before.localUrl, vscode.ConfigurationTarget.Global);
+      await config.update("completion.model", before.completionModel, vscode.ConfigurationTarget.Global);
+      await config.update("privacy.confirmSend", before.confirm, vscode.ConfigurationTarget.Global);
+      remote.close();
+      local.close();
+    }
+  });
+
+  /**
    * The escalation that is not a guess.
    *
    * The router's own escalation reads the QUESTION and bets. This one reads what happened: a local
@@ -1000,7 +1054,7 @@ function delay(ms: number): Promise<void> {
  * a specific thing at a specific step — a tool call, then an answer — so that the turn reaches its
  * end and the code under test gets to look at what happened.
  */
-async function scriptedStub(replies: Array<{ tool?: { name: string; args: unknown }; text?: string }>): Promise<{
+async function scriptedStub(replies: Array<{ tool?: { name: string; args: unknown }; text?: string; status?: number }>): Promise<{
   port: number;
   asked: () => string[];
   bodies: () => string[];
@@ -1024,6 +1078,11 @@ async function scriptedStub(replies: Array<{ tool?: { name: string; args: unknow
         asked.push("(unreadable)");
       }
       const reply = replies[Math.min(asked.length - 1, replies.length - 1)] ?? {};
+      if (reply.status && reply.status >= 400) {
+        res.writeHead(reply.status, { "content-type": "application/json" });
+        res.end(JSON.stringify({ error: { message: "rate limited" } }));
+        return;
+      }
       res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });
       if (reply.tool) {
         res.write(

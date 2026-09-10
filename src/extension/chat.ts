@@ -17,7 +17,9 @@ import { costOf, makeLookup, type Price } from "../core/router/pricing.js";
 import { calibrate, observe, prune, type Calibration } from "../core/util/calibrate.js";
 import { handoverNote, verifyTurn, type TurnStep } from "../core/router/outcome.js";
 import { unifiedDiff } from "../core/text/diff.js";
-import { escalationTarget, route } from "../core/router/route.js";
+import { escalationTarget, route, type Route } from "../core/router/route.js";
+import { describeFallback, fallbackChain, isRetryable } from "../core/router/fallback.js";
+import type { Provider } from "../core/providers/index.js";
 import { Session, type ContextItem, type Entry, type SessionData } from "../core/session/session.js";
 import { headToTokens } from "../core/util/tokens.js";
 import { matchesName } from "../core/ibmi/sql.js";
@@ -3029,6 +3031,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       }
     }
 
+    // Where to go if this one will not answer. Computed BEFORE the attempt, from the route that was
+    // chosen, so the chain is a property of the decision rather than something improvised inside a
+    // catch block. Empty for a user with one remote model and nothing local — see `fallbackChain`.
+    const chain = fallbackChain(routerConfig(settings), { provider: providerId, model, why: "" }, {
+      kind: mode === "chat" ? "chat" : "agent",
+      ...(settings.completion.model ? { localModel: settings.completion.model } : {}),
+    });
+
     try {
       const provider = await providerFor(settings, this.keys, providerId);
 
@@ -3064,9 +3074,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       let streamed = "";
       let thought = "";
 
-      const result = await runTurn({
-        provider,
-        model,
+      // One attempt, wrapped so it can be repeated against a different endpoint. See the catch below.
+      const attempt = (useProvider: Provider, useModel: string): Promise<Awaited<ReturnType<typeof runTurn>>> =>
+        runTurn({
+        provider: useProvider,
+        model: useModel,
         messages: prepared.messages,
         tools,
         signal: ctl.signal,
@@ -3137,7 +3149,20 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         },
         afterResponse: (t) => vault.restore(t),
         onUsage: (info) => this.noteUsage(info),
-      });
+        });
+
+      let result: Awaited<ReturnType<typeof runTurn>>;
+      try {
+        result = await attempt(provider, model);
+      } catch (err) {
+        // Only while nothing has reached the user. A turn that has already streamed a sentence or
+        // run a tool cannot be moved elsewhere: the second model would repeat the sentence and
+        // re-run the side effect. So the fallback covers exactly the case it is for — a provider
+        // that refuses before it starts, which is what a rate limit and a dead network both are.
+        const untouched = !streamed && !steps.length;
+        if (!untouched || ctl.signal.aborted || !isRetryable(err) || !chain.length) throw err;
+        result = await this.runFallback(chain, settings, { provider: providerId, model, why: "" }, attempt, ctl);
+      }
 
       // What the provider's cache actually served, accumulated across the conversation. Shown in the
       // ring: the cache is most of the bill on a long conversation, and the things that break it are
@@ -3398,6 +3423,42 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
   /** Prompt tokens sent, and how many of them the provider served from its cache, this session. */
   private cacheSeen = { prompt: 0, cached: 0 };
+
+  /**
+   * Try the next endpoint down, and the one after that, until one answers or the chain runs out.
+   *
+   * The user is TOLD, every time. A silent fallback is the worst version of this feature: the
+   * answer arrives from a smaller model, reads slightly worse, and nobody knows why — least of all
+   * when they later compare it against what the model they chose actually does. So each hop posts a
+   * line, and the entry records the model that really answered.
+   *
+   * When the whole chain fails, the FIRST error is what is thrown: it is the one about the endpoint
+   * the user actually chose, and "this machine is not running a model either" is a confusing thing
+   * to be told when the real problem is that OpenRouter is rate-limiting.
+   */
+  private async runFallback(
+    chain: Route[],
+    settings: Settings,
+    from: Route,
+    attempt: (provider: Provider, model: string) => Promise<Awaited<ReturnType<typeof runTurn>>>,
+    ctl: AbortController,
+  ): Promise<Awaited<ReturnType<typeof runTurn>>> {
+    let first: unknown;
+    for (const next of chain) {
+      if (ctl.signal.aborted) break;
+      this.post({ type: "status", text: describeFallback(from, next) });
+      try {
+        const provider = await providerFor(settings, this.keys, next.provider);
+        const result = await attempt(provider, next.model);
+        this.log.appendLine(`[fallback] ${from.model} → ${next.model} (${next.why})`);
+        return result;
+      } catch (err) {
+        first ??= err;
+        if (!isRetryable(err)) break;
+      }
+    }
+    throw first ?? new Error(t("No endpoint answered."));
+  }
 
   private checkpointFor: string | undefined;
 

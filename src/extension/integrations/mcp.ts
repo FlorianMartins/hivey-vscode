@@ -19,6 +19,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { t } from "../../shared/i18n.js";
 import type { Tool, ToolResult } from "../../core/agent/loop.js";
 import { LineFramer, McpClient, flattenContent, type McpTransport, type McpToolDescriptor } from "../../core/mcp/client.js";
+import { describeChanges, diffTools, fingerprint, frameDescription } from "../../core/mcp/pinning.js";
 import { headToTokens } from "../../core/util/tokens.js";
 import { SECTION } from "../config.js";
 import { request } from "../../core/util/http.js";
@@ -256,6 +257,57 @@ export class McpManager {
     return `hiveyCode.mcp.trust:${config.name}:${describeTarget(config)}`;
   }
 
+  /**
+   * What this server's tools looked like when they were approved.
+   *
+   * Keyed by the same name-and-target as the trust decision, because that is what the approval was
+   * about: pointing the same server name at a different command is a different server, and it
+   * should not inherit an approval.
+   */
+  private pinKey(config: McpServerConfig): string {
+    return `hiveyCode.mcp.tools:${config.name}:${describeTarget(config)}`;
+  }
+
+  /**
+   * Has this server changed what it offers since the user last looked?
+   *
+   * The consent dialog names a command, and a command is not what a tool does to a conversation —
+   * the DESCRIPTION is, because that is the text the model reads to decide when to call it. A
+   * server that serves a harmless description on the day it is approved and another one a week
+   * later is the whole of the tool-poisoning problem, and nothing was asking again.
+   *
+   * Returns true when the tools may be offered: either nothing changed, or the user looked at what
+   * changed and said yes.
+   */
+  private async confirmTools(config: McpServerConfig, tools: McpToolDescriptor[]): Promise<boolean> {
+    const key = this.pinKey(config);
+    const stored = this.context.workspaceState.get<{ hash: string; tools: McpToolDescriptor[] }>(key);
+    const hash = fingerprint(tools);
+    if (stored?.hash === hash) return true;
+
+    if (stored) {
+      // Named rather than vague. "Something changed, approve?" is a dialog that teaches people to
+      // click yes; a list of what changed is a dialog somebody can actually judge.
+      const changes = diffTools(stored.tools, tools);
+      const keep = t("Accept the new tools");
+      const answer = await vscode.window.showWarningMessage(
+        t("The MCP server “{0}” has changed what it offers.", config.name),
+        {
+          modal: true,
+          detail: t(
+            "You approved this server with a different set of tools. What changed:\n\n{0}\n\nA tool's description is what the model reads to decide when to call it, so a rewritten description can change what this server makes the assistant do.",
+            describeChanges(changes),
+          ),
+        },
+        keep,
+      );
+      if (answer !== keep) return false;
+    }
+
+    await this.context.workspaceState.update(key, { hash, tools });
+    return true;
+  }
+
   isTrusted(config: McpServerConfig): boolean {
     // Nothing runs locally for an HTTP server, so there is no code-execution decision to make. What
     // it sends still goes through the egress gate, which is where that question belongs.
@@ -316,6 +368,16 @@ export class McpManager {
       const client = new McpClient({ transport, clientName: "hivey-code", clientVersion: this.version });
       await client.initialize();
       const tools = await client.listTools();
+      // The approval covered a command AND a set of tools. If the tools have moved since, the user
+      // looks again before any of them reaches the model — see `confirmTools`. A refusal closes the
+      // connection rather than leaving a server running with its tools withheld: a process the user
+      // has just declined should not go on running.
+      if (!(await this.confirmTools(config, tools))) {
+        await client.close().catch(() => undefined);
+        this.failed.set(config.name, t("its tools changed and the new ones were declined"));
+        log(config.name, "declined: the tools changed since this server was approved");
+        return undefined;
+      }
       const session: Session = { config, client, tools };
       this.sessions.set(config.name, session);
       this.failed.delete(config.name);
@@ -364,7 +426,7 @@ export class McpManager {
     const tool: Tool = {
       schema: {
         name: qualified,
-        description: `[${session.config.name}] ${descriptor.description ?? label}`,
+        description: frameDescription(session.config.name, descriptor.description ?? label),
         parameters: (descriptor.inputSchema as Tool["schema"]["parameters"]) ?? { type: "object", properties: {}, required: [] },
       },
       // A server saying "this only reads" is a claim by the very thing being governed. It is worth
