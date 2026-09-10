@@ -979,6 +979,8 @@
     "package": "npx --yes @vscode/vsce@3 package --no-dependencies -o hivey-code.vsix",
     "models": "node scripts/update-models.mjs",
     "models:check": "node scripts/update-models.mjs --check",
+    "eval": "node scripts/evaluate.mjs",
+    "eval:verify": "node scripts/evaluate.mjs --verify-tasks",
     "scan:secrets": "node scripts/scan-secrets.mjs",
     "test:integration": "node esbuild.mjs && node esbuild.mjs --integration && node dist-integration/runTest.js",
     "publish:vsce": "npx --yes @vscode/vsce@3 publish --no-dependencies",

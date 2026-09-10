@@ -1,0 +1,8 @@
+{
+  "title": "Explain and fix a slow query",
+  "kind": "bug",
+  "prompt": "The query in slow.sql scans the whole table. Add the index it needs in index.sql (one CREATE INDEX statement), keeping slow.sql unchanged.",
+  "check": "sqlite3 shop.db < index.sql && sqlite3 shop.db \"EXPLAIN QUERY PLAN SELECT * FROM movement WHERE account_id = 42 AND booked_on >= '2026-01-01';\" | grep -qi 'using index'",
+  "timeoutMs": 180000,
+  "setup": "rm -f shop.db && sqlite3 shop.db < schema.sql"
+}

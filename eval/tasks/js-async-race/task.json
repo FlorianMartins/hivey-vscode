@@ -1,0 +1,7 @@
+{
+  "title": "A cache that answers before it is filled",
+  "kind": "bug",
+  "prompt": "getUser sometimes returns undefined for a user that exists. The test reproduces it. Fix it.",
+  "check": "node --test",
+  "timeoutMs": 180000
+}

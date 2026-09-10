@@ -1,0 +1,7 @@
+{
+  "title": "An off-by-one in a paginator",
+  "kind": "bug",
+  "prompt": "The pagination test fails. Find the cause and fix it. Do not change the test.",
+  "check": "node --test",
+  "timeoutMs": 180000
+}

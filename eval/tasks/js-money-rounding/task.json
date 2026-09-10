@@ -1,0 +1,7 @@
+{
+  "title": "Credit notes rounded the wrong way",
+  "kind": "bug",
+  "prompt": "Refund lines come out a cent short. The tests say which. Accounting rounds half away from zero, in both directions. Fix total.js without touching the test.",
+  "check": "node --test",
+  "timeoutMs": 180000
+}

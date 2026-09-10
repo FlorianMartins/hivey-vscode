@@ -1,0 +1,8 @@
+{
+  "title": "A SQL query that counts too much",
+  "kind": "bug",
+  "prompt": "The query in report.sql is meant to return one row per customer with their number of orders. It returns inflated counts when a customer has several addresses. Fix report.sql. The expected output is in expected.txt.",
+  "check": "sqlite3 shop.db < report.sql > got.txt && diff -u expected.txt got.txt",
+  "timeoutMs": 180000,
+  "setup": "rm -f shop.db && sqlite3 shop.db < schema.sql"
+}

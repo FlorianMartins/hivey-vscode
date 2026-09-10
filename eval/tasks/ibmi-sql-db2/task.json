@@ -1,0 +1,7 @@
+{
+  "title": "A Db2 for i query using the wrong catalogue",
+  "kind": "ibmi",
+  "prompt": "list-tables.sql is meant to list the tables of library SALESLIB on IBM i, with their row counts, most rows first. It was written for PostgreSQL and does not run on Db2 for i. Rewrite it for Db2 for i.",
+  "check": "grep -qi 'QSYS2' list-tables.sql && grep -qiE 'SYSTABLES|SYSTABLESTAT' list-tables.sql && ! grep -qi 'information_schema' list-tables.sql && ! grep -qi 'pg_' list-tables.sql && grep -qi 'SALESLIB' list-tables.sql",
+  "timeoutMs": 180000
+}

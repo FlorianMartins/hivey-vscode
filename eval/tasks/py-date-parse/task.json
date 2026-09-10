@@ -1,0 +1,7 @@
+{
+  "title": "A date parser that rejects valid dates",
+  "kind": "bug",
+  "prompt": "The date tests fail. Fix parse_date so all of them pass, without touching the tests.",
+  "check": "python3 -m unittest -q test_dates.py",
+  "timeoutMs": 180000
+}

@@ -1,0 +1,7 @@
+{
+  "title": "Convert a fixed-format RPG program to free form",
+  "kind": "ibmi",
+  "prompt": "Convert CUSTRPT.rpgle from fixed-format RPG IV to fully free-form RPG (**FREE). Keep the behaviour identical. Write the result back to CUSTRPT.rpgle.",
+  "check": "grep -qi '^\\*\\*free' CUSTRPT.rpgle && ! grep -qE '^     [CDFH]' CUSTRPT.rpgle && grep -qi 'dcl-f' CUSTRPT.rpgle && grep -qi 'dcl-s' CUSTRPT.rpgle && grep -qi 'CUSTMAST' CUSTRPT.rpgle",
+  "timeoutMs": 180000
+}

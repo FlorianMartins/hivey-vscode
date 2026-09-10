@@ -8,3 +8,4 @@ media/webview.js.map
 .DS_Store
 dist-integration/
 .vscode-test/
+eval/results/

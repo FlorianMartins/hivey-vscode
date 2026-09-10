@@ -1,0 +1,7 @@
+{
+  "title": "Extract a duplicated rule",
+  "kind": "refactor",
+  "prompt": "The same discount rule is written three times in orders.js. Extract it into one function and use it everywhere. The behaviour must not change: the tests must still pass.",
+  "check": "node --test && node -e \"const s=require('fs').readFileSync('orders.js','utf8'); const n=(s.match(/0\\\\.9/g)||[]).length; if(n>1){console.error('the rule is still written '+n+' times');process.exit(1)}\"",
+  "timeoutMs": 180000
+}

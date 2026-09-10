@@ -40,6 +40,12 @@ jobs:
       - name: Secrets — scanned with the extension's own detectors
         run: node scripts/scan-secrets.mjs
 
+      # Not the evaluation itself, which needs a model. This is the gate that makes the evaluation
+      # worth running at all: every task's check must FAIL on its untouched fixture, or the task
+      # scores every model 100 % and measures nothing. It needs no GPU, so it runs on every commit.
+      - name: Evaluation tasks are honest
+        run: npm run eval:verify
+
       - name: Dependencies — known vulnerabilities
         # The extension ships zero runtime dependency; this covers the dev toolchain, which is
         # still code that runs on a maintainer's machine.

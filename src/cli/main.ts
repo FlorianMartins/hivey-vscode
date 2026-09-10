@@ -150,7 +150,14 @@ async function main(): Promise<void> {
   );
   console.log(C.dim(t("/help for the commands, Ctrl+C to quit.") + "\n"));
 
-  const oneOff = process.argv.slice(2).join(" ").trim();
+  const argv = process.argv.slice(2);
+  // Approve everything without asking. Two rules make this defensible rather than reckless: it must
+  // be typed by the person running it, and it changes only the ANSWER to the approval question —
+  // the blocked globs, the redaction and the budget are all upstream of it and still apply. It
+  // exists for the one caller that cannot answer a prompt: the evaluation harness, which runs the
+  // same agent against the same tasks every night in a throwaway directory.
+  const yes = argv.includes("--yes") || process.env["HIVEY_CODE_YES"] === "1";
+  const oneOff = argv.filter((a) => a !== "--yes").join(" ").trim();
   if (oneOff) {
     await ask(oneOff);
     rl.close();
@@ -334,6 +341,10 @@ async function main(): Promise<void> {
         },
         report: (m) => console.log(C.dim(`  ${m}`)),
         approve: async (req) => {
+          if (yes) {
+            console.log(C.dim(`  ${t("auto-approved")}: ${req.description}`));
+            return true;
+          }
           const answer = (await rl.question(`\n${C.amber("?")} ${req.description} — ${t("allow? [y/N]")} `)).toLowerCase();
           return answer === "y" || answer === "o" || answer === "yes" || answer === "oui";
         },

@@ -1,0 +1,7 @@
+{
+  "title": "Add validation that does not exist yet",
+  "kind": "feature",
+  "prompt": "Add an exported function isValidSiret(value) to siret.js. A SIRET is 14 digits and passes the Luhn checksum. Return true or false, never throw. The tests in siret.test.js describe it.",
+  "check": "node --test",
+  "timeoutMs": 180000
+}

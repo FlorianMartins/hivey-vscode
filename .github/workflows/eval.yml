@@ -1,0 +1,76 @@
+name: Evaluation
+
+# What the rest of CI cannot tell us: whether the answers are any good.
+#
+# It is scheduled rather than per-commit because it needs a model, and a model is a machine with a
+# GPU or somebody's API key — neither of which belongs on every push. It is also allowed to find
+# nothing: with no endpoint configured the harness prints "nothing to evaluate" and exits 0, because
+# a nightly job that goes red every night is a job people mute, and a muted job is worse than none.
+#
+# To turn it on, set the repository variable HIVEY_EVAL_URL to an OpenAI-compatible endpoint (a
+# self-hosted Ollama reachable from the runner, or a gateway) and HIVEY_EVAL_MODELS to a
+# comma-separated list. The key, if the endpoint needs one, goes in the secret HIVEY_EVAL_KEY.
+
+on:
+  schedule:
+    - cron: "40 2 * * *"
+  workflow_dispatch:
+    inputs:
+      url:
+        description: "OpenAI-compatible endpoint (overrides the repository variable)"
+        required: false
+      models:
+        description: "Comma-separated model ids"
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: eval-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install (locked)
+        run: npm ci
+
+      # First, and always: a task whose check already passes measures nothing. This runs with no
+      # model at all, so the honesty of the set is verified even on a night with no endpoint.
+      - name: Tasks are honest
+        run: npm run eval:verify
+
+      - name: Build the terminal client
+        run: npm run build
+
+      - name: Evaluate
+        env:
+          HIVEY_CODE_KEY: ${{ secrets.HIVEY_EVAL_KEY }}
+          HIVEY_CODE_PROVIDER: ${{ vars.HIVEY_EVAL_PROVIDER || 'local' }}
+        run: |
+          URL="${{ github.event.inputs.url || vars.HIVEY_EVAL_URL }}"
+          MODELS="${{ github.event.inputs.models || vars.HIVEY_EVAL_MODELS }}"
+          if [ -z "$URL" ] || [ -z "$MODELS" ]; then
+            echo "No endpoint configured — set the HIVEY_EVAL_URL and HIVEY_EVAL_MODELS repository variables."
+            exit 0
+          fi
+          node scripts/evaluate.mjs --url "$URL" --model "$MODELS" | tee eval-report.txt
+
+      - name: Keep the report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evaluation
+          path: |
+            eval-report.txt
+            eval/results/
+          if-no-files-found: ignore
+          retention-days: 30

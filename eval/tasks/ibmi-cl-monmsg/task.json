@@ -1,0 +1,7 @@
+{
+  "title": "Add error handling to a CL program",
+  "kind": "ibmi",
+  "prompt": "BACKUP.clle deletes a file and recreates it, but it fails when the file does not exist. Add the proper MONMSG handling so the program continues. Do not use MONMSG MSGID(CPF0000) at program level to swallow everything — handle the specific message on the command that can fail.",
+  "check": "grep -qi 'MONMSG' BACKUP.clle && grep -qiE 'CPF2105|CPF2110|CPF3142' BACKUP.clle && ! grep -qiE '^\\\\s*MONMSG\\\\s+MSGID\\\\(CPF0000\\\\)' BACKUP.clle",
+  "timeoutMs": 180000
+}
