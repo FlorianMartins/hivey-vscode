@@ -18,6 +18,8 @@
 // mysterious failure.
 
 import type { ChatMessage, ChatResult, Provider, ReasoningEffort, ToolCall, ToolSchema, Usage } from "../providers/types.js";
+import { coerceArgs, parseToolArgs, unknownToolMessage, validateArgs } from "./toolcall.js";
+import { estimateMessageTokens } from "../util/tokens.js";
 
 export interface ToolContext {
   /** Cancels when the user stops the turn. */
@@ -83,6 +85,14 @@ export interface TurnOptions {
   onDelta?: (d: { text?: string; reasoning?: string }) => void;
   onStep?: (info: { step: number; toolCalls: ToolCall[] }) => void;
   onToolResult?: (info: { call: ToolCall; result: ToolResult }) => void;
+  /**
+   * One measurement per request: what we estimated the prompt at, and what the provider counted.
+   *
+   * Reported here rather than by the caller because only this loop knows the exact messages of each
+   * step — an agent turn is many requests, and pairing the first estimate with the SUM of every
+   * step's usage would teach the calibrator that its estimate is four times too low.
+   */
+  onUsage?: (info: { model: string; estimated: number; actual: number }) => void;
   approve?: Approver;
   /** Applied to the messages of EVERY step, immediately before the request leaves. */
   beforeRequest?: (messages: ChatMessage[]) => Promise<ChatMessage[]> | ChatMessage[];
@@ -138,6 +148,13 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
       throw err;
     }
 
+    // Measured against `outgoing`, which is what actually left — after redaction, after whatever
+    // `beforeRequest` did to it. Estimating the pre-redaction messages would calibrate against text
+    // no provider ever saw.
+    if (res.usage.promptTokens > 0) {
+      opts.onUsage?.({ model: opts.model, estimated: estimateMessageTokens(outgoing), actual: res.usage.promptTokens });
+    }
+
     usage.promptTokens += res.usage.promptTokens;
     usage.completionTokens += res.usage.completionTokens;
     usage.cachedTokens += res.usage.cachedTokens;
@@ -179,17 +196,29 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
       }
       const tool = byName.get(call.name);
       if (!tool) {
-        planned.push({ call, settled: `Unknown tool: ${call.name}`, parallel: false });
+        // Naming the nearest real tool rather than only refusing: models invent plurals and
+        // synonyms constantly, and a refusal with no suggestion costs a whole step to recover from.
+        planned.push({ call, settled: unknownToolMessage(call.name, [...byName.keys()]), parallel: false });
         continue;
       }
-      let args: Record<string, unknown>;
-      try {
-        args = JSON.parse(call.args || "{}") as Record<string, unknown>;
-      } catch {
-        // A malformed call is the model's mistake to fix, not a crash.
-        planned.push({ call, settled: "Arguments were not valid JSON. Send the call again.", parallel: false });
+      // Repaired rather than refused where the text has exactly one plausible reading — a fence
+      // around the object, a trailing comma, a real newline inside a string. A small model given
+      // "not valid JSON" sends the same thing again; see `parseToolArgs` for why each repair is
+      // safe and why nothing is guessed.
+      const parsed = parseToolArgs(call.args || "{}");
+      if (!parsed.ok || !parsed.args) {
+        planned.push({ call, settled: parsed.error ?? "Those arguments could not be read.", parallel: false });
         continue;
       }
+      if (parsed.repaired) opts.report?.(`repaired the arguments of ${call.name}`);
+      // Checked against the schema before the tool sees them, so a missing field is one corrective
+      // sentence rather than an exception from inside a tool that says nothing useful.
+      const invalid = validateArgs(tool.schema, parsed.args);
+      if (invalid) {
+        planned.push({ call, settled: invalid, parallel: false });
+        continue;
+      }
+      const args: Record<string, unknown> = coerceArgs(tool.schema, parsed.args);
 
       const needs = tool.approval(args);
       let approved = true;

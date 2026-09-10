@@ -13,6 +13,7 @@ import { language, t } from "../shared/i18n.js";
 import { runTurn, type Tool } from "../core/agent/loop.js";
 import { Permissions, commandPrefix, type PermissionStore, type Rule } from "../core/agent/permissions.js";
 import { costOf, makeLookup, type Price } from "../core/router/pricing.js";
+import { calibrate, observe, prune, type Calibration } from "../core/util/calibrate.js";
 import { handoverNote, verifyTurn, type TurnStep } from "../core/router/outcome.js";
 import { unifiedDiff } from "../core/text/diff.js";
 import { escalationTarget, route } from "../core/router/route.js";
@@ -105,6 +106,8 @@ const ALLOWED_LINKS = [
 ];
 
 const PREFS_KEY = "hiveyCode.prefs";
+/** What each model's provider has actually been counting. See `core/util/calibrate.ts`. */
+const CALIBRATION_KEY = "hiveyCode.tokenCalibration";
 const HISTORY_MAX = 100;
 
 interface Prefs {
@@ -140,6 +143,27 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private historyFilter: UiHistoryFilter = { query: "", period: "all", mode: "all", paidOnly: false, sort: "updated" };
   private readonly approvals = new Map<string, (answer: "once" | "session" | "always" | "no") => void>();
   private readonly priceLookup = makeLookup(loadPrices());
+
+  /**
+   * What each model's provider counts, against what this extension estimated.
+   *
+   * Global rather than per-workspace: a tokenizer is a property of the model, not of the project,
+   * and a user who opens a second repository should not start from zero.
+   */
+  private calibration: Calibration = {};
+
+  /** One measurement, folded in and persisted only when it actually moved the number. */
+  private noteUsage(info: { model: string; estimated: number; actual: number }): void {
+    const next = observe(this.calibration, info.model, { estimated: info.estimated, actual: info.actual });
+    if (next === this.calibration) return;
+    this.calibration = prune(next);
+    void this.ctx.globalState.update(CALIBRATION_KEY, this.calibration);
+  }
+
+  /** An estimate corrected by what this model has been measured to do. */
+  private tokensFor(model: string, estimated: number): number {
+    return calibrate(this.calibration, model, estimated);
+  }
   private readonly permissions: Permissions;
 
   constructor(
@@ -156,6 +180,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     // editor. If the panel is not open there is nobody to ask, and the gate refuses — which is the
     // right way round for a question about what leaves the machine.
     this.gate.ask = (request) => this.askEgress(request);
+    this.calibration = ctx.globalState.get<Calibration>(CALIBRATION_KEY) ?? {};
     const prefs = ctx.globalState.get<Prefs>(PREFS_KEY);
     this.session.mode = prefs?.mode ?? "agent";
     this.reasoning = prefs?.reasoning ?? "none";
@@ -2659,6 +2684,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         provider,
         model,
         messages: prepared.messages,
+        onUsage: (info) => this.noteUsage(info),
         signal: ctl.signal,
         maxTokens: 2048,
         temperature: 0.2,
@@ -2921,9 +2947,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     // untouched by the answer given here.
     if (settings.privacy.confirmSend !== "never") {
       const price = this.priceLookup(model);
-      const cost = isLocal ? 0 : estimateCost(built.estimatedTokens, price);
+      // Corrected by what this model has actually been counting, so the figure the user is
+      // shown before sending is the one they will be billed against rather than a safe-side guess.
+      const estimatedTokens = this.tokensFor(model, built.estimatedTokens);
+      const cost = isLocal ? 0 : estimateCost(estimatedTokens, price);
       const detail = [
-        t("~{0} tokens", built.estimatedTokens),
+        t("~{0} tokens", estimatedTokens),
         isLocal ? t("on this machine, nothing billed") : t("~{0} $ on {1}", cost.toFixed(4), safeHost(baseUrl)),
       ];
       const answer = await new Promise<"once" | "session" | "always" | "no">((resolve) => {
@@ -2977,7 +3006,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       }
 
       if (!isLocal) {
-        const estimate = estimateCost(prepared.estimatedTokens, this.priceLookup(model));
+        const estimate = estimateCost(this.tokensFor(model, prepared.estimatedTokens), this.priceLookup(model));
         const verdict = this.gate.budget.check(estimate);
         if (!verdict.ok) {
           this.post({
@@ -3065,6 +3094,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           return again.messages;
         },
         afterResponse: (t) => vault.restore(t),
+        onUsage: (info) => this.noteUsage(info),
       });
 
       answer.text = result.text || streamed;

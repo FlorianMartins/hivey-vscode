@@ -132,7 +132,19 @@ test("an unknown tool is answered, never ignored", async () => {
   await runTurn({ ...base, provider, tools: [] });
   const last = provider.seen[1]!.messages.at(-1)!;
   assert.equal(last.role, "tool");
-  assert.match(last.content, /Unknown tool/);
+  assert.match(last.content, /no tool called "nope"/);
+  // With no tools at all, the answer says so rather than trailing off into an empty list — which
+  // reads to a model like a broken harness rather than like an answer.
+  assert.match(last.content, /no tools are available/);
+});
+
+test("an unknown tool that is nearly a real one is corrected rather than only refused", async () => {
+  // Models invent plurals and synonyms constantly. A bare refusal costs a whole step to recover
+  // from; naming the nearest real tool usually costs none.
+  const real = tool("read_file");
+  const provider = scriptedProvider([{ toolCalls: [{ id: "c1", name: "read_files", args: "{}" }] }, { text: "ok" }]);
+  await runTurn({ ...base, provider, tools: [real] });
+  assert.match(provider.seen[1]!.messages.at(-1)!.content, /Did you mean "read_file"/);
 });
 
 test("every call gets exactly one result, even when several arrive at once", async () => {
