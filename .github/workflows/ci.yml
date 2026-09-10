@@ -20,6 +20,13 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # What signing needs. `id-token` is the OIDC token GitHub mints for this run, which is what
+      # ties the signature to THIS workflow, THIS commit and nothing else — the whole point of
+      # provenance is that it cannot be produced by anybody who is not this job.
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@v4
 
@@ -56,11 +63,46 @@ jobs:
         continue-on-error: true # a provider outage must not turn the build red
 
       - name: Package the extension
-        run: npx --yes @vscode/vsce@3 package --no-dependencies -o hivey-code.vsix
+        run: npx --yes @vscode/vsce@3.9.2 package --no-dependencies -o hivey-code.vsix
+
+      # What somebody who downloads the file can check it against.
+      #
+      # `.vsix` is a zip, and a zip carries the modification time of every file in it, so two builds
+      # of the same commit do NOT produce the same bytes. Byte-for-byte reproducibility is therefore
+      # not claimed here — what is offered instead is stronger in the way that matters: the digest
+      # of the artifact that was actually published, tied by signature to the commit and the
+      # workflow run that produced it.
+      - name: Digest
+        id: digest
+        run: |
+          sha256sum hivey-code.vsix | tee SHA256SUMS
+          echo "sha256=$(sha256sum hivey-code.vsix | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          {
+            echo "### The build you can check"
+            echo
+            echo '`hivey-code.vsix`'
+            echo
+            echo "| | |"
+            echo "| --- | --- |"
+            echo "| sha256 | \`$(sha256sum hivey-code.vsix | cut -d' ' -f1)\` |"
+            echo "| commit | \`${GITHUB_SHA}\` |"
+            echo "| run | ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID} |"
+            echo
+            echo 'Verify with `gh attestation verify hivey-code.vsix --repo ${GITHUB_REPOSITORY}`'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Sigstore, through GitHub's own action: a signed statement that this exact file was built by
+      # this workflow from this commit. It is verified with `gh attestation verify`, needs no key
+      # anybody has to keep, and it is the difference between "zero dependencies, trust us" and
+      # "zero dependencies, and here is how you check that what you installed is what is on GitHub".
+      - name: Sign the build
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: hivey-code.vsix
 
       - name: Software bill of materials
         run: |
-          npx --yes @cyclonedx/cyclonedx-npm@latest --output-file sbom.json --omit dev || \
+          npx --yes @cyclonedx/cyclonedx-npm@6.0.1 --output-file sbom.json --omit dev || \
             echo '{"note":"SBOM generation skipped"}' > sbom.json
 
       - uses: actions/upload-artifact@v4
@@ -69,6 +111,7 @@ jobs:
           path: |
             hivey-code.vsix
             sbom.json
+            SHA256SUMS
           retention-days: 30
 
   integration:

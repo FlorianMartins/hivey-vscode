@@ -1,9 +1,9 @@
 // The model list the picker shows.
 //
-// Two sources, merged: the generated catalogue (411 models with prices and context windows, no
-// network) and whatever the configured endpoint actually serves. The second matters more than it
-// sounds — a team running vLLM has three models with names nobody outside knows, and a catalogue
-// that cannot show them is a catalogue nobody uses.
+// Two sources, merged: the generated catalogue (four hundred-odd models with prices and context
+// windows, no network) and whatever the configured endpoint actually serves. The second matters
+// more than it sounds — a team running vLLM has three models with names nobody outside knows, and a
+// catalogue that cannot show them is a catalogue nobody uses.
 
 import * as vscode from "vscode";
 import { t } from "../shared/i18n.js";

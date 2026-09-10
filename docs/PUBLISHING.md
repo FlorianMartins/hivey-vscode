@@ -33,7 +33,7 @@ with a syntax error that looks like a bug in the extension and is not.
 npm ci
 npm run typecheck
 npm test                                # 193 tests (node:test)
-xvfb-run -a npm run test:integration    # 9 tests inside a real VS Code
+xvfb-run -a npm run test:integration    # 27 tests inside a real VS Code
 npm run scan:secrets                    # this repository, scanned with the extension's own rules
 npm audit --audit-level=high            # 0 — five dev tools, no runtime dependency
 ```
@@ -45,14 +45,14 @@ Then bump and describe the release **before** packaging, because both are shippe
 npm version minor --no-git-tag-version
 $EDITOR CHANGELOG.md
 npm run build
-npx @vscode/vsce@3 package --no-dependencies -o hivey-code.vsix
+npx @vscode/vsce@3.9.2 package --no-dependencies -o hivey-code.vsix
 ```
 
 `--no-dependencies` is correct here and would be wrong in most extensions: the bundle is built by
 esbuild and there is no runtime `node_modules` to include. Check what actually went in:
 
 ```bash
-npx @vscode/vsce@3 ls --no-dependencies
+npx @vscode/vsce@3.9.2 ls --no-dependencies
 ```
 
 `package.nls.json`, `package.nls.fr.json`, `readme.md`, `changelog.md`, `dist/` and `media/` should
@@ -95,7 +95,7 @@ release for anything anyone will keep.
 
 ```bash
 export VSCE_PAT=…                                # or let vsce prompt for it
-npx @vscode/vsce@3 publish --no-dependencies
+npx @vscode/vsce@3.9.2 publish --no-dependencies
 
 export OVSX_PAT=…
 npx ovsx publish hivey-code.vsix -p "$OVSX_PAT"
@@ -143,7 +143,7 @@ id and loses everything attached to it. The real remedy for a bad release is a h
 number:
 
 ```bash
-npx @vscode/vsce@3 unpublish hivey.hivey-code   # last resort, irreversible
+npx @vscode/vsce@3.9.2 unpublish hivey.hivey-code   # last resort, irreversible
 ```
 
 ## What is deliberately not automated
@@ -152,3 +152,26 @@ Publishing from CI would mean a token with publish rights sitting in a repositor
 by any workflow anyone adds, in a project whose premise is that you can see what leaves your
 machine. The pipeline builds, tests, scans and packages the `.vsix` and attaches it to the run; a
 person presses the last button.
+
+## Vérifier un `.vsix` publié
+
+Chaque `.vsix` de la release `build` est construit par la CI et porte de quoi le vérifier :
+
+```bash
+gh attestation verify hivey-code.vsix --repo FlorianMartins/hivey-vscode
+sha256sum hivey-code.vsix        # à comparer avec SHA256SUMS, dans la même release
+```
+
+L'attestation est une signature Sigstore émise par le workflow lui-même, via l'identité OIDC que
+GitHub émet pour cette exécution précise. Elle répond à : « ce fichier a-t-il bien été construit par
+ce workflow, depuis ce commit ». Personne d'autre que ce job ne peut en produire une.
+
+**La reproductibilité octet pour octet n'est pas promise**, et c'est délibéré plutôt qu'à faire : un
+`.vsix` est un zip, un zip enregistre la date de modification de chaque fichier, deux constructions
+du même commit diffèrent donc. Aucun `vsce` déterministe n'existe aujourd'hui. Ce qui est offert à la
+place — l'empreinte du fichier réellement publié, signée et liée au commit — répond à la question qui
+compte : *ce que j'installe est-il ce qui est sur GitHub ?*
+
+Les outils de construction sont **épinglés à une version exacte** (`@vscode/vsce@3.9.2`,
+`@cyclonedx/cyclonedx-npm@6.0.1`). Un `@latest` dans une CI, c'est la prochaine release compromise
+qui s'exécute dans le build.

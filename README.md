@@ -45,6 +45,9 @@ that does leave is **reversibly pseudonymised** first.
 | **Agent mode** | Reads the repository, searches it, consults the **editor's diagnostics**, edits files and proposes commands — **one approval per action**, a diff before every write, everything in the undo stack. |
 | **Permissions** | Per action and per shape of action: “allow once”, “for this conversation”, “always”. Allowing `npm test` does not allow `npm publish`. A dedicated screen separates what is permanent from what expires. |
 | **Reasoning** | An adjustable thinking budget (direct / brief / standard / deep), translated per provider — `reasoning.effort` on OpenRouter, a token budget on Anthropic. The thinking is shown in a collapsed block and never sent back to the model. |
+| **It reads what it runs** | `run_command` returns the output and the exit code, through VS Code's shell integration — so "run the tests and fix what fails" is one turn instead of a round trip through you. On a shell with no integration the result says the output could not be read, and never invents an exit code. |
+| **The next edit** | After you change something, the edit that follows from it **elsewhere in the file** — a call site still on the old name, a branch that no longer matches — offered as a hint with a quick fix. It runs on the completion model, so on your machine it costs nothing; on a paid endpoint it stays off until you ask. |
+| **It falls back instead of failing** | A rate limit or a dead network moves the request down a chain — the cheaper model of the same preset, then your own machine — never up into something more expensive, never after a word has reached the screen, and never silently. |
 | **Terminal** | The `hivey-code` command (short alias `hivey`): the same core in a REPL, with command output actually captured and a diff printed before every write. Launched from a shell, not from the editor. |
 | **In the editor** | `Ctrl+I` rewrites the selection in place · right-click → **Hivey Code** (rewrite, ask, add to the conversation, or the full list of what to do with a selection: explain, find problems, cover with a test, document, show the callers, simplify, handle the failures, add the types) · the lightbulb carries the same offers · commit message written from the staged diff · “explain the terminal output”. |
 | **Quick fixes** | On an error reported by your language server: “Fix with Hivey Code” and “Explain this problem”. The compiler says **what** and **where**; the model only has to fix it — which is what makes a small local model enough for most everyday cases. |
@@ -64,12 +67,14 @@ that does leave is **reversibly pseudonymised** first.
 | **History filters** | Period, mode, “paid only”, and four sort orders (recently updated, created, longest, most expensive). |
 | **Context control** | Every exchange can be **muted** (stays on screen, stops being sent), **pinned** (survives trimming), edited or deleted. It is the most direct lever there is on both quality **and** cost. |
 | **Privacy** | Reversible pseudonymisation, blocked files, consent before the first destination, an **egress log** and a **cost report**. |
+| **A log you can check** | Every entry in the egress log carries the hash of the one before it, so altering a line means rewriting the whole tail and deleting one leaves a gap the check finds. Exportable as JSONL or RFC 5424 syslog, for the collector that is not on this machine. |
+| **MCP that stays what you approved** | The approval covers the tool **descriptions and schemas**, not just the command that starts the server. A server that rewrites what its tools claim to do asks again, naming what changed — that is what tool poisoning is, and a dialog that only says "something changed" teaches people to click yes. |
 | **Languages** | English and French, following the editor's display language — or pinned with `hiveyCode.language`, for a machine whose editor is in one language and whose user reads another. |
 | **Your theme** | Every colour in the panel is one of the editor's own variables. Not one hex value — [the same picker under a light theme](https://raw.githubusercontent.com/FlorianMartins/hivey-vscode/main/docs/images/picker.light.png), captured by the same script. It follows a theme change immediately, high contrast included. |
 
 ## How the cost tends to zero
 
-Not a slogan — an architecture. Five levers, in order of effect:
+Not a slogan — an architecture. Six levers, in order of effect:
 
 1. **Completion never escalates.** It is the high-frequency traffic — one request per pause in
    typing. It runs on a local code model (7B is enough) and costs electricity. The router forbids
@@ -78,15 +83,30 @@ Not a slogan — an architecture. Five levers, in order of effect:
    symbols, extracted without a native parser), not file contents. A few thousand tokens describe a
    repository a hundred times their size, and the model asks for the two files it needs instead of
    being handed forty.
-3. **The prompt cache.** The stable prefix (system prompt + repository map) is marked with
-   `cache_control` on Anthropic and benefits from implicit caching elsewhere. A coding conversation
-   resends almost the same context every turn: that is where most of the bill is decided.
-4. **Do not ask when it is pointless.** No request mid-word, none in front of existing code, none
+3. **The prompt cache, and keeping it.** The stable prefix (system prompt + repository map) is
+   marked with `cache_control` on Anthropic and benefits from implicit caching elsewhere. A coding
+   conversation resends almost the same context every turn: that is where most of the bill is
+   decided. Which is why the prefix is guarded rather than merely marked — every cache hits up to
+   the first byte that differs, so one line in the system prompt that follows the open editor around
+   costs the *whole* prefix, every turn. The repository map is frozen for the life of a conversation
+   and everything per-turn was moved out from in front of it. The hit rate is on the ring's tooltip:
+   it was logged from the start and shown to nobody, which made it useless.
+4. **Escalate on failure, not on a guess.** The old rule read the question and bet: a regular
+   expression decided "refactor the architecture" was hard and bought a remote call, while "make
+   this test pass" stayed local and came back wrong. Now the local model tries, the tests or the
+   diagnostics say whether it worked, and only a *proven* failure buys a remote call — carrying the
+   diff of what the failed attempt left on disk and the error it produced, so the second model
+   finishes rather than starts over. Nobody who never hits a failure ever pays for one.
+5. **Do not ask when it is pointless.** No request mid-word, none in front of existing code, none
    for a context the model already had nothing to say about; and the rest of a suggestion you are
    typing through is served from the cache.
-5. **A budget that refuses.** A per-request cap (one runaway prompt cannot cost a dinner) and a
-   daily cap, checked **before** the call on an estimate, recorded **after** on the real cost when
-   the provider reports it (OpenRouter does).
+6. **A budget that refuses, on a number it has checked.** A per-request cap (one runaway prompt
+   cannot cost a dinner) and a daily cap, checked **before** the call on an estimate and recorded
+   **after** on the real cost when the provider reports it (OpenRouter does). There is no BPE
+   tokenizer here, by choice, so that estimate would be a pessimistic guess from character classes —
+   refusing requests that were affordable — except that every answer comes back carrying the
+   provider's own count of the text we just estimated. Pairing the two is free, and about ten of
+   them put a given model's factor within a few per cent.
 
 Default result: **$0**. The first cent spent is an explicit choice.
 
@@ -105,6 +125,30 @@ Which model each preset uses is **generated**, never written by hand: a daily jo
 OpenRouter's own catalogue by budget, capability, vendor family and recency, and commits the diff.
 No model version is named anywhere in this repository — a hard-coded id is correct the day it is
 written and returns 404 a few weeks later, silently.
+
+### How any of this is checked
+
+The test suite proves the extension works. It says nothing about whether an *answer* is any good,
+and "more reliable than the alternatives" is a sentence that needs a number behind it or it is
+marketing. So there is a set of small broken repositories in [`eval/`](eval/) — a paginator off by
+one, a credit note rounded the wrong way, a fixed-format RPG program to convert, a query written for
+PostgreSQL that has to run on Db2 for i — and each one carries a shell command that decides whether
+the result works. A command rather than a diff: two models that solve a task differently both pass,
+and what is scored is the only thing you care about, which is whether the code works now.
+
+```bash
+npm run eval:verify                                    # no model needed
+npm run eval -- --model qwen2.5-coder:7b --url http://127.0.0.1:11434/v1
+```
+
+The first line is the one that makes the numbers mean anything, and it runs on every commit: **every
+task's check must fail on its untouched fixture**. A task that already passes scores every model
+100 %, it is invisible in the results, and it is the easiest mistake there is — a fixture gets
+written by breaking working code and sometimes the break does not take. It caught one of mine on the
+first run.
+
+The honest limit: the harness has been proven end to end here with a stub model, not with a real
+one. This machine has no GPU. See [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ### Your own account, if you already pay for one
 
@@ -280,16 +324,38 @@ the assistant ignore instructions it never received, and leaves nobody able to f
 
 ## Install
 
-From the VS Code Marketplace: search for **Hivey Code** (publisher `hivey`).
+**Not on the VS Code Marketplace yet.** Everything needed to publish is in place
+([`docs/PUBLISHING.md`](docs/PUBLISHING.md)); what is missing is a publisher token, which only the
+maintainer can create. Saying "search the Marketplace" until then would waste your time, so:
+
+Download `hivey-code.vsix` from the [`build` release](https://github.com/FlorianMartins/hivey-vscode/releases/tag/build)
+and install it:
+
+```bash
+code --install-extension hivey-code.vsix
+```
+
+Every published `.vsix` is built by CI and carries proof of it. To check that the file you have is
+the file that workflow produced, from the commit it says it did:
+
+```bash
+gh attestation verify hivey-code.vsix --repo FlorianMartins/hivey-vscode
+sha256sum hivey-code.vsix          # compare with SHA256SUMS in the same release
+```
+
+Byte-for-byte reproducibility is deliberately **not** claimed: a `.vsix` is a zip, a zip records the
+modification time of every file in it, and two builds of the same commit therefore differ. What is
+offered instead is stronger where it counts — a signature, issued by GitHub's own OIDC identity for
+that workflow run, tying that exact file to that exact commit.
 
 From source:
 
 ```bash
 git clone https://github.com/FlorianMartins/hivey-vscode
-cd hivey-code
+cd hivey-vscode
 npm ci
 npm run build
-npx @vscode/vsce package --no-dependencies   # produces hivey-code.vsix
+npm run package        # produces hivey-code.vsix (needs Node >= 20)
 code --install-extension hivey-code.vsix
 ```
 
@@ -364,14 +430,24 @@ src/webview/      the panel: chat / history / models / permissions screens, the 
 ```
 
 More: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) · [`docs/PRIVACY.md`](docs/PRIVACY.md) ·
-[`docs/THREAT-MODEL.md`](docs/THREAT-MODEL.md) · decisions: [`docs/adr/`](docs/adr).
+[`docs/THREAT-MODEL.md`](docs/THREAT-MODEL.md) · [`docs/ROADMAP.md`](docs/ROADMAP.md) ·
+[`eval/README.md`](eval/README.md).
+
+The decisions, with what was rejected and why: [`docs/adr/`](docs/adr) — including
+[escalating on an observed failure rather than on a question that looks hard](docs/adr/0009-escalader-sur-un-echec-constate.md),
+[why the prompt prefix is an asset](docs/adr/0010-le-prefixe-est-un-actif.md),
+[hashing the log and never the data](docs/adr/0011-hacher-le-journal-jamais-les-donnees.md),
+[measuring answer quality with a command instead of a diff](docs/adr/0012-mesurer-la-qualite-des-reponses.md), and
+[reading the terminal — and saying so when it cannot](docs/adr/0013-lire-la-sortie-du-terminal.md).
+
 Those documents are currently written in French; translations are welcome.
 
 ## Development
 
 ```bash
-npm test                   # builds the bundles, then 284 tests (node:test)
-npm run test:integration   # loads the extension into a real VS Code (9 tests, headless)
+npm test                   # builds the bundles, then 562 tests (node:test)
+npm run test:integration   # loads the extension into a real VS Code (27 tests, headless)
+npm run eval:verify        # every evaluation task must fail before a model touches it
 node scripts/screenshots.mjs  # retakes the README's images from that same editor
 npm run typecheck
 npm run scan:secrets       # scans this repository with the extension's own detectors
@@ -393,8 +469,11 @@ no entry, so a translation cannot silently rot.
 
 ## Status
 
-`0.11.1` — usable day to day. See [`docs/ROADMAP.md`](docs/ROADMAP.md) for what is done and what is
-not.
+`0.39.0` — used every day by its author. [`docs/ROADMAP.md`](docs/ROADMAP.md) is the honest version:
+what is tested, what was only checked by hand, and what is written but has never run in the
+conditions it was written for. That last list is not empty and it is named.
+
+Not on the Marketplace yet — see [Install](#install).
 
 ## Licence
 

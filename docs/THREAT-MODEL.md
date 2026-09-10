@@ -144,13 +144,74 @@ dépôt. Les quatre outils de développement sont épinglés, suivis par Dependa
 casse la CI au niveau `high`. CodeQL tourne sur les poussées et chaque semaine. Un SBOM est publié
 à chaque build.
 
-**Résidu, assumé.** Une compromission d'`esbuild` ou de `typescript` toucherait le bundle produit.
-Le remède est la reproductibilité de la construction, qui n'est pas encore en place (voir
-`docs/ROADMAP.md`).
+**Parade (livraison), depuis la 0.39.0.** Le `.vsix` publié porte son empreinte SHA-256 et une
+**attestation de provenance Sigstore** émise par le workflow qui l'a produit, via l'identité OIDC
+que GitHub émet pour cette exécution précise. `gh attestation verify hivey-code.vsix --repo
+FlorianMartins/hivey-vscode` répond à la question « ce que j'installe est-il bien ce qui est sur
+GitHub, construit depuis ce commit ». Les outils de construction (`@vscode/vsce`, `cyclonedx-npm`)
+sont épinglés à une version exacte : un `@latest` dans une CI, c'est la prochaine release compromise
+qui s'exécute dans le build.
+
+**Résidu, assumé.** Une compromission d'`esbuild` ou de `typescript` toucherait le bundle produit —
+l'attestation prouverait fidèlement qu'un artefact compromis a bien été construit par ce workflow.
+Et la **reproductibilité octet pour octet n'est pas promise** : un `.vsix` est un zip, un zip porte
+les dates de modification, deux constructions du même commit diffèrent donc. Elle est explicitement
+hors périmètre plutôt que « à faire », parce qu'un `vsce` déterministe n'existe pas aujourd'hui.
 
 ---
 
-## 8. Un serveur « local » qui ne l'est pas
+## 8. Un serveur MCP qui change ce qu'il propose
+
+**Vecteur.** Un serveur MCP est approuvé sur une **commande** : « ceci lance ce programme sur votre
+machine ». Mais le pouvoir d'un outil sur la conversation n'est pas dans sa commande, il est dans sa
+**description** — le texte que le modèle lit pour décider quand l'appeler et quoi lui passer. Un
+serveur peut servir une description inoffensive le jour de l'approbation et une autre une semaine
+plus tard. Les noms consacrés sont *tool poisoning* et *rug pull*.
+
+**Impact.** Le serveur dicte au modèle des actions que l'utilisateur n'a jamais approuvées, en
+utilisant les outils que l'utilisateur, lui, a bel et bien approuvés.
+
+**Parade (code), depuis la 0.39.0.** L'approbation est **épinglée** aux descriptions et aux schémas,
+pas seulement à la commande : une empreinte de l'ensemble des outils est enregistrée avec la
+décision de confiance, et un changement rouvre le dialogue en **nommant** ce qui a changé — un outil
+apparu, une description réécrite, un schéma élargi. Un dialogue qui dit seulement « quelque chose a
+changé » apprend aux gens à cliquer « oui ». Un refus **ferme la connexion** : un programme que
+l'utilisateur vient de refuser ne doit pas continuer à tourner. Les descriptions qui atteignent
+malgré tout le modèle sont encadrées comme la parole d'un tiers, aplaties (ni saut de ligne ni
+caractère de contrôle, donc pas de fausse frontière de message) et plafonnées à 1 200 caractères —
+une instruction enterrée à la ligne quatre cents d'une « description » est une injection par le
+volume même si chaque phrase est innocente.
+
+**Résidu, assumé.** L'encadrement est une atténuation, pas une preuve : un modèle peut toujours se
+laisser convaincre par du texte qu'on lui donne. Ce que le cadre supprime, c'est l'ambiguïté sur
+**qui** a écrit la phrase, ce qui est la partie que l'extension peut réellement contrôler.
+
+---
+
+## 9. Falsification du journal des sorties
+
+**Vecteur.** Le journal qui prouve ce qui est sorti est un tableau JSON dans l'état de l'espace de
+travail. Tout ce qui peut écrire sur le disque peut le modifier — y compris la personne auditée.
+
+**Impact.** Le contrôle sur lequel repose la conformité ne prouve rien : on peut supprimer la ligne
+d'un envoi gênant et personne ne le saura.
+
+**Parade (code), depuis la 0.39.0.** Chaque entrée porte l'empreinte de la précédente et un numéro
+d'ordre. Modifier une ligne change son empreinte, ce qui casse le lien que porte la suivante et
+toutes les suivantes : il faut réécrire toute la queue. Supprimer une ligne du milieu ne casse aucun
+lien si l'on rechaîne — mais laisse un trou dans la numérotation, et c'est justement la modification
+que quelqu'un voudrait faire. `Hivey Code : Vérifier…` répond, et `Hivey Code : Exporter…` met une
+copie hors de portée (JSONL ou syslog RFC 5424, empreintes comprises).
+
+**Résidu, assumé.** Une chaîne locale ne protège pas contre quelqu'un qui réécrit **tout** le journal
+depuis le début : rien ne le lie à une racine de confiance extérieure. L'export vers un collecteur
+distant est ce qui ferme ce trou, et il dépend de l'exploitant. La troncature (le journal est
+plafonné à 500 entrées) est tolérée par la vérification, sans quoi le contrôle deviendrait inutile
+dès que le plafond est atteint.
+
+---
+
+## 10. Un serveur « local » qui ne l'est pas
 
 **Vecteur.** `endpoints.local` pointe vers une passerelle interne… qui journalise, ou vers une URL
 publique par erreur de copier-coller.

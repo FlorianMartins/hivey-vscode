@@ -2,6 +2,124 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.39.0 — 2026-09-10
+
+Une version sur un seul thème : **fermer la boucle de rétroaction**. L'agent pouvait agir et ne
+pouvait pas observer le résultat de ses actions, et presque tout ce qui suit en découle.
+
+### Corrigé
+
+- **La sortie des commandes est lue.** `run_command` renvoyait « demandez à l'utilisateur ce que ça
+  a affiché ». Le client terminal capturait depuis toujours ; l'éditeur, non. Donc chaque tour du
+  genre « lance les tests et corrige ce qui casse » passait par un aller-retour humain — et le plus
+  souvent le modèle sautait l'aller-retour et affirmait une réussite sans preuve. L'intégration
+  shell de VS Code rend le flux et le code de retour. Elle n'est pas disponible partout, ce dont
+  l'ancien commentaire avait à moitié raison : sur un shell sans intégration, le résultat **dit** que
+  la sortie n'a pas pu être lue, et n'invente jamais un code de retour. Les deux branches sont
+  testées dans un vrai éditeur.
+- **Le graphe d'imports de la carte du dépôt ne s'était jamais déclenché.** Il comparait un
+  spécificateur `./helper.js` à une racine de chemin `src/helper` — or dans un projet TypeScript
+  ESM tout import finit en `.js` et tout fichier finit en `.ts`. Cette moitié du classement était
+  morte depuis le début, sur exactement le genre de dépôt dans lequel l'extension est écrite.
+  Trouvée en écrivant le test du classement au second degré, pas en relisant le code.
+- **Le cache de prompt était jeté à chaque changement d'onglet.** Tout cache de prompt est touché
+  jusqu'au premier octet qui diffère : une ligne du prompt système qui suit l'onglet ouvert ne coûte
+  donc pas cette ligne, elle coûte **tout le préfixe**, carte du dépôt comprise. Deux choses s'y
+  trouvaient et changeaient — la note de dialecte et la carte elle-même, reclassée autour du fichier
+  de devant. Le préfixe est maintenant construit par une fonction qui prend les parties stables
+  comme champs nommés, la carte est gelée pour la durée d'une conversation, et un test d'intégration
+  compare le premier message de deux requêtes **octet par octet**.
+- **Les appels d'outils presque valides ne sont plus refusés.** Un modèle 7 B produit du JSON à peu
+  près juste : une clôture markdown autour, une virgule finale, `True` au lieu de `true`, et surtout
+  de vrais retours à la ligne dans le `content` d'un `write_file` — parce que c'est ce que contient
+  un fichier multi-lignes. La boucle répondait « ce ne sont pas des arguments JSON valides,
+  renvoyez l'appel », et un petit modèle renvoie la même chose : trois étapes de budget pour rien.
+  Ce qui a une lecture unique est réparé ; ce qui n'en a pas est refusé avec une phrase qui nomme le
+  champ fautif. Rien n'est deviné : un `write_file` mal réparé écrit la mauvaise chose sur le disque
+  sans jamais signaler d'erreur.
+- **Un 429 ne termine plus le tour.** Le préréglage gratuit route vers des points d'accès gratuits
+  *parce qu'ils* sont limités en débit, donc c'était le cas ordinaire et il perdait la réponse.
+
+### Ajouté
+
+- **L'escalade se décide sur un échec constaté.** C'était un pari pris sur la formulation de la
+  question : une expression régulière décidait que « refactor the architecture » était difficile et
+  achetait un appel distant, pendant que « fais passer ce test » restait en local et revenait faux.
+  Maintenant le modèle local essaie, les tests ou les diagnostics tranchent, et seul un échec
+  **prouvé** achète un appel distant — avec le diff de ce que la tentative a laissé sur le disque et
+  l'erreur qu'elle a produite, pour que le second modèle finisse au lieu de recommencer. Qui ne
+  rencontre jamais d'échec ne paie jamais rien.
+
+  La subtilité est dans `verifyTurn` : un agent qui lance les tests, les voit échouer, corrige et les
+  relance a un échec dans sa trace et un dépôt qui marche. Escalader sur « il y a un échec quelque
+  part » paierait un modèle distant pour refaire du travail fini, sur la majorité des tours réussis.
+  Ce qui compte est le dernier mot de chaque type de contrôle — plus un motif qu'aucun contrôle
+  n'attrape : le même appel, avec les mêmes arguments, qui échoue trois fois de suite.
+- **La modification qui suit celle qu'on vient de faire.** La complétion répond « qu'est-ce qui vient
+  après le curseur », ce qui est la mauvaise question une fois sur deux : l'essentiel de l'édition
+  consiste à propager un changement aux trois autres endroits qui le mentionnent, et ces endroits ne
+  sont pas sous le curseur. Après une modification, le modèle de complétion cherche **ailleurs dans
+  le fichier** l'édition qui en découle, et la propose en indice avec un correctif rapide. Cent
+  frappes deviennent un seul diff avant que le modèle les voie. Chaque proposition est vérifiée
+  contre le fichier : un extrait absent, présent deux fois, sur la ligne en cours de frappe, ou qui
+  réécrit la moitié du fichier est écarté sans un mot. Activé par défaut sur un point d'accès local,
+  désactivé sur un point d'accès payant sauf demande explicite.
+- **Un banc d'évaluation.** La CI prouvait que l'extension marche et ne disait rien de la qualité des
+  **réponses**. Quinze petits dépôts cassés, une commande par tâche qui décide si le résultat marche
+  — une commande et non un diff, pour que deux modèles qui résolvent autrement passent tous les
+  deux. Le harnais pilote le vrai client terminal. La règle qui donne un sens aux chiffres tourne à
+  chaque commit : **le contrôle de chaque tâche doit échouer sur la version non modifiée**. Elle a
+  attrapé une de mes propres tâches au premier essai.
+- **Repli automatique entre fournisseurs.** Sur 429, 5xx ou panne réseau : le rôle moins cher du même
+  préréglage, puis la machine. Jamais vers plus cher, jamais sur un 400 (la requête est mauvaise,
+  l'envoyer ailleurs l'envoie deux fois), jamais après qu'un mot soit arrivé à l'écran, et jamais en
+  silence. La moitié qu'aucun assistant hébergé ne peut offrir : quand le réseau tombe, il y a
+  généralement déjà un modèle sur la machine.
+- **Le journal des sorties est chaîné.** Chaque entrée porte l'empreinte de la précédente : modifier
+  une ligne oblige à réécrire toute la queue, et supprimer une ligne du milieu laisse un trou que la
+  numérotation trahit. Export JSONL ou syslog RFC 5424, et une commande qui vérifie. Cela ne rend pas
+  la falsification impossible, cela la rend visible. À noter ce qui n'est **pas** haché : les données
+  qui sortent. L'empreinte d'une adresse e-mail est une adresse e-mail pour qui possède une liste
+  d'adresses.
+- **Les définitions d'outils MCP sont épinglées.** Le dialogue d'approbation nomme une **commande**,
+  or le pouvoir d'un outil sur la conversation est dans sa **description** — le texte que le modèle
+  lit pour décider quand l'appeler. Un serveur pouvait servir une description inoffensive le jour de
+  l'approbation et une autre une semaine plus tard, sans que rien redemande ; les noms consacrés sont
+  *tool poisoning* et *rug pull*. L'approbation porte maintenant sur les descriptions et les schémas,
+  et un changement redemande en **nommant** ce qui a changé — un dialogue qui dit seulement « quelque
+  chose a changé » apprend aux gens à cliquer « oui ». Les descriptions qui atteignent le modèle sont
+  encadrées comme la parole d'un tiers, aplaties et plafonnées.
+- **Le `.vsix` publié se vérifie.** Empreinte SHA-256 publiée et attestation de provenance Sigstore
+  émise par le workflow, vérifiable avec `gh attestation verify`. La reproductibilité octet pour
+  octet n'est **pas** promise et c'est écrit : un `.vsix` est un zip, un zip porte les dates de
+  modification. Les outils de construction sont épinglés à une version exacte.
+- **`--yes` sur le client terminal**, qui ne répond qu'à la question d'approbation : les globs
+  interdits, l'anonymisation et le budget sont en amont et s'appliquent toujours. C'est ce qui permet
+  au banc d'évaluation de lancer le vrai client.
+
+### Modifié
+
+- **L'estimation de jetons se calibre.** Il n'y a pas de tokenizer BPE ici, par choix, donc
+  l'estimation était une supposition pessimiste tirée des classes de caractères — et un budget
+  pessimiste refuse des requêtes qui passaient. Chaque réponse rapporte pourtant le compte du
+  fournisseur pour le texte qu'on vient d'estimer. Par modèle, borné, et décroissant vers les mesures
+  récentes.
+- **La carte du dépôt est classée par la question.** Le signal le plus fort était le seul à ne pas
+  être utilisé.
+- **La documentation.** Le README annonçait `0.11.1` et « cherchez Hivey Code sur le Marketplace »,
+  alors que le manifeste était en `0.38.0` et que rien n'est publié ; la feuille de route était
+  restée figée à `0.3.0` pendant trente-cinq versions. Un acheteur lit cela comme « pas maintenu »
+  avant d'avoir lu une ligne d'ADR. Corrigé, avec cinq nouvelles décisions écrites
+  ([ADR-0009](docs/adr/0009-escalader-sur-un-echec-constate.md) à
+  [ADR-0013](docs/adr/0013-lire-la-sortie-du-terminal.md)) et une feuille de route qui distingue
+  « testé », « vérifié à la main » et « jamais exécuté dans ses conditions réelles » — cette dernière
+  liste n'est pas vide et elle est nommée.
+
+### Prérequis
+
+- **VS Code 1.93** au lieu de 1.90 : l'API d'intégration shell y est stable. Les versions de mi-2024
+  ne sont plus visées.
+
 ## 0.38.0 — 2026-09-08
 
 ### Added
