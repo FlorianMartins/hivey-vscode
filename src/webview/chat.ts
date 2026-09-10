@@ -975,7 +975,15 @@ function contextRing(state: UiState, deps: ChatDeps): HTMLElement {
   // guess, went from "qwen2.5-co…" to "qwen2…". Here it costs nothing: the ring was already drawn,
   // already about exactly this, and already in the row where the token count lives.
   const wrap = el("button", `context-ring${fill > 0.85 ? " high" : fill > 0.6 ? " warm" : ""}`);
-  wrap.title = t("{0}% of the context budget — click to change it", pct);
+  // The cache rate rides on the same tooltip rather than taking a control of its own. It is the
+  // number that explains the bill on a long conversation — a high fill with a high cache rate is
+  // cheap, the same fill with a cold cache is not — and it belongs next to the fill for exactly
+  // that reason. Absent until something has been sent to a provider that reports it, because a
+  // local model has no cache and a zero would read as a problem rather than as "not applicable".
+  wrap.title =
+    state.cacheHitRate === undefined
+      ? t("{0}% of the context budget — click to change it", pct)
+      : t("{0}% of the context budget — {1}% of it served from the prompt cache. Click to change it", pct, Math.round(state.cacheHitRate * 100));
   wrap.addEventListener("click", () =>
     menu(wrap, (close) => {
       const panel = el("div", "menu-list");

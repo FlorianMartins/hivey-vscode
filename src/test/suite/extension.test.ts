@@ -592,6 +592,77 @@ suite("Hivey Code", () => {
   });
 
   /**
+   * The prefix must be byte-identical from one turn to the next, or the prompt cache is decoration.
+   *
+   * Every provider's cache hits up to the first byte that differs. So one line in the system prompt
+   * that follows the open editor around does not cost that line — it costs the WHOLE prefix, on
+   * every turn, repository map included, on exactly the providers that bill for it. Two things used
+   * to sit in there and change: the dialect note, derived from the attached files, and the
+   * repository map, re-ranked around whichever tab was in front.
+   *
+   * Nothing about that is visible from reading the code, which is why it is asserted on the socket:
+   * two turns, a different file open for each, and the first message of the request compared byte
+   * for byte.
+   */
+  test("the cacheable prefix does not change when the open file does", async () => {
+    const ext = vscode.extensions.getExtension(ID)!;
+    await ext.activate();
+
+    const stub = await scriptedStub([{ text: "one" }, { text: "two" }]);
+    const config = vscode.workspace.getConfiguration(SECTION);
+    const before = {
+      provider: config.get("chat.provider"),
+      model: config.get("chat.model"),
+      local: config.get("endpoints.local"),
+      confirm: config.get("privacy.confirmSend"),
+    };
+    const dir = await fs.mkdtemp(join(tmpdir(), "hivey-prefix-"));
+    await fs.writeFile(join(dir, "a.sql"), "select * from QSYS2.SYSTABLES\n");
+    await fs.writeFile(join(dir, "b.py"), "def total(x):\n    return x\n");
+
+    await config.update("chat.provider", "local", vscode.ConfigurationTarget.Global);
+    await config.update("chat.model", "prefix-model", vscode.ConfigurationTarget.Global);
+    await config.update("endpoints.local", `http://127.0.0.1:${stub.port}/v1`, vscode.ConfigurationTarget.Global);
+    await config.update("privacy.confirmSend", "never", vscode.ConfigurationTarget.Global);
+
+    const systemOf = (body: string): string => {
+      const messages = JSON.parse(body).messages as Array<{ role: string; content: string }>;
+      return messages.find((m) => m.role === "system")?.content ?? "";
+    };
+
+    try {
+      await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(join(dir, "a.sql")));
+      void vscode.commands.executeCommand("hiveyCode.askWith", "first question");
+      for (let i = 0; i < 100 && stub.bodies().length < 1; i++) await delay(50);
+
+      await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(join(dir, "b.py")));
+      void vscode.commands.executeCommand("hiveyCode.askWith", "second question");
+      for (let i = 0; i < 100 && stub.bodies().length < 2; i++) await delay(50);
+      await vscode.commands.executeCommand("hiveyCode.stopAnswer");
+
+      const bodies = stub.bodies();
+      assert.ok(bodies.length >= 2, `only ${bodies.length} requests were sent`);
+      assert.equal(
+        systemOf(bodies[0]!),
+        systemOf(bodies[1]!),
+        "the system prompt changed between two turns, so the prompt cache misses on the whole prefix",
+      );
+      // And the per-turn material still reaches the model — moved, not dropped. It arrives after
+      // the transcript, which is also where a model reads it last.
+      const second = JSON.parse(bodies[1]!).messages as Array<{ role: string; content: string }>;
+      assert.ok(second.length > 1, "the request has no messages after the system prompt");
+    } finally {
+      await vscode.commands.executeCommand("workbench.action.closeAllEditors");
+      await fs.rm(dir, { recursive: true, force: true });
+      await config.update("chat.provider", before.provider, vscode.ConfigurationTarget.Global);
+      await config.update("chat.model", before.model, vscode.ConfigurationTarget.Global);
+      await config.update("endpoints.local", before.local, vscode.ConfigurationTarget.Global);
+      await config.update("privacy.confirmSend", before.confirm, vscode.ConfigurationTarget.Global);
+      stub.close();
+    }
+  });
+
+  /**
    * The escalation that is not a guess.
    *
    * The router's own escalation reads the QUESTION and bets. This one reads what happened: a local

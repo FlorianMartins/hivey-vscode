@@ -12,6 +12,7 @@ import { knowledgeAmbient } from "./knowledge.js";
 import { language, t } from "../shared/i18n.js";
 import { runTurn, type Tool } from "../core/agent/loop.js";
 import { Permissions, commandPrefix, type PermissionStore, type Rule } from "../core/agent/permissions.js";
+import { stablePrompt, turnDirectives } from "../core/prompts.js";
 import { costOf, makeLookup, type Price } from "../core/router/pricing.js";
 import { calibrate, observe, prune, type Calibration } from "../core/util/calibrate.js";
 import { handoverNote, verifyTurn, type TurnStep } from "../core/router/outcome.js";
@@ -388,6 +389,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       // fixed steps instead of pretending to know a ceiling.
       modelContext: this.models.find((m) => m.id === hiveyModel(s.chat.model, "everyday"))?.context ?? 0,
       contextFill: budgetTokens > 0 ? Math.min(1, contextTokens / budgetTokens) : 0,
+      ...(this.cacheSeen.prompt > 0 ? { cacheHitRate: this.cacheSeen.cached / this.cacheSeen.prompt } : {}),
       // Computed here rather than in the panel because the budget is a setting, and a panel that
       // guessed at it would offer to summarise a conversation that fits comfortably.
       // No offer when it happens by itself: a banner proposing what is already scheduled to
@@ -502,6 +504,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const mode = this.session.mode;
     this.session = new Session();
     this.session.mode = mode;
+    // The prefix is being rewritten from nothing anyway, so this is the free moment to take a fresh
+    // map. See `frozenMap`.
+    this.frozenMap = undefined;
+    this.cacheSeen = { prompt: 0, cached: 0 };
     this.attachments = [];
     this.screen = "chat";
     this.searchQuery = "";
@@ -574,7 +580,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           this.wizard = undefined;
           this.persist();
           const found = this.history().find((s) => s.id === m.id);
-          if (found) this.session = new Session(found);
+          if (found) {
+            this.session = new Session(found);
+            this.frozenMap = undefined;
+          }
           this.screen = "chat";
           this.searchQuery = "";
           this.sendState();
@@ -2635,6 +2644,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
   private async compact(): Promise<boolean> {
     const settings = readSettings();
+    // Compaction rewrites the transcript, so the cache is lost regardless: the one moment where a
+    // rebuilt map costs nothing.
+    this.frozenMap = undefined;
     const covered = this.session.entries.filter((e) => e.included && !e.error && e.text.trim());
     if (covered.length < 2) {
       void vscode.window.showInformationMessage(t("There is not enough conversation to summarise yet."));
@@ -2837,10 +2849,26 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     // the house rules because it is the same kind of text: identical from one turn to the next, and
     // about the work rather than about the question.
     const learned = await knowledgeAmbient(settings);
-    const ambient =
-      mode !== "chat" && settings.context.repoMap
-        ? await this.workspace.repoMap(Math.floor(settings.context.maxTokens * 0.4))
-        : undefined;
+    // FROZEN for the life of the conversation, and this is the other half of protecting the cache.
+    //
+    // The map is ranked around the file being edited, so it used to be rebuilt every time the user
+    // switched tab — and the map sits inside the cacheable prefix. Switching tab therefore threw
+    // away the prompt cache for the whole conversation, on a provider that bills the miss. Nobody
+    // would ever connect the two.
+    //
+    // A map that is one tab-switch out of date costs nothing: it is a list of paths and symbols, the
+    // model can read any file it wants, and the ranking only decides what it sees FIRST. It is
+    // rebuilt when the conversation is compacted, when a new one starts, and when the user asks —
+    // which are the moments where the prefix is being rewritten anyway.
+    if (mode !== "chat" && settings.context.repoMap && !this.frozenMap) {
+      // The first question of a conversation is what the map is ranked around, and it is frozen
+      // there afterwards — which is the right trade: the question that opens a conversation is what
+      // the conversation is about, and re-ranking on every follow-up would cost the prompt cache far
+      // more than a better ordering is worth.
+      const opening = [...this.session.entries].reverse().find((e) => e.role === "user")?.text;
+      this.frozenMap = await this.workspace.repoMap(Math.floor(settings.context.maxTokens * 0.4), false, opening);
+    }
+    const ambient = mode !== "chat" && settings.context.repoMap ? this.frozenMap : undefined;
     const allTools: Tool[] = buildTools({
       settings: () => settings,
       confirmEdit: (u, n) => this.confirmEdit(u, n),
@@ -2883,21 +2911,31 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       );
     }
 
+    // Split in two, and the split is worth money. The system prompt is the head of the cacheable
+    // prefix: every provider's prompt cache hits up to the first byte that differs, so one line in
+    // here that follows the open editor around costs the WHOLE prefix on every turn — the repository
+    // map included. What used to sit in it and should not: the dialect note, which is derived from
+    // the attached files, and the participant directive, which is per-turn by definition. Both now
+    // ride after the transcript, where they are also read last. See `stablePrompt`.
+    const directives = turnDirectives({
+      dialect: dialectNote(this.attachments),
+      ...(this.participant ? { participant: participantDirective(this.participant) } : {}),
+    });
     const built = this.session.build({
-      systemPrompt:
-        promptForMode(mode) +
-        workspaceNote() +
-        dialectNote(this.attachments) +
-        houseRules +
-        (learned ? `\n\n${learned}\n` : "") +
-        (mode === "chat"
-          ? ""
-          : skillsPrompt(
-              // A switched-off skill is not described to the model either. Filtering it out of the
-              // `/` list alone would leave the model announcing a skill the user cannot invoke.
-              definitions.skills.filter((sk) => isSkillEnabled(skillInvocation(sk.name), settings.skills.disabled)),
-            )) +
-        (this.participant ? `\n\n${participantDirective(this.participant)}` : ""),
+      systemPrompt: stablePrompt({
+        mode: promptForMode(mode),
+        workspace: workspaceNote(),
+        houseRules,
+        knowledge: learned,
+        skills:
+          mode === "chat"
+            ? ""
+            : skillsPrompt(
+                // A switched-off skill is not described to the model either. Filtering it out of the
+                // `/` list alone would leave the model announcing a skill the user cannot invoke.
+                definitions.skills.filter((sk) => isSkillEnabled(skillInvocation(sk.name), settings.skills.disabled)),
+              ),
+      }),
       ambient: ambient ? `${ambient.text}\n\n(${ambient.files} files mapped, ${ambient.omitted} omitted)` : undefined,
       maxTokens: settings.context.maxTokens,
       nonce,
@@ -2997,7 +3035,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       // The evidence rides at the END, after the transcript, so it is the last thing the model
       // reads before answering — and so it stays out of the cacheable prefix, which must be
       // identical from one turn to the next or the provider's prompt cache misses on all of it.
-      const outgoing = handover ? [...built.messages, { role: "user" as const, content: handover.note }] : built.messages;
+      const outgoing = [
+        ...built.messages,
+        ...(directives ? [{ role: "user" as const, content: directives }] : []),
+        ...(handover ? [{ role: "user" as const, content: handover.note }] : []),
+      ];
       const prepared = await this.gate.prepare(outgoing, settings, { provider: providerId, model, baseUrl, isLocal }, vault);
       if (!prepared) {
         this.post({ type: "status", text: t("Request cancelled.") });
@@ -3096,6 +3138,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         afterResponse: (t) => vault.restore(t),
         onUsage: (info) => this.noteUsage(info),
       });
+
+      // What the provider's cache actually served, accumulated across the conversation. Shown in the
+      // ring: the cache is most of the bill on a long conversation, and the things that break it are
+      // invisible without a number.
+      this.cacheSeen.prompt += result.usage.promptTokens;
+      this.cacheSeen.cached += result.usage.cachedTokens;
 
       answer.text = result.text || streamed;
       if (this.plan) answer.plan = this.plan;
@@ -3341,6 +3389,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     }
     return out;
   }
+
+  /**
+   * The repository map this conversation is using, held until something makes it worth paying to
+   * rebuild. See where it is set for why a slightly stale map is cheaper than a fresh one.
+   */
+  private frozenMap: { text: string; files: number; omitted: number } | undefined;
+
+  /** Prompt tokens sent, and how many of them the provider served from its cache, this session. */
+  private cacheSeen = { prompt: 0, cached: 0 };
 
   private checkpointFor: string | undefined;
 

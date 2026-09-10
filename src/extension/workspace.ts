@@ -60,10 +60,19 @@ export class WorkspaceContext {
    * The repository map, cached. `focus` is the file being edited: it changes the ranking, so a
    * different focus rebuilds the map from the already-read files.
    */
-  async repoMap(budgetTokens: number, force = false): Promise<{ text: string; files: number; omitted: number } | undefined> {
+  async repoMap(
+    budgetTokens: number,
+    force = false,
+    /** What the user asked, when there is a question. The strongest ranking signal there is. */
+    question?: string,
+  ): Promise<{ text: string; files: number; omitted: number } | undefined> {
     if (!vscode.workspace.workspaceFolders?.length) return undefined;
     const focus = this.openPaths()[0] ?? "";
-    if (!force && !this.dirty && this.map && this.map.focus === focus) {
+    // The question is part of the cache key: a map ranked around "the invoice total is wrong" is
+    // not the map for the next question, and reusing it would silently answer the second question
+    // with the first one's ranking.
+    const key = `${focus}\u0000${question ?? ""}`;
+    if (!force && !this.dirty && this.map && this.map.focus === key) {
       return { text: this.map.text, files: this.map.files, omitted: this.map.omitted };
     }
 
@@ -72,8 +81,9 @@ export class WorkspaceContext {
       focusPath: focus,
       openPaths: this.openPaths(),
       recentPaths: this.recent,
+      ...(question ? { question } : {}),
     });
-    this.map = { text: built.text, builtAt: Date.now(), focus, files: built.filesIncluded, omitted: built.filesOmitted };
+    this.map = { text: built.text, builtAt: Date.now(), focus: key, files: built.filesIncluded, omitted: built.filesOmitted };
     this.dirty = false;
     return { text: built.text, files: built.filesIncluded, omitted: built.filesOmitted };
   }

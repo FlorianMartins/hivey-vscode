@@ -269,6 +269,15 @@ export interface UiState {
   suggestCompact: boolean;
   /** How much of the model's context the conversation currently occupies, 0–1, for the meter. */
   contextFill: number;
+  /**
+   * How much of what was SENT this conversation came back from the provider's prompt cache.
+   *
+   * Logged since the beginning and shown to nobody, which made it useless: the cache is most of the
+   * bill on a long conversation, and the things that break it — a repository map that follows the
+   * open tab, a line in the system prompt that changes per turn — are invisible without a number.
+   * Undefined until something has actually been sent to a provider that reports it.
+   */
+  cacheHitRate?: number;
   /** True when summarising happens by itself at the threshold instead of being offered. */
   autoCompact: boolean;
   /**

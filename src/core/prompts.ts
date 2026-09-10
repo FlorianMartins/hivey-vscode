@@ -81,3 +81,58 @@ export const INLINE_EDIT_PROMPT = `You rewrite a fragment of code according to a
 Answer with the replacement code ONLY: no explanation, no markdown fence, no commentary. Keep the
 surrounding indentation style. If the instruction cannot be satisfied, answer with the original
 fragment unchanged.`;
+
+/**
+ * The part of the prompt that must be byte-identical from one turn to the next.
+ *
+ * Every remote provider with a prompt cache keys it on a PREFIX. Anthropic marks it explicitly,
+ * OpenAI and OpenRouter match it implicitly, and all of them share one rule: the cache hits up to
+ * the first byte that differs, and misses on everything after it. So a single character that
+ * changes per turn at the top of the system prompt does not cost one character — it costs the
+ * whole prefix, on every turn, which on a long conversation with a repository map is most of the
+ * bill.
+ *
+ * This function exists to make that rule impossible to break by accident. It takes only things that
+ * are stable for the life of a conversation, and it takes them as named fields rather than as a
+ * concatenated string, so adding "just one more line about the open file" here is a change somebody
+ * has to make deliberately and a reviewer can see.
+ *
+ * Anything that follows the user around — which file is open, what they attached, who they are
+ * talking to — belongs in `turnDirectives`, which is sent AFTER the transcript and cached by
+ * nobody.
+ */
+export interface StablePromptParts {
+  /** The mode's own instructions: chat, plan or agent. */
+  mode: string;
+  /** What this workspace is. Its name and root, which do not change while it is open. */
+  workspace?: string;
+  /** The repository's own rules, from its instruction files. */
+  houseRules?: string;
+  /** The knowledge base's table of contents. Not its contents. */
+  knowledge?: string;
+  /** Which skills exist. Not which one is being used. */
+  skills?: string;
+}
+
+export function stablePrompt(parts: StablePromptParts): string {
+  return [parts.mode, parts.workspace, parts.houseRules, parts.knowledge ? `\n${parts.knowledge}\n` : "", parts.skills]
+    .filter(Boolean)
+    .join("");
+}
+
+/**
+ * The part that changes every turn, and therefore must never sit in the cacheable prefix.
+ *
+ * Sent as its own message after the transcript, which also puts it where a model reads it last —
+ * the position that carries the most weight in practice.
+ */
+export interface TurnDirectiveParts {
+  /** Dialect rules implied by the files in play, e.g. Db2 for i rather than PostgreSQL. */
+  dialect?: string;
+  /** The named participant this turn is addressed to, when the user picked one. */
+  participant?: string;
+}
+
+export function turnDirectives(parts: TurnDirectiveParts): string {
+  return [parts.dialect, parts.participant].filter(Boolean).join("\n\n").trim();
+}

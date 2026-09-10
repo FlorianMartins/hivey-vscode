@@ -27,6 +27,15 @@ export interface RankHints {
   openPaths?: string[];
   /** Recently edited paths, newest first. */
   recentPaths?: string[];
+  /**
+   * What the user actually asked.
+   *
+   * The strongest signal there is, and it was not being used. Someone who writes "the invoice total
+   * is wrong" has named the file they want; the ranking was answering with whatever happened to be
+   * in the front tab. Matched against paths and against the symbols each file declares, so
+   * "totalCents" finds the file that defines it even when the path says nothing.
+   */
+  question?: string;
 }
 
 export interface RepoMapEntry {
@@ -56,6 +65,34 @@ function baseScore(path: string): number {
   return s;
 }
 
+/**
+ * The words in a question that could name something in the repository.
+ *
+ * Identifiers, paths, and CamelCase or snake_case names — never ordinary prose, or every file
+ * containing the word "total" outranks the one that defines it. Two characters is the floor: "id"
+ * and "db" are real, "a" and "is" are noise.
+ */
+function termsIn(question: string): string[] {
+  const words = question.match(/[A-Za-z_$][\w$]*(?:[./-][\w$]+)*/g) ?? [];
+  const seen = new Set<string>();
+  for (const word of words) {
+    if (word.length < 3) continue;
+    if (STOPWORDS.has(word.toLowerCase())) continue;
+    seen.add(word.toLowerCase());
+    // A dotted or slashed name also contributes its parts: `src/totals.ts` should match `totals`.
+    for (const part of word.split(/[./-]/)) if (part.length >= 3) seen.add(part.toLowerCase());
+  }
+  return [...seen];
+}
+
+/** Words that appear in every question about code and name nothing in particular. */
+const STOPWORDS = new Set([
+  "the", "and", "for", "with", "this", "that", "from", "into", "when", "why", "how", "what", "where",
+  "add", "fix", "make", "use", "does", "not", "can", "should", "would", "file", "files", "code",
+  "function", "class", "method", "test", "tests", "error", "bug", "please", "there", "then", "them",
+  "you", "your", "its", "are", "was", "were", "has", "have", "but", "all", "any", "some", "more",
+]);
+
 export function rankFiles(files: MapFile[], hints: RankHints = {}): RepoMapEntry[] {
   const focus = hints.focusPath;
   const focusFile = focus ? files.find((f) => f.path === focus) : undefined;
@@ -63,9 +100,52 @@ export function rankFiles(files: MapFile[], hints: RankHints = {}): RepoMapEntry
   const focusDir = focus ? focus.slice(0, focus.lastIndexOf("/") + 1) : "";
   const open = new Set(hints.openPaths ?? []);
   const recent = hints.recentPaths ?? [];
+  const terms = hints.question ? termsIn(hints.question) : [];
 
-  return files
-    .filter((f) => isMappable(f.path))
+  const mappable = files.filter((f) => isMappable(f.path));
+
+  // The import graph, built once. It used to be re-derived per file inside the scoring loop, which
+  // is quadratic in a way nobody notices until a repository has three thousand files in it — and it
+  // could only ever see DIRECT edges, so the module the focus file's dependency depends on ranked
+  // no higher than a README.
+  const importsOf = new Map<string, string[]>();
+  for (const f of mappable) importsOf.set(f.path, extractImports(f.path, f.text));
+
+  const stemOf = (path: string): string => path.replace(/\.[^./]+$/, "");
+
+  /**
+   * Does this import specifier name this file?
+   *
+   * The extension is stripped from BOTH sides, and that is a fix rather than a tidy-up: in a
+   * TypeScript ESM project every import ends in `.js` while every file on disk ends in `.ts`, so
+   * comparing a specifier against a stem silently never matched. The whole import-graph half of the
+   * ranking was dead on exactly the kind of repository this extension is written in — including
+   * this one.
+   *
+   * The match is anchored on a path boundary, so `./helper` does not also claim `src/otherhelper.ts`.
+   */
+  const resolves = (specifier: string, path: string): boolean => {
+    const want = stemOf(specifier.replace(/^[./]+/, ""));
+    if (!want) return false;
+    const stem = stemOf(path);
+    return stem === want || stem.endsWith(`/${want}`);
+  };
+
+  /** Paths the focus file reaches directly, and the ones those reach in turn. */
+  const firstDegree = new Set<string>();
+  for (const f of mappable) {
+    if (focusImports.some((i) => resolves(i, f.path))) firstDegree.add(f.path);
+  }
+  const secondDegree = new Set<string>();
+  for (const near of firstDegree) {
+    for (const spec of importsOf.get(near) ?? []) {
+      for (const f of mappable) {
+        if (f.path !== focus && !firstDegree.has(f.path) && resolves(spec, f.path)) secondDegree.add(f.path);
+      }
+    }
+  }
+
+  return mappable
     .map((f) => {
       let score = baseScore(f.path);
       if (f.path === focus) score += 100;
@@ -73,11 +153,25 @@ export function rankFiles(files: MapFile[], hints: RankHints = {}): RepoMapEntry
       const r = recent.indexOf(f.path);
       if (r >= 0) score += Math.max(1, 10 - r);
       if (focusDir && f.path.startsWith(focusDir)) score += 6;
-      // Imported by the focus file, or importing it: a direct edge in the dependency graph.
-      const stem = f.path.replace(/\.[^./]+$/, "");
-      if (focusImports.some((i) => stem.endsWith(i.replace(/^[./]+/, "")))) score += 15;
-      if (focus && extractImports(f.path, f.text).some((i) => focus.replace(/\.[^./]+$/, "").endsWith(i.replace(/^[./]+/, "")))) score += 8;
-      return { path: f.path, symbols: extractSymbols(f.path, f.text), score };
+      // A direct edge in the dependency graph, either way round.
+      if (firstDegree.has(f.path)) score += 15;
+      if (focus && (importsOf.get(f.path) ?? []).some((i) => resolves(i, focus))) score += 8;
+      // One hop further out. Worth less than a direct edge and much more than an unrelated file:
+      // this is where the type the focus file's helper returns actually lives.
+      if (secondDegree.has(f.path)) score += 5;
+
+      const symbols = extractSymbols(f.path, f.text);
+      if (terms.length) {
+        const path = f.path.toLowerCase();
+        // The path naming a term is a strong claim: `src/totals.ts` for "the totals are wrong".
+        for (const term of terms) if (path.includes(term)) score += 12;
+        // A declared symbol naming a term is stronger still — it is the definition, not a mention.
+        const declared = symbols.map((sym) => sym.signature.toLowerCase());
+        for (const term of terms) {
+          if (declared.some((sig) => sig.includes(term))) score += 18;
+        }
+      }
+      return { path: f.path, symbols, score };
     })
     .filter((e) => e.symbols.length > 0 || e.score > 4)
     .sort((a, b) => b.score - a.score || a.path.localeCompare(b.path));
