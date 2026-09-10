@@ -23,7 +23,18 @@ export interface Settings {
    *  extension in another — which is more common than it sounds on shared machines. */
   language: "auto" | "en" | "fr";
   chat: { provider: ProviderId; model: string };
-  completion: { provider: ProviderId | "off"; model: string; enabled: boolean; debounceMs: number; maxTokens: number; multiline: boolean };
+  completion: {
+    provider: ProviderId | "off";
+    model: string;
+    enabled: boolean;
+    debounceMs: number;
+    maxTokens: number;
+    multiline: boolean;
+    /** Offer the edit that follows the one just made, elsewhere in the file. */
+    nextEdit: boolean;
+    /** Allow it on a paid endpoint. Off by default: it fires on every pause in typing. */
+    nextEditRemote: boolean;
+  };
   endpoints: Record<ProviderId, string>;
   /** Extra model servers, on this machine or on the operator's network. Probed, never assumed. */
   servers: Array<{ name: string; url: string }>;
@@ -96,6 +107,8 @@ export function readSettings(scope?: vscode.Uri): Settings {
       debounceMs: c.get<number>("completion.debounceMs", 220),
       maxTokens: c.get<number>("completion.maxTokens", 128),
       multiline: c.get<boolean>("completion.multiline", true),
+      nextEdit: c.get<boolean>("completion.nextEdit", true),
+      nextEditRemote: c.get<boolean>("completion.nextEditRemote", false),
     },
     // Read from the vendor table rather than listed here: a provider whose address this function
     // forgot is a provider that silently cannot answer, and the manifest already declares them all.

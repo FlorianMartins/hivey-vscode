@@ -107,6 +107,11 @@
         "icon": "$(graph)"
       },
       {
+        "command": "hiveyCode.applyNextEdit",
+        "title": "%command.applyNextEdit.title%",
+        "category": "Hivey Code"
+      },
+      {
         "command": "hiveyCode.exportAudit",
         "title": "%command.exportAudit.title%",
         "category": "Hivey Code",
@@ -961,6 +966,16 @@
             "type": "number",
             "default": 128,
             "description": "%config.completion.maxTokens%"
+          },
+          "hiveyCode.completion.nextEdit": {
+            "type": "boolean",
+            "default": true,
+            "markdownDescription": "%config.completion.nextEdit%"
+          },
+          "hiveyCode.completion.nextEditRemote": {
+            "type": "boolean",
+            "default": false,
+            "markdownDescription": "%config.completion.nextEditRemote%"
           },
           "hiveyCode.completion.multiline": {
             "type": "boolean",

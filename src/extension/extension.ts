@@ -19,6 +19,7 @@ import { watchInstructions } from "./instructions.js";
 import { createDefinition, definitionUri, DefinitionStore } from "./definitions.js";
 import { ibmiDiagnose, ibmiLibraryList } from "./integrations/ibmi.js";
 import { REMOTE_VENDORS } from "../core/providers/vendors.js";
+import { NextEditWatcher } from "./nextEdit.js";
 import { toJsonl, toSyslog, type Chained } from "../core/audit/chain.js";
 
 export function activate(context: vscode.ExtensionContext): void {
@@ -38,6 +39,11 @@ export function activate(context: vscode.ExtensionContext): void {
 
   const status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
   const completion = new InlineCompletionProvider(keys, status, log);
+  // The edit that follows the one just made, elsewhere in the file. Runs on the completion model,
+  // so on a local endpoint it is free; see `nextEdit.ts` for why it is not offered on a paid one.
+  const nextEdit = new NextEditWatcher(keys, log);
+  const previousText = new Map<string, string>();
+  for (const doc of vscode.workspace.textDocuments) previousText.set(doc.uri.toString(), doc.getText());
   completion.updateStatus(readSettings());
 
   // MCP servers are started after activation, never during it: a slow or hanging server must not
@@ -136,6 +142,24 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
 
     vscode.commands.registerCommand("hiveyCode.completionAccepted", () => completion.noteAccepted()),
+
+    vscode.commands.registerCommand("hiveyCode.applyNextEdit", () => nextEdit.apply()),
+
+    // The journal needs the text as it was BEFORE the change, and the change event does not carry
+    // it — so the last version of every open document is kept here, one string per file, replaced
+    // on every change. Cheaper than reconstructing it from the content changes, and correct in the
+    // cases reconstruction is not: a multi-cursor edit, a formatter, an applied refactor.
+    vscode.workspace.onDidChangeTextDocument((event) => {
+      const key = event.document.uri.toString();
+      const before = previousText.get(key) ?? event.document.getText();
+      previousText.set(key, event.document.getText());
+      nextEdit.onChange(event, before);
+    }),
+    vscode.workspace.onDidCloseTextDocument((doc) => previousText.delete(doc.uri.toString())),
+    vscode.workspace.onDidOpenTextDocument((doc) => previousText.set(doc.uri.toString(), doc.getText())),
+    // A suggestion is about where the user was. Moving somewhere else retires it.
+    vscode.window.onDidChangeActiveTextEditor(() => nextEdit.clear()),
+    nextEdit,
 
     vscode.commands.registerCommand("hiveyCode.toggleCompletions", async () => {
       const config = vscode.workspace.getConfiguration(SECTION);
@@ -429,7 +453,7 @@ export function activate(context: vscode.ExtensionContext): void {
   // Quick fixes are registered for every file: the diagnostics come from whichever language server
   // the user already has, so there is no list of supported languages to keep up to date.
   context.subscriptions.push(
-    vscode.languages.registerCodeActionsProvider({ pattern: "**" }, new HiveyCodeActions(), {
+    vscode.languages.registerCodeActionsProvider({ pattern: "**" }, new HiveyCodeActions(nextEdit), {
       providedCodeActionKinds: HiveyCodeActions.kinds,
     }),
   );

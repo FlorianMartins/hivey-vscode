@@ -10,8 +10,15 @@ import * as vscode from "vscode";
 import { t } from "../shared/i18n.js";
 import { selectionActions } from "../core/agent/selection.js";
 
+export interface NextEditSource {
+  suggestionFor(uri: vscode.Uri, range: vscode.Range): { summary: string } | undefined;
+}
+
 export class HiveyCodeActions implements vscode.CodeActionProvider {
   static readonly kinds = [vscode.CodeActionKind.QuickFix, vscode.CodeActionKind.RefactorRewrite];
+
+  /** Optional, because the terminal client and the tests build this without one. */
+  constructor(private readonly nextEdit?: NextEditSource) {}
 
   provideCodeActions(
     document: vscode.TextDocument,
@@ -19,6 +26,17 @@ export class HiveyCodeActions implements vscode.CodeActionProvider {
     context: vscode.CodeActionContext,
   ): vscode.CodeAction[] {
     const actions: vscode.CodeAction[] = [];
+
+    // The predicted follow-up edit, when the cursor is on it. First in the list because the user
+    // put their cursor there — on a hint they can only have reached deliberately, the thing they
+    // came for is the thing the hint is about.
+    const predicted = this.nextEdit?.suggestionFor(document.uri, range);
+    if (predicted) {
+      const take = new vscode.CodeAction(t("Apply: {0}", predicted.summary), vscode.CodeActionKind.QuickFix);
+      take.isPreferred = true;
+      take.command = { command: "hiveyCode.applyNextEdit", title: t("Apply") };
+      actions.push(take);
+    }
 
     for (const diagnostic of context.diagnostics.slice(0, 3)) {
       const fix = new vscode.CodeAction(t("Fix with Hivey Code: {0}", short(diagnostic.message)), vscode.CodeActionKind.QuickFix);

@@ -717,6 +717,85 @@ suite("Hivey Code", () => {
   });
 
   /**
+   * The edit somewhere else.
+   *
+   * Completion answers "what comes next at the cursor", which is the wrong question about half the
+   * time: most editing is propagating a change you have just made to the three other places that
+   * mention it. Those places are not at the cursor, so no cursor completion can reach them.
+   *
+   * The check is on what the user would actually see — a hint in the file, at the right place, with
+   * a quick fix that applies it — because everything in between (the journal, the debounce, the
+   * prompt, the validation) exists only to produce that.
+   */
+  test("after an edit, the follow-up edit elsewhere in the file is offered", async () => {
+    const ext = vscode.extensions.getExtension(ID)!;
+    await ext.activate();
+
+    const stub = await scriptedStub([
+      { text: "FIND\nconst y = oldName(3);\nREPLACE\nconst y = newName(3);\nEND" },
+    ]);
+    const config = vscode.workspace.getConfiguration(SECTION);
+    const before = {
+      provider: config.get("completion.provider"),
+      model: config.get("completion.model"),
+      local: config.get("endpoints.local"),
+      enabled: config.get("completion.enabled"),
+      nextEdit: config.get("completion.nextEdit"),
+    };
+    const dir = await fs.mkdtemp(join(tmpdir(), "hivey-next-"));
+    const file = join(dir, "app.js");
+    await fs.writeFile(file, ["function newName(a) {", "  return a;", "}", "", "const y = oldName(3);", ""].join("\n"));
+
+    await config.update("completion.provider", "local", vscode.ConfigurationTarget.Global);
+    await config.update("completion.model", "little-model", vscode.ConfigurationTarget.Global);
+    await config.update("endpoints.local", `http://127.0.0.1:${stub.port}/v1`, vscode.ConfigurationTarget.Global);
+    await config.update("completion.enabled", true, vscode.ConfigurationTarget.Global);
+    await config.update("completion.nextEdit", true, vscode.ConfigurationTarget.Global);
+
+    try {
+      const doc = await vscode.workspace.openTextDocument(file);
+      const editor = await vscode.window.showTextDocument(doc);
+      // The rename that the suggestion should follow from. Typed into the file, because the whole
+      // trigger is "the user changed something" — opening a file must never make a model run.
+      await editor.edit((b) => b.replace(new vscode.Range(0, 9, 0, 16), "newName"));
+      editor.selection = new vscode.Selection(1, 0, 1, 0);
+
+      const hints = async (): Promise<vscode.Diagnostic[]> =>
+        vscode.languages.getDiagnostics(doc.uri).filter((d) => d.source === "Hivey Code");
+      for (let i = 0; i < 100 && !(await hints()).length; i++) await delay(100);
+
+      const found = await hints();
+      assert.ok(found.length, `no suggestion appeared; the stub was asked ${stub.asked().length} times`);
+      assert.equal(found[0]!.severity, vscode.DiagnosticSeverity.Hint, "a suggestion must not look like an error");
+      assert.match(found[0]!.message, /oldName/, found[0]!.message);
+      // And at the right place: line 5 of the file, not wherever the cursor is.
+      assert.equal(found[0]!.range.start.line, 4, "the hint is not on the line it is about");
+
+      // The quick fix that takes it, and the effect of taking it.
+      const actions = (await vscode.commands.executeCommand<vscode.CodeAction[]>(
+        "vscode.executeCodeActionProvider",
+        doc.uri,
+        found[0]!.range,
+      )) ?? [];
+      assert.ok(
+        actions.some((a) => a.command?.command === "hiveyCode.applyNextEdit"),
+        `no way to apply it: ${actions.map((a) => a.title).join(" | ")}`,
+      );
+      await vscode.commands.executeCommand("hiveyCode.applyNextEdit");
+      assert.match(doc.getText(), /const y = newName\(3\);/, doc.getText());
+    } finally {
+      await vscode.commands.executeCommand("workbench.action.closeAllEditors");
+      await fs.rm(dir, { recursive: true, force: true });
+      await config.update("completion.provider", before.provider, vscode.ConfigurationTarget.Global);
+      await config.update("completion.model", before.model, vscode.ConfigurationTarget.Global);
+      await config.update("endpoints.local", before.local, vscode.ConfigurationTarget.Global);
+      await config.update("completion.enabled", before.enabled, vscode.ConfigurationTarget.Global);
+      await config.update("completion.nextEdit", before.nextEdit, vscode.ConfigurationTarget.Global);
+      stub.close();
+    }
+  });
+
+  /**
    * The escalation that is not a guess.
    *
    * The router's own escalation reads the QUESTION and bets. This one reads what happened: a local
