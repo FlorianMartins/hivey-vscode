@@ -55,8 +55,8 @@ Trois niveaux, jamais mélangés :
 - **Définitions d'outils MCP épinglées** (testé) : l'approbation porte sur les descriptions et les
   schémas, pas seulement sur la commande. Un changement redemande en **nommant** ce qui a changé.
   Les descriptions qui atteignent le modèle sont encadrées, aplaties et plafonnées.
-- **Build vérifiable** (non vérifié en production — voir plus bas) : empreinte SHA-256 publiée et
-  attestation de provenance Sigstore par le workflow.
+- **Build vérifiable** (vérifié sur la release 0.39.0) : empreinte SHA-256 publiée et attestation de
+  provenance Sigstore par le workflow, acceptée par `gh attestation verify` et liée au commit.
 
 ### Avant 0.39.0
 
@@ -107,7 +107,9 @@ ses conditions réelles :
 - **Le schéma `streamfile:`** de l'IFS IBM i. Le reste de l'intégration IBM i a été écrit contre la
   documentation de Code for IBM i sans partition sous la main.
 - **La correspondance version ↔ bibliothèque d'ARCAD**, qu'aucune API Elias ne semble exposer.
-- **L'attestation de provenance**, qui ne peut s'exécuter que dans le workflow GitHub.
+- ~~L'attestation de provenance~~ — **vérifiée le 2026-09-10** : le workflow l'a produite et
+  `gh attestation verify` accepte le `.vsix` publié, en le liant au commit `871e4d5` et à
+  `ci.yml`. Elle reste hors de portée d'un test local, par construction.
 - **La prédiction de la prochaine édition contre un vrai modèle local.** Le circuit est testé dans un
   vrai éditeur contre un serveur factice ; ce que produit réellement `qwen2.5-coder:7b` sur cette
   invite n'a pas été mesuré. C'est précisément ce que le banc d'évaluation existe pour dire.
