@@ -3945,3 +3945,14 @@ pre.code code {
   padding-left: var(--sp-1);
   padding-right: var(--sp-1);
 }
+
+/* Somewhere to drop a screenshot.
+ *
+ * The whole composer card is the target, not the text area: dropping on the chips or on the toolbar
+ * is the same intent, and a target that only accepts its own middle is a target people miss. The
+ * cue is the focus border the panel already uses for "this is where your input is going" — a colour
+ * of our own here would be the one place in the panel that has one. */
+.composer-card.drop-target {
+  outline: 2px dashed var(--vscode-focusBorder, var(--vscode-textLink-foreground));
+  outline-offset: 2px;
+}

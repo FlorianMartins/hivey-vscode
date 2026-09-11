@@ -131,6 +131,21 @@ export class OpenAICompatibleProvider implements Provider {
             tool_calls: m.toolCalls.map((t) => ({ id: t.id, type: "function", function: { name: t.name, arguments: t.args } })),
           };
         }
+        // A message carrying images becomes the array form. Text first: every provider's
+        // documentation puts it there, and a model handed an image before the question it is about
+        // describes the image instead of answering.
+        if (m.images?.length) {
+          return {
+            role: m.role,
+            content: [
+              { type: "text", text: m.content },
+              ...m.images.map((img) => ({
+                type: "image_url",
+                image_url: { url: `data:${img.mediaType};base64,${img.data}` },
+              })),
+            ],
+          };
+        }
         return { role: m.role, content: m.content };
       }),
     };

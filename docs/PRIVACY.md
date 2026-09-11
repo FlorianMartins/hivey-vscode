@@ -13,6 +13,8 @@ l'extension fait, pas ce qu'elle promet.
 | **Sortie des commandes lancées par l'agent** | `run_command` renvoie la sortie et le code de retour au modèle | Oui si la discussion est distante, anonymisée comme tout résultat d'outil. Avant la 0.39.0 la sortie n'était pas lue du tout : c'est une donnée **de plus** qui circule, et elle est signalée ici pour cette raison. |
 | Chemins + symboles de tête du dépôt | Carte du dépôt jointe à la discussion | Oui si la discussion est distante. **Les corps de fichiers ne sont pas envoyés** — seulement les signatures. |
 | Fichier ou sélection que vous joignez | Discussion | Oui si distante, anonymisé, après consentement. |
+| **Texte collé ou déposé** (> 1 200 caractères ou > 12 lignes) | Joint à la discussion plutôt qu'inséré dans la zone de saisie | Oui si distante, anonymisé comme n'importe quelle pièce jointe, et clôturé comme contenu non fiable. |
+| **Image collée ou déposée** | Jointe à la discussion, réduite à 1 600 px de côté par le panneau | Oui si distante — **et c'est la seule donnée que l'anonymisation ne peut pas toucher** (voir ci-dessous). |
 | Fichiers lus par l'agent | Discussion en mode agent | Idem, ré-anonymisés à **chaque** étape. |
 | Diff indexé (`git diff --cached`) | Message de commit | Idem. |
 | Sélection du terminal | « Expliquer la sortie » | Idem. |
@@ -35,6 +37,24 @@ adresse e-mail *est* une adresse e-mail pour qui possède une liste d'adresses. 
 l'anonymisation ici est réversible-avec-un-coffre-local et non un condensat, et pourquoi le hachage
 n'apparaît qu'au seul endroit où il répond à une vraie question : « est-ce que quelqu'un a modifié
 ce journal après coup ? »
+
+## Ce qu'une image change, et pourquoi c'est dit deux fois
+
+Toute l'architecture de confidentialité de cette extension travaille sur du **texte** : des noms,
+des hôtes, des chemins, des identifiants sont trouvés et remplacés par des marqueurs avant le
+départ. Rien de tout cela ne peut s'appliquer à une capture d'écran, qui peut porter un bureau
+entier — une fenêtre de messagerie, un gestionnaire de mots de passe ouvert, le nom d'un client.
+
+Donc, quand une image part vers un point d'accès distant :
+
+- la carte de consentement le **dit** — « 1 image, envoyée telle quelle — une image ne peut pas être
+  pseudonymisée » — au lieu de la compter comme une pièce jointe ordinaire ;
+- le journal des sorties enregistre le **nombre d'images** de la requête, parce qu'une ligne disant
+  « 0 anonymisation » sur un tour qui a envoyé une capture d'écran serait vraie et trompeuse ;
+- sur un point d'accès **local**, rien de tout cela ne se pose : l'image ne quitte pas la machine.
+
+Les globs interdits s'appliquent à un fichier déposé comme à n'importe quel autre. Ce qu'ils ne
+peuvent pas faire, c'est reconnaître un secret **dans** une image.
 
 ## Anonymisation : ce qui est reconnu
 

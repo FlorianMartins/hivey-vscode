@@ -10,6 +10,8 @@ export interface UiContextItem {
   label: string;
   /** Tokens the item costs, so the user can see what their context is worth before sending. */
   tokens: number;
+  /** For an image: its dimensions and weight, since the label alone says nothing about either. */
+  detail?: string;
 }
 
 export interface UiStep {
@@ -345,6 +347,24 @@ export type ToExtension =
   | { type: "retry" }
   | { type: "attach"; what: "active" | "editor" | "selection" | "browse" | "openFiles" | "mention" }
   | { type: "attachPath"; path: string }
+  /**
+   * Something pasted or dropped onto the composer.
+   *
+   * Text and images take the same route because from the user's side they are the same gesture. The
+   * panel does the decoding — it is the only side that has a clipboard — and the downscaling, so
+   * what crosses this channel is already bounded.
+   */
+  | {
+      type: "pasteContext";
+      /** What to call it: a file name when there was one, a description otherwise. */
+      name: string;
+      text?: string;
+      /** For an image: `image/png` and the base64 payload, without the `data:` prefix. */
+      mediaType?: string;
+      data?: string;
+      width?: number;
+      height?: number;
+    }
   | { type: "removeAttachment"; label: string }
   /** Keep or drop the file the editor is showing, for as long as it is the one on screen. */
   | { type: "setImplicit"; on: boolean }

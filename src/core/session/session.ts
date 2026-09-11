@@ -14,11 +14,12 @@
 // Excluding is not cosmetic: it is the cheapest and most direct control anyone has over both the
 // quality and the price of the next turn.
 
-import type { ChatMessage } from "../providers/types.js";
+import type { ChatMessage, ImagePart } from "../providers/types.js";
 import type { FileSnapshot } from "./checkpoint.js";
 import type { Plan } from "../agent/plan.js";
 import type { Mode } from "./modes.js";
 import { estimateTokens } from "../util/tokens.js";
+import { IMAGE_TOKENS } from "../models/vision.js";
 
 export type EntryRole = "user" | "assistant";
 
@@ -31,6 +32,12 @@ export interface ContextItem {
   body: string;
   /** Content the user did not write (a page, a log, a dependency) is fenced as untrusted. */
   untrusted?: boolean;
+  /**
+   * An image, when the attachment is one. `body` then holds what the TRANSCRIPT says about it —
+   * a name and a size — because a base64 blob in the conversation record would be unreadable, would
+   * be counted as text by every budget, and would be written to disk with the history.
+   */
+  image?: ImagePart;
 }
 
 export interface Entry {
@@ -248,12 +255,24 @@ export class Session {
       }
     }
 
-    for (const r of keep) messages.push({ role: r.entry.role, content: r.text });
+    for (const r of keep) {
+      // Images ride beside the text rather than inside it — see `ImagePart`. Collected here because
+      // this is the one place an entry becomes a message, which is the same reason redaction lives
+      // at one point: a second path would be a path that forgets.
+      const images = (r.entry.context ?? []).flatMap((c) => (c.image ? [c.image] : []));
+      messages.push({ role: r.entry.role, content: r.text, ...(images.length ? { images } : {}) });
+    }
 
     return {
       messages,
       trimmed,
-      estimatedTokens: messages.reduce((s, m) => s + estimateTokens(m.content) + 4, 0),
+      // Images counted at a flat rate rather than not at all. Every provider prices them
+      // differently and most by tile, so no number is right; a budget that ignores them entirely is
+      // wrong by a thousand tokens per screenshot, which is the mistake that costs money.
+      estimatedTokens: messages.reduce(
+        (total, m) => total + estimateTokens(m.content) + 4 + (m.images?.length ?? 0) * IMAGE_TOKENS,
+        0,
+      ),
     };
   }
 }

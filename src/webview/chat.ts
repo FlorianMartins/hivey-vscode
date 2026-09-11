@@ -11,6 +11,7 @@ import { markdown } from "./markdown.js";
 import { t } from "../shared/i18n.js";
 import { REMOTE_VENDORS, vendor } from "../core/providers/vendors.js";
 import { closeModelCombo, isModelComboOpen, openModelCombo } from "./modelCombo.js";
+import { wirePaste } from "./paste.js";
 import { focusGateway } from "./setup.js";
 import type { Mode, Reasoning, ToExtension, UiEntry, UiSkill, UiState } from "../shared/protocol.js";
 import { applySuggestion, suggestionsFor, type Suggestion } from "../core/session/mentions.js";
@@ -658,6 +659,10 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
   // the thing the animation is actually telling them.
   const wrap = el("div", `composer${isStreaming() ? " working" : ""}`);
   const card = el("div", "composer-card");
+  // Paste and drop, on the card rather than the text area: dropping a file on the chips or on the
+  // toolbar is the same intent, and a target that only accepts the middle of itself is a target
+  // people miss. An ordinary paste is untouched — see `wirePaste`.
+  wirePaste(card, deps.send);
 
   if (state.attachments.length || state.implicit) {
     const chips = el("div", "chips attached");
@@ -700,7 +705,9 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
       const cut = a.label.lastIndexOf("/");
       chip.append(el("span", "chip-label", cut >= 0 ? a.label.slice(cut + 1) : a.label));
       if (cut > 0) chip.append(el("span", "chip-dir", a.label.slice(0, cut)));
-      chip.title = t("{0} · ~{1} tokens", a.kind, formatTokens(a.tokens));
+      chip.title = a.detail
+        ? t("{0} · {1} · ~{2} tokens", a.kind, a.detail, formatTokens(a.tokens))
+        : t("{0} · ~{1} tokens", a.kind, formatTokens(a.tokens));
       chip.append(
         button({
           icon: ICON.close,

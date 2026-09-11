@@ -15,6 +15,7 @@ import { Permissions, commandPrefix, type PermissionStore, type Rule } from "../
 import { stablePrompt, turnDirectives } from "../core/prompts.js";
 import { costOf, makeLookup, type Price } from "../core/router/pricing.js";
 import { calibrate, observe, prune, type Calibration } from "../core/util/calibrate.js";
+import { acceptsImages, IMAGE_TOKENS } from "../core/models/vision.js";
 import { handoverNote, verifyTurn, type TurnStep } from "../core/router/outcome.js";
 import { unifiedDiff } from "../core/text/diff.js";
 import { escalationTarget, route, type Route } from "../core/router/route.js";
@@ -413,7 +414,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         .sort((a, b) => b.updatedAt - a.updatedAt)
         .slice(0, 10)
         .map((x) => ({ id: x.id, title: x.title, messages: x.entries.length })),
-      attachments: this.attachments.map((c) => ({ kind: c.kind, label: c.label, tokens: estimateTokens(c.body) })),
+      // An image costs what an image costs, not what the sentence describing it costs. Counting the
+      // label would tell the user an attachment is worth twelve tokens when it is worth a thousand.
+      attachments: this.attachments.map((c) => ({
+        kind: c.kind,
+        label: c.label,
+        tokens: c.image ? IMAGE_TOKENS : estimateTokens(c.body),
+        ...(c.image ? { detail: c.body.replace(/^\[[^:]*:\s*/, "").replace(/\]$/, "") } : {}),
+      })),
       ...(implicit ? { implicit: { kind: implicit.kind, label: implicit.label, tokens: estimateTokens(implicit.body) } } : {}),
       implicitOn: Boolean(implicit) && this.implicitDismissed !== implicit?.label,
       openFiles: openFiles(),
@@ -838,6 +846,28 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           } else {
             void vscode.window.showWarningMessage(t("{0} could not be attached.", m.path));
           }
+          this.sendState();
+          break;
+        }
+        case "pasteContext": {
+          const item = pastedContext(m);
+          if (!item) {
+            void vscode.window.showWarningMessage(t("Nothing usable was pasted."));
+            break;
+          }
+          // Said once, at the moment of the gesture, rather than buried in a settings page. A model
+          // that cannot see the image will not say so — it answers about an image nobody looked at —
+          // and the person pasting is the only one who can choose a different model.
+          if (item.image) {
+            const settings = readSettings();
+            if (!acceptsImages(settings.chat.model)) {
+              void vscode.window.showWarningMessage(
+                t("{0} does not read images. It is attached, but the answer will be about the text alone.", settings.chat.model),
+              );
+            }
+          }
+          this.attachments = this.attachments.filter((a) => a.label !== item.label);
+          this.attachments.push(item);
           this.sendState();
           break;
         }
@@ -2943,6 +2973,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       nonce,
     });
 
+    // Counted once, used twice: on the card the user consents with, and in the ledger row the
+    // request leaves behind. This is the one thing in a request the redaction cannot touch —
+    // everything else has been through the pseudonymiser, and a screenshot leaves as it is.
+    const outgoingImages = built.messages.reduce((n, msg) => n + (msg.images?.length ?? 0), 0);
+
     const lastUser = [...this.session.entries].reverse().find((e) => e.role === "user");
     const decision = route(routerConfig(settings), {
       kind: mode === "chat" ? "chat" : "agent",
@@ -2995,6 +3030,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         t("~{0} tokens", estimatedTokens),
         isLocal ? t("on this machine, nothing billed") : t("~{0} $ on {1}", cost.toFixed(4), safeHost(baseUrl)),
       ];
+      if (outgoingImages && !isLocal) detail.push(t("{0} image(s), sent as they are — an image cannot be pseudonymised", outgoingImages));
       const answer = await new Promise<"once" | "session" | "always" | "no">((resolve) => {
         const id = randomNonce();
         this.approvals.set(id, resolve);
@@ -3191,6 +3227,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             usd: cost.usd,
             redactions: prepared.findings.length,
             redactionSummary: vault.summary().map((x) => `${x.label}×${x.count}`).join(", "),
+            // Recorded because it is the part of the request the redaction count says nothing
+            // about: "0 redactions" on a turn that sent a screenshot would be true and misleading.
+            ...(outgoingImages ? { images: outgoingImages } : {}),
           },
           settings,
         );
@@ -3580,6 +3619,37 @@ async function readOrEmpty(uri: vscode.Uri): Promise<string | undefined> {
   } catch {
     return undefined;
   }
+}
+
+/**
+ * What the clipboard gave us, as an attachment.
+ *
+ * The transcript gets a SENTENCE about the image — its name and its size — and never the base64,
+ * which would be unreadable in the record, counted as text by every budget, and written to disk
+ * with the history. The bytes ride separately, on the message, and go no further than the request.
+ */
+function pastedContext(m: { name: string; text?: string; mediaType?: string; data?: string; width?: number; height?: number }): ContextItem | undefined {
+  if (m.data && m.mediaType?.startsWith("image/")) {
+    const kb = Math.round((m.data.length * 3) / 4 / 1024);
+    const size = m.width && m.height ? `${m.width}×${m.height}, ${kb} kB` : `${kb} kB`;
+    return {
+      kind: "image",
+      label: m.name || t("pasted image"),
+      body: `[${t("image")}: ${m.name || t("pasted image")} — ${size}]`,
+      image: { mediaType: m.mediaType, data: m.data },
+    };
+  }
+  const text = (m.text ?? "").trim();
+  if (!text) return undefined;
+  return {
+    kind: "paste",
+    label: m.name || t("pasted text"),
+    body: headToTokens(text, 8000),
+    // Pasted text was written by somebody else — a log, a page, a colleague's message — so it goes
+    // behind the same fence as a file the agent read. The fence is the whole reason an attachment
+    // cannot give the model instructions.
+    untrusted: true,
+  };
 }
 
 function estimateCost(promptTokens: number, price: Price | undefined): number {

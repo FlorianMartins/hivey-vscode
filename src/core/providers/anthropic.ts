@@ -52,7 +52,13 @@ export class AnthropicProvider implements Provider {
         // A cache breakpoint costs nothing when it misses and saves ~90 % of the input price when
         // it hits. Put it on the big, stable blocks only: the API allows four per request.
         if (m.cacheable) block["cache_control"] = { type: "ephemeral" };
-        return { role: m.role === "assistant" ? "assistant" : "user", content: [block] };
+        // Images after the text, for the same reason as everywhere else: a model handed a picture
+        // before the question it is about describes the picture instead of answering.
+        const images = (m.images ?? []).map((img) => ({
+          type: "image",
+          source: { type: "base64", media_type: img.mediaType, data: img.data },
+        }));
+        return { role: m.role === "assistant" ? "assistant" : "user", content: [block, ...images] };
       }),
     };
     if (system.length) {

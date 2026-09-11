@@ -367,3 +367,57 @@ test("a refusal that names no parameter is reported, not retried", async () => {
   await s.close();
   assert.equal(calls, 1);
 });
+
+// The two dialects that follow disagree about everything here — the field name, the encoding, the
+// nesting — so both are checked on the body that actually leaves. The ORDER is not cosmetic either:
+// a model handed a picture before the question it is about describes the picture instead of
+// answering it.
+
+test("OpenAI: an image becomes a content array with a data URL", async () => {
+  const s = await serve((_req, res) => sse(res, [{ choices: [{ delta: { content: "a cat" } }] }]));
+  const p = new OpenAICompatibleProvider({ id: "openai", baseUrl: s.url, apiKey: "k", isLocal: false });
+  await p.chat({
+    model: "gpt-5",
+    messages: [{ role: "user", content: "what is this?", images: [{ mediaType: "image/png", data: "QUJD" }] }],
+  });
+  await s.close();
+
+  const sent = s.requests[0]!.body.messages[0];
+  assert.ok(Array.isArray(sent.content), "a message with an image must use the array form");
+  assert.equal(sent.content[0].type, "text");
+  assert.equal(sent.content[0].text, "what is this?");
+  assert.equal(sent.content[1].type, "image_url");
+  assert.equal(sent.content[1].image_url.url, "data:image/png;base64,QUJD");
+});
+
+test("OpenAI: a message with no image keeps the plain string form", async () => {
+  // Every server on the list accepts the array form, and several older gateways accept only the
+  // string. Switching everything to arrays for the sake of one feature would break them all.
+  const s = await serve((_req, res) => sse(res, [{ choices: [{ delta: { content: "ok" } }] }]));
+  const p = new OpenAICompatibleProvider({ id: "local", baseUrl: s.url, isLocal: true });
+  await p.chat({ model: "m", messages: [{ role: "user", content: "hello" }] });
+  await s.close();
+  assert.equal(s.requests[0]!.body.messages[0].content, "hello");
+});
+
+test("Anthropic: an image becomes a base64 source block, after the text", async () => {
+  const s = await serve((_req, res) => {
+    res.writeHead(200, { "Content-Type": "text/event-stream" });
+    res.write(`event: content_block_delta\ndata: ${JSON.stringify({ type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "a cat" } })}\n\n`);
+    res.write(`event: message_stop\ndata: ${JSON.stringify({ type: "message_stop" })}\n\n`);
+    res.end();
+  });
+  const p = new AnthropicProvider({ baseUrl: s.url, apiKey: "k" });
+  await p.chat({
+    model: "claude-sonnet-5",
+    messages: [{ role: "user", content: "what is this?", images: [{ mediaType: "image/png", data: "QUJD" }] }],
+  });
+  await s.close();
+
+  const blocks = s.requests[0]!.body.messages[0].content;
+  assert.equal(blocks[0].type, "text");
+  assert.equal(blocks[1].type, "image");
+  assert.equal(blocks[1].source.type, "base64");
+  assert.equal(blocks[1].source.media_type, "image/png");
+  assert.equal(blocks[1].source.data, "QUJD");
+});

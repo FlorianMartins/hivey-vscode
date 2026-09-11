@@ -2,6 +2,58 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.40.0 — 2026-09-11
+
+### Corrigé
+
+- **Le panneau suit de nouveau la réponse pendant qu'elle s'écrit, et cesse de remonter tout seul
+  dans les anciens messages.** Les deux signalés par l'utilisateur, invisibles pour une suite de
+  tests qui ne photographiait que des écrans au repos, et une seule cause de fond : un message
+  d'état reconstruit tout le panneau, et les messages d'état arrivent pour des raisons étrangères à
+  la conversation — le curseur a bougé dans un éditeur, un fichier a été ouvert, et en mode agent
+  l'agent enregistre lui-même des fichiers. Chaque reconstruction détruisait le tour en cours,
+  l'animation de frappe et la position de lecture sous une réponse en train d'arriver. Le transcript
+  appartient maintenant au tour tant qu'un tour tourne.
+
+  Trois autres choses, chacune suffisant à tuer le suivi à elle seule : le conteneur du tour est plus
+  haut que la tolérance qui décide si l'on est « en bas », et il était ajouté avant qu'on pose la
+  question ; les positions de défilement étaient appliquées à la frame suivante, et un jeton arrivant
+  entre-temps mesurait une position que personne n'avait choisie ; et « laisser le lecteur
+  tranquille » était codé comme « ne pas toucher au défilement », ce qui n'est pas la même chose —
+  un tour d'agent écrit ses étapes et son plan **au-dessus** de la réponse, donc chaque outil insère
+  des lignes au-dessus de la tête du lecteur. C'est cela, le transcript qui remonte tout seul. Il
+  s'ancre désormais sur l'élément en haut de la vue et se décale d'exactement ce qui a bougé.
+
+  **L'instrument compte autant que la correction.** Tout ce que le banc de captures photographiait
+  était au repos, ce qui est précisément pourquoi deux défauts de comportement **en mouvement** ont
+  été livrés deux fois. Il y a maintenant une image prise pendant l'écriture d'une réponse, derrière
+  une fixture qui diffuse pendant quarante secondes. Correction retirée, elle montre le panneau posé
+  sur la première question de la conversation, bouton de retour au dernier message affiché, pendant
+  que la troisième reçoit sa réponse — le rapport de bug, en photo.
+
+### Ajouté
+
+- **Coller ou déposer un élément en contexte.** Une capture d'écran, une trace de pile, un journal,
+  un fichier venu de l'explorateur : collé ou déposé sur le composeur et joint à la question. Un
+  collage court va toujours dans la zone de saisie, comme partout ailleurs ; un mur de texte devient
+  une pièce jointe au lieu d'enterrer ce qu'on est en train d'écrire.
+
+  Les images sont réduites à 1 600 px avant de voyager, et ne partent qu'aux modèles dont le
+  catalogue dit qu'ils les lisent — **lu chez le fournisseur, jamais deviné d'après le nom** : `gpt`
+  lit les images, `gpt-oss` non, et une heuristique sur les noms est fausse la semaine suivante.
+  Quand le modèle choisi ne les lit pas, on vous le dit, au lieu qu'il réponde à propos d'une image
+  que personne n'a regardée.
+
+  Ce qu'un `.docx` ou un `.pdf` ne peut pas devenir honnêtement est refusé plutôt que joint en
+  charabia : les lire demande un analyseur que ce projet n'embarque pas, et un modèle répond avec
+  aplomb à propos du bruit.
+
+  **Une image est la seule donnée que l'anonymisation ne peut pas toucher.** Toute l'architecture de
+  confidentialité travaille sur du texte ; une capture d'écran peut porter un bureau entier. La carte
+  de consentement le dit en toutes lettres avant le départ, et le journal des sorties enregistre le
+  nombre d'images — une ligne « 0 anonymisation » sur un tour qui a envoyé une capture serait vraie
+  et trompeuse.
+
 ## 0.39.0 — 2026-09-10
 
 Une version sur un seul thème : **fermer la boucle de rétroaction**. L'agent pouvait agir et ne

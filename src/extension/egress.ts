@@ -41,6 +41,15 @@ export interface EgressRecord {
   redactions: number;
   /** Kinds only — `EMAIL x3, HOST x1` — never the values. */
   redactionSummary: string;
+  /**
+   * How many images went with it, when any did.
+   *
+   * The one thing in a request that the redaction count says nothing about: an image cannot be
+   * pseudonymised, so a row reading "0 redactions" on a turn that sent a screenshot would be true
+   * and misleading. Absent rather than zero on the ordinary turn, so the log does not grow a column
+   * of noughts.
+   */
+  images?: number;
 }
 
 const LEDGER_KEY = "hiveyCode.egress.ledger";

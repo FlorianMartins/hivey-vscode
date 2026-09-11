@@ -27,6 +27,7 @@ const { data } = await res.json();
 // Compact tuples rather than objects: 400 models, one line each, and a daily diff a human can read.
 // [id, display name, vendor, context window, $/M in, $/M out, $/M cached-in]
 const rows = [];
+const vision = [];
 let kept = 0;
 for (const m of data ?? []) {
   const p = m.pricing ?? {};
@@ -45,9 +46,15 @@ for (const m of data ?? []) {
   const vendor = m.id.includes("/") ? m.id.slice(0, m.id.indexOf("/")) : "";
   const name = String(m.name ?? m.id).replace(/^[^:]+:\s*/, "");
   rows.push([m.id, name, vendor, Number(m.context_length ?? 0), inUsd, outUsd, cachedUsd]);
+  // Which models will actually look at a pasted screenshot. Read from the provider rather than
+  // guessed from the name, for the same reason no model version is written by hand here: "gpt" and
+  // "gemini" accept images and "gpt-oss" does not, and a heuristic over names is wrong the week
+  // after it is written.
+  if ((m.architecture?.input_modalities ?? []).includes("image")) vision.push(m.id);
   kept++;
 }
 rows.sort((a, b) => a[0].localeCompare(b[0]));
+vision.sort();
 
 const body = `// GENERATED FILE — do not edit by hand.
 // Written by \`npm run models\` (scripts/update-models.mjs); a scheduled workflow commits the diff.
@@ -70,6 +77,23 @@ ${rows.map((r) => `  ${JSON.stringify(r)},`).join("\n")}
  * Prices, keyed by id. Bare ids are aliased too: a native API calls it \`claude-sonnet-4-5\` where
  * OpenRouter calls it \`anthropic/claude-sonnet-4.5\`, and both should be priced.
  */
+/**
+ * The models that accept an image alongside the question.
+ *
+ * Bare ids are aliased for the same reason the prices are: a native API calls it \`gpt-5\` where
+ * OpenRouter calls it \`openai/gpt-5\`, and somebody pasting a screenshot should not be told their
+ * model cannot see it because of a prefix.
+ */
+export const GENERATED_VISION: ReadonlySet<string> = (() => {
+  const ids = ${JSON.stringify(vision)};
+  const set = new Set(ids);
+  for (const id of ids) {
+    const bare = id.includes("/") ? id.slice(id.indexOf("/") + 1) : undefined;
+    if (bare) set.add(bare);
+  }
+  return set;
+})();
+
 export const GENERATED_PRICES: Record<string, Price> = (() => {
   const table: Record<string, Price> = { "local/*": { in: 0, out: 0 } };
   for (const [id, , , , inUsd, outUsd, cachedUsd] of GENERATED_MODELS) {
