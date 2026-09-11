@@ -48,3 +48,53 @@ test("growth under the tolerance follows either way — which is why this hid fo
   assert.ok(atEnd(after), "a small chunk keeps the reader nominally at the end");
   assert.equal(placeAfterChange(before, after), 620);
 });
+
+// ── Being left alone while the document grows over your head ─────────────────────────────────────
+//
+// The second defect, and the harder one to see: "leave the reader alone" was implemented as "do not
+// touch scrollTop", which is not the same thing. An agent turn writes its step lines and its plan
+// ABOVE the answer text, so every tool that runs inserts rows over the reader's head. Their pixel
+// offset from the top is unchanged and the content at that offset is not — so the transcript drifts
+// upward into older messages, by itself, while they are reading.
+
+test("content inserted above the reader moves them with it, so the glass does not change", () => {
+  const before = view(2000, 800);
+  // Two step rows, 120 px, landed above the viewport: everything the reader sees moved down.
+  const after = view(2120, 800);
+  const place = placeAfterChange(before, after, { before: 900, after: 1020 });
+  assert.equal(place, 920, "the reader should have been moved down by exactly what was inserted above");
+});
+
+test("content that grows BELOW the reader does not move them", () => {
+  // The answer itself getting longer is the ordinary case, and it must not shift anybody: the
+  // anchor at the top of their viewport has not moved.
+  const before = view(2000, 800);
+  const after = view(2400, 800);
+  assert.equal(placeAfterChange(before, after, { before: 900, after: 900 }), undefined);
+});
+
+test("content removed above the reader moves them back up by the same amount", () => {
+  // Deleting an earlier exchange, or a plan block collapsing.
+  const place = placeAfterChange(view(2000, 800), view(1880, 800), { before: 900, after: 780 });
+  assert.equal(place, 680);
+});
+
+test("compensation never computes a position past the last scrollable pixel", () => {
+  // More was inserted above the reader than there is room to move down into. The arithmetic wants
+  // 1600 + 400 = 2000; the last position this content can be scrolled to is 2200 − 300 = 1900.
+  // Handing the browser 2000 would have it clamp to the end anyway, so the clamp is done here where
+  // it can be reasoned about rather than discovered.
+  const place = placeAfterChange(view(2000, 1600), view(2200, 1600), { before: 1700, after: 2100 });
+  assert.equal(place, 1900);
+});
+
+test("a reader at the end still follows, anchor or no anchor", () => {
+  // Following wins over compensating: someone at the bottom asked to be at the bottom.
+  assert.equal(placeAfterChange(view(600, 300), view(900, 300), { before: 100, after: 400 }), 900);
+});
+
+test("without an anchor the old behaviour is unchanged", () => {
+  // Every caller that has nothing above the reader to anchor against — an empty transcript, a
+  // mutation at the very top — keeps the two-outcome contract.
+  assert.equal(placeAfterChange(view(2000, 800), view(2120, 800)), undefined);
+});

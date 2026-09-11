@@ -47,6 +47,14 @@ function render(): void {
   // extension from erasing a half-written question.
   const draft = captureDraft();
   const place = captureScroll();
+  // The transcript belongs to the turn while a turn is running — see `chatScreen`. Held by
+  // reference before the tree is emptied, which detaches it without destroying it, and put back
+  // below. Everything else (the header, the composer, the context chips that this rebuild exists
+  // for) is rebuilt as before.
+  const keep =
+    state.screen === "chat" && isStreaming()
+      ? (document.querySelector<HTMLElement>(".transcript-wrap") ?? undefined)
+      : undefined;
   app.textContent = "";
   app.append(header(state));
   if (searchOpen && state.screen === "chat") app.append(searchBar(state));
@@ -71,11 +79,13 @@ function render(): void {
       break;
     case "chat":
     default:
-      app.append(chatScreen(state, deps));
+      app.append(chatScreen(state, deps, keep));
       break;
   }
-  live = undefined;
-  restoreScroll(place);
+  // Only when the transcript was actually rebuilt. Clearing it while its nodes are still on screen
+  // is what orphaned the live turn: the next token created a second one underneath the first.
+  if (!keep) live = undefined;
+  restoreScroll(place, Boolean(keep));
   restoreDraft(draft);
 }
 
@@ -97,20 +107,33 @@ function captureScroll(): { top: number; atEnd: boolean } | undefined {
   return { top: list.scrollTop, atEnd: atBottom(list) };
 }
 
-function restoreScroll(place: { top: number; atEnd: boolean } | undefined): void {
+/**
+ * `preserved` says the transcript node survived the rebuild, so its content is identical and the
+ * number captured before still points at the same thing.
+ *
+ * Either way the position is applied IMMEDIATELY and not on the next frame. A re-inserted scroller
+ * starts at zero, and a token arriving in the millisecond before that frame would measure "the
+ * reader is not at the end" against a position nobody chose — and, the rule being what it is, stop
+ * following for the rest of the answer. That was one of the two ways the follow died.
+ */
+function restoreScroll(place: { top: number; atEnd: boolean } | undefined, preserved = false): void {
   // At the end, or arriving from another screen: the end is where a conversation is read from.
   if (!place || place.atEnd) {
     scrollToEnd(true);
     return;
   }
-  requestAnimationFrame(() => {
-    const list = document.querySelector(".transcript");
+  const apply = (): void => {
+    const list = document.querySelector<HTMLElement>(".transcript");
     if (!list) return;
     list.scrollTop = place.top;
     // The rebuild dropped the button with the old DOM; the reader is still where they were, so it
     // is still needed.
     showJumpButton(!atBottom(list));
-  });
+  };
+  apply();
+  // A rebuilt transcript is still settling — a code block measured, a font swapped — so it is
+  // placed again once layout has run. A preserved one is the same nodes it already was.
+  if (!preserved) requestAnimationFrame(apply);
 }
 
 function header(s: UiState): HTMLElement {
@@ -257,7 +280,15 @@ class LiveTurn {
   private thinking?: { wrap: HTMLElement; body: HTMLElement };
   private buffer = "";
 
-  constructor(list: HTMLElement) {
+  /**
+   * Built and attached in two steps, because the attachment is what moves the reader.
+   *
+   * The turn's own container is a header and a line of padding — taller than the tolerance that
+   * decides whether somebody is "at the end of the transcript". Appending it and then asking the
+   * question pushed every reader over that line by the container's own height, and from then on the
+   * answer never followed the bottom. `attach()` exists so the caller can ask first.
+   */
+  constructor(private readonly list: HTMLElement) {
     this.root = el("article", "entry assistant streaming");
     const head = el("div", "entry-head");
     head.append(el("span", "entry-who", "Hivey Code"));
@@ -265,7 +296,10 @@ class LiveTurn {
     this.root.append(head);
     this.body = el("div", "entry-body");
     this.root.append(this.body);
-    list.append(this.root);
+  }
+
+  attach(): void {
+    this.list.append(this.root);
   }
 
   appendText(chunk: string): void {
@@ -528,8 +562,14 @@ function ensureLive(): LiveTurn {
   const list = document.querySelector<HTMLElement>(".transcript") ?? app;
   // The welcome block is not part of the conversation; it goes as soon as one starts.
   list.querySelector(".welcome")?.remove();
-  live = new LiveTurn(list);
-  scrollToEnd();
+  // Through `following`, and this is not a tidy-up. The turn's own container — a header, a name, a
+  // line of padding — is taller than the tolerance that decides whether the reader is "at the end".
+  // Appended first and asked afterwards, as it was, it pushed the reader over that line by its own
+  // height: every following frame then measured "they have scrolled up" and the answer never
+  // followed the bottom once. The question has to be asked before the container exists.
+  const turn = new LiveTurn(list);
+  following(() => turn.attach());
+  live = turn;
   return live;
 }
 
@@ -576,15 +616,52 @@ function following(mutate: () => void): void {
     return;
   }
   const before = measure(list);
+  // Only for a reader who is NOT at the end — the one this protects. An agent turn writes its step
+  // lines and its plan ABOVE the answer, so every tool that runs inserts rows over their head and
+  // pushes what they are reading further down the document. Their pixel offset does not change and
+  // the content at it does, which is the transcript wandering up into older messages on its own.
+  const anchorNode = atEnd(before) ? undefined : topmostVisible(list);
+  const anchorBefore = anchorNode ? contentOffset(list, anchorNode) : 0;
+
   mutate();
-  const place = placeAfterChange(before, measure(list));
+
+  const after = measure(list);
+  // A mutation that removed the anchor leaves nothing to measure against, and moving the reader on
+  // a guess is worse than leaving them.
+  const anchor =
+    anchorNode && anchorNode.isConnected ? { before: anchorBefore, after: contentOffset(list, anchorNode) } : undefined;
+  const place = placeAfterChange(before, after, anchor);
   if (place !== undefined) list.scrollTop = place;
-  showJumpButton(place === undefined);
+  // Asked of the list rather than inferred from `place`, because those stopped being the same
+  // question: a compensated reader has a position applied to them AND is still away from the end,
+  // and inferring would have hidden the button that tells them an answer is being written.
+  showJumpButton(!atBottom(list));
+}
+
+/** Where a node sits within the scrolled content, independent of where the content is scrolled to. */
+function contentOffset(list: HTMLElement, node: Element): number {
+  return node.getBoundingClientRect().top - list.getBoundingClientRect().top + list.scrollTop;
+}
+
+/**
+ * The element at the top of what the reader can see.
+ *
+ * Their anchor: whatever happens above it, this is the thing that must not move on the glass. Top
+ * level children only — an entry, the live turn — because those are what the transcript inserts
+ * between, and because a deeper node is liable to be replaced by the very mutation being measured.
+ */
+function topmostVisible(list: HTMLElement): Element | undefined {
+  const top = list.scrollTop;
+  for (const child of Array.from(list.children)) {
+    const start = contentOffset(list, child);
+    if (start + child.getBoundingClientRect().height > top) return child;
+  }
+  return undefined;
 }
 
 function scrollToEnd(force = false): void {
-  requestAnimationFrame(() => {
-    const list = document.querySelector(".transcript");
+  const apply = (): void => {
+    const list = document.querySelector<HTMLElement>(".transcript");
     if (!list) return;
     if (!force && !atBottom(list)) {
       showJumpButton(true);
@@ -592,7 +669,11 @@ function scrollToEnd(force = false): void {
     }
     list.scrollTop = list.scrollHeight;
     showJumpButton(false);
-  });
+  };
+  // Now, and again after layout. Waiting only for the frame left a window in which the transcript
+  // sat at zero; anything that measured during it concluded the reader had scrolled up.
+  apply();
+  requestAnimationFrame(apply);
 }
 
 /**

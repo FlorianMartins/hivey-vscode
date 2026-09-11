@@ -1086,6 +1086,23 @@ suite("Screenshot", () => {
 
       await announce("conversation");
 
+      // The frame taken WHILE an answer is being written.
+      //
+      // Everything else here is photographed at rest, which is exactly why two scrolling defects
+      // shipped: the transcript stopping following the answer, and the view drifting up into older
+      // messages on its own. Both are only visible in motion, both were reported by the person
+      // using the panel rather than by this suite, and neither could have been seen in any picture
+      // it took. The fixture behind this one streams for half a minute so the shutter opens with
+      // the answer still arriving.
+      // NOT awaited, and that is the whole trick: `askWith` resolves when the turn ENDS, so awaiting
+      // it here photographed a finished answer every time and proved nothing about following one.
+      void vscode.commands.executeCommand("hiveyCode.askWith", "Explain the rounding options step by step.");
+      await new Promise((r) => setTimeout(r, 2000));
+      await announce("pendant");
+      // Let it finish before anything else is photographed: a turn still running would leave a
+      // spinner in the frames that follow.
+      await new Promise((r) => setTimeout(r, 45_000));
+
       // A screen showing what an attachment actually looks like. Three separate fixes to "attach
       // all open editors" were verified by reasoning about the code, and the feature stayed broken
       // for the person using it — because nothing in the suite ever LOOKED at the result. This
@@ -1110,7 +1127,9 @@ suite("Screenshot", () => {
       }
       if (marker) await fs.writeFile(marker, "done", "utf8");
     },
-    200_000,
+    // Eight screens at twenty seconds each, plus a real conversation between them and one answer
+    // deliberately streamed slowly so it can be photographed while it is still arriving.
+    360_000,
   );
 });
 

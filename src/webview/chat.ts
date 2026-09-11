@@ -36,14 +36,25 @@ export interface ChatDeps {
   rerender: () => void;
 }
 
-export function chatScreen(state: UiState, deps: ChatDeps): HTMLElement {
+/**
+ * `keep` is the transcript box from the previous render, when there is a reason to keep it.
+ *
+ * That reason is a turn in progress. The panel is rebuilt from scratch on every state message, and
+ * state messages arrive for reasons that have nothing to do with the conversation — the caret moved
+ * in an editor, a file was opened, the agent itself saved a file. Rebuilding the transcript under a
+ * streaming answer throws away the live turn, the typing animation and the scroll position, several
+ * times a second, which is what made the answer stop following the bottom and the view wander off
+ * into older messages. So while a turn is running, the transcript belongs to the turn: the same
+ * node is moved into the new tree instead of a new one being built from a stale copy of the text.
+ */
+export function chatScreen(state: UiState, deps: ChatDeps, keep?: HTMLElement): HTMLElement {
   const wrap = el("div", "screen chat-screen");
   // The transcript sits in its own positioned box so the "latest" button can float at the BOTTOM
   // OF THE TRANSCRIPT — which is the gap between the last answer and the composer, wherever the
   // composer happens to end up. Pinning it to the screen with a hand-measured offset put it inside
   // the composer the moment the composer grew a row.
-  const area = el("div", "transcript-wrap");
-  area.append(transcript(state, deps));
+  const area = keep ?? el("div", "transcript-wrap");
+  if (!keep) area.append(transcript(state, deps));
   wrap.append(area, composer(state, deps));
   return wrap;
 }
