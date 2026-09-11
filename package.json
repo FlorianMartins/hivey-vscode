@@ -1017,7 +1017,7 @@
   },
   "devDependencies": {
     "@types/node": "^18.19.0",
-    "@types/vscode": "^1.93.0",
+    "@types/vscode": "^1.136.0",
     "@vscode/test-electron": "^2.5.2",
     "esbuild": "^0.25.0",
     "typescript": "^5.9.0"
