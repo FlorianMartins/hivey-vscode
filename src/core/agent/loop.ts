@@ -113,6 +113,46 @@ export interface TurnResult {
 
 const DEFAULT_MAX_STEPS = 12;
 
+/**
+ * Below this there is nothing worth caching, and marking it costs money.
+ *
+ * A cache entry is written at a premium — Anthropic charges 1.25× for the tokens it stores — and
+ * read back at a tenth. So marking pays off the moment a prefix is reused once, and is a 25 %
+ * penalty when it never is. A title, a commit message, a classification: one short request, never
+ * repeated. Anthropic will not cache under about a thousand tokens in any case.
+ */
+const CACHE_WORTH_IT_TOKENS = 2000;
+
+/**
+ * Move the cache breakpoint to the end of what is being sent.
+ *
+ * This is the difference between caching the system prompt and caching the CONVERSATION, and on a
+ * long agent turn it is most of the bill.
+ *
+ * The prefix marked as cacheable by the caller is the part that never changes: the system prompt and
+ * the repository map. Everything a turn then produces — the model's tool calls, the file it read,
+ * the output of the command it ran — is appended, and on the next step every byte of it is sent
+ * again. Marked nowhere, all of it is charged at full price on step 2, and again on step 3, and so
+ * on: the cost of a twelve-step turn grows with the SQUARE of its length.
+ *
+ * One more breakpoint, at the end of each request, turns that into a straight line. Step N writes a
+ * cache entry covering everything it sent; step N+1 finds it, pays a tenth for all of it, and full
+ * price only for the tool result that has arrived since. The same mechanism makes the second
+ * question in a conversation cheap, and the twentieth cheap as well.
+ *
+ * Returns a new array: the flag must not stick to the messages the loop keeps, or a twelve-step turn
+ * would accumulate twelve breakpoints and Anthropic accepts four.
+ */
+export function withRollingCacheMark(messages: ChatMessage[]): ChatMessage[] {
+  if (messages.length < 2) return messages;
+  const total = estimateMessageTokens(messages);
+  if (total < CACHE_WORTH_IT_TOKENS) return messages;
+  const last = messages[messages.length - 1]!;
+  if (last.cacheable) return messages;
+  return [...messages.slice(0, -1), { ...last, cacheable: true }];
+}
+
+
 export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
   const tools = opts.tools ?? [];
   const byName = new Map(tools.map((t) => [t.schema.name, t]));
@@ -128,7 +168,8 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
   for (let step = 0; step < maxSteps; step++) {
     if (opts.signal?.aborted) return done("cancelled");
 
-    const outgoing = opts.beforeRequest ? await opts.beforeRequest(working) : working;
+    const prepared = opts.beforeRequest ? await opts.beforeRequest(working) : working;
+    const outgoing = withRollingCacheMark(prepared);
     let res: ChatResult;
     try {
       res = await opts.provider.chat(

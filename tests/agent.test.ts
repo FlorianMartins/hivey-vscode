@@ -225,3 +225,44 @@ test("usage adds up across the steps of one turn", async () => {
   assert.equal(r.usage.promptTokens, 20);
   assert.equal(r.usage.completionTokens, 10);
 });
+
+// ── The breakpoint that moves ────────────────────────────────────────────────────────────────────
+//
+// Caching the system prompt caches the part that never grows. Everything a turn PRODUCES — the
+// model's tool calls, the file it read, the output of the command it ran — is appended and sent
+// again on the next step, and unmarked it is charged at full price every time: the cost of a
+// twelve-step turn grows with the square of its length.
+
+test("each step marks the end of what it sent, so the next one starts from a cache hit", async () => {
+  const t1 = tool("a");
+  const provider = scriptedProvider([
+    { toolCalls: [{ id: "c1", name: "a", args: "{}" }] },
+    { toolCalls: [{ id: "c2", name: "a", args: "{}" }] },
+    { text: "done" },
+  ]);
+  // Long enough to be worth caching: below a couple of thousand tokens a breakpoint is a 25 % write
+  // premium on something that will never be read back.
+  const big = "x ".repeat(4000);
+  await runTurn({ ...base, provider, tools: [t1], messages: [{ role: "system", content: big, cacheable: true }] });
+
+  for (const [step, sent] of provider.seen.entries()) {
+    const last = sent.messages[sent.messages.length - 1]!;
+    assert.equal(last.cacheable, true, `step ${step} did not mark the end of what it sent`);
+  }
+  // And the flag must not stick to the loop's own copy, or a twelve-step turn accumulates twelve
+  // breakpoints — four is the most Anthropic accepts before refusing the request.
+  const lastRequest = provider.seen[provider.seen.length - 1]!.messages;
+  assert.ok(
+    lastRequest.filter((m) => m.cacheable).length <= 2,
+    `the marks accumulated: ${lastRequest.filter((m) => m.cacheable).length}`,
+  );
+});
+
+test("a short request is not marked, because writing a cache entry costs more than it saves", async () => {
+  // A title, a commit message, a classification: one short request, never repeated. Anthropic
+  // charges 1.25× to store a prefix and a tenth to read it back, so marking one that is never read
+  // is a straight 25 % penalty.
+  const provider = scriptedProvider([{ text: "ok" }]);
+  await runTurn({ ...base, provider, messages: [{ role: "user", content: "write a commit message" }] });
+  assert.ok(!provider.seen[0]!.messages.some((m) => m.cacheable));
+});

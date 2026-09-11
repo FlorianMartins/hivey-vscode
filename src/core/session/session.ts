@@ -53,6 +53,15 @@ export interface Entry {
   pinned?: boolean;
   model?: string;
   usdCost?: number;
+  /**
+   * What the answer actually consumed, so the price can be explained rather than only stated.
+   *
+   * A number on its own is unarguable and undiagnosable: "14.13 $" beside "43.7k tokens" reads as
+   * an error, and there is no way to discover that the 43.7k is the conversation's weight while the
+   * 14.13 is every step of every turn that resent it. These three numbers are what turns the second
+   * figure into an explanation.
+   */
+  usage?: { promptTokens: number; completionTokens: number; cachedTokens: number };
   /** What the model thought before answering. Kept for the user, never sent back to the model. */
   reasoning?: string;
   /** The tools this answer ran, for the transcript and the audit trail. */
@@ -207,6 +216,34 @@ export class Session {
   dropLastAnswer(): void {
     const last = this.entries[this.entries.length - 1];
     if (last?.role === "assistant") this.entries.pop();
+  }
+
+  /**
+   * How much of this conversation will actually travel with the next question.
+   *
+   * NOT the same number as its weight, and the difference is the whole point: `build` drops the
+   * oldest unpinned exchanges when the budget is short. A panel reporting the weight under the
+   * words "what the next question will send" is wrong by whatever was trimmed — which on a long
+   * conversation is most of it.
+   *
+   * Mirrors `build`'s walk exactly, including the order: newest first, pinned kept regardless.
+   */
+  plannedTokens(budgetTokens: number): number {
+    let budget = budgetTokens;
+    let used = 0;
+    const included = this.entries.filter((e) => e.included && !e.error);
+    for (let i = included.length - 1; i >= 0; i--) {
+      const entry = included[i]!;
+      const cost =
+        estimateTokens(entry.text) +
+        (entry.context ?? []).reduce((sum, c) => sum + (c.image ? IMAGE_TOKENS : estimateTokens(c.body)), 0) +
+        4;
+      if (cost <= budget || entry.pinned) {
+        budget -= cost;
+        used += cost;
+      }
+    }
+    return used;
   }
 
   totalCostUsd(): number {

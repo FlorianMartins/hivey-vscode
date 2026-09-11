@@ -421,3 +421,82 @@ test("Anthropic: an image becomes a base64 source block, after the text", async 
   assert.equal(blocks[1].source.media_type, "image/png");
   assert.equal(blocks[1].source.data, "QUJD");
 });
+
+// ── The prompt cache, which is where the bill is actually decided ────────────────────────────────
+//
+// Anthropic's cache is not automatic: it applies only to prefixes a request explicitly marks. The
+// marker existed here from the beginning and only the NATIVE Anthropic client ever emitted it — so
+// every Claude conversation routed through OpenRouter, which is the default paid route and what the
+// Hivey presets use, paid the full input price for its system prompt, its repository map and its
+// whole transcript on every single request.
+
+test("OpenRouter: a cacheable message carries the marker Anthropic needs", async () => {
+  const s = await serve((_req, res) => sse(res, [{ choices: [{ delta: { content: "ok" } }] }]));
+  const p = new OpenAICompatibleProvider({ id: "openrouter", baseUrl: s.url, apiKey: "k", isLocal: false });
+  await p.chat({
+    model: "anthropic/claude-opus-5",
+    messages: [
+      { role: "system", content: "rules", cacheable: true },
+      { role: "user", content: "hello" },
+    ],
+  });
+  await s.close();
+
+  const sent = s.requests[0]!.body.messages;
+  assert.ok(Array.isArray(sent[0].content), "a marked message must use the content-array form");
+  assert.deepEqual(sent[0].content[0].cache_control, { type: "ephemeral" });
+  assert.equal(sent[1].content, "hello", "an unmarked message keeps the plain string form");
+});
+
+test("a gateway that is not OpenRouter is sent nothing it did not ask for", async () => {
+  // `cache_control` is an Anthropic-and-OpenRouter extension. A strict gateway answers 400 to a
+  // field it does not know, and turning every request into the array form to suit one provider
+  // would break the others.
+  const s = await serve((_req, res) => sse(res, [{ choices: [{ delta: { content: "ok" } }] }]));
+  const p = new OpenAICompatibleProvider({ id: "openai-compatible", baseUrl: s.url, apiKey: "k", isLocal: false });
+  await p.chat({ model: "m", messages: [{ role: "system", content: "rules", cacheable: true }] });
+  await s.close();
+  assert.equal(s.requests[0]!.body.messages[0].content, "rules");
+});
+
+test("never more than four breakpoints, whichever door the request goes through", async () => {
+  // Anthropic rejects the whole request beyond four, and a repository with two skills loaded plus
+  // the rolling breakpoint reaches five without anybody doing anything unusual. The LAST four win:
+  // a breakpoint caches everything before it, so a later one subsumes an earlier one.
+  const six = Array.from({ length: 6 }, (_, i) => ({ role: "user" as const, content: `m${i}`, cacheable: true }));
+
+  const a = await serve((_req, res) => sse(res, [{ choices: [{ delta: { content: "ok" } }] }]));
+  const openrouter = new OpenAICompatibleProvider({ id: "openrouter", baseUrl: a.url, apiKey: "k", isLocal: false });
+  await openrouter.chat({ model: "anthropic/claude-opus-5", messages: six });
+  await a.close();
+  const marked = a.requests[0]!.body.messages.filter((m: any) => Array.isArray(m.content) && m.content[0].cache_control);
+  assert.equal(marked.length, 4);
+  assert.equal(marked[3].content[0].text, "m5", "the last message must keep its breakpoint");
+  assert.equal(marked[0].content[0].text, "m2", "the earliest ones are the ones to drop");
+});
+
+test("Anthropic: the system blocks and the messages share the same budget of four", async () => {
+  const s = await serve((_req, res) => {
+    res.writeHead(200, { "Content-Type": "text/event-stream" });
+    res.write(`event: message_stop\ndata: ${JSON.stringify({ type: "message_stop" })}\n\n`);
+    res.end();
+  });
+  const p = new AnthropicProvider({ baseUrl: s.url, apiKey: "k" });
+  await p.chat({
+    model: "claude-opus-5",
+    messages: [
+      { role: "system", content: "rules", cacheable: true },
+      { role: "system", content: "skill one", cacheable: true },
+      { role: "system", content: "skill two", cacheable: true },
+      { role: "user", content: "map", cacheable: true },
+      { role: "user", content: "question", cacheable: true },
+    ],
+  });
+  await s.close();
+
+  const body = s.requests[0]!.body;
+  const systemMarks = body.system.filter((b: any) => b.cache_control).length;
+  const messageMarks = body.messages.filter((m: any) => m.content.some((b: any) => b.cache_control)).length;
+  assert.equal(systemMarks + messageMarks, 4, "five breakpoints is a request Anthropic refuses outright");
+  assert.equal(messageMarks, 2, "the two latest — the map and the question — must be the ones kept");
+});

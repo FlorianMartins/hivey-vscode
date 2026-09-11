@@ -9,6 +9,7 @@ import { request } from "../util/http.js";
 import { sseData, sseLines } from "../util/sse.js";
 import type { ChatDelta, ChatRequest, ChatResult, Provider, ToolCall, Usage } from "./types.js";
 import { EMPTY_USAGE, THINKING_BUDGET } from "./types.js";
+import { keepCacheMarks } from "./cache.js";
 import { describeHttpError } from "./openai.js";
 
 export interface AnthropicOptions {
@@ -32,11 +33,23 @@ export class AnthropicProvider implements Provider {
     const system = req.messages.filter((m) => m.role === "system");
     const rest = req.messages.filter((m) => m.role !== "system");
 
+    // One budget of four breakpoints, shared by the system blocks and the messages, in that order —
+    // which is the order the API reads them in. Beyond four Anthropic rejects the request outright,
+    // and a repository with two skills loaded reaches five without anyone doing anything unusual.
+    const wanted: number[] = [];
+    system.forEach((m, i) => {
+      if (m.cacheable !== false) wanted.push(i);
+    });
+    rest.forEach((m, i) => {
+      if (m.cacheable) wanted.push(system.length + i);
+    });
+    const marks = keepCacheMarks(wanted);
+
     const body: Record<string, unknown> = {
       model: req.model,
       max_tokens: req.maxTokens ?? 4096,
       stream: true,
-      messages: rest.map((m) => {
+      messages: rest.map((m, index) => {
         if (m.role === "tool") {
           return { role: "user", content: [{ type: "tool_result", tool_use_id: m.toolCallId, content: m.content }] };
         }
@@ -50,8 +63,8 @@ export class AnthropicProvider implements Provider {
         }
         const block: Record<string, unknown> = { type: "text", text: m.content };
         // A cache breakpoint costs nothing when it misses and saves ~90 % of the input price when
-        // it hits. Put it on the big, stable blocks only: the API allows four per request.
-        if (m.cacheable) block["cache_control"] = { type: "ephemeral" };
+        // it hits. Which ones survive the ceiling of four is decided once, above.
+        if (marks.has(system.length + index)) block["cache_control"] = { type: "ephemeral" };
         // Images after the text, for the same reason as everywhere else: a model handed a picture
         // before the question it is about describes the picture instead of answering.
         const images = (m.images ?? []).map((img) => ({
@@ -62,9 +75,9 @@ export class AnthropicProvider implements Provider {
       }),
     };
     if (system.length) {
-      body["system"] = system.map((s) => {
+      body["system"] = system.map((s, i) => {
         const b: Record<string, unknown> = { type: "text", text: s.content };
-        if (s.cacheable !== false) b["cache_control"] = { type: "ephemeral" };
+        if (marks.has(i)) b["cache_control"] = { type: "ephemeral" };
         return b;
       });
     }

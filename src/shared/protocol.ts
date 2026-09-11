@@ -30,6 +30,8 @@ export interface UiEntry {
   error?: string;
   model?: string;
   usdCost?: number;
+  /** What the answer consumed, so its price can be explained on hover rather than only asserted. */
+  usage?: { promptTokens: number; completionTokens: number; cachedTokens: number };
   /** Number of files this question's checkpoint can put back. Zero means there is nothing to restore. */
   checkpointFiles?: number;
   /** True when the checkpoint could not hold everything the turn changed. */
@@ -217,6 +219,14 @@ export interface UiState {
   provider: string;
   remote: boolean;
   contextTokens: number;
+  /**
+   * Of that, how much actually goes with the next question.
+   *
+   * Equal to `contextTokens` until the conversation outgrows its budget, and then smaller — because
+   * the oldest exchanges are dropped from the prompt. Shown when the two differ, because that gap
+   * is the answer to "why does a conversation this size cost that much", read the other way round.
+   */
+  sentTokens: number;
   /** The budget the next question is measured against — `context.maxTokens`. */
   contextBudget: number;
   /** The selected model's own window, 0 when the catalogue does not know it. */

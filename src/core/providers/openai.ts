@@ -19,6 +19,7 @@ import type {
   Usage,
 } from "./types.js";
 import { EMPTY_USAGE } from "./types.js";
+import { keepCacheMarks } from "./cache.js";
 
 export interface OpenAIProviderOptions {
   id: string;
@@ -119,10 +120,13 @@ export class OpenAICompatibleProvider implements Provider {
   }
 
   async chat(req: ChatRequest, onDelta?: (d: ChatDelta) => void): Promise<ChatResult> {
+    // The same ceiling of four, because the same models are behind OpenRouter — a request with five
+    // breakpoints is refused by Anthropic whichever door it came through.
+    const marks = keepCacheMarks(req.messages.flatMap((m, i) => (m.cacheable ? [i] : [])));
     const body: Record<string, unknown> = {
       model: req.model,
       stream: true,
-      messages: req.messages.map((m) => {
+      messages: req.messages.map((m, index) => {
         if (m.role === "tool") return { role: "tool", tool_call_id: m.toolCallId, content: m.content };
         if (m.toolCalls?.length) {
           return {
@@ -131,15 +135,27 @@ export class OpenAICompatibleProvider implements Provider {
             tool_calls: m.toolCalls.map((t) => ({ id: t.id, type: "function", function: { name: t.name, arguments: t.args } })),
           };
         }
-        // A message carrying images becomes the array form. Text first: every provider's
-        // documentation puts it there, and a model handed an image before the question it is about
-        // describes the image instead of answering.
-        if (m.images?.length) {
+        // Two reasons to use the array form of `content`, and one of them is money.
+        //
+        // IMAGES. Text first: every provider's documentation puts it there, and a model handed an
+        // image before the question it is about describes the image instead of answering.
+        //
+        // CACHING, on OpenRouter. Anthropic's prompt cache is not automatic — it only applies to the
+        // prefixes a request explicitly marks — and OpenRouter passes the marker through in the
+        // OpenAI format, on a content part. Without it, a Claude conversation routed through
+        // OpenRouter pays the full input price for its system prompt, its repository map and its
+        // whole transcript on EVERY request. That is what this extension's own cost report was
+        // showing and nobody could see why: the marker existed, and only the native Anthropic
+        // client ever emitted it. OpenAI's and DeepSeek's caches are automatic and ignore the field.
+        const cache = this.id === "openrouter" && marks.has(index);
+        if (m.images?.length || cache) {
+          const text: Record<string, unknown> = { type: "text", text: m.content };
+          if (cache) text["cache_control"] = { type: "ephemeral" };
           return {
             role: m.role,
             content: [
-              { type: "text", text: m.content },
-              ...m.images.map((img) => ({
+              text,
+              ...(m.images ?? []).map((img) => ({
                 type: "image_url",
                 image_url: { url: `data:${img.mediaType};base64,${img.data}` },
               })),

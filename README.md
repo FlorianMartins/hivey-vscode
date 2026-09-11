@@ -84,14 +84,18 @@ Not a slogan — an architecture. Six levers, in order of effect:
    symbols, extracted without a native parser), not file contents. A few thousand tokens describe a
    repository a hundred times their size, and the model asks for the two files it needs instead of
    being handed forty.
-3. **The prompt cache, and keeping it.** The stable prefix (system prompt + repository map) is
-   marked with `cache_control` on Anthropic and benefits from implicit caching elsewhere. A coding
-   conversation resends almost the same context every turn: that is where most of the bill is
-   decided. Which is why the prefix is guarded rather than merely marked — every cache hits up to
-   the first byte that differs, so one line in the system prompt that follows the open editor around
-   costs the *whole* prefix, every turn. The repository map is frozen for the life of a conversation
-   and everything per-turn was moved out from in front of it. The hit rate is on the ring's tooltip:
-   it was logged from the start and shown to nobody, which made it useless.
+3. **The prompt cache — asked for, kept, and moved along.** A coding conversation resends almost
+   the same context every turn, so this is where most of the bill is decided, and there are three
+   separate ways to get it wrong. *Asked for*: Anthropic's cache is not automatic, it applies only
+   to prefixes a request explicitly marks — so a Claude conversation routed through OpenRouter, the
+   default paid route, paid full price for everything on every request until the marker was emitted
+   there too. *Kept*: every cache hits up to the first byte that differs, so one line in the system
+   prompt that follows the open editor around costs the **whole** prefix, every turn; the repository
+   map is frozen for the life of a conversation and everything per-turn sits after it. *Moved
+   along*: a breakpoint at the end of each request means the next step of an agent turn starts from
+   a cache hit instead of re-paying for everything the previous step sent — without it the cost of a
+   twelve-step turn grows with the square of its length. The hit rate is on the ring's tooltip, so
+   none of this has to be taken on trust.
 4. **Escalate on failure, not on a guess.** The old rule read the question and bet: a regular
    expression decided "refactor the architecture" was hard and bought a remote call, while "make
    this test pass" stayed local and came back wrong. Now the local model tries, the tests or the

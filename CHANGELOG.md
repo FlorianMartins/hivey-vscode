@@ -2,6 +2,49 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.41.0 — 2026-09-11
+
+Une version entièrement sur le coût, partie d'une question : « 43,7 k jetons pour 14,13 $, ça me
+semble cher ». Le chiffre n'était pas faux. Ce qui était faux, c'est qu'on payait le plein tarif
+pour du texte qui aurait dû venir du cache — et que rien dans le panneau ne permettait de s'en
+apercevoir.
+
+### Corrigé
+
+- **Le cache de prompt n'était jamais demandé sur OpenRouter.** Le cache d'Anthropic n'est pas
+  automatique : il ne s'applique qu'aux préfixes qu'une requête marque explicitement. Le marqueur
+  existait depuis le début et **seul le client Anthropic natif l'émettait**. Donc toute conversation
+  Claude passant par OpenRouter — la route payante par défaut, et celle qu'utilisent les préréglages
+  Hivey — payait le prix d'entrée plein sur son prompt système, sa carte du dépôt et tout son
+  transcript, à **chaque** requête. Le prix de lecture d'un cache est le dixième du prix d'entrée :
+  5 $/M contre 0,50 $/M sur Opus 5.
+- **Le cache ne couvrait que la partie qui ne grandit pas.** Le préfixe marqué était le prompt
+  système et la carte ; tout ce qu'un tour **produit** — les appels d'outils, le fichier lu, la
+  sortie de la commande — était renvoyé à l'étape suivante et facturé plein tarif, puis de nouveau à
+  l'étape d'après. Le coût d'un tour de douze étapes croissait avec le **carré** de sa longueur. Un
+  point de rupture supplémentaire à la fin de chaque requête en fait une droite. Sur un tour de douze
+  étapes avec un prompt de 43,7 k, aux tarifs du catalogue : **2,62 $ avant, 0,60 $ après**.
+- **Un sous-agent dépensait et rien ne le comptait.** Un sous-agent est un tour complet — jusqu'à
+  huit étapes sur un modèle payant — et son coût n'apparaissait ni dans le budget censé pouvoir le
+  refuser, ni dans le journal qui prétend contenir chaque requête sortie de la machine, ni dans le
+  total affiché. De l'argent partait et rien ne le comptait.
+- **Le nombre de jetons affiché ignorait l'élagage.** Le panneau annonçait « ce que la prochaine
+  question envoie » en montrant le poids **entier** de la conversation, alors que `build` coupe les
+  plus anciens échanges quand le budget est court. Sur une longue conversation, l'écart est
+  l'essentiel du nombre.
+
+### Modifié
+
+- **Le prix d'une réponse s'explique.** Un nombre seul est indiscutable et indiagnosticable : « 14,13 $ »
+  à côté de « 43,7 k jetons » se lit comme une erreur, et rien ne permettait de découvrir que le
+  premier est ce que toute la conversation a dépensé pendant que le second est ce qu'elle pèse
+  maintenant. L'infobulle d'une réponse donne désormais ce qu'elle a envoyé, ce qui venait du cache
+  et ce qu'elle a reçu ; celle du compteur de jetons dit ce que les deux nombres mesurent.
+- **Jamais plus de quatre points de rupture.** Anthropic refuse la requête entière au-delà, et un
+  dépôt avec deux compétences chargées plus le point de rupture mobile atteint cinq sans que
+  personne ait rien fait d'inhabituel. Les derniers l'emportent : un point de rupture met en cache
+  tout ce qui le précède, donc un point tardif absorbe un point précoce.
+
 ## 0.40.0 — 2026-09-11
 
 ### Corrigé

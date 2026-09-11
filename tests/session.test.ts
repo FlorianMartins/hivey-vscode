@@ -153,3 +153,44 @@ test("a session round-trips through JSON so history survives a restart", () => {
   assert.equal(back.entries[0]!.included, false);
   assert.equal(back.title, s.title);
 });
+
+// ── What the conversation weighs, and what actually travels ──────────────────────────────────────
+//
+// Two different numbers, and the panel was showing the first under a label that promised the second.
+// On a conversation that has outgrown its budget the gap is most of it — which matters because that
+// figure sits beside a price, and reading the two as a ratio is the natural thing to do.
+
+test("what is sent equals what it weighs, while it fits", () => {
+  const s = new Session();
+  s.add({ role: "user", text: "a".repeat(400) });
+  s.add({ role: "assistant", text: "b".repeat(400) });
+  const planned = s.plannedTokens(100_000);
+  assert.ok(planned > 100, "nothing was counted");
+  assert.equal(planned, s.plannedTokens(100_000));
+});
+
+test("once it outgrows the budget, what travels is smaller — and that is the number to show", () => {
+  const s = new Session();
+  for (let i = 0; i < 40; i++) s.add({ role: "user", text: `question ${i} `.repeat(60) });
+  const budget = 2000;
+  const planned = s.plannedTokens(budget);
+  assert.ok(planned <= budget, `${planned} tokens planned against a budget of ${budget}`);
+  assert.ok(planned > 0, "the newest exchanges must still fit");
+});
+
+test("a pinned exchange travels whatever the budget says, and the figure says so", () => {
+  // `build` keeps pinned entries regardless; a planned figure that ignored that would under-report
+  // exactly the conversations somebody has deliberately made expensive.
+  const s = new Session();
+  const pinned = s.add({ role: "user", text: "pin me ".repeat(400) });
+  pinned.pinned = true;
+  for (let i = 0; i < 30; i++) s.add({ role: "user", text: `filler ${i} `.repeat(60) });
+  assert.ok(s.plannedTokens(500) > 500, "the pinned entry should push the planned figure past the budget");
+});
+
+test("a muted exchange is in neither figure", () => {
+  const s = new Session();
+  const muted = s.add({ role: "user", text: "x".repeat(4000) });
+  muted.included = false;
+  assert.equal(s.plannedTokens(100_000), 0);
+});

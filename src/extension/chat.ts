@@ -340,6 +340,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       error: e.error,
       model: e.model,
       usdCost: e.usdCost,
+      ...(e.usage ? { usage: e.usage } : {}),
       ...(e.checkpoint?.length ? { checkpointFiles: e.checkpoint.length } : {}),
       ...(e.checkpointPartial ? { checkpointPartial: true } : {}),
       ...(e.plan ? { plan: e.plan } : {}),
@@ -386,6 +387,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       // conversation reads to promise that nothing leaves the machine.
       remote: isHivey(s.chat.model) || !isLocalEndpoint(baseUrl),
       contextTokens,
+      sentTokens: this.session.plannedTokens(budgetTokens),
       contextBudget: budgetTokens,
       // The window the chosen model actually has, straight from the catalogue. Zero when it is not
       // known — a local runtime that reports no such number, most often — and the panel then offers
@@ -1231,7 +1233,33 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       },
       afterResponse: (text) => env.vault.restore(text),
       report: (message) => run.report(`${definition.name}: ${message}`),
+      onUsage: (info) => this.noteUsage(info),
     });
+
+    // A sub-agent is a full turn — up to eight steps on a paid model — and its cost was recorded
+    // nowhere: not against the budget that is supposed to be able to refuse it, not in the ledger
+    // that claims to hold every request that left this machine, not in the total the panel shows.
+    // Money left and nothing counted it, which is the one kind of accounting error that cannot be
+    // argued about.
+    if (!env.isLocal) {
+      const cost = costOf(result.usage, this.priceLookup(model));
+      this.delegatedCostUsd += cost.usd;
+      this.gate.record(
+        {
+          at: Date.now(),
+          provider: env.providerId,
+          host: safeHost(env.baseUrl),
+          model,
+          promptTokens: result.usage.promptTokens,
+          completionTokens: result.usage.completionTokens,
+          cachedTokens: result.usage.cachedTokens,
+          usd: cost.usd,
+          redactions: 0,
+          redactionSummary: `${t("sub-agent")}: ${definition.name}`,
+        },
+        env.settings,
+      );
+    }
     return result.text;
   }
 
@@ -2867,6 +2895,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     // have nothing to do with checkpoints.
     this.checkpointFor = [...this.session.entries].reverse().find((e) => e.role === "user")?.id;
     this.plan = undefined;
+    this.delegatedCostUsd = 0;
     this.turn?.abort();
     const ctl = new AbortController();
     this.turn = ctl;
@@ -3209,12 +3238,19 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       answer.text = result.text || streamed;
       if (this.plan) answer.plan = this.plan;
       answer.usdCost = 0;
+      answer.usage = {
+        promptTokens: result.usage.promptTokens,
+        completionTokens: result.usage.completionTokens,
+        cachedTokens: result.usage.cachedTokens,
+      };
       if (thought) answer.reasoning = thought;
       if (steps.length) answer.steps = steps;
 
       if (!isLocal) {
         const cost = costOf(result.usage, this.priceLookup(model));
-        answer.usdCost = cost.usd;
+        // Plus whatever this turn delegated. A sub-agent's bill belongs to the answer that ordered
+        // it, not to nobody.
+        answer.usdCost = cost.usd + this.delegatedCostUsd;
         this.gate.record(
           {
             at: Date.now(),
@@ -3459,6 +3495,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    * rebuild. See where it is set for why a slightly stale map is cheaper than a fresh one.
    */
   private frozenMap: { text: string; files: number; omitted: number } | undefined;
+
+  /** What sub-agents spent during the turn in progress, to be added to the answer that ordered it. */
+  private delegatedCostUsd = 0;
 
   /** Prompt tokens sent, and how many of them the provider served from its cache, this session. */
   private cacheSeen = { prompt: 0, cached: 0 };

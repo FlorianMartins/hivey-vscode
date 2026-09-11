@@ -449,7 +449,17 @@ function renderEntry(entry: UiEntry, state: UiState, deps: ChatDeps): HTMLElemen
   if (entry.model && entry.role === "assistant") receipt.append(el("span", "entry-meta", entry.model));
   if (entry.usdCost) {
     const cost = el("span", "entry-meta cost", formatCost(entry.usdCost));
-    cost.title = t("What this answer cost.");
+    // The breakdown, not just the total. A price on its own is unarguable and undiagnosable: a user
+    // who finds an answer expensive has no way to discover that the input was resent on every step
+    // of an agent turn, or that none of it came from the cache. These three numbers say which.
+    cost.title = entry.usage
+      ? t(
+          "What this answer cost. Sent {0} tokens ({1} served from the cache), received {2}. An agent turn sends the whole conversation again at every step — the cache is what stops that being paid for twice.",
+          formatTokens(entry.usage.promptTokens),
+          formatTokens(entry.usage.cachedTokens),
+          formatTokens(entry.usage.completionTokens),
+        )
+      : t("What this answer cost.");
     receipt.append(cost);
   }
   if (receipt.childElementCount) {
@@ -830,7 +840,23 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
   meter.append(providerButton(state, deps), approvalButton(state, deps));
   meter.append(el("div", "spacer"));
   const tokens = el("span", "composer-tokens", t("{0} tokens", formatTokens(state.contextTokens)));
-  tokens.title = t("What the next question will send, once muted exchanges are removed.");
+  // Said precisely, because this number sits next to a price and the two do not measure the same
+  // thing at all: this is what the conversation weighs NOW, and the price is everything every turn
+  // has spent. Reading them as a ratio — which is the natural thing to do with two numbers on one
+  // line — makes any long conversation look like a billing error.
+  //
+  // And when the conversation has outgrown its budget, what travels is smaller than what it weighs.
+  // Reporting the weight under the words "what the next question sends" was simply false.
+  tokens.title =
+    state.sentTokens < state.contextTokens
+      ? t(
+          "This conversation weighs {0} tokens; the next question sends {1} of them — the oldest exchanges no longer fit the context budget. The price beside this is what the whole conversation has spent, not what one question costs.",
+          formatTokens(state.contextTokens),
+          formatTokens(state.sentTokens),
+        )
+      : t(
+          "What the next question sends, once muted exchanges are removed. The price beside it is what the whole conversation has spent so far, not what one question costs.",
+        );
   // A ring rather than a bar, and always drawn.
   //
   // The bar was ninety pixels of a row that has to hold the provider, the approval setting, a token
