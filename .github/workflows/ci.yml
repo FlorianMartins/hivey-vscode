@@ -96,7 +96,7 @@ jobs:
       # anybody has to keep, and it is the difference between "zero dependencies, trust us" and
       # "zero dependencies, and here is how you check that what you installed is what is on GitHub".
       - name: Sign the build
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v4
         with:
           subject-path: hivey-code.vsix
 
