@@ -908,7 +908,10 @@ suite("Hivey Code", () => {
     const stub = await scriptedStub([
       // The local model runs something that fails, then answers as though it were done — which is
       // exactly the behaviour that made "ask the user what it printed" so expensive.
-      { tool: { name: "run_command", args: { command: "sh -c 'exit 7'" } } },
+      // A real check, not just any failing command: a non-zero exit is how half the shell reports
+      // "no" — `grep` finding nothing, `git diff --quiet` finding changes — and escalating on those
+      // bought a second turn on a larger model nearly every time an agent searched for something.
+      { tool: { name: "run_command", args: { command: "npm test" } } },
       { text: "All set." },
       { text: "Fixed it properly." },
     ]);
@@ -956,7 +959,7 @@ suite("Hivey Code", () => {
       const handover = stub.bodies().find((b) => b.includes("big-remote"));
       assert.ok(handover, "no request body for the escalation");
       assert.match(handover!, /smaller model already attempted/, "the evidence was not attached");
-      assert.match(handover!, /exit code 7|sh -c/, "the failure itself was not attached");
+      assert.match(handover!, /npm test/, "the failure itself was not attached");
     } finally {
       await config.update("chat.provider", before.provider, vscode.ConfigurationTarget.Global);
       await config.update("chat.model", before.model, vscode.ConfigurationTarget.Global);

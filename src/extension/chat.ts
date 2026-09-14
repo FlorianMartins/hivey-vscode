@@ -341,6 +341,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       error: e.error,
       model: e.model,
       usdCost: e.usdCost,
+      ...(e.id === this.streamingEntryId ? { streaming: true } : {}),
       ...(e.usage ? { usage: e.usage } : {}),
       ...(e.checkpoint?.length ? { checkpointFiles: e.checkpoint.length } : {}),
       ...(e.checkpointPartial ? { checkpointPartial: true } : {}),
@@ -3180,6 +3181,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       }
 
       const answer = this.session.add({ role: "assistant", text: "", model });
+      // Named so the panel can leave it to the live turn. Cleared in the `finally`, whatever
+      // happened — an answer that stays marked as in flight is an answer nothing ever draws.
+      this.streamingEntryId = answer.id;
       let streamed = "";
       let thought = "";
 
@@ -3338,6 +3342,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         this.post({ type: "error", message });
       }
     } finally {
+      // Before anything else, and unconditionally: this is what the panel reads to decide whether
+      // an answer is somebody else's to draw. Left set by a turn that threw, it would be an answer
+      // nothing ever draws — a silent, permanent blank.
+      this.streamingEntryId = undefined;
       this.checkpointFor = undefined;
       // Old checkpoints give up their file contents here rather than at write time: the cap is
       // about what is STORED, and this is the moment just before the conversation is stored.
@@ -3542,6 +3550,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
   /** What sub-agents spent during the turn in progress, to be added to the answer that ordered it. */
   private delegatedCostUsd = 0;
+
+  /** The answer a turn is writing right now, which the panel leaves to the live turn to draw. */
+  private streamingEntryId: string | undefined;
 
   /** Prompt tokens sent, and how many of them the provider served from its cache, this session. */
   private cacheSeen = { prompt: 0, cached: 0 };

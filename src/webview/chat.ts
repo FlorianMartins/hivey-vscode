@@ -38,24 +38,33 @@ export interface ChatDeps {
 }
 
 /**
- * `keep` is the transcript box from the previous render, when there is a reason to keep it.
+ * `liveTurn` is the DOM of the answer currently being written, when there is one.
  *
- * That reason is a turn in progress. The panel is rebuilt from scratch on every state message, and
- * state messages arrive for reasons that have nothing to do with the conversation — the caret moved
- * in an editor, a file was opened, the agent itself saved a file. Rebuilding the transcript under a
- * streaming answer throws away the live turn, the typing animation and the scroll position, several
- * times a second, which is what made the answer stop following the bottom and the view wander off
- * into older messages. So while a turn is running, the transcript belongs to the turn: the same
- * node is moved into the new tree instead of a new one being built from a stale copy of the text.
+ * The panel is rebuilt from scratch on every state message, and state messages arrive for reasons
+ * that have nothing to do with the conversation — the caret moved in an editor, a file was opened,
+ * the agent itself saved a file. Rebuilding the transcript under a streaming answer used to throw
+ * away the live turn, the typing animation and the scroll position, several times a second.
+ *
+ * The first attempt at that was to keep the WHOLE transcript untouched while a turn ran. It fixed
+ * the scrolling and introduced something far worse: for the length of a turn the transcript stopped
+ * being drawn from the state at all, so nothing new appeared — no answer, no step, and no error
+ * either. If anything left the panel believing a turn was still running, it went silent and stayed
+ * silent, with no message to say why and a token counter climbing behind it.
+ *
+ * So the transcript is rebuilt every time, as it always was, and the ONE node that cannot be
+ * rebuilt — the live turn, which holds the typing animation's state — is carried across. The answer
+ * it is writing is skipped by `transcript()`, so nothing is drawn twice.
  */
-export function chatScreen(state: UiState, deps: ChatDeps, keep?: HTMLElement): HTMLElement {
+export function chatScreen(state: UiState, deps: ChatDeps, liveTurn?: HTMLElement): HTMLElement {
   const wrap = el("div", "screen chat-screen");
   // The transcript sits in its own positioned box so the "latest" button can float at the BOTTOM
   // OF THE TRANSCRIPT — which is the gap between the last answer and the composer, wherever the
   // composer happens to end up. Pinning it to the screen with a hand-measured offset put it inside
   // the composer the moment the composer grew a row.
-  const area = keep ?? el("div", "transcript-wrap");
-  if (!keep) area.append(transcript(state, deps));
+  const area = el("div", "transcript-wrap");
+  const list = transcript(state, deps);
+  if (liveTurn) list.append(liveTurn);
+  area.append(list);
   wrap.append(area, composer(state, deps));
   return wrap;
 }
@@ -78,6 +87,11 @@ function transcript(state: UiState, deps: ChatDeps): HTMLElement {
   let first = true;
   for (const entry of state.session.entries) {
     if (state.searchQuery && !matches.has(entry.id)) continue;
+    // The answer being written is the live turn's to draw — see `UiEntry.streaming`. Drawing it
+    // here as well would print the answer twice, which is what made the transcript freeze instead:
+    // the earlier fix kept the whole transcript untouched during a turn to avoid the duplicate, and
+    // a frozen transcript hides everything, including the error that says why nothing is happening.
+    if (entry.streaming) continue;
     // The rule belongs to the transcript, not to either message it separates — it is emitted
     // between them rather than inside the question, so that a pinned answer's tint and a muted
     // turn's fade stop at the message and do not swallow the way back out of it.

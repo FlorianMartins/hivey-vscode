@@ -47,14 +47,17 @@ function render(): void {
   // extension from erasing a half-written question.
   const draft = captureDraft();
   const place = captureScroll();
-  // The transcript belongs to the turn while a turn is running — see `chatScreen`. Held by
-  // reference before the tree is emptied, which detaches it without destroying it, and put back
-  // below. Everything else (the header, the composer, the context chips that this rebuild exists
-  // for) is rebuilt as before.
-  const keep =
-    state.screen === "chat" && isStreaming()
-      ? (document.querySelector<HTMLElement>(".transcript-wrap") ?? undefined)
-      : undefined;
+  // The one node that cannot be rebuilt: the live turn holds the typing animation's state, the
+  // buffer it has released so far and the step rows a turn has produced, none of which exists in
+  // `state`. It is carried across; everything else is drawn from the state as it always was.
+  //
+  // It is carried only while the state still says an answer is being written. A live turn kept
+  // past the end of its turn would sit there for ever, next to the finished answer the transcript
+  // now draws — and the previous attempt at this, which kept the WHOLE transcript instead, went
+  // silent for the length of a turn and stayed silent if anything left the flag set.
+  const streamingNow = state.screen === "chat" && state.session.entries.some((e) => e.streaming);
+  const liveTurn = streamingNow && live?.root.isConnected ? live.root : undefined;
+  if (liveTurn) liveTurn.remove();
   app.textContent = "";
   app.append(header(state));
   if (searchOpen && state.screen === "chat") app.append(searchBar(state));
@@ -79,13 +82,13 @@ function render(): void {
       break;
     case "chat":
     default:
-      app.append(chatScreen(state, deps, keep));
+      app.append(chatScreen(state, deps, liveTurn));
       break;
   }
-  // Only when the transcript was actually rebuilt. Clearing it while its nodes are still on screen
-  // is what orphaned the live turn: the next token created a second one underneath the first.
-  if (!keep) live = undefined;
-  restoreScroll(place, Boolean(keep));
+  // The live turn did not survive this render, so the object that points at its nodes must not
+  // either: the next token would otherwise be written into a subtree nobody can see.
+  if (!liveTurn) live = undefined;
+  restoreScroll(place, Boolean(liveTurn));
   restoreDraft(draft);
 }
 

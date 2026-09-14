@@ -32,6 +32,15 @@ export interface UiEntry {
   usdCost?: number;
   /** What the answer consumed, so its price can be explained on hover rather than only asserted. */
   usage?: { promptTokens: number; completionTokens: number; cachedTokens: number };
+  /**
+   * True for the one answer a turn is writing right now.
+   *
+   * The panel skips it, because the live turn on screen is already showing it — and drawing both
+   * would print the answer twice. Saying it here rather than inferring it from `busy` is what lets
+   * the transcript be rebuilt at any moment during a turn without either duplicating the answer or
+   * freezing everything else.
+   */
+  streaming?: boolean;
   /** Number of files this question's checkpoint can put back. Zero means there is nothing to restore. */
   checkpointFiles?: number;
   /** True when the checkpoint could not hold everything the turn changed. */

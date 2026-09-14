@@ -2,6 +2,36 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.41.2 — 2026-09-14
+
+« Plus de message d'erreur, mais il ne fait plus rien — ni raisonnement ni réponse — et le nombre de
+jetons semble exploser. » Deux défauts que j'ai introduits moi-même, et qui se cachaient l'un
+l'autre : le premier rendait le second invisible.
+
+### Corrigé
+
+- **Le panneau cessait d'être dessiné pendant toute la durée d'un tour.** En 0.40, pour empêcher un
+  message d'état de détruire la réponse en cours, j'ai gelé **tout** le transcript tant qu'un tour
+  tournait. Cela corrigeait le défilement et introduisait bien pire : pendant un tour, plus rien
+  n'était dessiné depuis l'état — ni réponse, ni étape, **ni erreur**. Si quoi que ce soit laissait
+  le panneau croire qu'un tour tournait encore, il devenait muet et le restait, sans un mot pour
+  dire pourquoi, avec un compteur de jetons qui montait derrière.
+
+  Le transcript est de nouveau reconstruit à chaque fois. Le seul nœud qui ne peut pas l'être — le
+  tour en cours, qui porte l'état de l'animation de frappe — est **transporté** dans le nouvel arbre,
+  et la réponse qu'il écrit est désormais explicitement marquée dans l'état pour que le transcript la
+  lui laisse. Rien n'est dessiné deux fois, et rien ne peut plus figer l'affichage.
+
+- **`grep` qui ne trouve rien déclenchait une escalade payante.** Un code de retour non nul n'est pas
+  un échec : c'est ainsi que la moitié du shell répond « non ». `grep` sort en 1 quand il ne trouve
+  rien, `git diff --quiet` sort en 1 quand il y a des changements, `test -f` et `which` répondent par
+  un statut — et un agent explore avec exactement ces outils-là. Le classifieur d'échec les prenait
+  pour la preuve que le travail avait raté et achetait un **second tour complet sur un modèle plus
+  cher**, à peu près chaque fois qu'une recherche ne trouvait rien. Invisible, à cause du défaut
+  ci-dessus. Le code de retour ne compte désormais que si la commande était plausiblement un
+  contrôle — une suite de tests, une compilation, un vérificateur de types, un linter. Une commande
+  non reconnue n'est une preuve dans aucun sens.
+
 ## 0.41.1 — 2026-09-14
 
 Deux pannes signalées ensemble — « l'extension ne fonctionne plus », « invalid URL », « crédit à

@@ -104,3 +104,57 @@ test("the hand-over note carries the failure, the diff, and the warning that the
   assert.match(note, /still on disk/);
   assert.match(note, /rather than start over/);
 });
+
+// ── A non-zero exit is not a failure ─────────────────────────────────────────────────────────────
+//
+// This is the difference between an escalation that fires when the work is broken and one that
+// fires on almost every agent turn. Half the shell reports "no" with a status, and an agent explores
+// with exactly those tools — so treating any non-zero exit as proof of failure bought a second full
+// turn on a larger model nearly every time a search found nothing.
+
+test("a grep that found nothing is an answer, not a failed turn", () => {
+  const verdict = verifyTurn([
+    ok("edit_file", "src/app.ts"),
+    bad("run_command", "grep -r oldName src", "exit code 1"),
+  ]);
+  assert.equal(verdict.kind, "none", verdict.why);
+});
+
+test("the other commands that answer a question with a status", () => {
+  for (const command of ["git diff --quiet", "test -f build/out.js", "which ollama", "diff a.txt b.txt", "rg TODO"]) {
+    assert.equal(verifyTurn([bad("run_command", command)]).kind, "none", command);
+  }
+});
+
+test("a failing test suite is still a failed turn", () => {
+  for (const command of [
+    "npm test",
+    "npm run build",
+    "pnpm run typecheck",
+    "npx tsc --noEmit",
+    "pytest -q",
+    "cargo test",
+    "go test ./...",
+    "make check",
+  ]) {
+    const verdict = verifyTurn([ok("edit_file", "src/app.ts"), bad("run_command", command, "exit code 1")]);
+    assert.equal(verdict.kind, "verification", `${command} should count as a check`);
+  }
+});
+
+test("a command nobody recognises is not evidence in either direction", () => {
+  // Escalating on it would spend money on a guess; declaring success would be worse. Silence is the
+  // only honest answer, and the diagnostics still speak for themselves.
+  assert.equal(verifyTurn([bad("run_command", "./scripts/deploy.sh")]).kind, "none");
+  assert.equal(verifyTurn([bad("get_diagnostics", "src/app.ts", "2 errors")]).kind, "verification");
+});
+
+test("being stuck is judged on repetition, not on what the command was", () => {
+  // The same call failing three times is a model out of its depth whatever it was running.
+  const verdict = verifyTurn([
+    bad("run_command", "grep -r x src"),
+    bad("run_command", "grep -r x src"),
+    bad("run_command", "grep -r x src"),
+  ]);
+  assert.equal(verdict.kind, "stuck");
+});
