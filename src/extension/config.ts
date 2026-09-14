@@ -13,6 +13,7 @@ import { DEFAULT_GROUPS, type SkillGroup, type SkillPolicy } from "../core/sessi
 import { makeProvider, type Provider, type ProviderId } from "../core/providers/index.js";
 import { defaultEndpoints, endpointSettingKey, REMOTE_VENDORS, vendor } from "../core/providers/vendors.js";
 import { isLocalEndpoint } from "../core/redaction/index.js";
+import { describeUnusableEndpoint } from "../core/providers/endpoint.js";
 import type { RedactionLevel, RedactionPolicy } from "../core/redaction/types.js";
 import type { EscalationPolicy, RouterConfig } from "../core/router/route.js";
 
@@ -259,6 +260,13 @@ export class Keys {
 /** Build the provider for a role, resolving its endpoint and (if remote) its key. */
 export async function providerFor(s: Settings, keys: Keys, id: ProviderId): Promise<Provider> {
   const baseUrl = endpointFor(s, id);
+  // Checked here rather than discovered at the socket. An address without a scheme is a relative
+  // path to `fetch`, which answers "Invalid URL" — a message that names no cause and suggests no
+  // action, on every request, for the life of the setting. Settings arrive from `settings.json`,
+  // from synchronisation and from a team's configuration, so they do not all pass the field that
+  // validates them.
+  const unusable = describeUnusableEndpoint(baseUrl, id);
+  if (unusable) throw new Error(unusable);
   const local = isLocalEndpoint(baseUrl);
   const apiKey = local && id === "local" ? undefined : await keys.get(id);
   // A gateway whose address the user supplied may well be an unauthenticated one on their own

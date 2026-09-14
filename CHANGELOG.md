@@ -2,6 +2,40 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.41.1 — 2026-09-14
+
+Deux pannes signalées ensemble — « l'extension ne fonctionne plus », « invalid URL », « crédit à
+recharger » — et deux causes distinctes, toutes deux capables à elles seules de donner l'impression
+que rien ne marche.
+
+### Corrigé
+
+- **Une adresse sans schéma cassait tout, définitivement, avec le pire message possible.**
+  `api.openai.com/v1` est ce que montre une page de documentation et ce qu'accepte un navigateur.
+  Pour `fetch`, c'est un chemin relatif : la requête échoue sur `Invalid URL`, qui ne nomme aucune
+  cause et ne suggère aucune action — à chaque question, pour la durée du réglage, alors que la clé
+  est bonne et le compte est bon. L'adresse est désormais **vérifiée là où elle est saisie** (le
+  schéma manquant est complété : `https://` en général, `http://` pour une adresse loopback, parce
+  qu'aucun serveur de modèles local n'a de certificat) et **revérifiée au point d'usage**, puisqu'un
+  réglage peut arriver par `settings.json` ou par synchronisation sans jamais passer par le champ.
+  Un schéma qui n'est ni http ni https est refusé plutôt que deviné : `htp://` peut être l'un ou
+  l'autre, et choisir au hasard enverrait parfois une clé en clair.
+
+- **Choisir un fournisseur ne faisait rien tant que le modèle était un préréglage Hivey.** Un
+  préréglage est un routage sur le catalogue d'OpenRouter, donc `route()` l'envoie à OpenRouter
+  **avant même de lire** `chat.provider`. Quelqu'un qui enregistrait une clé OpenAI, sélectionnait
+  OpenAI dans le composeur et gardait un préréglage comme modèle voyait « OpenAI » pendant que
+  chaque requête partait chez OpenRouter, sur le solde OpenRouter — et quand ce solde s'épuisait,
+  l'erreur lui demandait de recharger un compte qu'il n'avait pas choisi d'utiliser. Rien à l'écran
+  ne reliait les deux. Le panneau annonce maintenant **où la requête va réellement**, et choisir un
+  autre fournisseur sous un préréglage le dit et propose d'aller prendre un de ses modèles.
+
+- **Un 402 n'avait aucune explication.** C'est le solde du compte, pas la clé : ni une nouvelle clé
+  ni un nouvel essai n'y changent rien. Le message le dit, et nomme le fournisseur qui a réellement
+  répondu — avec un préréglage, ce n'est pas celui que le panneau affiche. Les erreurs
+  d'authentification le nomment aussi : « vérifiez la clé d'API » est un conseil inutile à quelqu'un
+  qui vient de vérifier la clé d'API du fournisseur qu'il croit utiliser.
+
 ## 0.41.0 — 2026-09-11
 
 Une version entièrement sur le coût, partie d'une question : « 43,7 k jetons pour 14,13 $, ça me

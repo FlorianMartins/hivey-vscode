@@ -189,7 +189,7 @@ export class OpenAICompatibleProvider implements Provider {
     if (this.id === "openrouter") body["usage"] = { include: true };
 
     const res = await this.post(body, req.signal);
-    if (!res.ok || !res.body) throw new Error(await describeHttpError(res));
+    if (!res.ok || !res.body) throw new Error(await describeHttpError(res, this.id));
 
     let text = "";
     let reasoning = "";
@@ -268,7 +268,7 @@ export class OpenAICompatibleProvider implements Provider {
         }),
         signal: req.signal,
       });
-      if (!res.ok) throw new Error(await describeHttpError(res));
+      if (!res.ok) throw new Error(await describeHttpError(res, this.id));
       const json = (await res.json()) as { response?: string };
       return json.response ?? "";
     }
@@ -289,7 +289,7 @@ export class OpenAICompatibleProvider implements Provider {
       }),
       signal: req.signal,
     });
-    if (!res.ok) throw new Error(await describeHttpError(res));
+    if (!res.ok) throw new Error(await describeHttpError(res, this.id));
     const json = (await res.json()) as any;
     return json.choices?.[0]?.text ?? "";
   }
@@ -330,7 +330,7 @@ export class OpenAICompatibleProvider implements Provider {
     if (await this.isOllamaServer()) {
       const root = trimSlash(this.baseUrl).replace(/\/v1$/, "");
       const res = await request(`${root}/api/tags`, { timeoutMs: 15_000, label: "model list" });
-      if (!res.ok) throw new Error(await describeHttpError(res));
+      if (!res.ok) throw new Error(await describeHttpError(res, this.id));
       const json = (await res.json()) as any;
       return (json.models ?? []).map((m: any) => m.name).filter(Boolean);
     }
@@ -375,7 +375,14 @@ export function isOllama(baseUrl: string): boolean {
   return /:11434(\/|$)/.test(baseUrl) || /ollama/i.test(baseUrl);
 }
 
-export async function describeHttpError(res: Response): Promise<string> {
+/**
+ * `provider` is named in the message because with a Hivey preset it is not the one the panel shows.
+ *
+ * "Check the API key" is unhelpful advice to somebody who has just checked the API key — of the
+ * provider they selected, which is not the one that answered. Naming it turns the message into
+ * something a person can act on.
+ */
+export async function describeHttpError(res: Response, provider?: string): Promise<string> {
   let detail = "";
   try {
     const body = await res.text();
@@ -386,11 +393,17 @@ export async function describeHttpError(res: Response): Promise<string> {
   }
   const hint =
     res.status === 401 || res.status === 403
-      ? " — check the API key (Hivey Code: “Store a provider key”)."
-      : res.status === 404
-        ? " — check the endpoint URL and that the model exists on it."
-        : res.status === 429
-          ? " — rate limited by the provider."
-          : "";
+      ? ` — check the API key for ${provider ?? "this provider"} (Hivey Code: “Store a provider key”).`
+      : // 402 is the provider saying the ACCOUNT is empty, which no key and no retry fixes. It was
+        // falling through to no hint at all, so it arrived as the provider's own sentence about
+        // credits with nothing to say which account it meant — and a Hivey preset always bills the
+        // OpenRouter one, whatever provider the panel is set to.
+        res.status === 402
+        ? ` — this is the account balance at ${provider ?? "the provider"}, not the API key. A Hivey preset always bills your OpenRouter account, whichever provider the panel shows.`
+        : res.status === 404
+          ? " — check the endpoint URL and that the model exists on it."
+          : res.status === 429
+            ? " — rate limited by the provider."
+            : "";
   return `HTTP ${res.status} ${res.statusText}${detail ? `: ${detail}` : ""}${hint}`;
 }

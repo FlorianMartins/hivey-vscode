@@ -16,6 +16,7 @@ import { stablePrompt, turnDirectives } from "../core/prompts.js";
 import { costOf, makeLookup, type Price } from "../core/router/pricing.js";
 import { calibrate, observe, prune, type Calibration } from "../core/util/calibrate.js";
 import { acceptsImages, IMAGE_TOKENS } from "../core/models/vision.js";
+import { checkEndpoint } from "../core/providers/endpoint.js";
 import { handoverNote, verifyTurn, type TurnStep } from "../core/router/outcome.js";
 import { unifiedDiff } from "../core/text/diff.js";
 import { escalationTarget, route, type Route } from "../core/router/route.js";
@@ -381,7 +382,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         : this.models.length
           ? labelFor(this.models, s.chat.model)
           : s.chat.model,
-      provider: s.chat.provider,
+      // WHERE THE REQUEST ACTUALLY GOES, not what the setting says.
+      //
+      // A Hivey preset is a routing over OpenRouter's catalogue, so `route()` sends it to OpenRouter
+      // before it ever looks at `chat.provider`. The panel was reporting the setting — so somebody
+      // who stored an OpenAI key, chose OpenAI in the composer and kept a preset as their model saw
+      // "OpenAI" while every request went to OpenRouter, against the OpenRouter balance. When that
+      // balance ran out the error said to top up an account they had not chosen to use, and nothing
+      // on screen connected the two.
+      provider: isHivey(s.chat.model) ? "openrouter" : s.chat.provider,
       // A preset is served from the catalogue, so it is remote whatever the provider setting still
       // says. Getting this wrong would not merely mislabel a row: this flag is what the empty
       // conversation reads to promise that nothing leaves the machine.
@@ -732,6 +741,29 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           break;
         case "setProvider": {
           const config = vscode.workspace.getConfiguration(SECTION);
+          // A preset decides its own route, so setting the provider under one changes nothing at
+          // all — the setting is written, the panel shows it, and every request still goes to
+          // OpenRouter. Saying so and offering the way out is the difference between a control that
+          // does nothing and a control that explains itself.
+          if (isHivey(readSettings().chat.model) && m.provider !== "openrouter") {
+            const pick = t("Choose a model");
+            const keep = t("Keep the preset");
+            const answer = await vscode.window.showWarningMessage(
+              t(
+                "{0} is a Hivey preset: it always answers through OpenRouter and bills your OpenRouter account. Choosing {1} will not change that until you pick one of its models.",
+                hiveyLabel(readSettings().chat.model),
+                m.provider,
+              ),
+              pick,
+              keep,
+            );
+            if (answer === pick) {
+              await config.update("chat.provider", m.provider, writeTarget());
+              this.openModelPicker();
+              break;
+            }
+            if (answer !== keep) break;
+          }
           await config.update("chat.provider", m.provider, writeTarget());
           await this.refreshSetup();
           void this.loadModels(true);
@@ -995,11 +1027,23 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         }
 
         case "setEndpoint": {
+          // The moment it is typed is the only moment the person who can fix it is looking. A host
+          // with no scheme is completed rather than refused — `api.openai.com/v1` has exactly one
+          // plausible reading — and anything else is rejected with its reason, here, instead of
+          // becoming "Invalid URL" on every question from now on.
+          const checked = checkEndpoint(m.url);
+          if (!checked.url) {
+            void vscode.window.showWarningMessage(checked.problem ?? t("That address cannot be used."));
+            break;
+          }
+          if (checked.repaired) {
+            void vscode.window.showInformationMessage(t("Saved as {0}.", checked.url));
+          }
           const config = vscode.workspace.getConfiguration(SECTION);
           // The manifest spells `openai-compatible` differently from the provider id, because a
           // hyphen is not a legal settings key segment. The vendor table owns that translation.
           const key = endpointSettingKey(m.provider as ProviderId);
-          await config.update(key, m.url, vscode.ConfigurationTarget.Global);
+          await config.update(key, checked.url, vscode.ConfigurationTarget.Global);
           await this.refreshSetup();
           break;
         }

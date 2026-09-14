@@ -6,7 +6,7 @@ import * as vscode from "vscode";
 import * as fs from "node:fs/promises";
 // The settings namespace has one definition; a test that repeats it as a literal is a test that
 // keeps passing after a rename has broken the product.
-import { SECTION, readSettings } from "../../extension/config.js";
+import { SECTION, readSettings, providerFor, Keys } from "../../extension/config.js";
 import { buildTools } from "../../extension/tools.js";
 import { buildKnowledgeTools, knowledgeAmbient } from "../../extension/knowledge.js";
 import { openFileUris } from "../../extension/models.js";
@@ -791,6 +791,104 @@ suite("Hivey Code", () => {
       await config.update("endpoints.local", before.local, vscode.ConfigurationTarget.Global);
       await config.update("completion.enabled", before.enabled, vscode.ConfigurationTarget.Global);
       await config.update("completion.nextEdit", before.nextEdit, vscode.ConfigurationTarget.Global);
+      stub.close();
+    }
+  });
+
+  /**
+   * An address without a scheme must not become "Invalid URL" on every question for ever.
+   *
+   * `api.openai.com/v1` is what a documentation page shows and what a browser accepts. To `fetch`
+   * it is a relative path, so the request fails with a message naming no cause and suggesting no
+   * action — while the key is fine and the account is fine. Reported as "the extension no longer
+   * works", which from the outside is exactly what it looks like.
+   */
+  test("an endpoint with no scheme fails with a sentence that says what to put instead", async () => {
+    const ext = vscode.extensions.getExtension(ID)!;
+    await ext.activate();
+
+    const config = vscode.workspace.getConfiguration(SECTION);
+    const before = { provider: config.get("chat.provider"), model: config.get("chat.model"), url: config.get("endpoints.openrouter") };
+    await config.update("chat.provider", "openrouter", vscode.ConfigurationTarget.Global);
+    await config.update("chat.model", "some-model", vscode.ConfigurationTarget.Global);
+    await config.update("endpoints.openrouter", "api.openai.com/v1", vscode.ConfigurationTarget.Global);
+
+    try {
+      const settings = readSettings();
+      let message = "";
+      try {
+        // The keychain is never reached: the address is checked before the key is looked up, which
+        // is the point — a bad address must not be reported as a missing key.
+        const noSecrets = {
+          get: async () => undefined,
+          store: async () => undefined,
+          delete: async () => undefined,
+          keys: async () => [],
+          onDidChange: new vscode.EventEmitter<vscode.SecretStorageChangeEvent>().event,
+        } as unknown as vscode.SecretStorage;
+        await providerFor(settings, new Keys(noSecrets), "openrouter");
+      } catch (err) {
+        message = (err as Error).message;
+      }
+      assert.ok(message, "an unusable address was accepted");
+      assert.match(message, /openrouter/, message);
+      assert.match(message, /missing its scheme/i, message);
+      assert.match(message, /https:\/\/api\.openai\.com\/v1/, "it must name the address to use instead");
+      assert.equal(/Invalid URL/.test(message), false, "the useless message must be gone");
+    } finally {
+      await config.update("chat.provider", before.provider, vscode.ConfigurationTarget.Global);
+      await config.update("chat.model", before.model, vscode.ConfigurationTarget.Global);
+      await config.update("endpoints.openrouter", before.url, vscode.ConfigurationTarget.Global);
+    }
+  });
+
+  /**
+   * A Hivey preset bills OpenRouter whatever the provider setting says, and the panel has to admit
+   * it.
+   *
+   * `route()` sends a preset to OpenRouter before it ever reads `chat.provider`. So somebody who
+   * stored an OpenAI key, chose OpenAI in the composer and kept a preset as their model was shown
+   * "OpenAI" while every request went to OpenRouter, against the OpenRouter balance — and when that
+   * ran out, the error told them to top up an account they had not chosen to use.
+   */
+  test("the panel names OpenRouter when a preset is the model, whatever the provider setting says", async () => {
+    const ext = vscode.extensions.getExtension(ID)!;
+    await ext.activate();
+
+    const stub = await scriptedStub([{ text: "ok" }]);
+    const config = vscode.workspace.getConfiguration(SECTION);
+    const before = {
+      provider: config.get("chat.provider"),
+      model: config.get("chat.model"),
+      openrouter: config.get("endpoints.openrouter"),
+      confirm: config.get("privacy.confirmSend"),
+    };
+    await config.update("chat.provider", "openai", vscode.ConfigurationTarget.Global);
+    await config.update("chat.model", "hivey/free", vscode.ConfigurationTarget.Global);
+    await config.update("endpoints.openrouter", `http://127.0.0.1:${stub.port}/v1`, vscode.ConfigurationTarget.Global);
+    await config.update("privacy.confirmSend", "never", vscode.ConfigurationTarget.Global);
+
+    try {
+      void vscode.commands.executeCommand("hiveyCode.askWith", "hello");
+      for (let i = 0; i < 100 && !stub.asked().length; i++) await delay(50);
+      await vscode.commands.executeCommand("hiveyCode.stopAnswer");
+
+      // The socket is the proof: the provider setting says OpenAI and the request went to the
+      // OpenRouter endpoint.
+      assert.ok(stub.asked().length, "the preset never reached the OpenRouter endpoint");
+      // Read through the product's own reader rather than off the raw configuration: a workspace
+      // value set by an earlier test wins over the global one, and the test would then be asserting
+      // on the test rather than on the product.
+      assert.notEqual(
+        readSettings().chat.provider,
+        "openrouter",
+        "the point of the test is that the provider setting says something else",
+      );
+    } finally {
+      await config.update("chat.provider", before.provider, vscode.ConfigurationTarget.Global);
+      await config.update("chat.model", before.model, vscode.ConfigurationTarget.Global);
+      await config.update("endpoints.openrouter", before.openrouter, vscode.ConfigurationTarget.Global);
+      await config.update("privacy.confirmSend", before.confirm, vscode.ConfigurationTarget.Global);
       stub.close();
     }
   });

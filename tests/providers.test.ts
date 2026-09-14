@@ -500,3 +500,28 @@ test("Anthropic: the system blocks and the messages share the same budget of fou
   assert.equal(systemMarks + messageMarks, 4, "five breakpoints is a request Anthropic refuses outright");
   assert.equal(messageMarks, 2, "the two latest — the map and the question — must be the ones kept");
 });
+
+test("an authentication or balance failure names the provider that actually answered", async () => {
+  // With a Hivey preset the panel shows one provider and OpenRouter answers. "Check the API key" is
+  // unhelpful advice to somebody who has just checked the API key — of the provider they selected.
+  const unauthorised = await serve((_req, res) => {
+    res.writeHead(401, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: { message: "No auth credentials found" } }));
+  });
+  const p = new OpenAICompatibleProvider({ id: "openrouter", baseUrl: unauthorised.url, apiKey: "k", isLocal: false });
+  await assert.rejects(() => p.chat({ model: "m", messages: [{ role: "user", content: "hi" }] }), /API key for openrouter/);
+  await unauthorised.close();
+
+  // 402 is the account, not the key, and no retry or new key fixes it. It had no hint at all, so it
+  // arrived as the provider's own sentence about credits with nothing saying whose account it meant.
+  const broke = await serve((_req, res) => {
+    res.writeHead(402, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: { message: "Insufficient credits" } }));
+  });
+  const q = new OpenAICompatibleProvider({ id: "openrouter", baseUrl: broke.url, apiKey: "k", isLocal: false });
+  const failure = await q.chat({ model: "m", messages: [{ role: "user", content: "hi" }] }).catch((e: Error) => e.message);
+  await broke.close();
+  assert.match(String(failure), /account balance at openrouter/);
+  assert.match(String(failure), /not the API key/);
+  assert.match(String(failure), /Hivey preset always bills your OpenRouter account/);
+});
