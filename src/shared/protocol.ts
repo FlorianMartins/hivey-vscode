@@ -388,6 +388,23 @@ export type ToExtension =
   | { type: "dropEntry"; id: string }
   | { type: "editEntry"; id: string; text: string }
   | { type: "retry" }
+  /**
+   * Ask the same question again, from any point in the conversation.
+   *
+   * Added at the END rather than replacing the answer it had. Replacing would be the obvious
+   * reading and the destructive one: the answer you did not like is still the answer you might want
+   * to compare the new one against, and muting or deleting it is already one click away. Nothing is
+   * ever lost by asking twice.
+   */
+  | { type: "askAgain"; id: string }
+  /**
+   * The same question, answered by several models, one after another.
+   *
+   * In a panel 300 px wide there is no side-by-side to be had, so the answers land in the
+   * conversation in sequence, each labelled with the model that wrote it. Which is also the honest
+   * shape: they are answers, and they belong where answers go.
+   */
+  | { type: "compareEntry"; id: string }
   | { type: "attach"; what: "active" | "editor" | "selection" | "browse" | "openFiles" | "mention" }
   | { type: "attachPath"; path: string }
   /**

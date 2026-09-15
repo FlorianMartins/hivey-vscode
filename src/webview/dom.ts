@@ -103,6 +103,13 @@ const PATHS = {
   // An arrow turning back on itself: the workbench's own shape for "undo this", used here for
   // going back to before a question.
   restore: "M3.5 7.5a5 5 0 1 1 1.6 4.4M3.5 4v3.5H7",
+  // Ask again: a full circle with the arrow at the top right, going forward. Deliberately not the
+  // rewind arrow above, which belongs to the checkpoint — two different actions that looked alike
+  // would be two actions people press by mistake.
+  askAgain: "M12.5 8.5a4.5 4.5 0 1 1-1.4-4M12.5 1.5V5H9",
+  // Compare: two panes side by side, which is what the answers are even when a narrow panel has to
+  // stack them.
+  compare: "M6.5 2v12M2.5 2h11v12h-11z",
   // A spanner: the workbench's own mark for "configure the tools this thing may use", which is
   // exactly what the skills picker is.
   // A wand with a spark: what a skill IS — a named thing you invoke that changes what the assistant
@@ -163,7 +170,8 @@ export function icon(name: IconName, className = "ico"): SVGSVGElement {
 export const ICON: Record<
   | "send" | "stop" | "add" | "history" | "search" | "close" | "chevron" | "chevronLeft" | "file"
   | "check" | "cross" | "mute" | "unmute" | "pin" | "edit" | "copy" | "trash" | "settings"
-  | "shield" | "attach" | "sparkle" | "bringIn" | "forward" | "restore" | "tools" | "chip" | "more" | "back",
+  | "shield" | "attach" | "sparkle" | "bringIn" | "forward" | "restore" | "askAgain" | "compare"
+  | "tools" | "chip" | "more" | "back",
   IconName
 > = {
   send: "send",
@@ -191,6 +199,8 @@ export const ICON: Record<
   bringIn: "bringIn",
   forward: "forward",
   restore: "restore",
+  askAgain: "askAgain",
+  compare: "compare",
   tools: "tools",
   chip: "chip",
   more: "more",

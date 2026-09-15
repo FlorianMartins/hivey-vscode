@@ -22,7 +22,7 @@ import { unifiedDiff } from "../core/text/diff.js";
 import { escalationTarget, route, type Route } from "../core/router/route.js";
 import { describeFallback, fallbackChain, isRetryable } from "../core/router/fallback.js";
 import type { Provider } from "../core/providers/index.js";
-import { Session, type ContextItem, type Entry, type SessionData } from "../core/session/session.js";
+import { Session, renderEntry, type ContextItem, type Entry, type SessionData } from "../core/session/session.js";
 import { headToTokens } from "../core/util/tokens.js";
 import { matchesName } from "../core/ibmi/sql.js";
 import { arcadInstalled } from "./integrations/arcad.js";
@@ -904,6 +904,21 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           this.sendState();
           await this.runTurn();
           break;
+        case "askAgain": {
+          const entry = this.session.get(m.id);
+          if (!entry || entry.role !== "user") break;
+          // The attachments it was asked with, not whatever is attached now. Asking the same
+          // question against different context is not asking the same question.
+          this.attachments = [...(entry.context ?? [])];
+          await this.ask(entry.text);
+          break;
+        }
+        case "compareEntry": {
+          const entry = this.session.get(m.id);
+          if (!entry || entry.role !== "user") break;
+          await this.compareAcrossModels(entry, entry.context ?? []);
+          break;
+        }
         case "retry":
           this.session.dropLastAnswer();
           this.sendState();
@@ -3418,6 +3433,118 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    * Ask, unless the permission book already answered. The book is consulted BEFORE the panel is
    * disturbed, which is what makes "toujours autoriser" worth anything.
    */
+  /**
+   * The same question, answered by several models, one after another.
+   *
+   * Three decisions, and each is a refusal to do the obvious thing.
+   *
+   * NO SIDE-BY-SIDE. The panel is 300 px wide docked. Two columns of prose in it is one column of
+   * prose cut in half. The answers go into the conversation in sequence, each labelled with the
+   * model that wrote it, which is also where answers belong.
+   *
+   * NO TOOLS. Comparison runs in chat mode whatever the panel is set to. Three agents editing the
+   * same files to answer the same question is not a comparison, it is a collision — and the thing
+   * being compared is how the models THINK, which the first answer shows.
+   *
+   * THE PRICE IS IN THE PICKER. Comparing four models costs four answers. A feature that spends
+   * four times without saying so is a feature that gets used once and then distrusted, and the
+   * whole argument of this extension is that nothing is spent by surprise.
+   */
+  private async compareAcrossModels(question: Entry, context: ContextItem[]): Promise<void> {
+    if (this.turn) {
+      void vscode.window.showInformationMessage(t("Wait for the current answer to finish first."));
+      return;
+    }
+    const settings = readSettings();
+    const models = this.models.length ? this.models : await listModels(settings, this.keys, settings.chat.model);
+    const picked = await vscode.window.showQuickPick(
+      models.slice(0, 200).map((model) => ({
+        label: model.name || model.id,
+        description: model.local ? t("on this machine") : t("{0} $/M in · {1} $/M out", model.inUsd, model.outUsd),
+        detail: model.id,
+        model,
+      })),
+      {
+        canPickMany: true,
+        placeHolder: t("Which models should answer this? Each one costs one answer."),
+        matchOnDetail: true,
+      },
+    );
+    if (!picked?.length) return;
+
+    for (const choice of picked) {
+      if (this.turn) break;
+      // Announced before it is spent, one line per model, because a loop that bills four times
+      // should say so four times rather than once at the start.
+      this.post({ type: "status", text: t("Asking {0}…", choice.label) });
+      // A preset is a routing, not a model id: sending `hivey/free` to a provider is a 400. The
+      // model that answers an ordinary question is the one being compared.
+      const id = isHivey(choice.model.id) ? hiveyModel(choice.model.id, "everyday") : choice.model.id;
+      await this.answerWith(question, context, id, choice.model.provider as ProviderId);
+    }
+  }
+
+  /**
+   * One answer, from one named model, added to the conversation.
+   *
+   * Deliberately NOT `runTurn`: that one reads the settings to decide where a question goes, and the
+   * whole point here is that the caller has already decided. It is also chat-shaped — no tools, one
+   * request — which is what keeps a four-model comparison to four requests.
+   */
+  private async answerWith(question: Entry, context: ContextItem[], model: string, provider: ProviderId): Promise<void> {
+    const settings = readSettings();
+    const baseUrl = safeUrl(settings, provider);
+    const isLocal = isLocalEndpoint(baseUrl);
+    const vault = new Vault();
+    const entry = this.session.add({ role: "assistant", text: "", model });
+    this.sendState();
+    try {
+      // The question and its attachments, and NOTHING else — not the conversation around it.
+      //
+      // Two reasons, and they point the same way. A comparison in which one model is handed the
+      // transcript and another is handed the transcript plus the first model's answer is not a
+      // comparison. And the question being compared is already IN that transcript, so including it
+      // would send it twice. Every model gets the same input, which is the only thing that makes
+      // the answers comparable — and it is also the cheapest possible request.
+      const nonce = randomNonce();
+      const outgoing = [
+        { role: "system" as const, content: promptForMode("chat"), cacheable: true },
+        { role: "user" as const, content: renderEntry({ ...question, context } as Entry, nonce) },
+      ];
+      const prepared = isLocal
+        ? { messages: outgoing }
+        : await this.gate.prepare(outgoing, settings, { provider, model, baseUrl, isLocal }, vault);
+      if (!prepared) {
+        entry.error = t("Not sent.");
+        return;
+      }
+      const result = await runTurn({
+        provider: await providerFor(settings, this.keys, provider),
+        model,
+        messages: prepared.messages,
+        maxTokens: 2048,
+        afterResponse: (text) => vault.restore(text),
+        onUsage: (info) => this.noteUsage(info),
+      });
+      entry.text = result.text;
+      if (!isLocal) {
+        const cost = costOf(result.usage, this.priceLookup(model));
+        entry.usdCost = cost.usd;
+        entry.usage = {
+          promptTokens: result.usage.promptTokens,
+          completionTokens: result.usage.completionTokens,
+          cachedTokens: result.usage.cachedTokens,
+        };
+      }
+    } catch (err) {
+      // One model failing must not take the comparison down with it: the others are the point.
+      entry.error = (err as Error).message;
+    } finally {
+      this.persist();
+      this.sendState();
+    }
+  }
+
   /** Consent to send, asked as a card in the conversation. */
   private askEgress(request: { description: string; detail: string[] }): Promise<"once" | "always" | "no"> {
     if (!this.view) return Promise.resolve("no");

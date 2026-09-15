@@ -2,6 +2,31 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.43.0 — 2026-09-15
+
+### Ajouté
+
+- **Reposer une question.** Un bouton sur n'importe quel message de la conversation, distinct de
+  « modifier et renvoyer » : la raison la plus courante de vouloir une autre réponse est que la
+  première était mauvaise, pas que la question l'était. La réponse **s'ajoute en dessous** plutôt que
+  de remplacer : celle qui ne convenait pas est justement celle à laquelle on veut comparer la
+  nouvelle, et la masquer ou la supprimer est déjà à un clic. La question repart avec **les pièces
+  jointes qu'elle avait**, pas avec ce qui est joint maintenant — la même question posée sur un autre
+  contexte n'est pas la même question.
+
+- **Faire répondre plusieurs modèles à la même question.** Trois choix, chacun un refus de la
+  solution évidente. Pas de côte à côte : le panneau fait 300 px une fois ancré, deux colonnes de
+  prose y sont une colonne coupée en deux — les réponses arrivent dans la conversation, l'une après
+  l'autre, chacune portant le nom du modèle qui l'a écrite. Pas d'outils : la comparaison tourne en
+  mode discussion quel que soit le réglage, parce que trois agents qui modifient les mêmes fichiers
+  pour répondre à la même question ne sont pas une comparaison mais une collision. Et **le prix est
+  dans le sélecteur** : comparer quatre modèles coûte quatre réponses, et une fonction qui dépense
+  quatre fois sans le dire est une fonction dont on se méfie ensuite.
+
+  Chaque modèle reçoit **exactement la même entrée** — la question et ses pièces jointes, pas la
+  conversation autour. Une comparaison où l'un reçoit le transcript et l'autre le transcript plus la
+  réponse du premier n'en est pas une.
+
 ## 0.42.0 — 2026-09-15
 
 « Je pose une question, je n'ai pas de réponse… mais les jetons sont utilisés. » Trois corrections

@@ -472,6 +472,20 @@ function renderEntry(entry: UiEntry, state: UiState, deps: ChatDeps): HTMLElemen
   if (entry.role === "user") {
     actions.append(
       button({ icon: ICON.edit, title: t("Edit and resend"), className: "btn icon-only", onClick: () => startEdit(entry, deps) }),
+      // Asking the same thing again, unchanged. Distinct from editing: the commonest reason to want
+      // another answer is that the first one was poor, not that the question was.
+      button({
+        icon: ICON.askAgain,
+        title: t("Ask this again — the answer is added below, nothing is replaced"),
+        className: "btn icon-only",
+        onClick: () => deps.send({ type: "askAgain", id: entry.id }),
+      }),
+      button({
+        icon: ICON.compare,
+        title: t("Answer this with several models, to compare them"),
+        className: "btn icon-only",
+        onClick: () => deps.send({ type: "compareEntry", id: entry.id }),
+      }),
     );
   }
   actions.append(
