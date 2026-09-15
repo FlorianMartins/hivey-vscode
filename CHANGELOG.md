@@ -2,6 +2,39 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.49.0 — 2026-09-15
+
+### Corrigé
+
+- **Une question et deux fichiers estimés à 468 726 jetons.** Chaque pièce jointe recevait deux
+  cinquièmes du budget de contexte, **sans jamais regarder combien il y en avait** : deux fichiers
+  réclamaient donc quatre cinquièmes du budget, trois en réclamaient plus que la totalité, et rien
+  en aval ne rattrapait ça. Le défaut dormait tant que le budget valait 8 000 jetons — deux
+  cinquièmes de 8 000 passent sous l'ancien plancher de 4 000, donc le plancher gagnait toujours —
+  et **la 0.46.0 l'a réveillé** en faisant suivre au budget la fenêtre du modèle.
+
+  Il n'y a plus qu'une règle, et elle porte sur **l'ensemble** : tout ce qui est joint prend au plus
+  trois cinquièmes du budget, partagés à parts égales. Le plancher par fichier descend à 1 000
+  jetons, parce que huit fichiers à mille jetons valent mieux que deux fichiers à quatre mille.
+
+- **Trois mentions n'avaient aucune limite.** `@changes` envoyait le diff non commité **entier** —
+  un fichier généré, un fichier de verrouillage, un premier commit, et c'est la requête tout
+  entière ; `@problems` envoyait tous les diagnostics d'un projet en pleine refonte ; `@codebase`
+  envoyait la carte sans tenir compte du reste. Les trois sont coupées comme tout le reste.
+
+- **La question posée pouvait être jetée de sa propre requête.** Une entrée plus grosse que le
+  budget échouait au même test qu'une vieille entrée et était écartée : une question portant une
+  pièce jointe surdimensionnée disparaissait donc de la requête qu'on venait de taper, et le modèle
+  répondait à ce qui restait. La dernière entrée n'est plus jamais écartée — elle est **coupée par
+  la fin**, là où se trouvent les pièces jointes, jamais la phrase à laquelle il faut répondre.
+
+### Ajouté
+
+- **La carte d'estimation dit où vont les jetons.** Un seul grand nombre n'est pas un fait sur
+  lequel agir : « 468 726 jetons pour un message et deux fichiers » était une anomalie, et rien sur
+  la carte ne disait lequel des deux fichiers, ni même si c'étaient les fichiers. Les trois plus
+  gros postes sont nommés avec leur taille, dès qu'ils pèsent au moins un dixième de la requête.
+
 ## 0.48.0 — 2026-09-15
 
 ### Corrigé

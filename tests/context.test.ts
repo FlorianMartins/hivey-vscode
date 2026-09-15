@@ -4,6 +4,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { extractSymbols, extractImports } from "../src/core/context/symbols.js";
 import { buildRepoMap, rankFiles, isMappable, type MapFile } from "../src/core/context/repomap.js";
+import { Session } from "../src/core/session/session.js";
 
 test("top-level symbols come out of TypeScript", () => {
   const src = `
@@ -171,4 +172,20 @@ test("a partial name does not claim a longer one", () => {
   const ranked = rankFiles(files, { focusPath: "src/app.ts" });
   const score = (p: string) => ranked.find((r) => r.path === p)!.score;
   assert.ok(score("src/helper.ts") > score("src/otherhelper.ts"), "otherhelper was treated as the import");
+});
+
+test("the question being asked is never dropped, however big what it carries", () => {
+  // It used to be. An entry larger than the whole budget failed the same test as an old one and was
+  // trimmed away — so a question with one oversized file attached was removed from the request it
+  // had just been typed into, and the model answered whatever was left of the conversation.
+  const session = new Session();
+  session.add({
+    role: "user",
+    text: "Why does this crash?",
+    context: [{ kind: "file", label: "huge.ts", body: "const x = 1;\n".repeat(60_000) }],
+  });
+  const built = session.build({ systemPrompt: "rules", maxTokens: 8_000, nonce: "n" });
+  const sent = built.messages.map((m) => m.content).join("\n");
+  assert.match(sent, /Why does this crash\?/, "the question itself was dropped from the request");
+  assert.ok(built.estimatedTokens < 20_000, `the budget was ignored (${built.estimatedTokens})`);
 });

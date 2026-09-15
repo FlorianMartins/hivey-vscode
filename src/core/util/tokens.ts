@@ -35,18 +35,27 @@ export function headToTokens(text: string, maxTokens: number): string {
 }
 
 /**
- * How much of one attached file is kept.
+ * How much of ONE attached file is kept, knowing how many there are.
  *
- * It was four thousand tokens, flat, and that was the right number when the context budget itself
- * was eight: half the budget on one file is already generous. It stopped being right the moment the
- * budget followed the model — a two-hundred-thousand-token window with a four-thousand-token cap
- * per file throws away most of every source file and labels it "truncated", which reads as a fault
- * and is in fact a setting from another era.
+ * The count is the whole point, and leaving it out was a real defect. The rule was two fifths of
+ * the context budget per file, with no idea how many files there were: two attachments therefore
+ * asked for four fifths of the budget, three for more than all of it, and nothing downstream put
+ * that right. It lay dormant while the budget was a flat 8 000 tokens — two fifths of that is below
+ * the old 4 000 floor, so the floor always won — and it woke the moment the budget began following
+ * the model's window. A user with a large budget and two files open saw one question estimated at
+ * 468 726 tokens.
  *
- * Two fifths of the budget, with the old number as the floor. One attachment may be most of the
- * conversation when the conversation is about one file; it may not be all of it, because the
- * question and the answer have to fit beside it.
+ * So there is one rule and it is about the SET: everything attached together may take three fifths
+ * of the budget, shared equally. What is left is for the question, the transcript, the repository
+ * map and the answer, which all have to fit beside the attachments.
+ *
+ * The floor is per file and deliberately small. Attaching eight files at once is a legitimate thing
+ * to do, and a thousand tokens of each of them is worth more than four thousand tokens of two. It
+ * is the one case where the three fifths can be exceeded, and the trimming in `Session.build` is
+ * the backstop — the floor exists so that a file attached on purpose says SOMETHING, not so that it
+ * says everything.
  */
-export function perFileBudget(contextBudget: number): number {
-  return Math.max(4000, Math.floor(contextBudget * 0.4));
+export function perFileBudget(contextBudget: number, attachments = 1): number {
+  const together = Math.floor(contextBudget * 0.6);
+  return Math.max(1000, Math.floor(together / Math.max(1, attachments)));
 }

@@ -1074,4 +1074,7 @@ export const FR: Record<string, string> = {
   "{0} tokens — follows the model": "{0} jetons — suit le modèle",
   "Hivey Code: your {0} key was in the address setting. It has been moved to the secret store — ask your question again.": "Hivey Code : votre clé {0} se trouvait dans le réglage d'adresse. Elle a été déplacée dans le coffre — reposez votre question.",
   "That is a key, not an address — saved as the key.": "C'est une clé, pas une adresse — enregistrée comme clé.",
+  "instructions": "instructions",
+  "the conversation": "la conversation",
+  "{0} — ~{1} tokens": "{0} — ~{1} jetons",
 };

@@ -233,9 +233,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    */
   private budgetWaived = false;
 
-  /** What one attached file may take of it. */
-  private perFileTokens(): number {
-    return perFileBudget(this.budgetTokensFor(readSettings()));
+  /**
+   * What one attached file may take of it — counting the ones already attached.
+   *
+   * The count is what was missing. Each file used to be cut to a share of the budget computed as
+   * though it were the only one, so attaching a second doubled the context and a third trebled it,
+   * with nothing putting it right before the request was priced.
+   */
+  private perFileTokens(adding = 1): number {
+    return perFileBudget(this.budgetTokensFor(readSettings()), this.attachments.length + adding);
   }
 
   /** The selected model's own window, 0 when the catalogue does not know it. */
@@ -1279,7 +1285,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       case "browse": {
         const picked = await vscode.window.showOpenDialog({ canSelectMany: true, openLabel: "Joindre" });
         for (const uri of picked ?? []) {
-          const item = await this.workspace.fileContext(uri, settings, perFileBudget(this.budgetTokensFor(settings)));
+          const item = await this.workspace.fileContext(uri, settings, this.perFileTokens());
           if (item) this.attachments.push(item);
         }
         break;
@@ -1296,7 +1302,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         const uris = openFileUris();
         let added = 0;
         for (const uri of uris) {
-          const item = await this.workspace.fileContext(uri, settings, perFileBudget(this.budgetTokensFor(settings)));
+          const item = await this.workspace.fileContext(uri, settings, this.perFileTokens());
           if (item && !this.attachments.some((a) => a.label === item.label)) {
             this.attachments.push(item);
             added += 1;
@@ -3079,6 +3085,49 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    * A second attempt at the same question, on a bigger model, because the first one is PROVEN not
    * to have worked. Carries the evidence, so the second model finishes rather than starts over.
    */
+  /**
+   * The three largest things in the request, named.
+   *
+   * Shown beside the estimate rather than instead of it. The estimate answers "how much"; this
+   * answers "because of what", which is the only one of the two a person can do anything about —
+   * detach a file, narrow a selection, lower the budget.
+   *
+   * Approximate on purpose: it measures the sources rather than the assembled messages, so the
+   * lines will not sum exactly to the total. A breakdown that has to be exact is a breakdown that
+   * has to be maintained in step with the assembly, and would be dropped the first time the two
+   * drifted. Naming the big one correctly is what matters.
+   */
+  private whereTheTokensWent(systemPrompt: string, ambient: string | undefined): string[] {
+    const parts: Array<{ label: string; tokens: number }> = [
+      { label: t("instructions"), tokens: estimateTokens(systemPrompt) },
+    ];
+    if (ambient) parts.push({ label: t("repository map"), tokens: estimateTokens(ambient) });
+
+    let conversation = 0;
+    for (const entry of this.session.entries) {
+      if (!entry.included || entry.error) continue;
+      conversation += estimateTokens(entry.text);
+      for (const item of entry.context ?? []) {
+        if (item.image) {
+          parts.push({ label: item.label, tokens: IMAGE_TOKENS });
+          continue;
+        }
+        parts.push({ label: item.label, tokens: estimateTokens(item.body) });
+      }
+    }
+    parts.push({ label: t("the conversation"), tokens: conversation });
+
+    const total = parts.reduce((sum, p) => sum + p.tokens, 0);
+    if (total <= 0) return [];
+    return parts
+      .sort((a, b) => b.tokens - a.tokens)
+      // A tenth of the request or it is not what anybody is looking for, and at most three lines:
+      // the card is a question, not a report.
+      .filter((p) => p.tokens >= total * 0.1)
+      .slice(0, 3)
+      .map((p) => t("{0} — ~{1} tokens", p.label, p.tokens));
+  }
+
   private async runTurn(handover?: { provider: ProviderId; model: string; note: string }): Promise<void> {
     const settings = readSettings();
     const mode = this.session.mode;
@@ -3180,8 +3229,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       dialect: dialectNote(this.attachments),
       ...(this.participant ? { participant: participantDirective(this.participant) } : {}),
     });
-    const built = this.session.build({
-      systemPrompt: stablePrompt({
+    // Named rather than inlined, because the card that asks the user to consent has to be able to
+    // say how big each of them is. A number nobody can attribute is a number nobody can act on.
+    const systemPrompt = stablePrompt({
         mode: promptForMode(mode),
         workspace: workspaceNote(),
         houseRules,
@@ -3194,8 +3244,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
                 // `/` list alone would leave the model announcing a skill the user cannot invoke.
                 definitions.skills.filter((sk) => isSkillEnabled(skillInvocation(sk.name), settings.skills.disabled)),
               ),
-      }),
-      ambient: ambient ? `${ambient.text}\n\n(${ambient.files} files mapped, ${ambient.omitted} omitted)` : undefined,
+    });
+    const ambientText = ambient
+      ? `${ambient.text}\n\n(${ambient.files} files mapped, ${ambient.omitted} omitted)`
+      : undefined;
+    const built = this.session.build({
+      systemPrompt,
+      ambient: ambientText,
       maxTokens: this.budgetTokensFor(settings),
       nonce,
     });
@@ -3256,6 +3311,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       const detail = [
         t("~{0} tokens", estimatedTokens),
         isLocal ? t("on this machine, nothing billed") : t("~{0} $ on {1}", cost.toFixed(4), safeHost(baseUrl)),
+        // Where they went. A single large number is not a fact anybody can act on: "468 726 tokens
+        // for one message and two files" was reported as an anomaly, and it was one — but nothing
+        // on the card said which of the two files, or whether it was the files at all. Three lines
+        // turn the figure into something that can be argued with.
+        ...this.whereTheTokensWent(systemPrompt, ambientText),
       ];
       if (outgoingImages && !isLocal) detail.push(t("{0} image(s), sent as they are — an image cannot be pseudonymised", outgoingImages));
       const answer = await new Promise<"once" | "session" | "always" | "no">((resolve) => {

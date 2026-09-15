@@ -119,13 +119,18 @@ async function resolveOne(mention: Mention, deps: ResolveDeps): Promise<ContextI
     case "codebase": {
       const map = await deps.repoMap();
       if (!map) return undefined;
-      return { kind: "repomap", label: t("repository map"), body: map.text };
+      // The map is built to a budget already, but that budget is the turn's, and this is one item
+      // among several. Cutting it here keeps `@codebase` from being the whole request.
+      return { kind: "repomap", label: t("repository map"), body: headToTokens(map.text, deps.budgetTokens) };
     }
 
     case "changes": {
       const diff = await gitChangesSummary();
       if (!diff) throw new Error(t("No Git repository is open."));
-      return { kind: "diff", label: t("uncommitted changes"), body: diff, untrusted: true };
+      // Cut like everything else here. An uncommitted diff is unbounded by nature — a generated
+      // file, a lock file, a first commit — and this was the one mention that sent whatever it
+      // found. The head is the right half to keep: a diff reads from the top.
+      return { kind: "diff", label: t("uncommitted changes"), body: headToTokens(diff, MAX_TOKENS), untrusted: true };
     }
 
     case "problems": {
@@ -134,7 +139,9 @@ async function resolveOne(mention: Mention, deps: ResolveDeps): Promise<ContextI
         kind: "diagnostics",
         label: t("problems"),
         // "None" is information: it tells the model the compiler is happy and the bug is elsewhere.
-        body: body || t("The language servers report no errors or warnings."),
+        // Cut, because a project mid-refactor reports thousands of them and the first hundred say
+        // everything the next thousand would.
+        body: body ? headToTokens(body, MAX_TOKENS) : t("The language servers report no errors or warnings."),
       };
     }
 

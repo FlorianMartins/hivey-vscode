@@ -18,7 +18,7 @@ import type { ChatMessage, ImagePart } from "../providers/types.js";
 import type { FileSnapshot } from "./checkpoint.js";
 import type { Plan } from "../agent/plan.js";
 import type { Mode } from "./modes.js";
-import { estimateTokens } from "../util/tokens.js";
+import { estimateTokens, headToTokens } from "../util/tokens.js";
 import { IMAGE_TOKENS } from "../models/vision.js";
 
 export type EntryRole = "user" | "assistant";
@@ -284,9 +284,21 @@ export class Session {
     for (let i = rendered.length - 1; i >= 0; i--) {
       const r = rendered[i]!;
       const cost = estimateTokens(r.text) + 4;
+      const newest = i === rendered.length - 1;
       if (cost <= budget || r.entry.pinned) {
         budget -= cost;
         keep.unshift(r);
+      } else if (newest) {
+        // The newest entry is the question being asked, and it is never dropped — it used to be.
+        // An entry larger than the whole budget failed the same test as an old one and was trimmed
+        // away, so a question carrying one oversized attachment was removed from the request it had
+        // just been typed into, and the model answered whatever was left. Cut instead, from the
+        // END: `renderEntry` writes the question first and the attachments after it, so what goes
+        // is context rather than the sentence the answer is supposed to address.
+        const room = Math.max(1000, budget - 4);
+        keep.unshift({ ...r, text: headToTokens(r.text, room) });
+        budget = 0;
+        trimmed.push(r.entry.id);
       } else {
         trimmed.push(r.entry.id);
       }
