@@ -2,6 +2,37 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.48.0 — 2026-09-15
+
+### Corrigé
+
+- **Une clé d'API collée dans le réglage d'adresse — et le pire message que ce produit ait produit.**
+
+      L'adresse configurée pour « openrouter » n'a pas de schéma : « sk-or-v1-… ».
+      Elle devrait être « https://sk-or-v1-… ».
+
+  Ce message n'est pas seulement inutile : il est affirmatif, il est faux, et **il dit au lecteur
+  d'aggraver le réglage**. C'était la dernière chose lue avant de conclure que l'extension ne
+  marchait pas. La cause est structurelle : les clés vivent dans le coffre de l'éditeur — c'est la
+  bonne décision — donc l'éditeur de réglages n'affiche **qu'une seule case portant le nom du
+  fournisseur**, et c'est l'adresse. On y colle sa clé, et plus rien ne fonctionne.
+
+  - Une clé est **reconnue comme telle**, à partir des préfixes que la table des fournisseurs
+    publie déjà (`sk-or-v1-`, `sk-ant-`, `AIza`, `gsk_`, `xai-`, `pplx-`) — pas d'une liste écrite
+    une deuxième fois. Le contrôle reste prudent : tout ce qui contient un point, une barre oblique
+    ou un deux-points peut être une adresse et n'est pas touché.
+  - Elle est **rangée toute seule** dans le coffre, et l'adresse revient à celle du fournisseur.
+    Sans demander : quelqu'un qui tape une clé dans une case a déjà dit ce qu'il voulait. C'est
+    aussi strictement plus sûr — la valeur quitte `settings.json`, qui est en clair, synchronisé
+    entre machines et parfois versionné. Annoncé après coup, jamais journalisé.
+  - Même geste dans le panneau : une clé collée dans le champ d'adresse d'une passerelle est
+    enregistrée comme clé.
+  - Les réglages `hiveyCode.endpoints.*` disent désormais **« ceci est une adresse, pas votre
+    clé »**, et où va la clé.
+
+- **Un serveur de votre réseau n'exige plus qu'on tape le schéma.** `192.168.1.50:11434/v1` était
+  refusé ; il est complété, comme partout ailleurs dans le produit.
+
 ## 0.47.0 — 2026-09-15
 
 ### Corrigé

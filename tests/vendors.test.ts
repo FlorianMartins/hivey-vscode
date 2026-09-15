@@ -84,7 +84,9 @@ test("the settings spell every vendor's address, with the same default", () => {
     const declared = setting(key);
     assert.ok(declared, `${key} is not in the manifest, so the address cannot be changed`);
     assert.equal(declared.default, v.baseUrl, `${key} defaults to something else than the table says`);
-    const nlsKey = declared.description?.replace(/%/g, "");
+    // Either spelling: the endpoint settings use `markdownDescription` so that the warning about
+    // pasting a key there can be emphasised, and the rest use `description`.
+    const nlsKey = (declared.markdownDescription ?? declared.description)?.replace(/%/g, "");
     assert.ok(nls[nlsKey], `${nlsKey} has no English text`);
     assert.ok(nlsFr[nlsKey], `${nlsKey} has no French text`);
   }

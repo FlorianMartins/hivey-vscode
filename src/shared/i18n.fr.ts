@@ -632,7 +632,6 @@ export const FR: Record<string, string> = {
   "({0} earlier exchanges omitted.)": "({0} échanges antérieurs omis.)",
   "**Summary of the conversation so far**": "**Résumé de la conversation jusqu’ici**",
   "A machine on your own network — the team's GPU box, a vLLM server": "Une machine de votre propre réseau — le serveur GPU de l’équipe, un serveur vLLM",
-  "A server address starts with http:// or https://.": "Une adresse de serveur commence par http:// ou https://.",
   "A server on your network…": "Un serveur sur votre réseau…",
   "Add and search": "Ajouter et chercher",
   "An address on your own network counts as local: nothing is pseudonymised, nothing is billed, nothing leaves it.": "Une adresse de votre propre réseau compte comme locale : rien n’est pseudonymisé, rien n’est facturé, rien n’en sort.",
@@ -1073,4 +1072,6 @@ export const FR: Record<string, string> = {
   "Automatic": "Automatique",
   "Follows the model's own window": "Suit la fenêtre du modèle",
   "{0} tokens — follows the model": "{0} jetons — suit le modèle",
+  "Hivey Code: your {0} key was in the address setting. It has been moved to the secret store — ask your question again.": "Hivey Code : votre clé {0} se trouvait dans le réglage d'adresse. Elle a été déplacée dans le coffre — reposez votre question.",
+  "That is a key, not an address — saved as the key.": "C'est une clé, pas une adresse — enregistrée comme clé.",
 };

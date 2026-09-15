@@ -13,7 +13,7 @@ import { DEFAULT_GROUPS, type SkillGroup, type SkillPolicy } from "../core/sessi
 import { makeProvider, type Provider, type ProviderId } from "../core/providers/index.js";
 import { defaultEndpoints, endpointSettingKey, REMOTE_VENDORS, vendor } from "../core/providers/vendors.js";
 import { isLocalEndpoint } from "../core/redaction/index.js";
-import { describeUnusableEndpoint } from "../core/providers/endpoint.js";
+import { describeUnusableEndpoint, looksLikeApiKey } from "../core/providers/endpoint.js";
 import type { RedactionLevel, RedactionPolicy } from "../core/redaction/types.js";
 import type { EscalationPolicy, RouterConfig } from "../core/router/route.js";
 
@@ -111,6 +111,47 @@ function readEndpoints(c: vscode.WorkspaceConfiguration): Record<ProviderId, str
 function explicit<T>(c: vscode.WorkspaceConfiguration, key: string): T | undefined {
   const found = c.inspect<T>(key);
   return found?.workspaceFolderValue ?? found?.workspaceValue ?? found?.globalValue;
+}
+
+/**
+ * A key pasted where the address goes, put where it belongs — without asking.
+ *
+ * There is no setting for an API key, and that is the right decision: keys live in the editor's
+ * secret store. It has one consequence nobody designed for. A person who opens the settings looking
+ * for somewhere to put their key finds exactly one box carrying their provider's name, and it is
+ * the address. They paste it there, nothing works, and until this release the explanation was a
+ * sentence instructing them to write `https://` in front of their key.
+ *
+ * Done rather than offered, because the user's instruction was that entering a key should be the
+ * whole of the work: "he only has to enter the API keys of the providers he wants to use". A
+ * confirmation dialog here is a question with one answer, asked of somebody who has already told us
+ * what they meant by typing a key into a box.
+ *
+ * It is also strictly safer. The value moves OUT of `settings.json` — plain text, synchronised
+ * between machines, committed by anyone who versions their editor configuration — and into the
+ * secret store. Nothing is lost and nothing is sent anywhere; the address returns to the vendor's
+ * own, which is what somebody who never meant to set one should have. It is announced afterwards,
+ * because a credential that moves silently is a credential the user cannot find again.
+ */
+export async function recoverMisplacedKeys(keys: Keys, log?: { appendLine(line: string): void }): Promise<void> {
+  const config = vscode.workspace.getConfiguration(SECTION);
+  for (const v of REMOTE_VENDORS) {
+    const setting = endpointSettingKey(v.id);
+    const current = config.get<string>(setting, "");
+    if (!looksLikeApiKey(current)) continue;
+
+    // Never logged, even in part: this is a credential, and the log is a file people paste into
+    // issues. The setting is named, which is the only part anyone needs in order to understand.
+    log?.appendLine(`[setup] ${setting} held a key rather than an address; moved to the secret store`);
+    await keys.store(v.id, current);
+    // Cleared wherever it was written, and back to nothing — which means the vendor's own address.
+    for (const target of [vscode.ConfigurationTarget.Global, vscode.ConfigurationTarget.Workspace, vscode.ConfigurationTarget.WorkspaceFolder]) {
+      await config.update(setting, undefined, target).then(undefined, () => undefined);
+    }
+    void vscode.window.showInformationMessage(
+      t("Hivey Code: your {0} key was in the address setting. It has been moved to the secret store — ask your question again.", v.label),
+    );
+  }
 }
 
 export function readSettings(scope?: vscode.Uri): Settings {

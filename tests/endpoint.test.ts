@@ -7,7 +7,8 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { checkEndpoint, describeUnusableEndpoint } from "../src/core/providers/endpoint.js";
+import { checkEndpoint, describeUnusableEndpoint, looksLikeApiKey } from "../src/core/providers/endpoint.js";
+import { REMOTE_VENDORS } from "../src/core/providers/vendors.js";
 
 test("a complete address is kept exactly as it is", () => {
   const r = checkEndpoint("https://api.openai.com/v1");
@@ -70,4 +71,61 @@ test("a trailing slash alone is not reported as a problem to the user", () => {
   // because of a slash would be crying wolf.
   const said = describeUnusableEndpoint("https://api.openai.com/v1/", "openai");
   assert.equal(said, undefined);
+});
+
+// ── A key is not an address, and must never be told to become one ───────────────────────────────
+//
+// The worst message this product has produced, reported by a user on the morning of a demo:
+//
+//     The address configured for "openrouter" is missing its scheme: "sk-or-v1-…".
+//     It should be "https://sk-or-v1-…".
+//
+// It is worse than useless. It is confident, it is wrong, and it instructs the reader to make the
+// setting more broken than they found it — and it was the last thing they read before concluding
+// the extension did not work. The cause is structural: keys live in the editor's secret store, so
+// the settings editor shows exactly one box carrying the provider's name, and it is the address.
+
+test("a pasted key is recognised as a key, for every vendor that publishes a prefix", () => {
+  const body = "0123456789abcdef0123456789abcdef";
+  for (const v of REMOTE_VENDORS) {
+    const prefix = v.placeholder.replace(/[….]+$/u, "").trim();
+    if (prefix.length < 3) continue;
+    const key = `${prefix}${body}`;
+    assert.ok(looksLikeApiKey(key), `${v.id}: ${key} was not recognised as a key`);
+    const check = checkEndpoint(key);
+    assert.ok(check.credential, `${v.id}: the check did not say it was a credential`);
+    assert.equal(check.url, undefined, `${v.id}: a key was turned into an address`);
+    assert.doesNotMatch(
+      check.problem ?? "",
+      /https:\/\/sk-|should be “https/,
+      `${v.id}: the message still tells the user to put https:// in front of their key`,
+    );
+  }
+});
+
+test("the message at the point of use names the real problem", () => {
+  const said = describeUnusableEndpoint("sk-or-v1-0123456789abcdef0123456789abcdef", "openrouter") ?? "";
+  assert.match(said, /API key/, said);
+  assert.doesNotMatch(said, /missing its scheme/, said);
+});
+
+test("an address is still an address, and nothing here second-guesses one", () => {
+  // The other half. A detector that calls a hostname a credential breaks the setting it was added
+  // to protect, and it would do it silently on somebody's private gateway.
+  for (const address of [
+    "https://api.openai.com/v1",
+    "api.openai.com/v1",
+    "localhost:11434/v1",
+    "127.0.0.1:1234/v1",
+    "my-gateway.internal/v1",
+    "sk-proxy.example.com/v1",
+  ]) {
+    assert.equal(looksLikeApiKey(address), false, address);
+    assert.ok(checkEndpoint(address).url, `${address} was refused`);
+  }
+});
+
+test("a bare hostname is not long enough to be mistaken for a key", () => {
+  assert.equal(looksLikeApiKey("localhost"), false);
+  assert.equal(looksLikeApiKey("gateway"), false);
 });

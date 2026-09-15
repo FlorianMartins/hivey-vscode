@@ -1122,13 +1122,17 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         }
 
         case "addServer": {
-          const url = m.url.trim();
-          // Rejected here rather than stored and failed later: an address that is not an address
-          // would sit in the settings looking configured and probe nothing for ever.
-          if (!/^https?:\/\//i.test(url)) {
-            void vscode.window.showWarningMessage(t("A server address starts with http:// or https://."));
+          // Completed rather than refused, like every other address in the product: somebody who
+          // types `192.168.1.50:11434/v1` has said exactly one thing, and demanding they type the
+          // scheme as well is the product making them do its work. Checked here rather than stored
+          // and failed later, because an address that is not an address would sit in the settings
+          // looking configured and probe nothing for ever.
+          const checkedServer = checkEndpoint(m.url);
+          if (!checkedServer.url) {
+            void vscode.window.showWarningMessage(checkedServer.problem ?? t("That address cannot be used."));
             break;
           }
+          const url = checkedServer.url;
           const config = vscode.workspace.getConfiguration(SECTION);
           const existing = readSettings().servers;
           if (!existing.some((x) => x.url === url)) {
@@ -1149,6 +1153,16 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           // plausible reading — and anything else is rejected with its reason, here, instead of
           // becoming "Invalid URL" on every question from now on.
           const checked = checkEndpoint(m.url);
+          // A key pasted into the address field is not a mistake to report, it is an intention to
+          // carry out: the person meant to give this provider their key. Stored where keys go, and
+          // said afterwards — see `recoverMisplacedKeys` for the same decision in the settings.
+          if (checked.credential) {
+            await this.keys.store(m.provider as ProviderId, m.url.trim());
+            void vscode.window.showInformationMessage(t("That is a key, not an address — saved as the key."));
+            await this.refreshSetup();
+            void this.loadModels(true);
+            break;
+          }
           if (!checked.url) {
             void vscode.window.showWarningMessage(checked.problem ?? t("That address cannot be used."));
             break;

@@ -10,7 +10,7 @@ import { isLocalEndpoint } from "../core/redaction/index.js";
 import { ChatViewProvider, PreviewProvider } from "./chat.js";
 import { HiveyCodeActions } from "./codeActions.js";
 import { InlineCompletionProvider } from "./completion.js";
-import { Keys, endpointFor, providerFor, readSettings, SECTION, writeTarget } from "./config.js";
+import { Keys, endpointFor, providerFor, readSettings, recoverMisplacedKeys, SECTION, writeTarget } from "./config.js";
 import { EgressGate, WorkspaceSpendStore, safeHost } from "./egress.js";
 import { registerEditorCommands } from "./editorCommands.js";
 import { showEgressReport, showCostReport } from "./reports.js";
@@ -35,6 +35,9 @@ export function activate(context: vscode.ExtensionContext): void {
   const disposables: vscode.Disposable[] = [];
   const workspace = new WorkspaceContext(disposables);
   watchInstructions(disposables);
+  // Before anything is sent. Someone whose key is in the wrong box has an extension that cannot
+  // work, and the sooner they are told the fewer questions they ask into the void.
+  void recoverMisplacedKeys(keys, log);
   const budget = new Budget(new WorkspaceSpendStore(context.globalState), readSettings().budget);
   const gate = new EgressGate(context.globalState, budget);
 
@@ -84,6 +87,9 @@ export function activate(context: vscode.ExtensionContext): void {
       if (e.affectsConfiguration(`${SECTION}.panel.minWidth`)) chat.reload();
       const s = readSettings();
       budget.setLimits(s.budget);
+      // Checked on every change, because the mistake is made IN the settings editor and the moment
+      // it is made is the moment the person who can undo it is looking at it.
+      void recoverMisplacedKeys(keys, log);
       completion.invalidateProvider();
       completion.updateStatus(s);
     }),
