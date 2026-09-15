@@ -2,6 +2,31 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.47.0 — 2026-09-15
+
+### Corrigé
+
+- **Une question difficile posée en français était envoyée au modèle bon marché.** Les préréglages
+  Hivey choisissent le modèle selon la difficulté de la question : « difficile » va au modèle fort,
+  le reste au modèle courant. Les motifs qui décident étaient écrits **en anglais uniquement** —
+  `why does`, `race condition`, `security review`, `memory leak`. Donc « pourquoi est-ce que ça
+  plante », « condition de course », « revue de sécurité », « fuite mémoire » étaient classés comme
+  des tours ordinaires. Le routage était sûr de lui sur une question qu'il n'avait pas comprise, et
+  le seul symptôme visible était que les réponses étaient plus vagues que ce que le préréglage
+  promettait. Les motifs existent désormais dans les deux langues, et deux tests apparient les
+  formulations pour que l'ajout d'un signal dans une seule langue casse la suite.
+
+  ⚠️ Au passage : `\b` ne marque pas de frontière de mot après un « é » en JavaScript, les
+  caractères accentués n'étant pas des caractères de mot. `revue de sécurité\b` ne pouvait pas
+  correspondre. Les motifs français utilisent des limites Unicode.
+
+- **La carte du dépôt était hiérarchisée en partie par de la prose française.** Le classement des
+  fichiers se fait sur les mots de la question, en écartant une liste de mots vides — **anglaise
+  uniquement**. « Peux-tu corriger l'erreur dans ce fichier » apportait donc `corriger`, `erreur` et
+  `fichier` comme s'ils nommaient quelque chose. Ce classement décide ce que le modèle lit **en
+  premier**, c'est-à-dire la qualité de la réponse quand le budget s'épuise. La liste française est
+  ajoutée ; un identifiant nommé dans une question française reste prioritaire.
+
 ## 0.46.0 — 2026-09-15
 
 ### Corrigé

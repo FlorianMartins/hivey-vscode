@@ -116,6 +116,23 @@ test("ordinary words in a question rank nothing", () => {
   assert.deepEqual(flat.map((r) => r.path), none.map((r) => r.path));
 });
 
+test("ordinary words rank nothing in French either", () => {
+  // The same assertion in the other language the product speaks. The stop list was English only,
+  // so "peux-tu corriger l'erreur dans ce fichier" contributed "corriger", "erreur" and "fichier" as
+  // if they named something, and the ranking that decides what the model reads FIRST was partly
+  // decided by French prose. Ranking is answer quality: it is what the model sees before it runs out
+  // of budget.
+  const flat = rankFiles(shop, { question: "peux tu corriger erreur dans ce fichier" });
+  const none = rankFiles(shop, {});
+  assert.deepEqual(flat.map((r) => r.path), none.map((r) => r.path));
+});
+
+test("a symbol named in a French question still ranks its file first", () => {
+  // The other half: filtering prose must not filter the identifier the question is about.
+  const ranked = rankFiles(shop, { question: "pourquoi totalCents est faux sur les remboursements ?" });
+  assert.equal(ranked[0]!.path, "src/totals.ts", ranked.map((r) => r.path).join(", "));
+});
+
 test("what the focus file imports, and what THOSE import, both outrank a stranger", () => {
   const files: MapFile[] = [
     { path: "src/app.ts", text: "import { helper } from './helper.js';\nexport const app = 1;\n" },

@@ -221,3 +221,44 @@ test("the shipped daily cap allows a day's work, not a handful of questions", ()
       `($${perTurn.toFixed(3)} each). A day of work has to fit.`,
   );
 });
+
+// ── The grade has to be the same in both languages ──────────────────────────────────────────────
+//
+// The complexity grade decides which model a Hivey preset answers with: "hard" goes to the strong
+// one, anything else to the cheap one. The signals were written in English only, so a user working
+// in French got the cheap model for every hard question they asked — and the only symptom was that
+// the answers were vaguer than the preset promised. The routing was confident about a question it
+// had not read.
+
+const HARD_PAIRS: Array<[string, string]> = [
+  ["why does this crash on the second call?", "pourquoi est-ce que ça plante au deuxième appel ?"],
+  ["is there a race condition in this queue?", "y a-t-il une condition de course dans cette file ?"],
+  ["I need a security review of this endpoint", "il me faut une revue de sécurité de ce point d'entrée"],
+  ["find the memory leak in the worker", "trouve la fuite mémoire dans le worker"],
+  ["prove this invariant holds after the merge", "démontre que cet invariant tient après la fusion"],
+  ["the architecture needs a redesign", "l'architecture a besoin d'une refonte"],
+];
+
+test("a hard question is graded hard in French exactly as in English", () => {
+  for (const [english, french] of HARD_PAIRS) {
+    assert.equal(classifyComplexity(english, 100, 32_000).level, "hard", `English: ${english}`);
+    assert.equal(
+      classifyComplexity(french, 100, 32_000).level,
+      "hard",
+      `French: "${french}" was graded as an ordinary turn, so the preset answers it with the cheap model`,
+    );
+  }
+});
+
+test("an ordinary question is still ordinary in both languages", () => {
+  // The other half: a grader that says "hard" to everything sends every question to the dearest
+  // model, which is the opposite failure and costs real money.
+  for (const ordinary of [
+    "rename this variable to total and update the callers",
+    "renomme cette variable en total et mets à jour les appels",
+    "add a docstring to this function please",
+    "ajoute une docstring à cette fonction s'il te plaît",
+  ]) {
+    assert.notEqual(classifyComplexity(ordinary, 100, 32_000).level, "hard", ordinary);
+  }
+});

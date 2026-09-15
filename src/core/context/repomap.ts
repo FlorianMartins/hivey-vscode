@@ -85,12 +85,32 @@ function termsIn(question: string): string[] {
   return [...seen];
 }
 
-/** Words that appear in every question about code and name nothing in particular. */
+/**
+ * Words that appear in every question about code and name nothing in particular.
+ *
+ * In both languages the product speaks. The list was English only, and the terms are what the
+ * repository map is RANKED by: a question asked in French contributed "fonction", "erreur",
+ * "fichier" and "pourquoi" as if they were identifiers, so the files put in front of the model were
+ * chosen partly by French prose. The ranking decides what the model reads first, which is to say it
+ * decides how good the answer is.
+ *
+ * Only unaccented forms are listed, and that is not an oversight: `termsIn` matches ASCII
+ * identifiers, so an accented word never reaches this set in the first place.
+ */
 const STOPWORDS = new Set([
+  // English
   "the", "and", "for", "with", "this", "that", "from", "into", "when", "why", "how", "what", "where",
   "add", "fix", "make", "use", "does", "not", "can", "should", "would", "file", "files", "code",
   "function", "class", "method", "test", "tests", "error", "bug", "please", "there", "then", "them",
   "you", "your", "its", "are", "was", "were", "has", "have", "but", "all", "any", "some", "more",
+  // French
+  "les", "des", "une", "dans", "pour", "avec", "sur", "par", "que", "qui", "quoi", "dont", "cette",
+  "ces", "son", "sa", "ses", "leur", "leurs", "est", "sont", "etre", "avoir", "fait", "faire",
+  "peux", "peut", "pourquoi", "comment", "quand", "ajoute", "ajouter", "corrige", "corriger",
+  "modifie", "modifier", "supprime", "supprimer", "fonction", "classe", "methode", "fichier",
+  "fichiers", "erreur", "erreurs", "bogue", "code", "ligne", "lignes", "pas", "plus", "tout",
+  "toute", "tous", "toutes", "mais", "donc", "alors", "aussi", "meme", "entre", "vers", "sans",
+  "mon", "mes", "nos", "vos", "votre", "notre", "sil", "stp", "merci",
 ]);
 
 export function rankFiles(files: MapFile[], hints: RankHints = {}): RepoMapEntry[] {

@@ -52,11 +52,43 @@ export interface Route {
 
 // Signals that a request is beyond a small local model. Deliberately conservative: the failure
 // mode of escalating too eagerly is a bill, and the whole point of this project is not to have one.
+/**
+ * What makes a question worth the strong model.
+ *
+ * In BOTH languages the product speaks, and that is not a nicety. These patterns decide which model
+ * a Hivey preset answers with: match, and the question goes to `deep`; miss, and it goes to
+ * `everyday`. They were written in English only, so every hard question asked in French — "pourquoi
+ * est-ce que ça plante", "revue de sécurité", "fuite mémoire", "condition de course" — was graded as
+ * an ordinary turn and answered by the cheap model. The user got vaguer answers than the preset
+ * promised, for a reason that was invisible: the routing was right about a question it had not
+ * understood.
+ *
+ * Anything added here must be added in both languages, or it reintroduces exactly that.
+ */
 const HARD_SIGNALS: Array<[RegExp, string]> = [
-  [/\b(architecture|refactor(?:ing)?\s+(?:the|all|across)|migrat(?:e|ion)\s+(?:the|all)|redesign)\b/i, "cross-cutting change"],
+  [
+    /\b(architecture|refactor(?:ing)?\s+(?:the|all|across)|migrat(?:e|ion)\s+(?:the|all)|redesign)\b/i,
+    "cross-cutting change",
+  ],
+  [
+    /(?<!\p{L})(architecture|refonte|refactor(?:er|isation)?\s+(?:tout|toute|l'ensemble|le projet)|migr(?:er|ation)\s+(?:tout|toute|l'ensemble|le projet)|conception)(?!\p{L})/iu,
+    "cross-cutting change",
+  ],
   [/\b(why does|why is|root cause|race condition|deadlock|memory leak|heisenbug)\b/i, "diagnosis rather than transformation"],
+  [
+    /(?<!\p{L})(pourquoi|cause\s+racine|d['’]où\s+vient|condition\s+de\s+course|interblocage|fuite\s+(?:de\s+)?mémoire|concurrence)(?!\p{L})/iu,
+    "diagnosis rather than transformation",
+  ],
   [/\b(threat model|security review|audit|vulnerab)/i, "security reasoning"],
+  [
+    /(?<!\p{L})(modèle\s+de\s+menace|revue\s+de\s+sécurité|audit|vulnérab|faille|sécuriser)/iu,
+    "security reasoning",
+  ],
   [/\b(prove|invariant|complexity analysis|algorithm design)\b/i, "formal reasoning"],
+  [
+    /(?<!\p{L})(démontrer|démontre|preuve|invariant|complexité|conception\s+d['’]algorithme|algorithmique)(?!\p{L})/iu,
+    "formal reasoning",
+  ],
 ];
 
 export function classifyComplexity(prompt: string, promptTokens: number, localContextTokens: number): {
