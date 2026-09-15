@@ -9,6 +9,7 @@ import * as vscode from "vscode";
 import { isDocumentUri } from "./models.js";
 import { t } from "../shared/i18n.js";
 import { buildRepoMap, isMappable, type MapFile } from "../core/context/repomap.js";
+import { contextBudget } from "../core/context/budget.js";
 import type { ContextItem } from "../core/session/session.js";
 import { estimateTokens, headToTokens, perFileBudget } from "../core/util/tokens.js";
 import { EgressGate } from "./egress.js";
@@ -22,12 +23,31 @@ const MAX_FILE_BYTES = 200_000;
 export class WorkspaceContext {
   private map?: { text: string; builtAt: number; focus: string; files: number; omitted: number };
   private dirty = true;
+  /**
+   * Bumped when a file appears or disappears — not when one is saved.
+   *
+   * The repository map is frozen for the life of a conversation, which is right: re-ranking it every
+   * time a tab changes rewrites the cacheable prefix for no gain. But a map frozen against a
+   * STRUCTURE that no longer exists is a different thing. In agent mode the agent creates files
+   * itself, and it then went on reasoning about a repository those files were not in — asking for
+   * something it had just written and being told it was not there.
+   *
+   * A save does not bump it: the file was already on the list, and its symbols moving is not worth
+   * rebuilding the prefix for.
+   */
+  private structure = 0;
   private readonly recent: string[] = [];
 
   constructor(private readonly disposables: vscode.Disposable[]) {
     const watcher = vscode.workspace.createFileSystemWatcher("**/*");
-    watcher.onDidCreate(() => (this.dirty = true));
-    watcher.onDidDelete(() => (this.dirty = true));
+    watcher.onDidCreate(() => {
+      this.dirty = true;
+      this.structure += 1;
+    });
+    watcher.onDidDelete(() => {
+      this.dirty = true;
+      this.structure += 1;
+    });
     disposables.push(watcher);
     disposables.push(
       vscode.workspace.onDidSaveTextDocument((doc) => {
@@ -47,6 +67,12 @@ export class WorkspaceContext {
 
   invalidate(): void {
     this.dirty = true;
+    this.structure += 1;
+  }
+
+  /** Changes whenever a file appears or disappears. A frozen map built at another value is stale. */
+  structureVersion(): number {
+    return this.structure;
   }
 
   /** Paths of every file open in a visible editor, most relevant first. */
@@ -164,7 +190,7 @@ export class WorkspaceContext {
   }
 
   /** Turn a path the user picked into a context item, refusing the ones policy forbids. */
-  async fileContext(uri: vscode.Uri, settings: Settings, maxTokens = perFileBudget(settings.context.maxTokens)): Promise<ContextItem | undefined> {
+  async fileContext(uri: vscode.Uri, settings: Settings, maxTokens = perFileBudget(contextBudget(settings.context.maxTokens, 0))): Promise<ContextItem | undefined> {
     const rel = relative(uri);
     if (EgressGate.isBlocked(rel, settings.privacy.blockedGlobs)) {
       void vscode.window.showWarningMessage(t("Hivey Code: {0} is excluded by the privacy policy and will not be attached.", rel));
@@ -191,7 +217,7 @@ export class WorkspaceContext {
    * nobody asked about. The label carries the line numbers, so the model — and the user reading the
    * chip — knows this is an excerpt rather than the file.
    */
-  async rangeContext(uri: vscode.Uri, range: vscode.Range, settings: Settings, maxTokens = perFileBudget(settings.context.maxTokens)): Promise<ContextItem | undefined> {
+  async rangeContext(uri: vscode.Uri, range: vscode.Range, settings: Settings, maxTokens = perFileBudget(contextBudget(settings.context.maxTokens, 0))): Promise<ContextItem | undefined> {
     const rel = relative(uri);
     if (EgressGate.isBlocked(rel, settings.privacy.blockedGlobs)) {
       void vscode.window.showWarningMessage(t("Hivey Code: {0} is excluded by the privacy policy and will not be attached.", rel));

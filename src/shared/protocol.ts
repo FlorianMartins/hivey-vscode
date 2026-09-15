@@ -260,6 +260,8 @@ export interface UiState {
   sentTokens: number;
   /** The budget the next question is measured against — `context.maxTokens`. */
   contextBudget: number;
+  /** Whether that figure was derived from the model's window rather than chosen by the user. */
+  contextBudgetAuto: boolean;
   /** The selected model's own window, 0 when the catalogue does not know it. */
   modelContext: number;
   budget: { spentTodayUsd: number; dailyUsd: number };

@@ -1067,4 +1067,10 @@ export const FR: Record<string, string> = {
   "{0} of {1} today": "{0} sur {1} aujourd'hui",
   "Spent today against hiveyCode.budget.dailyUsd. At the cap, each question asks before it is sent.": "Dépensé aujourd'hui, rapporté à hiveyCode.budget.dailyUsd. Au plafond, chaque question demande confirmation avant d'être envoyée.",
   "Today's cap is reached: each question will ask before it is sent. Raise hiveyCode.budget.dailyUsd.": "Le plafond du jour est atteint : chaque question demandera confirmation avant d'être envoyée. Augmentez hiveyCode.budget.dailyUsd.",
+  "For this conversation": "Pour cette conversation",
+  "Send this and everything else in this conversation, without moving the cap": "Envoyer celle-ci et toutes les suivantes de cette conversation, sans déplacer le plafond",
+  "Allowed for this conversation, sent.": "Autorisé pour cette conversation, envoyé.",
+  "Automatic": "Automatique",
+  "Follows the model's own window": "Suit la fenêtre du modèle",
+  "{0} tokens — follows the model": "{0} jetons — suit le modèle",
 };

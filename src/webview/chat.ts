@@ -122,10 +122,12 @@ export function approvalCard(request: UiApproval, deps: ChatDeps): HTMLElement {
       }),
     session: () =>
       button({
-        label: t("Always (this conversation)"),
+        label: budget ? t("For this conversation") : t("Always (this conversation)"),
         className: "btn",
-        title: t("Stop asking for {0} until the next conversation", request.tool),
-        onClick: () => answer("session", t("Allowed for this conversation.")),
+        title: budget
+          ? t("Send this and everything else in this conversation, without moving the cap")
+          : t("Stop asking for {0} until the next conversation", request.tool),
+        onClick: () => answer("session", budget ? t("Allowed for this conversation, sent.") : t("Allowed for this conversation.")),
       }),
     always: () =>
       button({
@@ -1504,6 +1506,23 @@ function contextBudgetSection(state: UiState, deps: ChatDeps, close: () => void)
         : t("Context budget"),
     ),
   ];
+  // First, and the default: let it follow the model. A fixed figure chosen once, on whatever model
+  // was selected that day, is how a conversation on a 200k model ended up being summarised away
+  // after three exchanges.
+  out.push(
+    menuItem({
+      label: t("Automatic"),
+      hint:
+        state.modelContext > 0
+          ? t("{0} tokens — follows the model", formatTokens(state.contextBudget))
+          : t("Follows the model's own window"),
+      selected: state.contextBudgetAuto,
+      onClick: () => {
+        deps.send({ type: "setContextBudget", tokens: 0 });
+        close();
+      },
+    }),
+  );
   for (const tokens of contextBudgets(state.modelContext)) {
     out.push(
       menuItem({
@@ -1512,7 +1531,7 @@ function contextBudgetSection(state: UiState, deps: ChatDeps, close: () => void)
           tokens === state.modelContext && state.modelContext > 0
             ? t("The whole window. The answer needs room in it too.")
             : undefined,
-        selected: tokens === state.contextBudget,
+        selected: !state.contextBudgetAuto && tokens === state.contextBudget,
         onClick: () => {
           deps.send({ type: "setContextBudget", tokens });
           close();

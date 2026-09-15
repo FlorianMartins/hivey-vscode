@@ -5,6 +5,7 @@ import * as vscode from "vscode";
 import { showKnowledge } from "./knowledge.js";
 import { setLanguage, t } from "../shared/i18n.js";
 import { Budget } from "../core/router/budget.js";
+import { contextBudget } from "../core/context/budget.js";
 import { isLocalEndpoint } from "../core/redaction/index.js";
 import { ChatViewProvider, PreviewProvider } from "./chat.js";
 import { HiveyCodeActions } from "./codeActions.js";
@@ -437,7 +438,7 @@ export function activate(context: vscode.ExtensionContext): void {
         { location: vscode.ProgressLocation.Notification, title: t("Hivey Code: mapping the repository…") },
         async () => {
           workspace.invalidate();
-          const map = await workspace.repoMap(readSettings().context.maxTokens, true);
+          const map = await workspace.repoMap(contextBudget(readSettings().context.maxTokens, 0), true);
           void vscode.window.showInformationMessage(
             map
               ? t("Repository map: {0} files, {1} omitted (token budget).", map.files, map.omitted)

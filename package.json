@@ -2,7 +2,7 @@
   "name": "hivey-code",
   "displayName": "Hivey Code",
   "description": "%extension.description%",
-  "version": "0.45.0",
+  "version": "0.46.0",
   "publisher": "hivey",
   "license": "Apache-2.0",
   "repository": {
@@ -892,7 +892,7 @@
           },
           "hiveyCode.context.maxTokens": {
             "type": "number",
-            "default": 8000,
+            "default": 0,
             "description": "%config.context.maxTokens%"
           },
           "hiveyCode.context.repoMap": {

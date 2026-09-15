@@ -27,6 +27,7 @@ import { relative } from "./workspace.js";
 import { gitChangesSummary } from "./integrations/git.js";
 import { ibmiConnected, ibmiInstance } from "./integrations/ibmi.js";
 import { parseMemberRef, formatRows, isReadOnlySql } from "../core/ibmi/sql.js";
+import { perFileBudget } from "../core/util/tokens.js";
 
 const MAX_TOKENS = 4000;
 
@@ -35,6 +36,12 @@ export interface ResolveDeps {
   settings: Settings;
   /** The repository map, shared with the turn so the same budget is not spent twice. */
   repoMap: () => Promise<{ text: string; files: number; omitted: number } | undefined>;
+  /**
+   * The turn's context budget, which depends on the model and so cannot be read from the settings.
+   * A mention that is cut to a share of the old flat default while the turn has room for four times
+   * as much is an answer given about a file the model only half saw.
+   */
+  budgetTokens: number;
 }
 
 export async function resolveMentions(mentions: Mention[], deps: ResolveDeps): Promise<ContextItem[]> {
@@ -67,7 +74,11 @@ async function resolveOne(mention: Mention, deps: ResolveDeps): Promise<ContextI
       if (!path) return undefined;
       const folder = vscode.workspace.workspaceFolders?.[0];
       if (!folder) throw new Error(t("No folder is open."));
-      return deps.workspace.fileContext(vscode.Uri.joinPath(folder.uri, path), deps.settings);
+      return deps.workspace.fileContext(
+        vscode.Uri.joinPath(folder.uri, path),
+        deps.settings,
+        perFileBudget(deps.budgetTokens),
+      );
     }
 
     case "openFiles": {

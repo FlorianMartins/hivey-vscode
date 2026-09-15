@@ -89,6 +89,8 @@ import { SECTION, endpointFor, providerFor, readSettings, routerConfig, type Key
 import { EgressGate, safeHost } from "./egress.js";
 import { labelFor, listModels, openFiles, openFileUris, supportsReasoning } from "./models.js";
 import { loadPrices } from "./prices.js";
+import { contextBudget, repoMapBudget } from "../core/context/budget.js";
+import { perFileBudget } from "../core/util/tokens.js";
 import { buildTools } from "./tools.js";
 import { McpManager } from "./integrations/mcp.js";
 import { WorkspaceContext, relative } from "./workspace.js";
@@ -208,6 +210,37 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     if (next === this.calibration) return;
     this.calibration = prune(next);
     void this.ctx.globalState.update(CALIBRATION_KEY, this.calibration);
+  }
+
+  /**
+   * How much of the conversation may reach the model this turn.
+   *
+   * The user's figure when they set one, otherwise derived from the window of the model actually
+   * selected — see `core/context/budget.ts` for why a flat 8000 was destroying answers rather than
+   * saving money.
+   */
+  private budgetTokensFor(s: Settings): number {
+    return contextBudget(s.context.maxTokens, this.modelWindow(s));
+  }
+
+  /**
+   * "For this conversation" on the spending card.
+   *
+   * A cap is a habit; a piece of work is an exception. Someone in the middle of something expensive
+   * should not have to answer the same question at every turn, nor permanently move a limit they
+   * chose on purpose. Held in memory and cleared with the conversation, which is exactly as long as
+   * the exception is meant to last.
+   */
+  private budgetWaived = false;
+
+  /** What one attached file may take of it. */
+  private perFileTokens(): number {
+    return perFileBudget(this.budgetTokensFor(readSettings()));
+  }
+
+  /** The selected model's own window, 0 when the catalogue does not know it. */
+  private modelWindow(s: Settings): number {
+    return this.models.find((m) => m.id === hiveyModel(s.chat.model, "everyday"))?.context ?? 0;
   }
 
   /** An estimate corrected by what this model has been measured to do. */
@@ -425,7 +458,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     // simply does not appear.
     const implicit = this.workspace.activeContext(3000, s);
     const contextTokens = this.contextTokens();
-    const budgetTokens = s.context.maxTokens;
+    const budgetTokens = this.budgetTokensFor(s);
 
     const state: UiState = {
       screen: this.screen,
@@ -463,10 +496,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       contextTokens,
       sentTokens: this.session.plannedTokens(budgetTokens),
       contextBudget: budgetTokens,
+      contextBudgetAuto: !(typeof s.context.maxTokens === "number" && s.context.maxTokens > 0),
       // The window the chosen model actually has, straight from the catalogue. Zero when it is not
       // known — a local runtime that reports no such number, most often — and the panel then offers
       // fixed steps instead of pretending to know a ceiling.
-      modelContext: this.models.find((m) => m.id === hiveyModel(s.chat.model, "everyday"))?.context ?? 0,
+      modelContext: this.modelWindow(s),
       contextFill: budgetTokens > 0 ? Math.min(1, contextTokens / budgetTokens) : 0,
       ...(this.cacheSeen.prompt > 0 ? { cacheHitRate: this.cacheSeen.cached / this.cacheSeen.prompt } : {}),
       // Computed here rather than in the panel because the budget is a setting, and a panel that
@@ -598,8 +632,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this.attachments = [];
     this.screen = "chat";
     this.searchQuery = "";
-    // A new conversation starts cautious again: session-wide permissions do not carry over.
+    // A new conversation starts cautious again: session-wide permissions do not carry over, and
+    // neither does a spending exception that was granted for a particular piece of work.
     this.permissions.clearSession();
+    this.budgetWaived = false;
     this.sendState();
   }
 
@@ -684,7 +720,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             assistant: "Hivey Code",
             // A quarter of the turn's budget. An attachment that can fill the context is not an
             // attachment, it is a replacement for the conversation it was added to.
-            maxTokens: Math.floor(readSettings().context.maxTokens * 0.25),
+            maxTokens: Math.floor(this.budgetTokensFor(readSettings()) * 0.25),
             omittedNote: (n) => t("({0} earlier exchanges omitted.)", n),
             label: (title) => t("conversation: {0}", title || t("untitled")),
           });
@@ -954,7 +990,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           const folder = vscode.workspace.workspaceFolders?.[0];
           const absolute = /^([/\\]|[A-Za-z]:)/.test(m.path);
           const uri = absolute || !folder ? vscode.Uri.file(m.path) : vscode.Uri.joinPath(folder.uri, m.path);
-          const item = await this.workspace.fileContext(uri, readSettings());
+          const item = await this.workspace.fileContext(uri, readSettings(), this.perFileTokens());
           if (item) {
             this.attachments.push(item);
             this.remember(m.path);
@@ -1196,8 +1232,16 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           break;
       }
     } catch (err) {
-      this.post({ type: "error", message: (err as Error).message });
-      this.log.appendLine(`[chat] ${(err as Error).stack ?? (err as Error).message}`);
+      // Recorded, not just posted — the same lesson as the turn's own failure path. A message is
+      // consumed by the panel and destroyed by the next rebuild, so anything that went wrong while
+      // handling what the user did (attaching a file, switching model, restoring a checkpoint)
+      // showed for a fraction of a second and then never existed. An error nobody can read is an
+      // error nobody can report.
+      const message = (err as Error).message;
+      this.log.appendLine(`[chat] ${(err as Error).stack ?? message}`);
+      if (this.session.entries.length) this.session.add({ role: "assistant", text: "", model: "" }).error = message;
+      this.post({ type: "error", message });
+      this.sendState();
     }
   }
 
@@ -1221,7 +1265,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       case "browse": {
         const picked = await vscode.window.showOpenDialog({ canSelectMany: true, openLabel: "Joindre" });
         for (const uri of picked ?? []) {
-          const item = await this.workspace.fileContext(uri, settings);
+          const item = await this.workspace.fileContext(uri, settings, perFileBudget(this.budgetTokensFor(settings)));
           if (item) this.attachments.push(item);
         }
         break;
@@ -1238,7 +1282,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         const uris = openFileUris();
         let added = 0;
         for (const uri of uris) {
-          const item = await this.workspace.fileContext(uri, settings);
+          const item = await this.workspace.fileContext(uri, settings, perFileBudget(this.budgetTokensFor(settings)));
           if (item && !this.attachments.some((a) => a.label === item.label)) {
             this.attachments.push(item);
             added += 1;
@@ -1576,7 +1620,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private async autoCompactIfFull(settings: Settings): Promise<void> {
     if (!settings.context.autoCompact || this.autoCompactOff) return;
     const included = this.session.entries.filter((e) => e.included).length;
-    if (!shouldSuggestCompact(this.contextTokens(), settings.context.maxTokens, included)) return;
+    if (!shouldSuggestCompact(this.contextTokens(), this.budgetTokensFor(settings), included)) return;
     if (!(await this.compact())) this.autoCompactOff = true;
   }
 
@@ -2355,7 +2399,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     for (const row of picked) {
       const uri = byPath.get(row.path);
       if (!uri) continue;
-      const item = await this.workspace.fileContext(uri, readSettings());
+      const item = await this.workspace.fileContext(uri, readSettings(), this.perFileTokens());
       if (item && !this.attachments.some((a) => a.label === item.label)) this.attachments.push(item);
       this.remember(row.path);
     }
@@ -2374,7 +2418,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const items = await resolveMentions([{ kind, raw: `#${kind}` }], {
       workspace: this.workspace,
       settings,
-      repoMap: () => this.workspace.repoMap(Math.floor(settings.context.maxTokens * 0.4)),
+      repoMap: () => this.workspace.repoMap(repoMapBudget(this.budgetTokensFor(settings))),
+      budgetTokens: this.budgetTokensFor(settings),
     });
     this.attachments.push(...items);
     this.sendState();
@@ -2647,7 +2692,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         // A symbol attaches the lines it occupies rather than the whole file: a 3 000-line module
         // attached to answer a question about one method is most of a context window spent on
         // material nobody asked about.
-        const item = await this.workspace.rangeContext(picked.symbol.location.uri, picked.symbol.location.range, readSettings());
+        const item = await this.workspace.rangeContext(
+          picked.symbol.location.uri,
+          picked.symbol.location.range,
+          readSettings(),
+          this.perFileTokens(),
+        );
         if (item) {
           this.attachments.push(item);
           this.sendState();
@@ -2865,7 +2915,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         // Most of the window, since the summary is the point of the request rather than a
         // side-effect of it. What does not fit is the oldest material, which is what a summary
         // written under pressure would have compressed hardest anyway.
-        maxTokens: Math.floor(settings.context.maxTokens * 0.8),
+        maxTokens: Math.floor(this.budgetTokensFor(settings) * 0.8),
         omittedNote: (n) => t("({0} earlier exchanges omitted.)", n),
       });
 
@@ -2982,7 +3032,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       ? await resolveMentions(parsed.mentions, {
           workspace: this.workspace,
           settings,
-          repoMap: () => this.workspace.repoMap(Math.floor(settings.context.maxTokens * 0.4)),
+          repoMap: () => this.workspace.repoMap(repoMapBudget(this.budgetTokensFor(settings))),
+          budgetTokens: this.budgetTokensFor(settings),
         })
       : [];
     // The file on screen, unless the user waved it away or has already attached it by hand. It goes
@@ -3049,13 +3100,18 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     // model can read any file it wants, and the ranking only decides what it sees FIRST. It is
     // rebuilt when the conversation is compacted, when a new one starts, and when the user asks —
     // which are the moments where the prefix is being rewritten anyway.
+    // Rebuilt when the repository has gained or lost a file since the map was taken. Freezing it
+    // protects the cacheable prefix from a tab switch; it must not outlive the structure it
+    // describes, or the agent asks for a file it created a minute ago and is told it does not exist.
+    if (this.frozenMapAt !== this.workspace.structureVersion()) this.frozenMap = undefined;
     if (mode !== "chat" && settings.context.repoMap && !this.frozenMap) {
       // The first question of a conversation is what the map is ranked around, and it is frozen
       // there afterwards — which is the right trade: the question that opens a conversation is what
       // the conversation is about, and re-ranking on every follow-up would cost the prompt cache far
       // more than a better ordering is worth.
       const opening = [...this.session.entries].reverse().find((e) => e.role === "user")?.text;
-      this.frozenMap = await this.workspace.repoMap(Math.floor(settings.context.maxTokens * 0.4), false, opening);
+      this.frozenMap = await this.workspace.repoMap(repoMapBudget(this.budgetTokensFor(settings)), false, opening);
+      this.frozenMapAt = this.workspace.structureVersion();
     }
     const ambient = mode !== "chat" && settings.context.repoMap ? this.frozenMap : undefined;
     const allTools: Tool[] = buildTools({
@@ -3126,7 +3182,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
               ),
       }),
       ambient: ambient ? `${ambient.text}\n\n(${ambient.files} files mapped, ${ambient.omitted} omitted)` : undefined,
-      maxTokens: settings.context.maxTokens,
+      maxTokens: this.budgetTokensFor(settings),
       nonce,
     });
 
@@ -3264,7 +3320,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       // runaway prompt still does not (see `hiveyCode.budget.*`). And going over the cap is now a
       // question in the conversation instead of a silent end: a guard whose only move is to kill
       // the turn without a readable reason protects the user from nothing.
-      if (!isLocal) {
+      if (!isLocal && !this.budgetWaived) {
         const estimate = estimateCost(this.tokensFor(model, prepared.estimatedTokens), this.priceLookup(model));
         const verdict = this.gate.budget.check(estimate);
         if (!verdict.ok) {
@@ -3274,7 +3330,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
                 id: randomNonce(),
                 tool: "budget",
                 description: t("This question is estimated at ${0}, over your cap. Send it anyway?", estimate.toFixed(3)),
-                choices: ["once", "always", "no"],
+                choices: ["once", "session", "always", "no"],
                 detail: [
                   verdict.message,
                   t("~{0} tokens to {1}", this.tokensFor(model, prepared.estimatedTokens), safeHost(baseUrl)),
@@ -3295,6 +3351,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             this.endTurnEarly(ctl);
             return;
           }
+          // The exception lasts as long as the piece of work does, and no longer.
+          if (decision === "session") this.budgetWaived = true;
           if (decision === "always") await this.raiseBudget(verdict.reason, estimate);
         }
       }
@@ -3797,6 +3855,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    * rebuild. See where it is set for why a slightly stale map is cheaper than a fresh one.
    */
   private frozenMap: { text: string; files: number; omitted: number } | undefined;
+  /** The workspace structure the frozen map describes. See `WorkspaceContext.structureVersion`. */
+  private frozenMapAt = -1;
 
   /** What sub-agents spent during the turn in progress, to be added to the answer that ordered it. */
   private delegatedCostUsd = 0;

@@ -2,6 +2,48 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.46.0 — 2026-09-15
+
+### Corrigé
+
+- **Le budget de contexte de 8 000 jetons faisait répondre à partir d'un résumé.** Ce nombre datait
+  de l'époque où le seul modèle joignable tournait sur le portable de l'utilisateur ; les modèles
+  vers lesquels le produit route ont des fenêtres de 200 000 à 1 000 000. L'offre de résumé se
+  déclenche aux deux tiers du budget, donc une conversation était remplacée par un digest d'elle-même
+  **au bout de deux ou trois échanges** — à partir de là le modèle ne raisonnait plus sur ce qui
+  avait été dit mais sur un résumé, et les réponses se dégradaient sans que rien ne l'explique.
+  « En 3 messages j'ai atteint presque tout le contexte. »
+
+  Le budget est désormais **déduit de la fenêtre du modèle réellement choisi** : 40 % de celle-ci,
+  entre 8 000 et 32 000 jetons. Le chiffre de l'utilisateur l'emporte dès qu'il en a posé un, et le
+  menu sous l'anneau de contexte propose « Automatique » en tête. Trois bornes rendent la déduction
+  sûre : un plancher (un modèle dont la fenêtre est inconnue se comporte comme avant), un plafond
+  (le budget est aussi ce que le plafond de dépense mesure), et une fraction bien inférieure à 1 (la
+  fenêtre doit contenir la réponse, et en mode agent les résultats d'outils de chaque étape).
+
+  La carte du dépôt est plafonnée à 12 000 jetons indépendamment : elle vit dans le préfixe
+  cacheable, donc chacun de ses jetons est payé à chaque tour, et au-delà de quelques milliers une
+  liste de chemins cesse d'être du savoir pour devenir de la paille. Les pièces jointes, elles,
+  suivent le budget : un fichier attaché n'est plus coupé à la part de l'ancien plancher.
+
+- **La carte du dépôt survivait au dépôt qu'elle décrit.** Gelée pour la durée de la conversation —
+  ce qui est juste, une re-hiérarchisation à chaque changement d'onglet réécrit le préfixe pour
+  rien — elle ne repartait jamais. En mode agent, l'agent **crée des fichiers lui-même**, puis
+  continuait à raisonner sur un dépôt où ils n'existaient pas. Elle est maintenant reconstruite quand
+  un fichier apparaît ou disparaît ; une sauvegarde ne la reconstruit pas.
+
+- **Une erreur survenue en traitant une action du panneau** (joindre un fichier, changer de modèle,
+  restaurer un point de reprise) était postée puis détruite au rendu suivant, comme l'était celle du
+  tour. Elle est écrite dans la conversation.
+
+### Ajouté
+
+- **« Pour cette conversation » sur la carte de dépassement de budget.** Un plafond est une habitude,
+  un chantier est une exception : personne ne devrait avoir à répondre à la même question à chaque
+  tour, ni à déplacer durablement une limite choisie exprès. L'exception est gardée en mémoire et
+  disparaît avec la conversation. Les quatre choix sont désormais *Envoyer quand même*, *Pour cette
+  conversation*, *Relever le plafond*, *Ne pas envoyer*.
+
 ## 0.45.0 — 2026-09-15
 
 ### Corrigé

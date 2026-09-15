@@ -52,7 +52,7 @@
   "config.privacy.auditLog": "Log every remote request locally (timestamp, provider, model, tokens, cost). Never the content.",
   "config.budget.perRequestUsd": "Estimated cost above which one remote request is questioned before being sent. The estimate charges the whole prompt at the input price plus a quarter of it at the output price, which on a premium model is about $34 per million tokens — so a cap under $1 is reached by an ordinary agent turn. 0 = never ask.",
   "config.budget.dailyUsd": "Remote spending in one day above which requests are questioned before being sent. 0 = never ask.",
-  "config.context.maxTokens": "Token budget for the context sent to the model (repository map + excerpts).",
+  "config.context.maxTokens": "Token budget for the context sent to the model (repository map + excerpts). **0 derives it from the selected model's own window** — 40% of it, between 8 000 and 32 000 tokens. The old fixed 8 000 came from the days when the only model was a local one; against a modern window it made the extension summarise a conversation away after two or three exchanges, and answer from the summary. Set a number to decide for yourself.",
   "config.knowledge.enabled": "Keep a knowledge base: what has been established about this system, this business and these tools, in Markdown files the agent can search, write and correct. Only the list of titles travels with each question; a note is read when it is needed.",
   "config.knowledge.scope": "Which base is in play. The project's lives in `.hiveycode/knowledge/` and is versioned with the code; the personal one in `~/.hiveycode/knowledge/` follows you across projects.",
   "config.knowledge.scope.project": "The repository's own notes, reviewed and committed like code",

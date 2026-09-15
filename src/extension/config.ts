@@ -55,7 +55,12 @@ export interface Settings {
     customTerms: string[];
   };
   budget: { perRequestUsd: number; dailyUsd: number };
-  context: { maxTokens: number; repoMap: boolean; autoCompact: boolean };
+  context: {
+    /** The user's figure when they set one, `undefined` when the budget is derived from the model. */
+    maxTokens: number | undefined;
+    repoMap: boolean;
+    autoCompact: boolean;
+  };
   knowledge: {
     enabled: boolean;
     scope: "project" | "personal" | "both";
@@ -94,6 +99,18 @@ function readEndpoints(c: vscode.WorkspaceConfiguration): Record<ProviderId, str
   const out = { local: c.get<string>("endpoints.local", defaults.local) } as Record<ProviderId, string>;
   for (const v of REMOTE_VENDORS) out[v.id] = c.get<string>(endpointSettingKey(v.id), v.baseUrl);
   return out;
+}
+
+/**
+ * A setting the user has actually set, as opposed to one the manifest supplies a default for.
+ *
+ * `inspect` is the only way to tell those apart, and the difference matters wherever the code wants
+ * to compute a better answer than the manifest can: a manifest default is one number for everybody,
+ * and it cannot depend on the model that happens to be selected.
+ */
+function explicit<T>(c: vscode.WorkspaceConfiguration, key: string): T | undefined {
+  const found = c.inspect<T>(key);
+  return found?.workspaceFolderValue ?? found?.workspaceValue ?? found?.globalValue;
 }
 
 export function readSettings(scope?: vscode.Uri): Settings {
@@ -144,7 +161,10 @@ export function readSettings(scope?: vscode.Uri): Settings {
       dailyUsd: c.get<number>("budget.dailyUsd", 20),
     },
     context: {
-      maxTokens: c.get<number>("context.maxTokens", 8000),
+      // Deliberately NOT `c.get(..., default)`. A default returned as a value cannot be told apart
+      // from the same value typed by the user, and the whole point is to derive the budget from the
+      // model's window unless someone has actually chosen a figure. See `core/context/budget.ts`.
+      maxTokens: explicit<number>(c, "context.maxTokens"),
       repoMap: c.get<boolean>("context.repoMap", true),
       autoCompact: c.get<boolean>("context.autoCompact", false),
     },
