@@ -140,8 +140,8 @@ export function readSettings(scope?: vscode.Uri): Settings {
       customTerms: c.get<string[]>("privacy.customTerms", []),
     },
     budget: {
-      perRequestUsd: c.get<number>("budget.perRequestUsd", 0.25),
-      dailyUsd: c.get<number>("budget.dailyUsd", 2),
+      perRequestUsd: c.get<number>("budget.perRequestUsd", 2),
+      dailyUsd: c.get<number>("budget.dailyUsd", 20),
     },
     context: {
       maxTokens: c.get<number>("context.maxTokens", 8000),

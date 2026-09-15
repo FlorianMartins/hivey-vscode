@@ -58,3 +58,20 @@ export function costOf(
   const usdWithoutCache = (usage.promptTokens * price.in + usage.completionTokens * price.out) / 1_000_000;
   return { usd, known: true, usdWithoutCache };
 }
+
+/**
+ * What a request will cost, before it is sent — the figure the spending caps are checked against.
+ *
+ * Deliberately pessimistic in two ways: the whole prompt is charged at the input price, cached
+ * prefix included, and an answer a quarter the size of the question is assumed on top. On a premium
+ * model those two together come to roughly $34 per million prompt tokens, which is what makes the
+ * caps in `hiveyCode.budget` far tighter than their figures suggest — a cap of $0.25 is reached at
+ * about seven thousand tokens, less than agent mode assembles before the question is even added.
+ *
+ * It lives here rather than beside the caller because a formula that decides whether the product
+ * answers at all has to be reachable by a test that does not need VS Code to run.
+ */
+export function estimateCost(promptTokens: number, price: Price | undefined): number {
+  if (!price) return 0;
+  return (promptTokens * price.in + promptTokens * 0.25 * price.out) / 1_000_000;
+}

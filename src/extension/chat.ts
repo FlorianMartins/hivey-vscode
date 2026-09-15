@@ -13,7 +13,7 @@ import { language, t } from "../shared/i18n.js";
 import { runTurn, type Tool } from "../core/agent/loop.js";
 import { Permissions, commandPrefix, type PermissionStore, type Rule } from "../core/agent/permissions.js";
 import { stablePrompt, turnDirectives } from "../core/prompts.js";
-import { costOf, makeLookup, type Price } from "../core/router/pricing.js";
+import { costOf, estimateCost, makeLookup, type Price } from "../core/router/pricing.js";
 import { calibrate, observe, prune, type Calibration } from "../core/util/calibrate.js";
 import { acceptsImages, IMAGE_TOKENS } from "../core/models/vision.js";
 import { checkEndpoint } from "../core/providers/endpoint.js";
@@ -213,6 +213,25 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   /** An estimate corrected by what this model has been measured to do. */
   private tokensFor(model: string, estimated: number): number {
     return calibrate(this.calibration, model, estimated);
+  }
+
+  /**
+   * "Always" on the spending card: move the cap that refused, far enough that it stops asking.
+   *
+   * Twice the request that tripped it, rounded up, and never downwards — the user answered a
+   * question about one request, and the honest reading of "always" is a ceiling that this kind of
+   * request fits under rather than one glued to this exact figure. Written globally: a spending
+   * limit is a fact about the person paying, not about the folder that happens to be open.
+   */
+  private async raiseBudget(reason: "per-request" | "daily", estimateUsd: number): Promise<void> {
+    const config = vscode.workspace.getConfiguration(SECTION);
+    const key = reason === "per-request" ? "budget.perRequestUsd" : "budget.dailyUsd";
+    const current = config.get<number>(key, 0);
+    const floor = reason === "per-request" ? estimateUsd : this.gate.budget.spentToday() + estimateUsd;
+    const next = Math.max(current, Math.ceil(floor * 2 * 100) / 100);
+    if (next === current) return;
+    await config.update(key, next, vscode.ConfigurationTarget.Global);
+    this.post({ type: "status", text: t("Cap raised to ${0}.", next.toFixed(2)) });
   }
   private readonly permissions: Permissions;
 
@@ -1729,6 +1748,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       lines.push(`## ${entry.role === "user" ? t("You") : "Hivey Code"}${entry.included ? "" : ` — ${t("out of context")}`}`);
       if (entry.role === "assistant" && entry.model) lines.push(`*${entry.model}*`, "");
       lines.push(entry.text.trim(), "");
+      // A failure is part of the record. An export that quietly drops it is a record that lies by
+      // omission — and it is the document somebody attaches when they report that nothing works.
+      if (entry.error) lines.push(`> ${t("Failed")}: ${entry.error}`, "");
       for (const step of entry.steps ?? []) lines.push(`- \`${step.tool}\` — ${step.summary}`);
       if (entry.steps?.length) lines.push("");
     }
@@ -3225,16 +3247,55 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         return;
       }
 
+      // The spending guard ASKS. It used to refuse, and that is the defect that made the extension
+      // look dead.
+      //
+      // The cap is checked on an estimate, and the estimate charges the whole prompt at the input
+      // price plus a quarter of it at the output price. On a premium model that is about $34 per
+      // million tokens, so the old default cap of $0.25 was reached at around seven thousand
+      // tokens — less than what agent mode assembles before the question is even added: the
+      // repository map, the house rules, the open file. Every turn was therefore refused BEFORE
+      // anything was sent, and refused by posting a message, which the panel consumes and the next
+      // rebuild destroys. What the user saw was a red line that flashed for a fraction of a second,
+      // no answer, no card, and a conversation whose context filled up with questions nobody ever
+      // answered. Nothing in the interface said the word "budget".
+      //
+      // Two changes, and both are needed. The defaults moved to where an ordinary turn fits and a
+      // runaway prompt still does not (see `hiveyCode.budget.*`). And going over the cap is now a
+      // question in the conversation instead of a silent end: a guard whose only move is to kill
+      // the turn without a readable reason protects the user from nothing.
       if (!isLocal) {
         const estimate = estimateCost(this.tokensFor(model, prepared.estimatedTokens), this.priceLookup(model));
         const verdict = this.gate.budget.check(estimate);
         if (!verdict.ok) {
-          this.post({
-            type: "error",
-            message: t("Budget: {0}. Adjust hiveyCode.budget or stay local.", verdict.message),
+          const decision = await new Promise<"once" | "session" | "always" | "no">((resolve) => {
+            this.askInPanel(
+              {
+                id: randomNonce(),
+                tool: "budget",
+                description: t("This question is estimated at ${0}, over your cap. Send it anyway?", estimate.toFixed(3)),
+                choices: ["once", "always", "no"],
+                detail: [
+                  verdict.message,
+                  t("~{0} tokens to {1}", this.tokensFor(model, prepared.estimatedTokens), safeHost(baseUrl)),
+                ],
+              },
+              resolve,
+              () => resolve("no"),
+            );
           });
-          this.post({ type: "turnEnd" });
-          return;
+          if (decision === "no") {
+            // Recorded, not posted. A refusal the user can still read after the next render is the
+            // whole point: this is the message they never got to see.
+            this.session.add({ role: "assistant", text: "", model }).error = t(
+              "Not sent — over the spending cap: {0}. Raise hiveyCode.budget.perRequestUsd or hiveyCode.budget.dailyUsd, or use a local model.",
+              verdict.message,
+            );
+            this.post({ type: "status", text: ctl.signal.aborted ? t("Stopped.") : t("Not sent.") });
+            this.endTurnEarly(ctl);
+            return;
+          }
+          if (decision === "always") await this.raiseBudget(verdict.reason, estimate);
         }
       }
 
@@ -3396,9 +3457,24 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       // whatever layer noticed first, and showing that to someone who pressed stop tells them their
       // own decision went wrong.
       if (!ctl.signal.aborted) {
+        // Written into the conversation, ALWAYS — and this is the defect that hid every other one.
+        //
+        // It used to be recorded only when an empty assistant entry already existed, which is to
+        // say only when the turn had got as far as contacting a model. A failure before that — a
+        // bad address, a missing key, a refused request, anything while the prompt was being built
+        // — was recorded nowhere. It was posted as a message, drawn into the turn in progress, and
+        // destroyed by the next rebuild: a red line that appeared for a fraction of a second and
+        // left nothing behind. The user could see something was wrong and could not read what.
         const last = this.session.entries[this.session.entries.length - 1];
         if (last?.role === "assistant" && !last.text) last.error = message;
+        else this.session.add({ role: "assistant", text: "", model }).error = message;
         this.post({ type: "error", message });
+        // And once, out of the transcript, because a transcript can be scrolled past — and because
+        // somebody who cannot get an answer needs the text of the failure to be able to report it.
+        const open = t("Open the log");
+        void vscode.window.showErrorMessage(t("Hivey Code: {0}", message), open).then((choice) => {
+          if (choice === open) this.log.show(true);
+        });
       }
     } finally {
       // Before anything else, and unconditionally: this is what the panel reads to decide whether
@@ -3918,13 +3994,6 @@ function pastedContext(m: { name: string; text?: string; mediaType?: string; dat
     // cannot give the model instructions.
     untrusted: true,
   };
-}
-
-function estimateCost(promptTokens: number, price: Price | undefined): number {
-  if (!price) return 0;
-  // Assume an answer about a quarter the size of the question: enough to catch a runaway prompt,
-  // not so pessimistic that the cap fires on ordinary turns.
-  return (promptTokens * price.in + promptTokens * 0.25 * price.out) / 1_000_000;
 }
 
 function randomNonce(): string {

@@ -2,6 +2,50 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.45.0 — 2026-09-15
+
+### Corrigé
+
+- **Le plafond de dépense tuait le tour en silence, et c'est ce qui donnait une extension qui « ne
+  fait plus rien ».** Le plafond est vérifié avant l'envoi, sur une estimation qui compte tout le
+  prompt au prix d'entrée plus un quart au prix de sortie — environ 34 $ le million de jetons sur un
+  modèle haut de gamme. Personne n'avait posé la multiplication contre le catalogue : avec le
+  plafond journalier livré de **2 $**, un tour d'agent ordinaire sur le modèle vers lequel le
+  préréglage *Hivey Smart* route coûte ≈ 0,22 $, donc **la huitième question de la journée était
+  refusée, et toutes les suivantes jusqu'à minuit**.
+
+  Le refus se faisait en postant un message. Le panneau consomme les messages et les redessine : la
+  ligne rouge apparaissait une fraction de seconde et disparaissait. Pas de réponse, pas de carte,
+  un contexte qui se remplit de questions que personne n'a traitées, et **aucun mot « budget » nulle
+  part**. La dépense du jour et son plafond étaient envoyés au panneau depuis le début et **dessinés
+  nulle part**.
+
+  Trois changements, et il faut les trois :
+
+  - **Dépasser un plafond ouvre une carte** dans la conversation — *Envoyer quand même / Relever le
+    plafond / Ne pas envoyer* — au lieu de terminer le tour. « Relever le plafond » place la limite
+    au-dessus de cette requête et envoie. Un refus, quand il arrive, est **écrit dans la
+    conversation** : il survit au rendu suivant et se retrouve dans l'export.
+  - **Les plafonds livrés passent de 0,25 $ à 2 $ par requête et de 2 $ à 20 $ par jour.** Un tour
+    ordinaire passe sur tous les modèles vers lesquels le produit route ; un prompt emballé de
+    400 000 jetons est toujours arrêté. Deux tests le vérifient contre le catalogue généré, donc ils
+    se déclencheront si un vendeur change ses prix.
+  - **La dépense du jour s'affiche** à côté de l'anneau de contexte dès qu'elle approche du plafond,
+    en couleur d'avertissement puis d'erreur. Ce qui peut interrompre l'utilisateur doit être
+    lisible avant de le faire.
+
+- **Une erreur survenue avant le contact du modèle ne laissait aucune trace.** Elle n'était
+  enregistrée que si une réponse vide existait déjà, c'est-à-dire seulement une fois le modèle
+  contacté. Tout ce qui échouait avant — adresse invalide, clé absente, requête refusée, assemblage
+  du prompt — était posté puis détruit au rendu suivant. L'erreur est désormais toujours écrite dans
+  la conversation, apparaît dans l'export (`> Échec : …`) et déclenche une notification unique avec
+  *Ouvrir le journal*.
+
+### Modifié
+
+- `estimateCost` quitte `src/extension/chat.ts` pour `src/core/router/pricing.ts`. Une formule qui
+  décide si le produit répond doit être atteignable par un test qui n'a pas besoin de VS Code.
+
 ## 0.44.0 — 2026-09-15
 
 ### Corrigé

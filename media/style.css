@@ -2732,6 +2732,15 @@ pre.code {
   color: var(--muted);
   white-space: nowrap;
 }
+/* The day's spend, once it is near its cap. Warning colours rather than a new palette: what is
+ * about to start interrupting the user is the editor's own idea of a warning. */
+.composer-cost.near {
+  color: var(--vscode-editorWarning-foreground, var(--muted));
+}
+.composer-cost.over {
+  color: var(--vscode-editorError-foreground, var(--muted));
+  font-weight: 600;
+}
 
 /* ── Skills ───────────────────────────────────────────────────────────────────────────────────
  *

@@ -2,7 +2,7 @@
   "name": "hivey-code",
   "displayName": "Hivey Code",
   "description": "%extension.description%",
-  "version": "0.44.0",
+  "version": "0.45.0",
   "publisher": "hivey",
   "license": "Apache-2.0",
   "repository": {
@@ -812,12 +812,12 @@
           },
           "hiveyCode.budget.perRequestUsd": {
             "type": "number",
-            "default": 0.25,
+            "default": 2,
             "description": "%config.budget.perRequestUsd%"
           },
           "hiveyCode.budget.dailyUsd": {
             "type": "number",
-            "default": 2,
+            "default": 20,
             "description": "%config.budget.dailyUsd%"
           }
         }

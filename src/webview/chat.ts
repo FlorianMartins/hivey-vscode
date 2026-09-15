@@ -88,10 +88,15 @@ export function chatScreen(state: UiState, deps: ChatDeps, liveTurn?: HTMLElemen
  */
 export function approvalCard(request: UiApproval, deps: ChatDeps): HTMLElement {
   const egress = request.tool === "egress" || request.tool === "send";
+  // Spending is neither a permission nor a destination, and generic labels made it unreadable:
+  // "Allow / Always / Refuse" says nothing about what is being allowed or what it costs.
+  const budget = request.tool === "budget";
   const card = el("div", `approval${egress ? " egress" : ""}`);
   const head = el("div", "approval-head");
   head.append(icon("shield", "approval-ico"));
-  head.append(el("span", undefined, egress ? t("Leaving this machine") : t("Approval requested")));
+  head.append(
+    el("span", undefined, budget ? t("Over your spending cap") : egress ? t("Leaving this machine") : t("Approval requested")),
+  );
   card.append(head);
   card.append(el("div", "approval-body", request.description));
   if (request.command) card.append(el("pre", "approval-command", request.command));
@@ -111,9 +116,9 @@ export function approvalCard(request: UiApproval, deps: ChatDeps): HTMLElement {
   const available: Record<string, () => HTMLElement> = {
     once: () =>
       button({
-        label: egress ? t("Send") : t("Allow"),
+        label: budget ? t("Send anyway") : egress ? t("Send") : t("Allow"),
         className: "btn primary",
-        onClick: () => answer("once", egress ? t("Sent.") : t("Allowed once.")),
+        onClick: () => answer("once", budget || egress ? t("Sent.") : t("Allowed once.")),
       }),
     session: () =>
       button({
@@ -124,16 +129,24 @@ export function approvalCard(request: UiApproval, deps: ChatDeps): HTMLElement {
       }),
     always: () =>
       button({
-        label: egress ? t("Always to this model") : t("Always"),
+        label: budget ? t("Raise the cap") : egress ? t("Always to this model") : t("Always"),
         className: "btn",
-        title: egress ? t("Stop asking before sending to this model") : t("Write a permanent rule for this action"),
-        onClick: () => answer("always", egress ? t("This model will not be asked about again.") : t("Permanent rule saved.")),
+        title: budget
+          ? t("Move the cap above this request, and send")
+          : egress
+            ? t("Stop asking before sending to this model")
+            : t("Write a permanent rule for this action"),
+        onClick: () =>
+          answer(
+            "always",
+            budget ? t("Cap raised, sent.") : egress ? t("This model will not be asked about again.") : t("Permanent rule saved."),
+          ),
       }),
     no: () =>
       button({
-        label: egress ? t("Do not send") : t("Refuse"),
+        label: budget || egress ? t("Do not send") : t("Refuse"),
         className: "btn danger",
-        onClick: () => answer("no", egress ? t("Not sent.") : t("Refused.")),
+        onClick: () => answer("no", budget || egress ? t("Not sent.") : t("Refused.")),
       }),
   };
   for (const choice of request.choices) actions.append(available[choice]!());
@@ -986,6 +999,23 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
     const cost = el("span", "composer-cost", formatCost(state.sessionCostUsd));
     cost.title = t("What this conversation has cost. Today's total is in the cost report.");
     meter.append(cost);
+  }
+  // The day's spend against its cap, shown once it is close enough to matter.
+  //
+  // It was in the state from the beginning and drawn nowhere, and that is how a $2-a-day default
+  // could stop every question without a word: the cap was checked before sending, the refusal was
+  // posted as a message the next rebuild destroyed, and the one number that explained it was never
+  // on screen. Anything that can end a turn has to be readable before it does.
+  const { spentTodayUsd, dailyUsd } = state.budget;
+  if (dailyUsd > 0 && spentTodayUsd >= dailyUsd * 0.6) {
+    meter.append(el("span", "composer-sep", "\u2022"));
+    const day = el("span", `composer-cost${spentTodayUsd >= dailyUsd ? " over" : " near"}`);
+    day.textContent = t("{0} of {1} today", formatCost(spentTodayUsd), formatCost(dailyUsd));
+    day.title =
+      spentTodayUsd >= dailyUsd
+        ? t("Today's cap is reached: each question will ask before it is sent. Raise hiveyCode.budget.dailyUsd.")
+        : t("Spent today against hiveyCode.budget.dailyUsd. At the cap, each question asks before it is sent.");
+    meter.append(day);
   }
   const offer = state.suggestCompact ? compactOffer(state, deps) : undefined;
   if (offer) wrap.append(offer);

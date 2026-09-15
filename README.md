@@ -107,13 +107,18 @@ Not a slogan — an architecture. Six levers, in order of effect:
 5. **Do not ask when it is pointless.** No request mid-word, none in front of existing code, none
    for a context the model already had nothing to say about; and the rest of a suggestion you are
    typing through is served from the cache.
-6. **A budget that refuses, on a number it has checked.** A per-request cap (one runaway prompt
+6. **A budget that asks, on a number it has checked.** A per-request cap (one runaway prompt
    cannot cost a dinner) and a daily cap, checked **before** the call on an estimate and recorded
    **after** on the real cost when the provider reports it (OpenRouter does). There is no BPE
    tokenizer here, by choice, so that estimate would be a pessimistic guess from character classes —
    refusing requests that were affordable — except that every answer comes back carrying the
    provider's own count of the text we just estimated. Pairing the two is free, and about ten of
    them put a given model's factor within a few per cent.
+
+   Going over a cap opens a card in the conversation — *Send anyway / Raise the cap / Do not send* —
+   and the day's spend appears next to the context ring as it approaches the cap. It used to refuse
+   outright, and silently, which is the worst of both: a guard that ends the turn without a readable
+   reason protects nobody. The caps are a brake, not a wall.
 
 Default result: **$0**. The first cent spent is an explicit choice.
 

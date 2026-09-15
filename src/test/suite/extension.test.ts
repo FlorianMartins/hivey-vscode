@@ -1026,6 +1026,58 @@ suite("Hivey Code", () => {
   });
 
   /**
+   * A failure has to leave something behind.
+   *
+   * "I just get a red error message that appears for a microsecond." It was recorded in the
+   * conversation only when an empty answer already existed — which is to say only once the turn had
+   * got as far as contacting a model. Anything that went wrong before that was posted as a message,
+   * drawn into the turn in progress, and destroyed by the next rebuild. The user could see that
+   * something was wrong and could not read what, and neither could anyone they reported it to.
+   *
+   * Asserted on the export, which is the conversation's own record: if the failure is in there, it
+   * is on screen and it stays there.
+   */
+  test("a failure before the model is contacted is still written into the conversation", async () => {
+    const ext = vscode.extensions.getExtension(ID)!;
+    await ext.activate();
+
+    const config = vscode.workspace.getConfiguration(SECTION);
+    const before = {
+      provider: config.get("chat.provider"),
+      model: config.get("chat.model"),
+      openrouter: config.get("endpoints.openrouter"),
+      confirm: config.get("privacy.confirmSend"),
+    };
+    // An address that cannot work: the turn dies before anything is sent, which is exactly the case
+    // that used to leave no trace.
+    await config.update("chat.provider", "openrouter", vscode.ConfigurationTarget.Global);
+    await config.update("chat.model", "some-model", vscode.ConfigurationTarget.Global);
+    await config.update("endpoints.openrouter", "api.openai.com/v1", vscode.ConfigurationTarget.Global);
+    await config.update("privacy.confirmSend", "never", vscode.ConfigurationTarget.Global);
+
+    try {
+      await vscode.commands.executeCommand("hiveyCode.newSession");
+      await vscode.commands.executeCommand("hiveyCode.askWith", "this will fail");
+
+      await vscode.commands.executeCommand("hiveyCode.exportSession");
+      const exported = vscode.window.activeTextEditor?.document.getText() ?? "";
+      await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
+
+      assert.match(exported, /this will fail/, "the question itself is missing from the record");
+      assert.match(
+        exported,
+        /missing its scheme|unusable/i,
+        `the failure left no trace in the conversation:\n${exported.slice(0, 800)}`,
+      );
+    } finally {
+      await config.update("chat.provider", before.provider, vscode.ConfigurationTarget.Global);
+      await config.update("chat.model", before.model, vscode.ConfigurationTarget.Global);
+      await config.update("endpoints.openrouter", before.openrouter, vscode.ConfigurationTarget.Global);
+      await config.update("privacy.confirmSend", before.confirm, vscode.ConfigurationTarget.Global);
+    }
+  });
+
+  /**
    * The escalation that is not a guess.
    *
    * The router's own escalation reads the QUESTION and bets. This one reads what happened: a local
