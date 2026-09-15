@@ -275,7 +275,21 @@ export class Session {
     }
 
     const included = this.entries.filter((e) => e.included && !e.error);
-    const rendered = included.map((e) => ({ entry: e, text: renderEntry(e, opts.nonce) }));
+
+    // Rendered newest-first so that a repeated attachment is kept where it is most useful and
+    // referred to everywhere else. Identity is the label AND the body: a file that CHANGED between
+    // two turns is two different things and both are sent, because which of them the question is
+    // about is not this function's to decide. An image is never stubbed — `body` is only what the
+    // transcript says about it, so two images with the same caption are not the same image.
+    const sentBelow = new Set<string>();
+    const rendered: Array<{ entry: Entry; text: string }> = [];
+    for (let i = included.length - 1; i >= 0; i--) {
+      const entry = included[i]!;
+      const key = (c: ContextItem): string => `${c.kind}\u0000${c.label}\u0000${c.body}`;
+      const text = renderEntry(entry, opts.nonce, (c) => !c.image && sentBelow.has(key(c)));
+      for (const c of entry.context ?? []) if (!c.image) sentBelow.add(key(c));
+      rendered.unshift({ entry, text });
+    }
 
     let budget = opts.maxTokens - estimateTokens(opts.systemPrompt) - estimateTokens(opts.ambient ?? "");
     const keep: typeof rendered = [];
@@ -333,10 +347,20 @@ export class Session {
  * instruction then anything it contains reads as an instruction. A fence whose delimiter the
  * content cannot guess keeps "the user said this" and "I read this" apart by construction.
  */
-export function renderEntry(e: Entry, nonce: string): string {
+export function renderEntry(e: Entry, nonce: string, alreadyBelow?: (c: ContextItem) => boolean): string {
   if (!e.context?.length) return e.text;
   const blocks = e.context.map((c) => {
     const head = `[${c.kind}] ${c.label}`;
+    // The same file, byte for byte, attached again later in the conversation. Sent once — down
+    // there, where the newest copy is — and referred to here.
+    //
+    // This is the difference between a conversation that costs what it contains and one that costs
+    // what it contains times the number of turns. The file on screen is re-attached to every
+    // question, and a file attached by hand stays in the record of the turn it was attached to, so
+    // a five-turn conversation about one module used to carry five copies of it. Nothing is lost:
+    // the model still reads the file in full, once, in the message nearest the question — which is
+    // also the position it reads most reliably.
+    if (alreadyBelow?.(c)) return `${head}\n(unchanged, and sent in full further down this conversation)`;
     if (!c.untrusted) return `${head}\n${c.body}`;
     const body = c.body.split(`⟦${nonce}`).join("⟦removed-fence");
     return `${head}\n⟦${nonce}:begin⟧\n${body}\n⟦${nonce}:end⟧`;

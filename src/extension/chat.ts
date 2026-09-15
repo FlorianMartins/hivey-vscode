@@ -115,7 +115,17 @@ const ALLOWED_LINKS = [
 
 const PREFS_KEY = "hiveyCode.prefs";
 /** What each model's provider has actually been counting. See `core/util/calibrate.ts`. */
-const CALIBRATION_KEY = "hiveyCode.tokenCalibration";
+/**
+ * The stored token calibration.
+ *
+ * The key carries a generation, and this is the second. Everything under the first was learned from
+ * a measurement that compared our estimate WITHOUT the images against the provider's count WITH
+ * them, so every request carrying a screenshot taught a ratio above 1 for a reason that had nothing
+ * to do with tokenization, and the factor drifted upwards — inflating the estimate on the consent
+ * card and the figure the spending cap is checked against. Keeping that table would mean carrying
+ * the error for another ten requests. Bad measurements are discarded, not averaged out.
+ */
+const CALIBRATION_KEY = "hiveyCode.tokenCalibration.v2";
 const HISTORY_MAX = 100;
 
 interface Prefs {

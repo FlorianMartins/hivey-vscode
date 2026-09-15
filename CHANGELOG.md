@@ -2,6 +2,30 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.51.0 — 2026-09-15
+
+### Corrigé
+
+- **Le même fichier était renvoyé à chaque tour.** Le fichier à l'écran est rattaché à chaque
+  question, et un fichier joint à la main reste dans le compte rendu du tour où il l'a été : une
+  conversation de cinq tours sur un module portait donc **cinq copies** de ce module, et
+  l'estimation grossissait de sa taille à chaque question. Un fichier identique **octet pour octet**
+  n'est désormais envoyé **qu'une fois**, dans le message le plus proche de la question — là où un
+  modèle lit le plus fidèlement — et les tours précédents y renvoient en une ligne. Rien n'est
+  perdu : chaque tour dit toujours de quel fichier il parlait, et un fichier qui a **changé** entre
+  deux tours est envoyé deux fois, parce que ce sont deux choses différentes.
+
+- **Le calibrage des jetons dérivait vers le haut à cause des images.** Il s'apprend d'une paire :
+  ce qu'on a estimé pour une requête, contre ce que le fournisseur a compté pour elle. Les images
+  manquaient de notre moitié — 1 300 jetons chacune — donc **toute requête portant une capture
+  d'écran** enseignait un rapport supérieur à 1 pour une raison étrangère à la tokenisation. Le
+  facteur montait vers son plafond de 2,5× et **gonflait toutes les estimations suivantes**, le
+  chiffre de la carte de consentement et celui que le plafond de dépense contrôle. Une mesure qui
+  compare deux choses différentes enseigne quelque chose, et ce quelque chose est faux.
+
+  Ce qui avait été appris par cette mesure est **jeté** plutôt que moyenné (la clé de stockage
+  change de génération) : le porter dix requêtes de plus serait porter l'erreur.
+
 ## 0.50.0 — 2026-09-15
 
 ### Modifié

@@ -3,7 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { compactBrief, digestEntries, sessionAsContext, shouldSuggestCompact } from "../src/core/session/digest.js";
-import type { Entry } from "../src/core/session/session.js";
+import { Session, type Entry } from "../src/core/session/session.js";
 
 let n = 0;
 function entry(role: Entry["role"], text: string, over: Partial<Entry> = {}): Entry {
@@ -106,4 +106,44 @@ test("the brief asks for the state of the work, not for prose", () => {
   assert.match(brief, /verbatim/i);
   assert.match(brief, /next step/i);
   assert.match(brief, /dense/i, "and a length budget, or it summarises to two thirds of the original");
+});
+
+// ── The same file is not sent five times ────────────────────────────────────────────────────────
+
+test("an attachment repeated across turns is sent once, in full, at its newest position", () => {
+  // "Do not resend attached files if they are already in the context." The file on screen is
+  // re-attached to every question, and a file attached by hand stays in the record of the turn it
+  // was attached to — so a five-turn conversation about one module carried five copies of it, and
+  // the estimate grew by the size of the module on every question.
+  const body = `export function total(cents: number): number {\n  return cents;\n}\n`.repeat(200);
+  const file = { kind: "file", label: "src/totals.ts", body };
+  const session = new Session();
+  for (const question of ["What does this do?", "And the rounding?", "Can you fix it?"]) {
+    session.add({ role: "user", text: question, context: [{ ...file }] });
+    session.add({ role: "assistant", text: "Answered." });
+  }
+
+  const built = session.build({ systemPrompt: "rules", maxTokens: 400_000, nonce: "n" });
+  const sent = built.messages.map((m) => m.content).join("\n");
+  const copies = sent.split("export function total(cents: number)").length - 1;
+  assert.equal(copies, 200, `the file body appears ${copies / 200} times over, not once`);
+
+  // Nothing is lost: every question still says which file it was asked about.
+  assert.equal(sent.split("src/totals.ts").length - 1, 3, "a turn stopped naming the file it was about");
+  // And the full copy is the newest one, nearest the question being answered.
+  assert.ok(
+    sent.lastIndexOf("export function total(cents: number)") > sent.indexOf("Can you fix it?"),
+    "the full copy is not the one nearest the last question",
+  );
+});
+
+test("a file that CHANGED between two turns is sent twice, because it is two different things", () => {
+  const session = new Session();
+  session.add({ role: "user", text: "before", context: [{ kind: "file", label: "a.ts", body: "const a = 1;" }] });
+  session.add({ role: "assistant", text: "ok" });
+  session.add({ role: "user", text: "after", context: [{ kind: "file", label: "a.ts", body: "const a = 2;" }] });
+
+  const sent = session.build({ systemPrompt: "r", maxTokens: 100_000, nonce: "n" }).messages.map((m) => m.content).join("\n");
+  assert.match(sent, /const a = 1;/, "the earlier version was dropped, which is a loss and not a saving");
+  assert.match(sent, /const a = 2;/);
 });

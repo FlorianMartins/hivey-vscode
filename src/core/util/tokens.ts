@@ -5,6 +5,8 @@
 // much, because its job is to refuse a request that would be too expensive, and an estimate that
 // is 10 % high refuses slightly too early while one that is 30 % low refuses too late.
 //
+import { IMAGE_TOKENS } from "../models/vision.js";
+
 // Ratios below come from the usual measurements: ~4 characters per token on English prose, ~3.2
 // on source code (punctuation and identifiers split more), ~2 on dense JSON/base64.
 
@@ -16,9 +18,23 @@ export function estimateTokens(text: string): number {
   return Math.ceil(n / charsPerToken);
 }
 
-export function estimateMessageTokens(messages: Array<{ content: string }>): number {
+/**
+ * A whole request, images included — and the images are why this comment exists.
+ *
+ * They were not counted here, and this function is one half of the pair the token calibration is
+ * learned from: what we estimated against what the provider counted. A request carrying a
+ * screenshot therefore reported an estimate that was short by about 1 300 tokens per image against
+ * an actual that included them, the ratio came out above 1 for a reason that had nothing to do with
+ * tokenization, and the learned factor drifted upwards — inflating every later estimate, the figure
+ * shown on the consent card, and the number the spending cap is checked against. A measurement that
+ * compares two different things teaches something, and what it teaches is wrong.
+ */
+export function estimateMessageTokens(messages: Array<{ content: string; images?: unknown[] }>): number {
   // ~4 tokens of framing per message on every chat API.
-  return messages.reduce((sum, m) => sum + estimateTokens(m.content) + 4, 0);
+  return messages.reduce(
+    (sum, m) => sum + estimateTokens(m.content) + 4 + (m.images?.length ?? 0) * IMAGE_TOKENS,
+    0,
+  );
 }
 
 /** Cut text to a token budget, keeping the END (the part nearest the cursor is the useful one). */
