@@ -4,18 +4,23 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { perFileBudget } from "../src/core/util/tokens.js";
+import { perFileBudget, ATTACHMENT_CEILING_TOKENS } from "../src/core/util/tokens.js";
 
-test("one file may take most of the budget, because the conversation is about it", () => {
+test("one file may take most of a small budget, because the conversation is about it", () => {
   assert.equal(perFileBudget(8_000), 4_800);
-  assert.equal(perFileBudget(200_000), 120_000);
+  assert.equal(perFileBudget(32_000), ATTACHMENT_CEILING_TOKENS);
 });
 
-test("a model-sized budget keeps model-sized files", () => {
+test("a model-sized budget keeps model-sized files, up to the attachment ceiling", () => {
   // The complaint that produced the fraction in the first place: every file attached from the
   // editor came back "(truncated)", because a 4 000-token cap survived into a window two hundred
-  // times its size.
-  assert.ok(perFileBudget(200_000) > 50_000);
+  // times its size. So the share still grows with the budget —
+  assert.ok(perFileBudget(200_000) >= 8_000, "a big budget must still keep big files");
+  // — but not without end. The budget is a ceiling on the conversation and was being read as a
+  // target for each file in it: "a prompt plus two files, 234 000 tokens". Past the ceiling the
+  // overflow is sent as the file's outline, which says more per token than its first N lines.
+  assert.equal(perFileBudget(1_000_000), ATTACHMENT_CEILING_TOKENS);
+  assert.equal(perFileBudget(400_000, 2), ATTACHMENT_CEILING_TOKENS);
 });
 
 test("what is attached TOGETHER is what is bounded", () => {
@@ -34,6 +39,13 @@ test("what is attached TOGETHER is what is bounded", () => {
       );
     }
   }
+});
+
+test("the ceiling can be lifted by whoever is paying for the tokens", () => {
+  // The answer to "is there a way to bring this down?" is a lever, not a number I chose for
+  // everybody: `hiveyCode.context.attachmentTokens`, with 0 meaning whole files.
+  assert.equal(perFileBudget(400_000, 2, 0), 120_000);
+  assert.equal(perFileBudget(400_000, 2, 4_000), 4_000);
 });
 
 test("a file attached on purpose always says something", () => {

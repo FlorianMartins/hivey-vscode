@@ -2,6 +2,34 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.50.0 — 2026-09-15
+
+### Modifié
+
+- **Un gros fichier joint n'est plus coupé, il est résumé par son plan.** « Un prompt plus deux
+  fichiers = 234 k jetons. » Le budget par pièce jointe ne faisait que *couper* : deux fichiers
+  vraiment gros passaient donc presque entiers. Et couper est la pire des réponses disponibles — un
+  module de 3 000 lignes réduit à ses 400 premières parle au modèle des imports et des deux
+  premières fonctions, et **cache l'existence de tout le reste**. Le modèle répond alors sur un
+  fichier qu'il croit avoir lu.
+
+  Au-delà de son plafond, un fichier arrive désormais comme **son plan complet** — chaque symbole
+  qu'il déclare avec son numéro de ligne, plus ses imports — suivi de son début. C'est une autre
+  projection du même fichier, pas une portion : la fin du fichier redevient visible, et pour une
+  fraction du prix. Quand le plan lui-même ne tient pas, il est **échantillonné sur toute la
+  longueur** (jamais coupé en tête), et le dernier symbole en fait toujours partie.
+
+### Ajouté
+
+- **`hiveyCode.context.attachmentTokens`** — ce qu'une pièce jointe peut prendre au maximum, quel
+  que soit le budget de contexte. Défaut **16 000** jetons, soit environ deux mille lignes ; `0`
+  retire le plafond et envoie les fichiers entiers. C'est le levier direct sur le coût d'une
+  question : le budget de contexte est un plafond sur *la conversation*, et il était lu comme une
+  cible pour *chaque fichier*.
+
+  Mesuré sur deux gros fichiers de ce dépôt : 74 193 jetons entiers → **32 027** envoyés avec un
+  grand budget, **19 227** avec le budget automatique.
+
 ## 0.49.0 — 2026-09-15
 
 ### Corrigé

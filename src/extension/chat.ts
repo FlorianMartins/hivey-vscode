@@ -241,7 +241,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    * with nothing putting it right before the request was priced.
    */
   private perFileTokens(adding = 1): number {
-    return perFileBudget(this.budgetTokensFor(readSettings()), this.attachments.length + adding);
+    const settings = readSettings();
+    return perFileBudget(
+      this.budgetTokensFor(settings),
+      this.attachments.length + adding,
+      settings.context.attachmentTokens,
+    );
   }
 
   /** The selected model's own window, 0 when the catalogue does not know it. */

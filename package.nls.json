@@ -120,5 +120,6 @@
   "config.ibmi.integration.auto": "Only when Code for IBM i is connected — nothing to see for anyone who does not use it.",
   "config.ibmi.integration.on": "Whenever Code for IBM i is installed, connected or not.",
   "config.ibmi.integration.off": "Never, even when Code for IBM i is there.",
-  "command.diagnoseIbmi.title": "Diagnose the IBM i connection"
+  "command.diagnoseIbmi.title": "Diagnose the IBM i connection",
+  "config.context.attachmentTokens": "The most one attached file may take, whatever the context budget is — about two thousand lines. Past it the overflow is replaced by the file's **outline**: every symbol it declares and the line it is on, which says more about a large module than its first two thousand lines and costs a twentieth as much. Lower it to spend less per question; **0** removes the ceiling and sends whole files."
 }

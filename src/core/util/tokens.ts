@@ -55,7 +55,28 @@ export function headToTokens(text: string, maxTokens: number): string {
  * the backstop — the floor exists so that a file attached on purpose says SOMETHING, not so that it
  * says everything.
  */
-export function perFileBudget(contextBudget: number, attachments = 1): number {
+/**
+ * The most one attachment may take, however large the context budget is.
+ *
+ * About two thousand lines of code — past which sending more of a file stops being the best use
+ * of the tokens. `fileExcerpt` replaces the overflow with the file's outline: every symbol it
+ * declares and the line it is on, which is a better projection of a large module than its first
+ * three thousand lines, and a twentieth of the price.
+ *
+ * It exists because the budget is a ceiling on the CONVERSATION and was being read as a target for
+ * each file in it. Somebody who raises the budget to work on a long conversation has not asked for
+ * a hundred thousand tokens of one file, and would not recognise the request if they saw it —
+ * "a prompt plus two files, 234 000 tokens".
+ */
+export const ATTACHMENT_CEILING_TOKENS = 16_000;
+
+export function perFileBudget(
+  contextBudget: number,
+  attachments = 1,
+  ceiling = ATTACHMENT_CEILING_TOKENS,
+): number {
   const together = Math.floor(contextBudget * 0.6);
-  return Math.max(1000, Math.floor(together / Math.max(1, attachments)));
+  const share = Math.floor(together / Math.max(1, attachments));
+  // 0 means no ceiling, for somebody who has decided a whole large file is what they want.
+  return Math.max(1000, ceiling > 0 ? Math.min(ceiling, share) : share);
 }

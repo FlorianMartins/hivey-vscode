@@ -1077,4 +1077,5 @@ export const FR: Record<string, string> = {
   "instructions": "instructions",
   "the conversation": "la conversation",
   "{0} — ~{1} tokens": "{0} — ~{1} jetons",
+  " (outline of {0} symbols + head, {1} of {2} tokens)": " (plan de {0} symboles + début, {1} sur {2} jetons)",
 };

@@ -14,6 +14,7 @@ import { makeProvider, type Provider, type ProviderId } from "../core/providers/
 import { defaultEndpoints, endpointSettingKey, REMOTE_VENDORS, vendor } from "../core/providers/vendors.js";
 import { isLocalEndpoint } from "../core/redaction/index.js";
 import { describeUnusableEndpoint, looksLikeApiKey } from "../core/providers/endpoint.js";
+import { ATTACHMENT_CEILING_TOKENS } from "../core/util/tokens.js";
 import type { RedactionLevel, RedactionPolicy } from "../core/redaction/types.js";
 import type { EscalationPolicy, RouterConfig } from "../core/router/route.js";
 
@@ -58,6 +59,8 @@ export interface Settings {
   context: {
     /** The user's figure when they set one, `undefined` when the budget is derived from the model. */
     maxTokens: number | undefined;
+    /** The most one attached file may take, whatever the budget. 0 = no ceiling. */
+    attachmentTokens: number;
     repoMap: boolean;
     autoCompact: boolean;
   };
@@ -206,6 +209,7 @@ export function readSettings(scope?: vscode.Uri): Settings {
       // from the same value typed by the user, and the whole point is to derive the budget from the
       // model's window unless someone has actually chosen a figure. See `core/context/budget.ts`.
       maxTokens: explicit<number>(c, "context.maxTokens"),
+      attachmentTokens: c.get<number>("context.attachmentTokens", ATTACHMENT_CEILING_TOKENS),
       repoMap: c.get<boolean>("context.repoMap", true),
       autoCompact: c.get<boolean>("context.autoCompact", false),
     },

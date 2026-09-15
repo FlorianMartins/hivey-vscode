@@ -10,6 +10,7 @@ import { isDocumentUri } from "./models.js";
 import { t } from "../shared/i18n.js";
 import { buildRepoMap, isMappable, type MapFile } from "../core/context/repomap.js";
 import { contextBudget } from "../core/context/budget.js";
+import { fileExcerpt } from "../core/context/outline.js";
 import type { ContextItem } from "../core/session/session.js";
 import { estimateTokens, headToTokens, perFileBudget } from "../core/util/tokens.js";
 import { EgressGate } from "./egress.js";
@@ -163,12 +164,7 @@ export class WorkspaceContext {
         untrusted: true,
       };
     }
-    return {
-      kind: "file",
-      label: rel,
-      body: headToTokens(ed.document.getText(), maxTokens),
-      untrusted: true,
-    };
+    return excerptItem(rel, ed.document.getText(), maxTokens);
   }
 
   /**
@@ -181,12 +177,7 @@ export class WorkspaceContext {
   activeFileContext(maxTokens = 6000): ContextItem | undefined {
     const ed = vscode.window.activeTextEditor;
     if (!ed) return undefined;
-    return {
-      kind: "file",
-      label: relative(ed.document.uri),
-      body: headToTokens(ed.document.getText(), maxTokens),
-      untrusted: true,
-    };
+    return excerptItem(relative(ed.document.uri), ed.document.getText(), maxTokens);
   }
 
   /** Turn a path the user picked into a context item, refusing the ones policy forbids. */
@@ -197,16 +188,7 @@ export class WorkspaceContext {
       return undefined;
     }
     const doc = await vscode.workspace.openTextDocument(uri);
-    const text = doc.getText();
-    return {
-      kind: "file",
-      // How much was kept, not just that something was lost. "(truncated)" tells the reader a
-      // decision was made and nothing about whether it matters; the numbers let them judge, and
-      // raise the context budget if it does.
-      label: `${rel}${estimateTokens(text) > maxTokens ? t(" (first {0} of {1} tokens)", maxTokens, estimateTokens(text)) : ""}`,
-      body: headToTokens(text, maxTokens),
-      untrusted: true,
-    };
+    return excerptItem(rel, doc.getText(), maxTokens);
   }
 
   /**
@@ -259,4 +241,23 @@ export function relative(uri: vscode.Uri): string {
   // ambiguous — `src/index.ts` exists in both halves of a two-folder workspace, and the model, the
   // transcript and the tool that has to find the file again all get the same name for two files.
   return vscode.workspace.asRelativePath(uri, (vscode.workspace.workspaceFolders?.length ?? 0) > 1);
+}
+
+/**
+ * One file as a context item, whole when it fits and as an outline plus its head when it does not.
+ *
+ * The label carries what happened, because "(truncated)" says a decision was made and nothing about
+ * whether it matters. A reader who knows the file was 40 000 tokens and that all 180 of its symbols
+ * are listed can judge whether to narrow the question or raise the budget; a reader who is told
+ * "truncated" can only worry.
+ */
+function excerptItem(label: string, text: string, maxTokens: number): ContextItem {
+  const excerpt = fileExcerpt(label, text, maxTokens);
+  const total = estimateTokens(text);
+  const suffix = excerpt.outlined
+    ? t(" (outline of {0} symbols + head, {1} of {2} tokens)", excerpt.symbols, maxTokens, total)
+    : total > maxTokens
+      ? t(" (first {0} of {1} tokens)", maxTokens, total)
+      : "";
+  return { kind: "file", label: `${label}${suffix}`, body: excerpt.body, untrusted: true };
 }

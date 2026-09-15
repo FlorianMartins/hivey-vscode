@@ -120,5 +120,6 @@
   "config.ibmi.integration.auto": "Seulement quand Code for IBM i est connecté — rien à voir pour qui ne s’en sert pas.",
   "config.ibmi.integration.on": "Dès que Code for IBM i est installé, connecté ou non.",
   "config.ibmi.integration.off": "Jamais, même si Code for IBM i est présent.",
-  "command.diagnoseIbmi.title": "Diagnostiquer la connexion IBM i"
+  "command.diagnoseIbmi.title": "Diagnostiquer la connexion IBM i",
+  "config.context.attachmentTokens": "Ce qu'une pièce jointe peut prendre au maximum, quel que soit le budget de contexte — environ deux mille lignes. Au-delà, le dépassement est remplacé par le **plan** du fichier : chaque symbole qu'il déclare et sa ligne, ce qui en dit plus sur un gros module que ses deux mille premières lignes et coûte vingt fois moins. Baissez-le pour dépenser moins par question ; **0** retire le plafond et envoie les fichiers entiers."
 }
