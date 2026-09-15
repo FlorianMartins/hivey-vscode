@@ -698,6 +698,7 @@ export const FR: Record<string, string> = {
   "Azure, LiteLLM, a company proxy — any OpenAI API.": "Azure, LiteLLM, un proxy d’entreprise — n’importe quelle API OpenAI.",
   "Changes": "Modifications",
   "Claude, billed directly, with prompt caching.": "Claude, facturé en direct, avec mise en cache des prompts.",
+  "Waiting for your answer above": "En attente de votre réponse ci-dessus",
   "Keep the preset": "Garder le préréglage",
   "Saved as {0}.": "Enregistré comme {0}.",
   "That address cannot be used.": "Cette adresse ne peut pas être utilisée.",

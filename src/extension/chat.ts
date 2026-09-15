@@ -83,6 +83,7 @@ import type {
   UiSkillGroup,
   UiWizard,
   UiState,
+  UiApproval,
 } from "../shared/protocol.js";
 import { SECTION, endpointFor, providerFor, readSettings, routerConfig, type Keys, type Settings, writeTarget } from "./config.js";
 import { EgressGate, safeHost } from "./egress.js";
@@ -147,6 +148,50 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private modelsLoading = false;
   private historyFilter: UiHistoryFilter = { query: "", period: "all", mode: "all", paidOnly: false, sort: "updated" };
   private readonly approvals = new Map<string, (answer: "once" | "session" | "always" | "no") => void>();
+
+  /**
+   * The same questions, in a form the panel can DRAW — and redraw.
+   *
+   * The map above holds what to do with an answer; this holds what the question looks like. Kept
+   * because a card that exists only as a message the panel has already consumed cannot survive a
+   * rebuild, and a lost card is a turn that waits for ever on a request that has already been paid
+   * for. Every path that adds to one of these adds to both, and every path that resolves removes
+   * from both — see `ask`.
+   */
+  private pendingApprovals: UiApproval[] = [];
+
+  /**
+   * Post a question, draw it from the state, and clean up however it is answered.
+   *
+   * One function for all three kinds — a tool asking permission, consent to send, an edit to
+   * review — because the thing that went wrong was bookkeeping, and three copies of bookkeeping is
+   * three chances to forget the line that removes the card.
+   */
+  private askInPanel(
+    request: UiApproval,
+    decide: (answer: "once" | "session" | "always" | "no") => void,
+    onAbort?: () => void,
+  ): void {
+    this.pendingApprovals = [...this.pendingApprovals, request];
+    this.approvals.set(request.id, (answer) => {
+      this.forgetApproval(request.id);
+      decide(answer);
+    });
+    this.sendState();
+    // A turn that is cancelled must not leave a promise hanging for ever, nor a card on screen for
+    // a question nobody is waiting on.
+    this.turn?.signal.addEventListener("abort", () => {
+      if (!this.approvals.delete(request.id)) return;
+      this.forgetApproval(request.id);
+      onAbort?.();
+      this.sendState();
+    });
+  }
+
+  private forgetApproval(id: string): void {
+    this.approvals.delete(id);
+    this.pendingApprovals = this.pendingApprovals.filter((a) => a.id !== id);
+  }
   private readonly priceLookup = makeLookup(loadPrices());
 
   /**
@@ -416,6 +461,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       busy: this.turn !== undefined,
       budget: { spentTodayUsd: this.gate.budget.spentToday(), dailyUsd: s.budget.dailyUsd },
       sessionCostUsd: this.session.totalCostUsd(),
+      pendingApprovals: this.pendingApprovals,
       skills: this.uiSkills(),
       skillGroups: this.uiSkillGroups(),
       ...(this.wizard ? { wizard: this.uiWizard() } : {}),
@@ -3106,24 +3152,21 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       ];
       if (outgoingImages && !isLocal) detail.push(t("{0} image(s), sent as they are — an image cannot be pseudonymised", outgoingImages));
       const answer = await new Promise<"once" | "session" | "always" | "no">((resolve) => {
-        const id = randomNonce();
-        this.approvals.set(id, resolve);
-        this.post({
-          type: "approval",
-          id,
-          tool: "send",
-          description: t("Send this question to {0}?", model),
-          choices: ["once", "always", "no"],
-          detail,
-        });
-        // Stopping while this card is up must answer it. Without this the promise had no second way
-        // out: the abort travelled, found nothing waiting on it, and the turn stayed parked on a
-        // question nobody was going to answer — for the rest of the conversation, with the panel
-        // showing a stop button over it. The other two cards in this file always had this listener;
-        // this one, the card every question opens by default, did not.
-        ctl.signal.addEventListener("abort", () => {
-          if (this.approvals.delete(id)) resolve("no");
-        });
+        // Through the same path as the other two, which is the point: a card that exists only as a
+        // message the panel has already consumed dies with the next rebuild, and the promise behind
+        // it waits for ever — on a request that has already been sent and paid for. Stopping must
+        // also answer it, or the turn parks on a question nobody will answer.
+        this.askInPanel(
+          {
+            id: randomNonce(),
+            tool: "send",
+            description: t("Send this question to {0}?", model),
+            choices: ["once", "always", "no"],
+            detail,
+          },
+          resolve,
+          () => resolve("no"),
+        );
       });
       if (answer === "no") {
         // Answering "no" — or stopping — ends the turn here, before the block whose `finally` does
@@ -3379,20 +3422,19 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private askEgress(request: { description: string; detail: string[] }): Promise<"once" | "always" | "no"> {
     if (!this.view) return Promise.resolve("no");
     const id = randomNonce();
-    this.post({
-      type: "approval",
-      id,
-      tool: "egress",
-      description: request.description,
-      detail: request.detail,
-      // No "this session": consent to a destination is per destination, and a session is not one.
-      choices: ["once", "always", "no"],
-    });
     return new Promise((resolve) => {
-      this.approvals.set(id, (answer) => resolve(answer === "no" ? "no" : answer === "always" ? "always" : "once"));
-      this.turn?.signal.addEventListener("abort", () => {
-        if (this.approvals.delete(id)) resolve("no");
-      });
+      this.askInPanel(
+        {
+          id,
+          tool: "egress",
+          description: request.description,
+          detail: request.detail,
+          // No "this session": consent to a destination is per destination, and a session is not one.
+          choices: ["once", "always", "no"],
+        },
+        (answer) => resolve(answer === "no" ? "no" : answer === "always" ? "always" : "once"),
+        () => resolve("no"),
+      );
     });
   }
 
@@ -3440,19 +3482,23 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
     const id = randomNonce();
     const command = req.tool === "run_command" ? String(req.args["command"] ?? "") : undefined;
-    this.post({ type: "approval", id, tool: req.tool, description: req.description, ...(command ? { command } : {}) });
     return new Promise<boolean>((resolve) => {
-      this.approvals.set(id, (answer) => {
-        if (answer === "session" || answer === "always") {
-          this.permissions.remember(req.tool, req.args, answer);
-          this.sendState();
-        }
-        resolve(answer !== "no");
-      });
-      // A turn that is cancelled must not leave a promise hanging forever.
-      this.turn?.signal.addEventListener("abort", () => {
-        if (this.approvals.delete(id)) resolve(false);
-      });
+      this.askInPanel(
+        {
+          id,
+          tool: req.tool,
+          description: req.description,
+          ...(command ? { command } : {}),
+          choices: ["once", "session", "always", "no"],
+        },
+        (answer) => {
+          if (answer === "session" || answer === "always") {
+            this.permissions.remember(req.tool, req.args, answer);
+          }
+          resolve(answer !== "no");
+        },
+        () => resolve(false),
+      );
     });
   }
 

@@ -3956,3 +3956,10 @@ pre.code code {
   outline: 2px dashed var(--vscode-focusBorder, var(--vscode-textLink-foreground));
   outline-offset: 2px;
 }
+
+/* A turn blocked on a question is not a turn that is working, and the row under the box is where
+ * the difference belongs: the same place that says what the answer runs on and what it has cost. */
+.composer-waiting {
+  color: var(--vscode-focusBorder, var(--vscode-textLink-foreground));
+  font-weight: 600;
+}

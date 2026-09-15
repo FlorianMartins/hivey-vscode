@@ -14,6 +14,28 @@ export interface UiContextItem {
   detail?: string;
 }
 
+/**
+ * A question the turn is waiting on, carried in the STATE rather than only announced once.
+ *
+ * It used to be a single `approval` message that the panel drew into the turn in progress, and
+ * nothing anywhere else knew it existed. So any rebuild that dropped that turn's DOM destroyed the
+ * card — and the promise behind it was never resolved, so the turn waited for ever: the request had
+ * been sent and paid for, no answer ever arrived, and there was nothing on screen to say why.
+ *
+ * Anything that must survive a render has to be in the state. This is the same lesson as the
+ * transcript, learned twice.
+ */
+export interface UiApproval {
+  id: string;
+  /** `egress` is consent to send; anything else is a tool asking permission to act. */
+  tool: string;
+  description: string;
+  /** The command, when the tool is `run_command` — shown verbatim, never paraphrased. */
+  command?: string;
+  choices: Array<"once" | "session" | "always" | "no">;
+  detail?: string[];
+}
+
 export interface UiStep {
   tool: string;
   summary: string;
@@ -243,6 +265,8 @@ export interface UiState {
   budget: { spentTodayUsd: number; dailyUsd: number };
   /** What THIS conversation has cost so far. Distinct from the day's spend, which spans all of them. */
   sessionCostUsd: number;
+  /** Questions the turn is blocked on. Drawn from here, so no rebuild can lose one. */
+  pendingApprovals: UiApproval[];
   /** Every skill the panel may offer, and whether the user has left it switched on. */
   skills: UiSkill[];
   /** The families, with whether each is currently in play and whether the workspace suggests it. */

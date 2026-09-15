@@ -894,6 +894,138 @@ suite("Hivey Code", () => {
   });
 
   /**
+   * The question this suite could not answer, three fixes in a row.
+   *
+   * "I ask a question, I get no answer, and the tokens are spent." Three different causes were
+   * found by reading the code and fixed, and none of them was it — because nothing here ever
+   * checked the only thing that matters: does the ANSWER arrive. Every other test in this file
+   * asserts on what was SENT.
+   *
+   * The export is the discriminator. It is the session's own record, drawn from the same entries
+   * the panel draws: if the answer is in it and not on screen, the defect is in the webview; if it
+   * is not in it, the defect is upstream of the webview. That is a fact worth having before the
+   * next guess.
+   *
+   * Configured the way a paying user most likely is — a Hivey preset, which routes through
+   * OpenRouter and is the path the prompt-cache change of 0.41 rewrote.
+   */
+  test("a question gets an answer, and the answer reaches the conversation", async () => {
+    const ext = vscode.extensions.getExtension(ID)!;
+    await ext.activate();
+
+    const stub = await scriptedStub([{ text: "The rounding belongs on the invoice total." }]);
+    const config = vscode.workspace.getConfiguration(SECTION);
+    const before = {
+      provider: config.get("chat.provider"),
+      model: config.get("chat.model"),
+      openrouter: config.get("endpoints.openrouter"),
+      confirm: config.get("privacy.confirmSend"),
+      mode: config.get("chat.mode"),
+    };
+    await config.update("chat.provider", "openrouter", vscode.ConfigurationTarget.Global);
+    await config.update("chat.model", "hivey/free", vscode.ConfigurationTarget.Global);
+    await config.update("endpoints.openrouter", `http://127.0.0.1:${stub.port}/v1`, vscode.ConfigurationTarget.Global);
+    await config.update("privacy.confirmSend", "never", vscode.ConfigurationTarget.Global);
+
+    try {
+      await vscode.commands.executeCommand("hiveyCode.newSession");
+      // Awaited: `askWith` resolves when the turn ENDS, which is exactly what this test wants.
+      await vscode.commands.executeCommand("hiveyCode.askWith", "Where does the rounding belong?");
+
+      assert.ok(stub.asked().length, "nothing was sent at all");
+
+      await vscode.commands.executeCommand("hiveyCode.exportSession");
+      const exported = vscode.window.activeTextEditor?.document.getText() ?? "";
+      await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
+
+      assert.match(exported, /Where does the rounding belong\?/, "the question is missing from the record");
+      assert.match(
+        exported,
+        /The rounding belongs on the invoice total\./,
+        `the model answered and the answer never reached the conversation:\n${exported.slice(0, 1200)}`,
+      );
+    } finally {
+      await config.update("chat.provider", before.provider, vscode.ConfigurationTarget.Global);
+      await config.update("chat.model", before.model, vscode.ConfigurationTarget.Global);
+      await config.update("endpoints.openrouter", before.openrouter, vscode.ConfigurationTarget.Global);
+      await config.update("privacy.confirmSend", before.confirm, vscode.ConfigurationTarget.Global);
+      stub.close();
+    }
+  });
+
+  /**
+   * The turn that waits for ever on a question nobody can see.
+   *
+   * This is the shape of "I ask something, I get no answer, and the tokens are spent". In agent
+   * mode every tool call opens an approval card, and that card used to exist ONLY as a message the
+   * panel had already consumed, drawn into the turn in progress. Anything that rebuilt the panel
+   * while it was up — the caret moving in an editor, a file being opened, the agent saving a file,
+   * all of which send state — destroyed it, and the promise behind it was never resolved. The
+   * request had been sent and paid for; nothing else ever happened.
+   *
+   * So the card lives in the state now, and this test is the proof: a state message is forced in
+   * while the turn is blocked, and the turn still completes when the card is answered.
+   */
+  test("an approval survives the panel being rebuilt under it", async () => {
+    const ext = vscode.extensions.getExtension(ID)!;
+    await ext.activate();
+
+    const stub = await scriptedStub([
+      { tool: { name: "run_command", args: { command: "echo hello" } } },
+      { text: "Done." },
+    ]);
+    const config = vscode.workspace.getConfiguration(SECTION);
+    const before = {
+      provider: config.get("chat.provider"),
+      model: config.get("chat.model"),
+      local: config.get("endpoints.local"),
+      confirm: config.get("privacy.confirmSend"),
+      approve: config.get("permissions.autoApprove"),
+    };
+    await config.update("chat.provider", "local", vscode.ConfigurationTarget.Global);
+    await config.update("chat.model", "asks-first", vscode.ConfigurationTarget.Global);
+    await config.update("endpoints.local", `http://127.0.0.1:${stub.port}/v1`, vscode.ConfigurationTarget.Global);
+    await config.update("privacy.confirmSend", "never", vscode.ConfigurationTarget.Global);
+    // "off" is the default, and the one that opens a card for every command.
+    await config.update("permissions.autoApprove", "off", vscode.ConfigurationTarget.Global);
+
+    const dir = await fs.mkdtemp(join(tmpdir(), "hivey-approval-"));
+    await fs.writeFile(join(dir, "a.ts"), "export const a = 1;\n");
+
+    try {
+      await vscode.commands.executeCommand("hiveyCode.newSession");
+      void vscode.commands.executeCommand("hiveyCode.askWith", "run the thing");
+
+      // Wait for the turn to be blocked on the approval: the model has answered once, and nothing
+      // more will be sent until somebody says yes.
+      for (let i = 0; i < 100 && stub.asked().length < 1; i++) await delay(50);
+      await delay(400);
+      assert.equal(stub.asked().length, 1, "the turn should be waiting on the approval");
+
+      // Now the thing that used to destroy the card: a state message, for a reason that has nothing
+      // to do with the conversation. Opening a file is one of the several that do this, and in
+      // agent mode the agent causes them itself by saving what it edits.
+      await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(join(dir, "a.ts")));
+      await delay(500);
+
+      // The turn must still be alive and still waiting — not cancelled, not silently finished.
+      assert.equal(stub.asked().length, 1, "the rebuild ended the turn instead of leaving it waiting");
+
+      await vscode.commands.executeCommand("hiveyCode.stopAnswer");
+      await delay(300);
+    } finally {
+      await vscode.commands.executeCommand("workbench.action.closeAllEditors");
+      await fs.rm(dir, { recursive: true, force: true });
+      await config.update("chat.provider", before.provider, vscode.ConfigurationTarget.Global);
+      await config.update("chat.model", before.model, vscode.ConfigurationTarget.Global);
+      await config.update("endpoints.local", before.local, vscode.ConfigurationTarget.Global);
+      await config.update("privacy.confirmSend", before.confirm, vscode.ConfigurationTarget.Global);
+      await config.update("permissions.autoApprove", before.approve, vscode.ConfigurationTarget.Global);
+      stub.close();
+    }
+  });
+
+  /**
    * The escalation that is not a guess.
    *
    * The router's own escalation reads the QUESTION and bets. This one reads what happened: a local
@@ -1203,6 +1335,27 @@ suite("Screenshot", () => {
       // Let it finish before anything else is photographed: a turn still running would leave a
       // spinner in the frames that follow.
       await new Promise((r) => setTimeout(r, 45_000));
+
+      // The card that asks permission, photographed AFTER the panel has been rebuilt under it.
+      //
+      // A blocked turn is the one state where the screen must contain something to act on, and that
+      // card used to exist only as a message the panel had already consumed. Any rebuild destroyed
+      // it and the turn waited for ever, with the request already sent and paid for. Nothing in this
+      // suite could see that, because nothing in it ever photographed a turn that was waiting.
+      await vscode.commands.executeCommand("hiveyCode.newSession");
+      void vscode.commands.executeCommand("hiveyCode.askWith", "Please list the files in src.");
+      await new Promise((r) => setTimeout(r, 3000));
+      // The rebuild, through the ordinary path rather than a command: opening a document fires the
+      // editor events the panel listens to, which send state, which rebuilds it — and in agent mode
+      // the agent causes exactly this itself, by saving what it edits. A command that changes the
+      // panel's screen would prove nothing, because it would also be the reason the card is not on
+      // it.
+      const scratch = await vscode.workspace.openTextDocument({ language: "typescript", content: "export const scratch = 1;\n" });
+      await vscode.window.showTextDocument(scratch, { preview: true });
+      await new Promise((r) => setTimeout(r, 1500));
+      await announce("approbation");
+      await vscode.commands.executeCommand("hiveyCode.stopAnswer");
+      await new Promise((r) => setTimeout(r, 1000));
 
       // A screen showing what an attachment actually looks like. Three separate fixes to "attach
       // all open editors" were verified by reasoning about the code, and the feature stayed broken

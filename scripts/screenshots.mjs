@@ -130,6 +130,29 @@ const server = createServer((req, res) => {
   // Three fixtures, picked on the question's own words. The slow one exists for the frame taken
   // mid-answer; the short one keeps the boundary between two exchanges inside the conversation
   // frame. See each constant for why.
+  // A tool call, so the frame can show the card that asks permission to run it — the one thing on
+  // screen a blocked turn needs the user to act on, and the thing that used to vanish with any
+  // rebuild of the panel.
+  if (/list the files|liste les fichiers/i.test(sent)) {
+    res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });
+    res.write(
+      `data: ${JSON.stringify({
+        choices: [
+          {
+            delta: {
+              tool_calls: [
+                { index: 0, id: "call_1", function: { name: "run_command", arguments: JSON.stringify({ command: "ls -la src" }) } },
+              ],
+            },
+          },
+        ],
+      })}\n\n`,
+    );
+    res.write(`data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: "tool_calls" }] })}\n\n`);
+    res.write("data: [DONE]\n\n");
+    res.end();
+    return;
+  }
   const slow = /step by step|en détail/i.test(sent);
   const answer = slow ? LONG : /rounding of the VAT itself|arrondi de la TVA/i.test(sent) ? SHORT : ANSWER;
   const chunks = answer.match(/[\s\S]{1,24}/g) ?? [];
@@ -214,7 +237,7 @@ function announced() {
 
 // Wait for the harness to name a screen, photograph it once it has settled, and move on. There is
 // no clock here beyond a timeout: the editor decides when it is ready, and says so.
-const SCREENS = ["conversation", "pendant", "contexte", "setup", "picker", "historique", "modeles", "permissions"];
+const SCREENS = ["conversation", "pendant", "approbation", "contexte", "setup", "picker", "historique", "modeles", "permissions"];
 // One hold per screen is not the budget: the fixture drives a real conversation between them, and
 // the frame taken mid-answer waits for a deliberately slow one to finish. Two screens' worth of
 // slack plus a flat minute covers the talking; a deadline that expires mid-run reports every

@@ -13,7 +13,7 @@ import { REMOTE_VENDORS, vendor } from "../core/providers/vendors.js";
 import { closeModelCombo, isModelComboOpen, openModelCombo } from "./modelCombo.js";
 import { wirePaste } from "./paste.js";
 import { focusGateway } from "./setup.js";
-import type { Mode, Reasoning, ToExtension, UiEntry, UiSkill, UiState } from "../shared/protocol.js";
+import type { Mode, Reasoning, ToExtension, UiApproval, UiEntry, UiSkill, UiState } from "../shared/protocol.js";
 import { applySuggestion, suggestionsFor, type Suggestion } from "../core/session/mentions.js";
 import { BUILTIN_SKILLS, type BuiltinSkill } from "../core/session/skills.js";
 import { planComplete, planSummary, type Plan } from "../core/agent/plan.js";
@@ -64,9 +64,81 @@ export function chatScreen(state: UiState, deps: ChatDeps, liveTurn?: HTMLElemen
   const area = el("div", "transcript-wrap");
   const list = transcript(state, deps);
   if (liveTurn) list.append(liveTurn);
+  // Last, below everything including the turn in progress: a question blocking the turn is the one
+  // thing on the screen the user has to act on, and it is drawn from the state so that no rebuild
+  // can lose it.
+  for (const request of state.pendingApprovals) list.append(approvalCard(request, deps));
   area.append(list);
   wrap.append(area, composer(state, deps));
   return wrap;
+}
+
+
+/**
+ * The question a turn is waiting on, drawn from the state.
+ *
+ * It used to be appended into the turn in progress and to exist nowhere else, so a rebuild that
+ * dropped that turn's DOM destroyed it — and the promise behind it was never resolved. The turn
+ * then waited for ever on a request that had already been sent and paid for, with nothing on screen
+ * to say why. Drawn from the state, every rebuild puts it back.
+ *
+ * The card answers itself optimistically the moment it is clicked, and the extension removes it
+ * from the state a moment later: the alternative is a button that looks unpressed for a round trip,
+ * on the one control where hesitating costs the user a second click.
+ */
+export function approvalCard(request: UiApproval, deps: ChatDeps): HTMLElement {
+  const egress = request.tool === "egress" || request.tool === "send";
+  const card = el("div", `approval${egress ? " egress" : ""}`);
+  const head = el("div", "approval-head");
+  head.append(icon("shield", "approval-ico"));
+  head.append(el("span", undefined, egress ? t("Leaving this machine") : t("Approval requested")));
+  card.append(head);
+  card.append(el("div", "approval-body", request.description));
+  if (request.command) card.append(el("pre", "approval-command", request.command));
+  for (const line of request.detail ?? []) card.append(el("div", "approval-detail", line));
+
+  const actions = el("div", "approval-actions");
+  const answer = (a: "once" | "session" | "always" | "no", label: string): void => {
+    deps.send({ type: "approve", id: request.id, answer: a });
+    // The class, not only the contents: the frame breathes while the question is open, and a
+    // question that has been answered is not open. Replacing the children alone left a decided
+    // card pulsing at the reader for the rest of the conversation.
+    card.classList.add("answered");
+    card.replaceChildren(el("div", "approval-done", label));
+  };
+  // Egress consent is per destination, so "this conversation" would be a promise about the wrong
+  // thing. The labels differ too: what is being agreed to is sending, not permitting an action.
+  const available: Record<string, () => HTMLElement> = {
+    once: () =>
+      button({
+        label: egress ? t("Send") : t("Allow"),
+        className: "btn primary",
+        onClick: () => answer("once", egress ? t("Sent.") : t("Allowed once.")),
+      }),
+    session: () =>
+      button({
+        label: t("Always (this conversation)"),
+        className: "btn",
+        title: t("Stop asking for {0} until the next conversation", request.tool),
+        onClick: () => answer("session", t("Allowed for this conversation.")),
+      }),
+    always: () =>
+      button({
+        label: egress ? t("Always to this model") : t("Always"),
+        className: "btn",
+        title: egress ? t("Stop asking before sending to this model") : t("Write a permanent rule for this action"),
+        onClick: () => answer("always", egress ? t("This model will not be asked about again.") : t("Permanent rule saved.")),
+      }),
+    no: () =>
+      button({
+        label: egress ? t("Do not send") : t("Refuse"),
+        className: "btn danger",
+        onClick: () => answer("no", egress ? t("Not sent.") : t("Refused.")),
+      }),
+  };
+  for (const choice of request.choices) actions.append(available[choice]!());
+  card.append(actions);
+  return card;
 }
 
 // ── Transcript ───────────────────────────────────────────────────────────────────────────────
@@ -681,7 +753,11 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
   // The working state lives on the composer rather than on the transcript because that is where the
   // user is looking while they wait — and because it is the control that is unavailable, which is
   // the thing the animation is actually telling them.
-  const wrap = el("div", `composer${isStreaming() ? " working" : ""}`);
+  // "Waiting for you" is not the same state as "working", and telling them apart is the difference
+  // between a panel that looks busy and a panel that is asking a question. A turn blocked on an
+  // approval used to look exactly like one that was thinking.
+  const waiting = state.pendingApprovals.length > 0;
+  const wrap = el("div", `composer${isStreaming() && !waiting ? " working" : ""}${waiting ? " waiting" : ""}`);
   const card = el("div", "composer-card");
   // Paste and drop, on the card rather than the text area: dropping a file on the chips or on the
   // toolbar is the same intent, and a target that only accepts the middle of itself is a target
@@ -853,6 +929,10 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
   // border they read as controls of the text. The editor's own chat makes the same split.
   meter.append(providerButton(state, deps), approvalButton(state, deps));
   meter.append(el("div", "spacer"));
+  if (waiting) {
+    meter.append(el("span", "composer-waiting", t("Waiting for your answer above")));
+    meter.append(el("span", "composer-sep", "\u2022"));
+  }
   const tokens = el("span", "composer-tokens", t("{0} tokens", formatTokens(state.contextTokens)));
   // Said precisely, because this number sits next to a price and the two do not measure the same
   // thing at all: this is what the conversation weighs NOW, and the price is everything every turn

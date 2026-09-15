@@ -2,6 +2,44 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.42.0 — 2026-09-15
+
+« Je pose une question, je n'ai pas de réponse… mais les jetons sont utilisés. » Trois corrections
+précédentes cherchaient au mauvais endroit. Voici la bonne, et la raison pour laquelle je l'avais
+manquée.
+
+### Corrigé
+
+- **Un tour bloqué sur une approbation invisible attendait pour toujours.** En mode agent, chaque
+  appel d'outil ouvre une carte demandant la permission — et cette carte n'existait **que** comme un
+  message que le panneau avait déjà consommé, dessiné dans le tour en cours. Tout ce qui
+  reconstruisait le panneau pendant qu'elle était affichée la détruisait : le curseur qui bouge dans
+  un éditeur, un fichier qu'on ouvre, l'agent qui enregistre ce qu'il vient de modifier — tous
+  envoient un état. La promesse derrière la carte n'était alors jamais résolue. La requête avait été
+  envoyée et payée ; plus rien n'arrivait, sans une erreur pour le dire.
+
+  Les trois sortes de questions — un outil qui demande la permission, le consentement à envoyer, une
+  modification à relire — passent maintenant par un seul chemin et **vivent dans l'état**. N'importe
+  quelle reconstruction les redessine. C'est la même leçon que pour le transcript, apprise deux fois :
+  **ce qui doit survivre à un rendu doit être dans l'état.**
+
+  Prouvé en image, avant et après : sans le correctif, le panneau montre la question, « thinking… »,
+  et rien d'autre.
+
+- **Le tour en cours n'était conservé que pendant qu'une réponse s'écrivait.** Il existe dès le
+  début du tour, et la première chose qu'il peut porter est justement une question. Lier sa survie à
+  l'existence d'une réponse le détruisait exactement pendant la fenêtre où le tour attendait
+  l'autorisation de commencer.
+
+### Modifié
+
+- **« En attente » n'est plus affiché comme « au travail ».** Un tour bloqué sur une question
+  ressemblait trait pour trait à un tour qui réfléchit. La ligne sous la zone de saisie le dit
+  désormais.
+
+- **Le banc de captures photographie un tour qui attend.** Rien dans la suite ne regardait jamais un
+  tour bloqué, ce qui est précisément pourquoi ce défaut a survécu à trois corrections.
+
 ## 0.41.2 — 2026-09-14
 
 « Plus de message d'erreur, mais il ne fait plus rien — ni raisonnement ni réponse — et le nombre de

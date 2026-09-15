@@ -55,8 +55,12 @@ function render(): void {
   // past the end of its turn would sit there for ever, next to the finished answer the transcript
   // now draws — and the previous attempt at this, which kept the WHOLE transcript instead, went
   // silent for the length of a turn and stayed silent if anything left the flag set.
-  const streamingNow = state.screen === "chat" && state.session.entries.some((e) => e.streaming);
-  const liveTurn = streamingNow && live?.root.isConnected ? live.root : undefined;
+  // Kept for as long as the turn it belongs to is running — NOT only while an answer is being
+  // written. The live turn exists from the moment a turn starts, and the first thing it can hold is
+  // a question; tying its survival to an answer existing yet destroyed it during exactly the window
+  // where the turn was waiting to be allowed to start.
+  const turnRunning = isStreaming() || state.session.entries.some((e) => e.streaming);
+  const liveTurn = state.screen === "chat" && turnRunning && live?.root.isConnected ? live.root : undefined;
   if (liveTurn) liveTurn.remove();
   app.textContent = "";
   app.append(header(state));
@@ -461,68 +465,6 @@ class LiveTurn {
   }
 
   /** The approval card: four answers, because "yes" and "yes forever" are different decisions. */
-  appendApproval(
-    id: string,
-    tool: string,
-    description: string,
-    command?: string,
-    choices: Array<"once" | "session" | "always" | "no"> = ["once", "session", "always", "no"],
-    detail: string[] = [],
-  ): void {
-    const egress = tool === "egress";
-    const card = el("div", `approval${egress ? " egress" : ""}`);
-    const head = el("div", "approval-head");
-    head.append(icon("shield", "approval-ico"));
-    head.append(el("span", undefined, egress ? t("Leaving this machine") : t("Approval requested")));
-    card.append(head);
-    card.append(el("div", "approval-body", description));
-    if (command) card.append(el("pre", "approval-command", command));
-    for (const line of detail) card.append(el("div", "approval-detail", line));
-
-    const actions = el("div", "approval-actions");
-    const answer = (a: "once" | "session" | "always" | "no", label: string) => {
-      send({ type: "approve", id, answer: a });
-      // The class, not only the contents: the frame breathes while the question is open, and a
-      // question that has been answered is not open. Replacing the children alone left a decided
-      // card pulsing at the reader for the rest of the conversation.
-      card.classList.add("answered");
-      card.replaceChildren(el("div", "approval-done", label));
-    };
-    // Egress consent is per destination, so "this conversation" would be a promise about the wrong
-    // thing. The labels differ too: what is being agreed to is sending, not permitting an action.
-    const available: Record<string, () => HTMLElement> = {
-      once: () =>
-        button({
-          label: egress ? t("Send") : t("Allow"),
-          className: "btn primary",
-          onClick: () => answer("once", egress ? t("Sent.") : t("Allowed once.")),
-        }),
-      session: () =>
-        button({
-          label: t("Always (this conversation)"),
-          className: "btn",
-          title: t("Stop asking for {0} until the next conversation", tool),
-          onClick: () => answer("session", t("Allowed for this conversation.")),
-        }),
-      always: () =>
-        button({
-          label: egress ? t("Always to this model") : t("Always"),
-          className: "btn",
-          title: egress ? t("Stop asking before sending to this model") : t("Write a permanent rule for this action"),
-          onClick: () => answer("always", egress ? t("This model will not be asked about again.") : t("Permanent rule saved.")),
-        }),
-      no: () =>
-        button({
-          label: egress ? t("Do not send") : t("Refuse"),
-          className: "btn danger",
-          onClick: () => answer("no", egress ? t("Not sent.") : t("Refused.")),
-        }),
-    };
-    for (const choice of choices) actions.append(available[choice]!());
-    card.append(actions);
-    following(() => this.body.append(card));
-  }
-
   /** The authoritative render: the finished text, with the actions that act on it. */
   finish(): void {
     // Whatever is still queued lands at once. An answer that has finished arriving is finished, and
@@ -795,10 +737,7 @@ window.addEventListener("message", (event: MessageEvent<ToPanel>) => {
       if (!live && !isStreaming()) break;
       ensureLive().appendStatus(m.text, m.tool, m.ok, m.call);
       break;
-    case "approval":
-      ensureLive().appendApproval(m.id, m.tool, m.description, m.command, m.choices, m.detail);
-      break;
-    case "error":
+        case "error":
       ensureLive().appendError(m.message);
       setStreaming(false);
       break;
