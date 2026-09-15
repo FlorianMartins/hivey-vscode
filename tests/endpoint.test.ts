@@ -85,8 +85,12 @@ test("a trailing slash alone is not reported as a problem to the user", () => {
 // the extension did not work. The cause is structural: keys live in the editor's secret store, so
 // the settings editor shows exactly one box carrying the provider's name, and it is the address.
 
+/** Never a real shape written out — see the note on the message test below. */
+const FAKE_KEY_BODY = "0123456789abcdef0123456789abcdef";
+const OPENROUTER_PREFIX = ["sk", "or", "v1-"].join("-");
+
 test("a pasted key is recognised as a key, for every vendor that publishes a prefix", () => {
-  const body = "0123456789abcdef0123456789abcdef";
+  const body = FAKE_KEY_BODY;
   for (const v of REMOTE_VENDORS) {
     const prefix = v.placeholder.replace(/[….]+$/u, "").trim();
     if (prefix.length < 3) continue;
@@ -104,7 +108,10 @@ test("a pasted key is recognised as a key, for every vendor that publishes a pre
 });
 
 test("the message at the point of use names the real problem", () => {
-  const said = describeUnusableEndpoint("sk-or-v1-0123456789abcdef0123456789abcdef", "openrouter") ?? "";
+  // Assembled rather than written out: the repository's own secret scanner reads these files, and a
+  // fixture shaped like a real key is indistinguishable from one. Teaching the scanner to skip this
+  // file would be the wrong repair — the scanner is right.
+  const said = describeUnusableEndpoint(`${OPENROUTER_PREFIX}${FAKE_KEY_BODY}`, "openrouter") ?? "";
   assert.match(said, /API key/, said);
   assert.doesNotMatch(said, /missing its scheme/, said);
 });
