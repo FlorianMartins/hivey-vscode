@@ -233,7 +233,7 @@ test("usage adds up across the steps of one turn", async () => {
 // again on the next step, and unmarked it is charged at full price every time: the cost of a
 // twelve-step turn grows with the square of its length.
 
-test("each step marks the end of what it sent, so the next one starts from a cache hit", async () => {
+test("asked for it, each step marks the end of what it sent so the next starts from a cache hit", async () => {
   const t1 = tool("a");
   const provider = scriptedProvider([
     { toolCalls: [{ id: "c1", name: "a", args: "{}" }] },
@@ -243,7 +243,13 @@ test("each step marks the end of what it sent, so the next one starts from a cac
   // Long enough to be worth caching: below a couple of thousand tokens a breakpoint is a 25 % write
   // premium on something that will never be read back.
   const big = "x ".repeat(4000);
-  await runTurn({ ...base, provider, tools: [t1], messages: [{ role: "system", content: big, cacheable: true }] });
+  await runTurn({
+    ...base,
+    provider,
+    tools: [t1],
+    promptCache: true,
+    messages: [{ role: "system", content: big, cacheable: true }],
+  });
 
   for (const [step, sent] of provider.seen.entries()) {
     const last = sent.messages[sent.messages.length - 1]!;
@@ -258,11 +264,20 @@ test("each step marks the end of what it sent, so the next one starts from a cac
   );
 });
 
-test("a short request is not marked, because writing a cache entry costs more than it saves", async () => {
+test("nothing is marked unless it was asked for", async () => {
+  // The default is the request shape that is known to work everywhere. See the providers tests for
+  // what turning it on changes and what that cost.
+  const provider = scriptedProvider([{ text: "ok" }]);
+  const big = "x ".repeat(4000);
+  await runTurn({ ...base, provider, messages: [{ role: "user", content: big }] });
+  assert.ok(!provider.seen[0]!.messages.some((m) => m.cacheable));
+});
+
+test("a short request is not marked even when it is asked for, because the write costs more", async () => {
   // A title, a commit message, a classification: one short request, never repeated. Anthropic
   // charges 1.25× to store a prefix and a tenth to read it back, so marking one that is never read
   // is a straight 25 % penalty.
   const provider = scriptedProvider([{ text: "ok" }]);
-  await runTurn({ ...base, provider, messages: [{ role: "user", content: "write a commit message" }] });
+  await runTurn({ ...base, provider, promptCache: true, messages: [{ role: "user", content: "write a commit message" }] });
   assert.ok(!provider.seen[0]!.messages.some((m) => m.cacheable));
 });

@@ -31,6 +31,20 @@ export interface OpenAIProviderOptions {
   referer?: string;
   title?: string;
   timeoutMs?: number;
+  /**
+   * Ask OpenRouter for Anthropic's prompt cache, which means marking content parts.
+   *
+   * OFF by default, and the reason is worth keeping: turning it on changes the SHAPE of the
+   * request. A message's `content` stops being a string and becomes an array of parts, because that
+   * is the only place `cache_control` can go. Every provider behind OpenRouter then has to accept
+   * that shape, and not all of them do the same thing with it — one of them answered with an empty
+   * completion, billed for the prompt, and reported no error at all. The extension looked as though
+   * it had stopped working, for a week, and nothing in the request said why.
+   *
+   * The saving is real — a cache read costs a tenth of an input token — so the option stays. What
+   * does not stay is it being on for everybody by default.
+   */
+  promptCache?: boolean;
 }
 
 const trimSlash = (u: string) => u.replace(/\/+$/, "");
@@ -147,7 +161,7 @@ export class OpenAICompatibleProvider implements Provider {
         // whole transcript on EVERY request. That is what this extension's own cost report was
         // showing and nobody could see why: the marker existed, and only the native Anthropic
         // client ever emitted it. OpenAI's and DeepSeek's caches are automatic and ignore the field.
-        const cache = this.id === "openrouter" && marks.has(index);
+        const cache = this.opts.promptCache === true && this.id === "openrouter" && marks.has(index);
         if (m.images?.length || cache) {
           const text: Record<string, unknown> = { type: "text", text: m.content };
           if (cache) text["cache_control"] = { type: "ephemeral" };

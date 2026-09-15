@@ -3320,6 +3320,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         },
         afterResponse: (t) => vault.restore(t),
         onUsage: (info) => this.noteUsage(info),
+        ...(settings.chat.promptCache ? { promptCache: true } : {}),
         });
 
       let result: Awaited<ReturnType<typeof runTurn>>;

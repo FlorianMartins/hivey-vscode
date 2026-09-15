@@ -430,9 +430,9 @@ test("Anthropic: an image becomes a base64 source block, after the text", async 
 // Hivey presets use, paid the full input price for its system prompt, its repository map and its
 // whole transcript on every single request.
 
-test("OpenRouter: a cacheable message carries the marker Anthropic needs", async () => {
+test("OpenRouter: asked for it, a cacheable message carries the marker Anthropic needs", async () => {
   const s = await serve((_req, res) => sse(res, [{ choices: [{ delta: { content: "ok" } }] }]));
-  const p = new OpenAICompatibleProvider({ id: "openrouter", baseUrl: s.url, apiKey: "k", isLocal: false });
+  const p = new OpenAICompatibleProvider({ id: "openrouter", baseUrl: s.url, apiKey: "k", isLocal: false, promptCache: true });
   await p.chat({
     model: "anthropic/claude-opus-5",
     messages: [
@@ -466,7 +466,7 @@ test("never more than four breakpoints, whichever door the request goes through"
   const six = Array.from({ length: 6 }, (_, i) => ({ role: "user" as const, content: `m${i}`, cacheable: true }));
 
   const a = await serve((_req, res) => sse(res, [{ choices: [{ delta: { content: "ok" } }] }]));
-  const openrouter = new OpenAICompatibleProvider({ id: "openrouter", baseUrl: a.url, apiKey: "k", isLocal: false });
+  const openrouter = new OpenAICompatibleProvider({ id: "openrouter", baseUrl: a.url, apiKey: "k", isLocal: false, promptCache: true });
   await openrouter.chat({ model: "anthropic/claude-opus-5", messages: six });
   await a.close();
   const marked = a.requests[0]!.body.messages.filter((m: any) => Array.isArray(m.content) && m.content[0].cache_control);
@@ -524,4 +524,53 @@ test("an authentication or balance failure names the provider that actually answ
   assert.match(String(failure), /account balance at openrouter/);
   assert.match(String(failure), /not the API key/);
   assert.match(String(failure), /Hivey preset always bills your OpenRouter account/);
+});
+
+// ── The shape of the request is a decision, and it must not drift ───────────────────────────────
+//
+// This is the test that was missing, and its absence cost a week. Marking content parts for
+// Anthropic's prompt cache turns a message's `content` from a string into an array — and it was
+// turned on for everybody. Somewhere behind OpenRouter that shape produced an empty completion,
+// billed for the prompt, with no error: the extension looked as though it had simply stopped
+// working, and nothing in the request said why.
+//
+// Nothing about that was visible from reading the code. What made it visible was recording the body
+// the extension actually sends and diffing it against the version that worked. This test is that
+// diff, kept.
+
+test("by default every message content is a plain string, on every provider", async () => {
+  for (const id of ["openrouter", "openai", "anthropic-compatible", "local"]) {
+    const s = await serve((_req, res) => sse(res, [{ choices: [{ delta: { content: "ok" } }] }]));
+    const p = new OpenAICompatibleProvider({ id, baseUrl: s.url, apiKey: "k", isLocal: id === "local" });
+    await p.chat({
+      model: "anthropic/claude-opus-5",
+      messages: [
+        { role: "system", content: "rules", cacheable: true },
+        { role: "user", content: "map", cacheable: true },
+        { role: "assistant", content: "noted" },
+        { role: "user", content: "question" },
+      ],
+    });
+    await s.close();
+    for (const sent of s.requests[0]!.body.messages) {
+      assert.equal(
+        typeof sent.content,
+        "string",
+        `${id}: the request shape changed for a message the caller marked cacheable — that is the regression`,
+      );
+    }
+  }
+});
+
+test("an image is still the one thing that forces the array form, asked for or not", async () => {
+  // Because there is nowhere else to put it. The difference from the cache marker is that it is the
+  // user who put an image there, so the change of shape is something they did.
+  const s = await serve((_req, res) => sse(res, [{ choices: [{ delta: { content: "ok" } }] }]));
+  const p = new OpenAICompatibleProvider({ id: "openrouter", baseUrl: s.url, apiKey: "k", isLocal: false });
+  await p.chat({
+    model: "m",
+    messages: [{ role: "user", content: "what is this?", images: [{ mediaType: "image/png", data: "QUJD" }] }],
+  });
+  await s.close();
+  assert.ok(Array.isArray(s.requests[0]!.body.messages[0].content));
 });

@@ -93,6 +93,11 @@ export interface TurnOptions {
    * step's usage would teach the calibrator that its estimate is four times too low.
    */
   onUsage?: (info: { model: string; estimated: number; actual: number }) => void;
+  /**
+   * Move the cache breakpoint to the end of each request. Off unless asked for — see
+   * `OpenAIProviderOptions.promptCache` for what turning it on changes and what it cost.
+   */
+  promptCache?: boolean;
   approve?: Approver;
   /** Applied to the messages of EVERY step, immediately before the request leaves. */
   beforeRequest?: (messages: ChatMessage[]) => Promise<ChatMessage[]> | ChatMessage[];
@@ -169,7 +174,7 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
     if (opts.signal?.aborted) return done("cancelled");
 
     const prepared = opts.beforeRequest ? await opts.beforeRequest(working) : working;
-    const outgoing = withRollingCacheMark(prepared);
+    const outgoing = opts.promptCache ? withRollingCacheMark(prepared) : prepared;
     let res: ChatResult;
     try {
       res = await opts.provider.chat(

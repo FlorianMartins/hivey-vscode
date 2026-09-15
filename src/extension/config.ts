@@ -23,7 +23,12 @@ export interface Settings {
   /** `auto` follows the editor; a fixed tag lets someone read the editor in one language and this
    *  extension in another — which is more common than it sounds on shared machines. */
   language: "auto" | "en" | "fr";
-  chat: { provider: ProviderId; model: string };
+  chat: {
+    provider: ProviderId;
+    model: string;
+    /** Ask for Anthropic's prompt cache through OpenRouter. Off: it changes the request's shape. */
+    promptCache: boolean;
+  };
   completion: {
     provider: ProviderId | "off";
     model: string;
@@ -100,6 +105,7 @@ export function readSettings(scope?: vscode.Uri): Settings {
     chat: {
       provider: c.get<ProviderId>("chat.provider", "local"),
       model: c.get<string>("chat.model", "qwen2.5-coder:7b"),
+      promptCache: c.get<boolean>("chat.promptCache", false),
     },
     completion: {
       provider: c.get<ProviderId | "off">("completion.provider", "local"),
@@ -275,7 +281,7 @@ export async function providerFor(s: Settings, keys: Keys, id: ProviderId): Prom
   if (!local && !apiKey && !vendor(id)?.needsUrl) {
     throw new Error(t("No API key stored for “{0}”. Run “Hivey Code: Store a provider key”.", id));
   }
-  return makeProvider({ id, baseUrl, apiKey });
+  return makeProvider({ id, baseUrl, apiKey, ...(s.chat.promptCache ? { promptCache: true } : {}) });
 }
 
 /** True when this role would send data off the machine — the question consent depends on. */

@@ -84,18 +84,20 @@ Not a slogan — an architecture. Six levers, in order of effect:
    symbols, extracted without a native parser), not file contents. A few thousand tokens describe a
    repository a hundred times their size, and the model asks for the two files it needs instead of
    being handed forty.
-3. **The prompt cache — asked for, kept, and moved along.** A coding conversation resends almost
-   the same context every turn, so this is where most of the bill is decided, and there are three
-   separate ways to get it wrong. *Asked for*: Anthropic's cache is not automatic, it applies only
-   to prefixes a request explicitly marks — so a Claude conversation routed through OpenRouter, the
-   default paid route, paid full price for everything on every request until the marker was emitted
-   there too. *Kept*: every cache hits up to the first byte that differs, so one line in the system
-   prompt that follows the open editor around costs the **whole** prefix, every turn; the repository
-   map is frozen for the life of a conversation and everything per-turn sits after it. *Moved
-   along*: a breakpoint at the end of each request means the next step of an agent turn starts from
-   a cache hit instead of re-paying for everything the previous step sent — without it the cost of a
-   twelve-step turn grows with the square of its length. The hit rate is on the ring's tooltip, so
-   none of this has to be taken on trust.
+3. **The prompt cache, kept rather than merely marked.** A coding conversation resends almost the
+   same context every turn, so this is where most of the bill is decided. Every cache hits up to the
+   first byte that differs, so one line in the system prompt that follows the open editor around
+   costs the **whole** prefix, every turn: the repository map is frozen for the life of a
+   conversation and everything per-turn sits after it. The hit rate is on the ring's tooltip, so
+   none of it has to be taken on trust.
+
+   Anthropic's cache goes further — it only applies to prefixes a request explicitly marks, and
+   marking them can cut a long conversation's bill several-fold. That is `chat.promptCache`, and it
+   is **off by default**, which is a scar rather than a preference: turning it on changes the shape
+   of the request (a message's content stops being a string and becomes an array of parts, the only
+   place the marker can go), and somewhere behind OpenRouter that shape produced an empty
+   completion, billed for the prompt, with no error at all. Turn it on, and check that answers
+   still arrive.
 4. **Escalate on failure, not on a guess.** The old rule read the question and bet: a regular
    expression decided "refactor the architecture" was hard and bought a remote call, while "make
    this test pass" stayed local and came back wrong. Now the local model tries, the tests or the

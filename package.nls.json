@@ -23,6 +23,7 @@
   "command.showPermissions.title": "Agent permissions",
   "command.pickCompletionModel.title": "Pick the completion model",
   "config.chat.provider": "Provider for the **chat** model. `local` = Ollama / LM Studio / llama.cpp on your machine or your server: no data leaves the network. The others are billed on your own account with that vendor — an API key, not a consumer subscription.",
+  "config.chat.promptCache": "Ask OpenRouter for Anthropic's prompt cache. It can cut the bill of a long conversation several-fold — a cache read costs a tenth of an input token — but it **changes the shape of the request**: a message's content stops being a string and becomes an array of parts, because that is the only place the marker can go. Not every model behind OpenRouter handles that the same way. Off by default; turn it on and check that answers still arrive.",
   "config.chat.model": "Identifier of the chat model, or a Hivey preset — `hivey/free`, `hivey`, `hivey/smart` — which sends each kind of work to a different model.",
   "config.completion.provider": "Provider for **inline completion**. Keep it `local`: this is the number-one cost driver elsewhere (one request per keystroke pause).",
   "config.completion.model": "Completion model (it must support fill-in-the-middle).",

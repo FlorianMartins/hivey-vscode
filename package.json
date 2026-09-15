@@ -2,7 +2,7 @@
   "name": "hivey-code",
   "displayName": "Hivey Code",
   "description": "%extension.description%",
-  "version": "0.43.0",
+  "version": "0.44.0",
   "publisher": "hivey",
   "license": "Apache-2.0",
   "repository": {
@@ -530,6 +530,11 @@
             ],
             "default": "local",
             "markdownDescription": "%config.chat.provider%"
+          },
+          "hiveyCode.chat.promptCache": {
+            "type": "boolean",
+            "default": false,
+            "markdownDescription": "%config.chat.promptCache%"
           },
           "hiveyCode.chat.model": {
             "type": "string",

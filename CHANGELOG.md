@@ -2,6 +2,33 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.44.0 — 2026-09-15
+
+### Corrigé
+
+- **La régression qui cassait tout depuis la 0.41.0, trouvée en comparant la requête réellement
+  envoyée.** « Je pose une question, pas de réponse, mais les jetons sont utilisés », quatre fois de
+  suite, et mes trois corrections précédentes portaient sur de vrais défauts qui n'étaient pas
+  celui-là. La bonne méthode était celle qu'on m'a indiquée : regarder ce qui avait changé.
+
+  Le client a été lancé contre un serveur qui enregistre le corps de la requête, à la version qui
+  marchait puis à la version actuelle, et les deux ont été comparés. **Une seule différence** : deux
+  messages dont le `content` était passé d'une chaîne à un tableau de parties. C'est le marquage du
+  cache de prompt d'Anthropic, ajouté en 0.41.0 et activé pour tout le monde — le marqueur ne peut se
+  placer que sur une partie de contenu, donc la demander change la forme de la requête. Quelque part
+  derrière OpenRouter, cette forme produisait une complétion **vide**, facturée, sans la moindre
+  erreur : l'extension paraissait simplement avoir cessé de fonctionner.
+
+  Le marquage devient une option, `hiveyCode.chat.promptCache`, **désactivée par défaut**. La requête
+  par défaut est de nouveau identique — à l'octet près, vérifié — à celle de la version qui
+  fonctionnait. Le gain reste réel et reste disponible ; ce qui ne reste pas, c'est qu'il soit activé
+  pour tout le monde sans que personne ait pu le vérifier.
+
+  **Le test qui manquait est ajouté** : par défaut, le contenu de chaque message doit être une
+  chaîne, chez tous les fournisseurs. Rien de tout cela ne se voyait en relisant le code ; ce qui l'a
+  rendu visible, c'est d'enregistrer ce qui part réellement et de le diffuser contre la version
+  d'avant. Ce test est ce diff, conservé.
+
 ## 0.43.0 — 2026-09-15
 
 ### Ajouté
