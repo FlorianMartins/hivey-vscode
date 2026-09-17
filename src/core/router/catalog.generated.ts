@@ -7,7 +7,7 @@
 
 import type { Price } from "./pricing.js";
 
-export const GENERATED_AT = "2026-09-16";
+export const GENERATED_AT = "2026-09-17";
 
 export type ModelRow = [string, string, string, number, number, number, number];
 
@@ -17,8 +17,8 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["~anthropic/claude-opus-latest","Claude Opus Latest","~anthropic",1000000,5,25,0.5],
   ["~anthropic/claude-sonnet-latest","Claude Sonnet Latest","~anthropic",1000000,2,10,0.2],
   ["~deepseek/deepseek-flash-latest","DeepSeek Flash Latest","~deepseek",1048576,0.15,0.6,0.015],
-  ["~deepseek/deepseek-pro-latest","DeepSeek Pro Latest","~deepseek",1048576,0.96,2.88,0.088],
-  ["~deepseek/deepseek-v4-flash-latest","DeepSeek V4 Flash Latest","~deepseek",1310720,0.04,0.1,0.01],
+  ["~deepseek/deepseek-pro-latest","DeepSeek Pro Latest","~deepseek",1048576,0.7,2.96,0.033],
+  ["~deepseek/deepseek-v4-flash-latest","DeepSeek V4 Flash Latest","~deepseek",1310720,0.03,0.13,0.01],
   ["~google/gemini-flash-latest","Gemini Flash Latest","~google",1048576,0.75,3.75,0.075],
   ["~google/gemini-pro-latest","Gemini Pro Latest","~google",1048576,2,12,0.2],
   ["~moonshotai/kimi-latest","Kimi Latest","~moonshotai",1048576,2,11.2,0.232],
@@ -97,7 +97,7 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["deepseek/deepseek-v4-flash-vision-exp","DeepSeek V4 Flash Vision Exp","deepseek",1048576,0.22,0.66,0.007],
   ["deepseek/deepseek-v4-flash-vision-exp:batch","DeepSeek V4 Flash Vision Exp (batch)","deepseek",1048576,0.11,0.33,0.0035],
   ["deepseek/deepseek-v4-pro","DeepSeek V4 Pro 0423","deepseek",1048576,1.6,3.2,0.135],
-  ["deepseek/deepseek-v4-pro-0813","DeepSeek V4 Pro 0813","deepseek",1048576,0.9834,2.9502,0.0328],
+  ["deepseek/deepseek-v4-pro-0813","DeepSeek V4 Pro 0813","deepseek",1048576,1.32,3.96,0.044],
   ["deepseek/deepseek-v4-pro-0813:batch","DeepSeek V4 Pro 0813 (batch)","deepseek",1048576,0.66,1.98,0.022],
   ["deepseek/deepseek-v4.1-flash","DeepSeek V4.1 Flash","deepseek",1048576,0.3,1.2,0.006],
   ["dots-studio/dots-3-note-preview:free","Dots3-Note Preview (free)","dots-studio",512000,0,0,0],
@@ -140,7 +140,7 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["google/gemma-4-26b-a4b-it:free","Gemma 4 26B A4B  (free)","google",262144,0,0,0],
   ["google/gemma-4-31b-it","Gemma 4 31B","google",262144,0.09,0.34,0.05],
   ["google/gemma-4-31b-it:free","Gemma 4 31B (free)","google",262144,0,0,0],
-  ["gryphe/mythomax-l2-13b","MythoMax 13B","gryphe",8192,0.06,0.06,0],
+  ["gryphe/mythomax-l2-13b","MythoMax 13B","gryphe",8192,0.08,0.11,0],
   ["ibm-granite/granite-4.0-h-micro","Granite 4.0 Micro","ibm-granite",131000,0.017,0.112,0],
   ["ibm-granite/granite-4.2-8b","Granite 4.2 8B","ibm-granite",131072,0.06,0.25,0.015],
   ["inception/mercury-2","Mercury 2","inception",128000,0.25,0.75,0.025],
@@ -215,7 +215,7 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["moonshotai/kimi-k2.5","Kimi K2.5","moonshotai",262144,0.45,2.25,0.07],
   ["moonshotai/kimi-k2.6","Kimi K2.6","moonshotai",262144,0.95,4,0.16],
   ["moonshotai/kimi-k2.7-code","Kimi K2.7 Code","moonshotai",262144,0.7062,3.21,0.18],
-  ["moonshotai/kimi-k3","Kimi K3","moonshotai",1048576,2.6481,13.2827,0.3026],
+  ["moonshotai/kimi-k3","Kimi K3","moonshotai",1048576,3,15,0.3],
   ["moonshotai/kimi-k3:batch","Kimi K3 (batch)","moonshotai",1048576,3,15,0.3],
   ["morph/morph-v3-fast","Morph V3 Fast","morph",81920,0.8,1.2,0],
   ["morph/morph-v3-large","Morph V3 Large","morph",262144,0.9,1.9,0],
@@ -224,7 +224,7 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["nousresearch/hermes-3-llama-3.1-405b","Hermes 3 405B Instruct","nousresearch",131072,1,1,0],
   ["nousresearch/hermes-3-llama-3.1-70b","Hermes 3 70B Instruct","nousresearch",131072,0.7,0.7,0],
   ["nousresearch/hermes-4-405b","Hermes 4 405B","nousresearch",131072,1,3,0],
-  ["nvidia/nemotron-3-nano-30b-a3b","Nemotron 3 Nano 30B A3B","nvidia",262144,0.05,0.2,0.03],
+  ["nvidia/nemotron-3-nano-30b-a3b","Nemotron 3 Nano 30B A3B","nvidia",262144,0.06,0.24,0],
   ["nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free","Nemotron 3 Nano Omni (free)","nvidia",256000,0,0,0],
   ["nvidia/nemotron-3-super-120b-a12b","Nemotron 3 Super","nvidia",262144,0.08,0.45,0],
   ["nvidia/nemotron-3-super-120b-a12b:free","Nemotron 3 Super (free)","nvidia",262144,0,0,0],
@@ -443,7 +443,7 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["z-ai/glm-5.2:batch","GLM 5.2 (batch)","z-ai",1048576,0.7,2.2,0.07],
   ["z-ai/glm-5.2:free","GLM 5.2 (free)","z-ai",32768,0,0,0],
   ["z-ai/glm-5.3","GLM 5.3","z-ai",1310720,1.4,4.4,0.26],
-  ["z-ai/glm-5.3-flash","GLM 5.3 Flash","z-ai",1310720,0.1,0.3333,0.02],
+  ["z-ai/glm-5.3-flash","GLM 5.3 Flash","z-ai",1310720,0.09,0.3,0.018],
   ["z-ai/glm-5.3-flash:batch","GLM 5.3 Flash (batch)","z-ai",1048576,0.075,0.25,0.015],
   ["z-ai/glm-5.3:batch","GLM 5.3 (batch)","z-ai",1048576,0.7,2.2,0.13],
   ["z-ai/glm-5v-turbo","GLM 5V Turbo","z-ai",202752,1.2,4,0.24],
