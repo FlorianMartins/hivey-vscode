@@ -7,7 +7,7 @@
 //
 // The rules live in scripts/update-models.mjs. Read them there before doubting a row.
 
-export const HIVEY_GENERATED_AT = "2026-09-19";
+export const HIVEY_GENERATED_AT = "2026-09-21";
 
 /** variant → role → model id. */
 export const HIVEY_ROUTING: Record<string, Record<string, string>> = {
@@ -18,13 +18,13 @@ export const HIVEY_ROUTING: Record<string, Record<string, string>> = {
     "completion": "cohere/north-mini-code:free"
   },
   "hivey": {
-    "chore": "deepseek/deepseek-v4-flash",
+    "chore": "qwen/qwen3.7-flash",
     "everyday": "qwen/qwen3.8-max-0902",
     "deep": "anthropic/claude-opus-5",
     "completion": "qwen/qwen3-coder-30b-a3b-instruct"
   },
   "hivey/smart": {
-    "chore": "deepseek/deepseek-v4-flash",
+    "chore": "qwen/qwen3.7-flash",
     "everyday": "openai/gpt-chat-latest",
     "deep": "openai/gpt-5-pro",
     "completion": "qwen/qwen3-coder-30b-a3b-instruct"
