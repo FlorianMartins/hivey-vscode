@@ -1,13 +1,13 @@
 // GENERATED FILE — do not edit by hand.
 // Written by `npm run models` (scripts/update-models.mjs); a scheduled workflow commits the diff.
-// 446 priced models. Tuples: [id, name, vendor, context, $/M in, $/M out, $/M cached-in].
+// 449 priced models. Tuples: [id, name, vendor, context, $/M in, $/M out, $/M cached-in].
 //
 // A model that is absent from this table is reported as "unknown cost" rather than guessed: a
 // wrong price silently spends someone's budget.
 
 import type { Price } from "./pricing.js";
 
-export const GENERATED_AT = "2026-09-23";
+export const GENERATED_AT = "2026-09-24";
 
 export type ModelRow = [string, string, string, number, number, number, number];
 
@@ -16,23 +16,25 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["~anthropic/claude-haiku-latest","Claude Haiku Latest","~anthropic",200000,1,5,0.1],
   ["~anthropic/claude-opus-latest","Claude Opus Latest","~anthropic",1000000,4,20,0.2],
   ["~anthropic/claude-sonnet-latest","Claude Sonnet Latest","~anthropic",1000000,2,10,0.2],
-  ["~deepseek/deepseek-flash-latest","DeepSeek Flash Latest","~deepseek",1048576,0.04,0.64,0.016],
-  ["~deepseek/deepseek-pro-latest","DeepSeek Pro Latest","~deepseek",1048576,0.4,4.3,0.033],
-  ["~deepseek/deepseek-v4-flash-latest","DeepSeek V4 Flash Latest","~deepseek",1310720,0.03,0.8,0.008],
+  ["~deepseek/deepseek-flash-latest","DeepSeek Flash Latest","~deepseek",1048576,0.04,1,0.01],
+  ["~deepseek/deepseek-pro-latest","DeepSeek Pro Latest","~deepseek",1048576,0.39,2.9,0.25],
+  ["~deepseek/deepseek-v4-flash-latest","DeepSeek V4 Flash Latest","~deepseek",1310720,0.03,0.32,0.016],
   ["~google/gemini-flash-latest","Gemini Flash Latest","~google",1048576,0.75,3.75,0.075],
   ["~google/gemini-pro-latest","Gemini Pro Latest","~google",1048576,2,12,0.2],
-  ["~moonshotai/kimi-latest","Kimi Latest","~moonshotai",1048576,1.19,14.5,0.21],
+  ["~moonshotai/kimi-latest","Kimi Latest","~moonshotai",1048576,1.4,10.75,0.3],
   ["~openai/gpt-astra-latest","GPT Astra Latest","~openai",1050000,10,50,1],
   ["~openai/gpt-luna-latest","GPT Luna Latest","~openai",1050000,0.1,0.5,0.01],
   ["~openai/gpt-mini-latest","GPT Mini Latest","~openai",400000,0.75,4.5,0.075],
   ["~openai/gpt-sol-latest","GPT Sol Latest","~openai",1050000,2,10,0.2],
   ["~openai/gpt-terra-latest","GPT Terra Latest","~openai",1050000,2,12,0.2],
   ["~x-ai/grok-latest","Grok Latest","~x-ai",500000,1.6,4.8,0.4],
-  ["~z-ai/glm-flash-latest","GLM Flash Latest","~z-ai",1310720,0.075,0.25,0.015],
+  ["~z-ai/glm-flash-latest","GLM Flash Latest","~z-ai",1310720,0.045,0.14,0.01],
   ["~z-ai/glm-latest","GLM Latest","~z-ai",1310720,0.5625,2.5,0.125],
   ["aion-labs/aion-2.0","Aion-2.0","aion-labs",131072,0.8,1.6,0.2],
   ["aion-labs/aion-3.0","Aion-3.0","aion-labs",131072,3,6,0.75],
   ["aion-labs/aion-3.0-mini","Aion-3.0-Mini","aion-labs",131072,0.7,1.4,0.18],
+  ["aion-labs/aion-3.5","Aion 3.5","aion-labs",262144,3,6,0.75],
+  ["aion-labs/aion-3.5-mini","Aion 3.5 Mini","aion-labs",262144,0.7,1.4,0.18],
   ["aion-labs/aion-rp-llama-3.1-8b","Aion-RP 1.0 (8B)","aion-labs",32768,0.8,1.6,0],
   ["amazon/nova-2-lite-v1","Nova 2 Lite","amazon",1000000,0.3,2.5,0],
   ["amazon/nova-lite-v1","Nova Lite 1.0","amazon",300000,0.06,0.24,0],
@@ -94,13 +96,14 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["deepseek/deepseek-v3.2","DeepSeek V3.2","deepseek",163840,0.269,0.4,0.1345],
   ["deepseek/deepseek-v3.2-exp","DeepSeek V3.2 Exp","deepseek",163840,0.27,0.41,0],
   ["deepseek/deepseek-v4-flash","DeepSeek V4 Flash 0423","deepseek",1048576,0.0886,0.1772,0.0177],
-  ["deepseek/deepseek-v4-flash-0731","DeepSeek V4 Flash 0731","deepseek",1310720,0.04,0.64,0.016],
+  ["deepseek/deepseek-v4-flash-0731","DeepSeek V4 Flash 0731","deepseek",1310720,0.03,0.32,0.016],
   ["deepseek/deepseek-v4-flash-vision-exp","DeepSeek V4 Flash Vision Exp","deepseek",1048576,0.22,0.66,0.007],
-  ["deepseek/deepseek-v4-pro","DeepSeek V4 Pro 0423","deepseek",1048576,0.9553,1.9105,0.0796],
-  ["deepseek/deepseek-v4-pro-0813","DeepSeek V4 Pro 0813","deepseek",1048576,1.32,3.96,0.044],
-  ["deepseek/deepseek-v4.1-flash","DeepSeek V4.1 Flash","deepseek",1048576,0.04,0.64,0.016],
+  ["deepseek/deepseek-v4-pro","DeepSeek V4 Pro 0423","deepseek",1048576,0.9396,1.8792,0.0783],
+  ["deepseek/deepseek-v4-pro-0813","DeepSeek V4 Pro 0813","deepseek",1048576,0.462,1.386,0.0154],
+  ["deepseek/deepseek-v4.1-flash","DeepSeek V4.1 Flash","deepseek",1048576,0.14,0.42,0.0042],
   ["deepseek/deepseek-v4.1-flash:batch","DeepSeek V4.1 Flash (batch)","deepseek",1048576,0.112,0.336,0.0034],
   ["dots-studio/dots-3-note-preview:free","Dots3-Note Preview (free)","dots-studio",512000,0,0,0],
+  ["fireworks/ember-1","Ember-1","fireworks",1048576,3,15,0.3],
   ["google/gemini-2.5-flash","Gemini 2.5 Flash","google",1048576,0.3,2.5,0.03],
   ["google/gemini-2.5-flash-image","Nano Banana (Gemini 2.5 Flash Image)","google",32768,0.3,2.5,0.03],
   ["google/gemini-2.5-flash-lite","Gemini 2.5 Flash Lite","google",1048576,0.1,0.4,0.01],
@@ -149,8 +152,7 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["inclusionai/ling-3.0-flash-fin","Ling 3.0 Flash Fin","inclusionai",262144,0.06,0.18,0.012],
   ["inclusionai/ling-3.0-flash-fin:free","Ling 3.0 Flash Fin (free)","inclusionai",262144,0,0,0],
   ["inclusionai/ling-3.0-flash-sante:free","Ling 3.0 Flash Sante (free)","inclusionai",262144,0,0,0],
-  ["inclusionai/ling-3.0-flash-vl","Ling 3.0 Flash VL","inclusionai",131072,0.06,0.18,0.012],
-  ["inclusionai/ling-3.0-flash-vl:free","Ling 3.0 Flash VL (free)","inclusionai",262144,0,0,0],
+  ["inclusionai/ling-3.0-flash-vl","Ling 3.0 Flash VL","inclusionai",262144,0.06,0.18,0.012],
   ["inference-net/schematron-v2-small","Schematron V2 Small","inference-net",128000,0.05,0.23,0.05],
   ["inference-net/schematron-v2-turbo","Schematron V2 Turbo","inference-net",128000,0.03,0.15,0.03],
   ["kwaipilot/kat-coder-pro-v2.5","KAT-Coder-Pro V2.5","kwaipilot",262144,0.74,2.96,0.15],
@@ -175,7 +177,7 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["microsoft/wizardlm-2-8x22b","WizardLM-2 8x22B","microsoft",65535,0.62,0.62,0],
   ["minimax/minimax-01","MiniMax-01","minimax",1000192,0.2,1.1,0],
   ["minimax/minimax-m1","MiniMax M1","minimax",1000000,0.4,2.2,0],
-  ["minimax/minimax-m2","MiniMax M2","minimax",204800,0.255,1.02,0],
+  ["minimax/minimax-m2","MiniMax M2","minimax",204800,0.3,1.2,0],
   ["minimax/minimax-m2-her","MiniMax M2-her","minimax",65536,0.3,1.2,0.03],
   ["minimax/minimax-m2.1","MiniMax M2.1","minimax",204800,0.3,1.2,0.03],
   ["minimax/minimax-m2.5","MiniMax M2.5","minimax",204800,0.27,1.08,0.027],
@@ -183,7 +185,6 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["minimax/minimax-m3","MiniMax M3","minimax",1048576,0.3,1.2,0.06],
   ["mistralai/codestral-2508","Codestral 2508","mistralai",256000,0.3,0.9,0.03],
   ["mistralai/codestral-2508:batch","Codestral 2508 (batch)","mistralai",256000,0.15,0.45,0.015],
-  ["mistralai/devstral-2512","Devstral 2 2512","mistralai",262144,0.4,2,0.04],
   ["mistralai/ministral-14b-2512","Ministral 3 14B 2512","mistralai",262144,0.2,0.2,0.02],
   ["mistralai/ministral-3b-2512","Ministral 3 3B 2512","mistralai",131072,0.1,0.1,0.01],
   ["mistralai/ministral-8b-2512","Ministral 3 8B 2512","mistralai",262144,0.15,0.15,0.015],
@@ -215,9 +216,7 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["moonshotai/kimi-k3:batch","Kimi K3 (batch)","moonshotai",1048576,2.28,11.4,0.228],
   ["morph/morph-v3-fast","Morph V3 Fast","morph",81920,0.8,1.2,0],
   ["morph/morph-v3-large","Morph V3 Large","morph",262144,0.9,1.9,0],
-  ["nex-agi/nex-n2.5-mini","Nex-N2.5-Mini","nex-agi",262144,0.025,0.1,0.0025],
   ["nex-agi/nex-n2.5-mini:free","Nex-N2.5-Mini (free)","nex-agi",262144,0,0,0],
-  ["nex-agi/nex-n2.5-pro","Nex-N2.5-Pro","nex-agi",262144,0.075,0.25,0.015],
   ["nex-agi/nex-n2.5-pro:free","Nex-N2.5-Pro (free)","nex-agi",262144,0,0,0],
   ["nousresearch/hermes-3-llama-3.1-405b","Hermes 3 405B Instruct","nousresearch",131072,1,1,0],
   ["nousresearch/hermes-3-llama-3.1-70b","Hermes 3 70B Instruct","nousresearch",131072,0.7,0.7,0],
@@ -230,7 +229,7 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["nvidia/nemotron-3-ultra-550b-a55b:free","Nemotron 3 Ultra (free)","nvidia",1000000,0,0,0],
   ["nvidia/nemotron-3.5-content-safety","Nemotron 3.5 Content Safety","nvidia",131072,0.2,0.2,0],
   ["nvidia/nemotron-3.5-content-safety:free","Nemotron 3.5 Content Safety (free)","nvidia",128000,0,0,0],
-  ["nvidia/nemotron-3.5-lightning","Nemotron 3.5 Lightning","nvidia",262144,0.07,0.2,0.04],
+  ["nvidia/nemotron-3.5-lightning","Nemotron 3.5 Lightning","nvidia",262144,0.08,0.2,0.04],
   ["nvidia/nemotron-3.5-lightning:free","Nemotron 3.5 Lightning (free)","nvidia",1000000,0,0,0],
   ["openai/gpt-3.5-turbo","GPT-3.5 Turbo","openai",16385,0.5,1.5,0],
   ["openai/gpt-3.5-turbo-0613","GPT-3.5 Turbo (older v0613)","openai",4095,1,2,0],
@@ -317,6 +316,7 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["openai/gpt-audio-mini","GPT Audio Mini","openai",128000,0.6,2.4,0],
   ["openai/gpt-chat-latest","GPT Chat Latest","openai",400000,5,30,0.5],
   ["openai/gpt-oss-120b","gpt-oss-120b","openai",131072,0.15,0.6,0.075],
+  ["openai/gpt-oss-120b:batch","gpt-oss-120b (batch)","openai",131072,0.0296,0.136,0],
   ["openai/gpt-oss-20b","gpt-oss-20b","openai",131072,0.018,0.09,0],
   ["openai/gpt-oss-20b:batch","gpt-oss-20b (batch)","openai",131072,0.024,0.112,0],
   ["openai/gpt-oss-safeguard-20b","gpt-oss-safeguard-20b","openai",131072,0.075,0.3,0.0375],
@@ -353,7 +353,7 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["qwen/qwen3-235b-a22b-2507","Qwen3 235B A22B Instruct 2507","qwen",262144,0.0875,0.35,0.0175],
   ["qwen/qwen3-235b-a22b-thinking-2507","Qwen3 235B A22B Thinking 2507","qwen",131072,0.23,2.3,0],
   ["qwen/qwen3-30b-a3b","Qwen3 30B A3B","qwen",131072,0.12,0.5,0],
-  ["qwen/qwen3-30b-a3b-instruct-2507","Qwen3 30B A3B Instruct 2507","qwen",262144,0.0481,0.193,0],
+  ["qwen/qwen3-30b-a3b-instruct-2507","Qwen3 30B A3B Instruct 2507","qwen",262144,0.1,0.3,0],
   ["qwen/qwen3-30b-a3b-thinking-2507","Qwen3 30B A3B Thinking 2507","qwen",81920,0.2,2.4,0],
   ["qwen/qwen3-32b","Qwen3 32B","qwen",131072,0.08,0.28,0],
   ["qwen/qwen3-8b","Qwen3 8B","qwen",131072,0.117,0.455,0],
@@ -364,7 +364,7 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["qwen/qwen3-coder-plus","Qwen3 Coder Plus","qwen",1000000,0.65,3.25,0.13],
   ["qwen/qwen3-max","Qwen3 Max","qwen",262144,0.78,3.9,0.156],
   ["qwen/qwen3-max-thinking","Qwen3 Max Thinking","qwen",262144,0.78,3.9,0],
-  ["qwen/qwen3-next-80b-a3b-instruct","Qwen3 Next 80B A3B Instruct","qwen",262144,0.09,1.1,0],
+  ["qwen/qwen3-next-80b-a3b-instruct","Qwen3 Next 80B A3B Instruct","qwen",262144,0.1,1.1,0.07],
   ["qwen/qwen3-next-80b-a3b-thinking","Qwen3 Next 80B A3B Thinking","qwen",262144,0.15,1.2,0],
   ["qwen/qwen3-vl-235b-a22b-instruct","Qwen3 VL 235B A22B Instruct","qwen",262144,0.21,1.9,0.1],
   ["qwen/qwen3-vl-235b-a22b-thinking","Qwen3 VL 235B A22B Thinking","qwen",131072,0.4,4,0],
@@ -394,6 +394,7 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["qwen/qwen3.8-27b:free","Qwen3.8 27B (free)","qwen",262144,0,0,0],
   ["qwen/qwen3.8-flash","Qwen3.8 Flash","qwen",1000000,0.15,0.47,0.016],
   ["qwen/qwen3.8-max-0902","Qwen3.8 Max (0902)","qwen",1000000,2,6,0.25],
+  ["qwen/qwen3.8-max-prime","Qwen3.8 Max Prime","qwen",1000000,4,12,0.5],
   ["qwen/qwen3.8-omni-flash","Qwen3.8 Omni Flash","qwen",1000000,0.15,0.47,0.016],
   ["rekaai/reka-edge","Reka Edge","rekaai",16384,0.1,0.1,0],
   ["rekaai/reka-flash-3","Reka Flash 3","rekaai",65536,0.1,0.2,0],
@@ -410,7 +411,7 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["stepfun/step-3.7-flash","Step 3.7 Flash","stepfun",262144,0.2,1.15,0.04],
   ["tencent/hunyuan-a13b-instruct","Hunyuan A13B Instruct","tencent",131072,0.14,0.57,0],
   ["tencent/hy-mt2-1.8b","Hy-MT2-1.8B","tencent",8192,0.044,0.177,0],
-  ["tencent/hy-mt2-30b-a3b","Hy-MT2-30B-A3B","tencent",8192,0.074,0.295,0],
+  ["tencent/hy-mt2-30b-a3b","Hy-MT2-30B-A3B","tencent",32768,0.074,0.295,0],
   ["tencent/hy-mt2-7b","Hy-MT2-7B","tencent",8192,0.074,0.295,0],
   ["tencent/hy3","Hy3","tencent",262144,0.132,0.528,0.033],
   ["tencent/hy3-preview","Hy3 preview","tencent",262144,0.18,0.6,0.06],
@@ -424,6 +425,7 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["thinkingmachines/inkling:free","Inkling (free)","thinkingmachines",1048576,0,0,0],
   ["unbiased/pareto","Pareto","unbiased",262144,2.5,7.5,0.25],
   ["undi95/remm-slerp-l2-13b","ReMM SLERP 13B","undi95",6144,0.35,0.65,0],
+  ["upstage/solar-mini4","Solar Mini 4","upstage",524288,0.05,0.2,0.005],
   ["upstage/solar-pro-3","Solar Pro 3","upstage",131072,0.15,0.6,0.015],
   ["upstage/solar-pro4","Solar Pro 4","upstage",524288,0.09,0.36,0.018],
   ["writer/palmyra-x5","Palmyra X5","writer",1040000,0.6,6,0],
@@ -455,8 +457,9 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["z-ai/glm-5.3","GLM 5.3","z-ai",1310720,0.84,2.64,0.156],
   ["z-ai/glm-5.3-flash","GLM 5.3 Flash","z-ai",1310720,0.15,0.5,0.05],
   ["z-ai/glm-5.3-flash:batch","GLM 5.3 Flash (batch)","z-ai",1048576,0.06,0.2,0.012],
-  ["z-ai/glm-5.3-flashx","GLM 5.3 FlashX","z-ai",1048576,0.37,1.25,0.075],
-  ["z-ai/glm-5.3:batch","GLM 5.3 (batch)","z-ai",1048576,0.72,2.4,0.12],
+  ["z-ai/glm-5.3-flashx","GLM 5.3 FlashX","z-ai",1048576,0.37,1.25,0.09],
+  ["z-ai/glm-5.3-prime","GLM 5.3 Prime","z-ai",1000000,2.8,8.8,0.56],
+  ["z-ai/glm-5.3:batch","GLM 5.3 (batch)","z-ai",1048576,0.45,2,0.1],
   ["z-ai/glm-5v-turbo","GLM 5V Turbo","z-ai",202752,1.2,4,0.24],
 ];
 
@@ -472,7 +475,7 @@ export const GENERATED_MODELS: ModelRow[] = [
  * model cannot see it because of a prefix.
  */
 export const GENERATED_VISION: ReadonlySet<string> = (() => {
-  const ids = ["amazon/nova-2-lite-v1","amazon/nova-lite-v1","amazon/nova-premier-v1","amazon/nova-pro-v1","anthropic/claude-3-haiku","anthropic/claude-fable-5","anthropic/claude-fable-5.1","anthropic/claude-fable-5.1:batch","anthropic/claude-fable-5:batch","anthropic/claude-haiku-4.5","anthropic/claude-haiku-4.5:batch","anthropic/claude-opus-4.1","anthropic/claude-opus-4.1:batch","anthropic/claude-opus-4.5","anthropic/claude-opus-4.5:batch","anthropic/claude-opus-4.6","anthropic/claude-opus-4.6:batch","anthropic/claude-opus-4.7","anthropic/claude-opus-4.7:batch","anthropic/claude-opus-4.8","anthropic/claude-opus-4.8:batch","anthropic/claude-opus-5","anthropic/claude-opus-5.5","anthropic/claude-opus-5.5:batch","anthropic/claude-opus-5:batch","anthropic/claude-sonnet-4","anthropic/claude-sonnet-4.5","anthropic/claude-sonnet-4.5:batch","anthropic/claude-sonnet-4.6","anthropic/claude-sonnet-4.6:batch","anthropic/claude-sonnet-5","anthropic/claude-sonnet-5:batch","baidu/ernie-4.5-vl-424b-a47b","bytedance-seed/seed-1.6","bytedance-seed/seed-1.6-flash","bytedance-seed/seed-2-1-turbo","bytedance-seed/seed-2.0-code","bytedance-seed/seed-2.0-lite","bytedance-seed/seed-2.0-mini","bytedance/ui-tars-1.5-7b","cohere/command-a-plus","deepseek/deepseek-v4-flash-vision-exp","deepseek/deepseek-v4.1-flash","deepseek/deepseek-v4.1-flash:batch","dots-studio/dots-3-note-preview:free","google/gemini-2.5-flash","google/gemini-2.5-flash-image","google/gemini-2.5-flash-lite","google/gemini-2.5-flash-lite:batch","google/gemini-2.5-flash:batch","google/gemini-2.5-pro","google/gemini-2.5-pro-preview","google/gemini-2.5-pro:batch","google/gemini-3-flash-preview","google/gemini-3-flash-preview:batch","google/gemini-3-pro-image","google/gemini-3-pro-image-preview","google/gemini-3.1-flash-image","google/gemini-3.1-flash-image-preview","google/gemini-3.1-flash-lite","google/gemini-3.1-flash-lite-image","google/gemini-3.1-flash-lite-preview","google/gemini-3.1-flash-lite:batch","google/gemini-3.1-pro-preview","google/gemini-3.1-pro-preview-customtools","google/gemini-3.1-pro-preview:batch","google/gemini-3.5-flash","google/gemini-3.5-flash-lite","google/gemini-3.5-flash-lite:batch","google/gemini-3.5-flash:batch","google/gemini-3.6-flash","google/gemini-3.6-flash:batch","google/gemini-3.7-flash","google/gemini-3.7-flash:batch","google/gemini-3.8-flash","google/gemini-3.8-flash:batch","google/gemma-3-12b-it","google/gemma-3-27b-it","google/gemma-3-4b-it","google/gemma-4-26b-a4b-it","google/gemma-4-26b-a4b-it:free","google/gemma-4-31b-it","google/gemma-4-31b-it:free","inclusionai/ling-3.0-flash-vl","inclusionai/ling-3.0-flash-vl:free","meta-llama/llama-4-maverick","meta-llama/llama-4-scout","meta-llama/llama-guard-4-12b","meta/muse-glimmer-30b","meta/muse-spark-1.1","meta/muse-spark-1.2","meta/muse-spark-1.2-contributor","meta/muse-spark-1.3","meta/muse-spark-1.3-contributor","minimax/minimax-01","minimax/minimax-m3","mistralai/ministral-14b-2512","mistralai/ministral-3b-2512","mistralai/ministral-8b-2512","mistralai/ministral-8b-2512:batch","mistralai/mistral-large-2512:batch","mistralai/mistral-medium-3","mistralai/mistral-medium-3-5","mistralai/mistral-medium-3-5:batch","mistralai/mistral-medium-3.1","mistralai/mistral-medium-3.1:batch","mistralai/mistral-small-2603","mistralai/mistral-small-2603:batch","mistralai/mistral-small-3.1-24b-instruct","mistralai/mistral-small-3.2-24b-instruct","moonshotai/kimi-k2.5","moonshotai/kimi-k2.6","moonshotai/kimi-k2.7-code","moonshotai/kimi-k3","moonshotai/kimi-k3:batch","nex-agi/nex-n2.5-mini","nex-agi/nex-n2.5-mini:free","nex-agi/nex-n2.5-pro","nex-agi/nex-n2.5-pro:free","nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free","nvidia/nemotron-3.5-content-safety","nvidia/nemotron-3.5-content-safety:free","openai/gpt-4-turbo","openai/gpt-4-turbo:batch","openai/gpt-4.1","openai/gpt-4.1-mini","openai/gpt-4.1-mini:batch","openai/gpt-4.1-nano","openai/gpt-4.1-nano:batch","openai/gpt-4.1:batch","openai/gpt-4o","openai/gpt-4o-2024-05-13","openai/gpt-4o-2024-08-06","openai/gpt-4o-2024-11-20","openai/gpt-4o-mini","openai/gpt-4o-mini-2024-07-18","openai/gpt-4o-mini:batch","openai/gpt-4o:batch","openai/gpt-5","openai/gpt-5-image","openai/gpt-5-image-mini","openai/gpt-5-mini","openai/gpt-5-mini:batch","openai/gpt-5-nano","openai/gpt-5-nano:batch","openai/gpt-5-pro","openai/gpt-5-pro:batch","openai/gpt-5.1","openai/gpt-5.1-codex","openai/gpt-5.1-codex-max","openai/gpt-5.1-codex-mini","openai/gpt-5.1:batch","openai/gpt-5.2","openai/gpt-5.2-chat","openai/gpt-5.2-codex","openai/gpt-5.2-pro","openai/gpt-5.2-pro:batch","openai/gpt-5.2:batch","openai/gpt-5.3-codex","openai/gpt-5.4","openai/gpt-5.4-image-2","openai/gpt-5.4-mini","openai/gpt-5.4-mini:batch","openai/gpt-5.4-nano","openai/gpt-5.4-nano:batch","openai/gpt-5.4-pro","openai/gpt-5.4-pro:batch","openai/gpt-5.4:batch","openai/gpt-5.5","openai/gpt-5.5-pro","openai/gpt-5.5-pro:batch","openai/gpt-5.5:batch","openai/gpt-5.6-luna","openai/gpt-5.6-luna-pro","openai/gpt-5.6-luna-pro:batch","openai/gpt-5.6-luna:batch","openai/gpt-5.6-sol","openai/gpt-5.6-sol-pro","openai/gpt-5.6-sol-pro:batch","openai/gpt-5.6-sol:batch","openai/gpt-5.6-terra","openai/gpt-5.6-terra-pro","openai/gpt-5.6-terra-pro:batch","openai/gpt-5.6-terra:batch","openai/gpt-5:batch","openai/gpt-6-astra","openai/gpt-6-astra-pro","openai/gpt-6-astra-pro:batch","openai/gpt-6-astra:batch","openai/gpt-6-luna","openai/gpt-6-luna-pro","openai/gpt-6-luna-pro:batch","openai/gpt-6-luna:batch","openai/gpt-6-sol","openai/gpt-6-sol-pro","openai/gpt-6-sol-pro:batch","openai/gpt-6-sol:batch","openai/gpt-chat-latest","openai/o1","openai/o1-pro","openai/o3","openai/o3-pro","openai/o3:batch","openai/o4-mini","openai/o4-mini-high","openai/o4-mini:batch","perceptron/perceptron-mk1","perplexity/sonar","perplexity/sonar-pro","perplexity/sonar-pro-search","perplexity/sonar-reasoning-pro","prism-ml/ternary-bonsai-2-27b","qwen/qwen2.5-vl-72b-instruct","qwen/qwen3-vl-235b-a22b-instruct","qwen/qwen3-vl-235b-a22b-thinking","qwen/qwen3-vl-30b-a3b-instruct","qwen/qwen3-vl-30b-a3b-thinking","qwen/qwen3-vl-32b-instruct","qwen/qwen3-vl-8b-instruct","qwen/qwen3-vl-8b-thinking","qwen/qwen3.5-122b-a10b","qwen/qwen3.5-27b","qwen/qwen3.5-35b-a3b","qwen/qwen3.5-397b-a17b","qwen/qwen3.5-9b","qwen/qwen3.5-flash-02-23","qwen/qwen3.5-plus-02-15","qwen/qwen3.5-plus-20260420","qwen/qwen3.6-27b","qwen/qwen3.6-35b-a3b","qwen/qwen3.6-flash","qwen/qwen3.6-plus","qwen/qwen3.7-flash","qwen/qwen3.7-plus","qwen/qwen3.8-27b","qwen/qwen3.8-27b:free","qwen/qwen3.8-flash","qwen/qwen3.8-max-0902","qwen/qwen3.8-omni-flash","rekaai/reka-edge","sakana/fugu-max","sakana/fugu-ultra","sakana/fugu-ultra-v2","sakana/sakana-namazu","stepfun/step-3.7-flash","thinkingmachines/inkling","thinkingmachines/inkling-small","thinkingmachines/inkling-small:free","thinkingmachines/inkling:free","unbiased/pareto","x-ai/grok-4.20","x-ai/grok-4.20-multi-agent","x-ai/grok-4.3","x-ai/grok-4.3:batch","x-ai/grok-4.5","x-ai/grok-4.6","x-ai/grok-4.7","x-ai/grok-build-0.1","xiaomi/mimo-v2.5","xiaomi/mimo-v2.6-flash","xiaomi/mimo-v2.6-pro","xiaomi/mimo-v2.6-pro-ultraspeed","z-ai/glm-4.5v","z-ai/glm-4.6v","z-ai/glm-5.3-flash","z-ai/glm-5.3-flash:batch","z-ai/glm-5.3-flashx","z-ai/glm-5v-turbo","~anthropic/claude-fable-latest","~anthropic/claude-haiku-latest","~anthropic/claude-opus-latest","~anthropic/claude-sonnet-latest","~deepseek/deepseek-flash-latest","~google/gemini-flash-latest","~google/gemini-pro-latest","~moonshotai/kimi-latest","~openai/gpt-astra-latest","~openai/gpt-luna-latest","~openai/gpt-mini-latest","~openai/gpt-sol-latest","~openai/gpt-terra-latest","~x-ai/grok-latest","~z-ai/glm-flash-latest"];
+  const ids = ["amazon/nova-2-lite-v1","amazon/nova-lite-v1","amazon/nova-premier-v1","amazon/nova-pro-v1","anthropic/claude-3-haiku","anthropic/claude-fable-5","anthropic/claude-fable-5.1","anthropic/claude-fable-5.1:batch","anthropic/claude-fable-5:batch","anthropic/claude-haiku-4.5","anthropic/claude-haiku-4.5:batch","anthropic/claude-opus-4.1","anthropic/claude-opus-4.1:batch","anthropic/claude-opus-4.5","anthropic/claude-opus-4.5:batch","anthropic/claude-opus-4.6","anthropic/claude-opus-4.6:batch","anthropic/claude-opus-4.7","anthropic/claude-opus-4.7:batch","anthropic/claude-opus-4.8","anthropic/claude-opus-4.8:batch","anthropic/claude-opus-5","anthropic/claude-opus-5.5","anthropic/claude-opus-5.5:batch","anthropic/claude-opus-5:batch","anthropic/claude-sonnet-4","anthropic/claude-sonnet-4.5","anthropic/claude-sonnet-4.5:batch","anthropic/claude-sonnet-4.6","anthropic/claude-sonnet-4.6:batch","anthropic/claude-sonnet-5","anthropic/claude-sonnet-5:batch","baidu/ernie-4.5-vl-424b-a47b","bytedance-seed/seed-1.6","bytedance-seed/seed-1.6-flash","bytedance-seed/seed-2-1-turbo","bytedance-seed/seed-2.0-code","bytedance-seed/seed-2.0-lite","bytedance-seed/seed-2.0-mini","bytedance/ui-tars-1.5-7b","cohere/command-a-plus","deepseek/deepseek-v4-flash-vision-exp","deepseek/deepseek-v4.1-flash","deepseek/deepseek-v4.1-flash:batch","dots-studio/dots-3-note-preview:free","fireworks/ember-1","google/gemini-2.5-flash","google/gemini-2.5-flash-image","google/gemini-2.5-flash-lite","google/gemini-2.5-flash-lite:batch","google/gemini-2.5-flash:batch","google/gemini-2.5-pro","google/gemini-2.5-pro-preview","google/gemini-2.5-pro:batch","google/gemini-3-flash-preview","google/gemini-3-flash-preview:batch","google/gemini-3-pro-image","google/gemini-3-pro-image-preview","google/gemini-3.1-flash-image","google/gemini-3.1-flash-image-preview","google/gemini-3.1-flash-lite","google/gemini-3.1-flash-lite-image","google/gemini-3.1-flash-lite-preview","google/gemini-3.1-flash-lite:batch","google/gemini-3.1-pro-preview","google/gemini-3.1-pro-preview-customtools","google/gemini-3.1-pro-preview:batch","google/gemini-3.5-flash","google/gemini-3.5-flash-lite","google/gemini-3.5-flash-lite:batch","google/gemini-3.5-flash:batch","google/gemini-3.6-flash","google/gemini-3.6-flash:batch","google/gemini-3.7-flash","google/gemini-3.7-flash:batch","google/gemini-3.8-flash","google/gemini-3.8-flash:batch","google/gemma-3-12b-it","google/gemma-3-27b-it","google/gemma-3-4b-it","google/gemma-4-26b-a4b-it","google/gemma-4-26b-a4b-it:free","google/gemma-4-31b-it","google/gemma-4-31b-it:free","inclusionai/ling-3.0-flash-vl","meta-llama/llama-4-maverick","meta-llama/llama-4-scout","meta-llama/llama-guard-4-12b","meta/muse-glimmer-30b","meta/muse-spark-1.1","meta/muse-spark-1.2","meta/muse-spark-1.2-contributor","meta/muse-spark-1.3","meta/muse-spark-1.3-contributor","minimax/minimax-01","minimax/minimax-m3","mistralai/ministral-14b-2512","mistralai/ministral-3b-2512","mistralai/ministral-8b-2512","mistralai/ministral-8b-2512:batch","mistralai/mistral-large-2512:batch","mistralai/mistral-medium-3","mistralai/mistral-medium-3-5","mistralai/mistral-medium-3-5:batch","mistralai/mistral-medium-3.1","mistralai/mistral-medium-3.1:batch","mistralai/mistral-small-2603","mistralai/mistral-small-2603:batch","mistralai/mistral-small-3.1-24b-instruct","mistralai/mistral-small-3.2-24b-instruct","moonshotai/kimi-k2.5","moonshotai/kimi-k2.6","moonshotai/kimi-k2.7-code","moonshotai/kimi-k3","moonshotai/kimi-k3:batch","nex-agi/nex-n2.5-mini:free","nex-agi/nex-n2.5-pro:free","nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free","nvidia/nemotron-3.5-content-safety","nvidia/nemotron-3.5-content-safety:free","openai/gpt-4-turbo","openai/gpt-4-turbo:batch","openai/gpt-4.1","openai/gpt-4.1-mini","openai/gpt-4.1-mini:batch","openai/gpt-4.1-nano","openai/gpt-4.1-nano:batch","openai/gpt-4.1:batch","openai/gpt-4o","openai/gpt-4o-2024-05-13","openai/gpt-4o-2024-08-06","openai/gpt-4o-2024-11-20","openai/gpt-4o-mini","openai/gpt-4o-mini-2024-07-18","openai/gpt-4o-mini:batch","openai/gpt-4o:batch","openai/gpt-5","openai/gpt-5-image","openai/gpt-5-image-mini","openai/gpt-5-mini","openai/gpt-5-mini:batch","openai/gpt-5-nano","openai/gpt-5-nano:batch","openai/gpt-5-pro","openai/gpt-5-pro:batch","openai/gpt-5.1","openai/gpt-5.1-codex","openai/gpt-5.1-codex-max","openai/gpt-5.1-codex-mini","openai/gpt-5.1:batch","openai/gpt-5.2","openai/gpt-5.2-chat","openai/gpt-5.2-codex","openai/gpt-5.2-pro","openai/gpt-5.2-pro:batch","openai/gpt-5.2:batch","openai/gpt-5.3-codex","openai/gpt-5.4","openai/gpt-5.4-image-2","openai/gpt-5.4-mini","openai/gpt-5.4-mini:batch","openai/gpt-5.4-nano","openai/gpt-5.4-nano:batch","openai/gpt-5.4-pro","openai/gpt-5.4-pro:batch","openai/gpt-5.4:batch","openai/gpt-5.5","openai/gpt-5.5-pro","openai/gpt-5.5-pro:batch","openai/gpt-5.5:batch","openai/gpt-5.6-luna","openai/gpt-5.6-luna-pro","openai/gpt-5.6-luna-pro:batch","openai/gpt-5.6-luna:batch","openai/gpt-5.6-sol","openai/gpt-5.6-sol-pro","openai/gpt-5.6-sol-pro:batch","openai/gpt-5.6-sol:batch","openai/gpt-5.6-terra","openai/gpt-5.6-terra-pro","openai/gpt-5.6-terra-pro:batch","openai/gpt-5.6-terra:batch","openai/gpt-5:batch","openai/gpt-6-astra","openai/gpt-6-astra-pro","openai/gpt-6-astra-pro:batch","openai/gpt-6-astra:batch","openai/gpt-6-luna","openai/gpt-6-luna-pro","openai/gpt-6-luna-pro:batch","openai/gpt-6-luna:batch","openai/gpt-6-sol","openai/gpt-6-sol-pro","openai/gpt-6-sol-pro:batch","openai/gpt-6-sol:batch","openai/gpt-chat-latest","openai/o1","openai/o1-pro","openai/o3","openai/o3-pro","openai/o3:batch","openai/o4-mini","openai/o4-mini-high","openai/o4-mini:batch","perceptron/perceptron-mk1","perplexity/sonar","perplexity/sonar-pro","perplexity/sonar-pro-search","perplexity/sonar-reasoning-pro","prism-ml/ternary-bonsai-2-27b","qwen/qwen2.5-vl-72b-instruct","qwen/qwen3-vl-235b-a22b-instruct","qwen/qwen3-vl-235b-a22b-thinking","qwen/qwen3-vl-30b-a3b-instruct","qwen/qwen3-vl-30b-a3b-thinking","qwen/qwen3-vl-32b-instruct","qwen/qwen3-vl-8b-instruct","qwen/qwen3-vl-8b-thinking","qwen/qwen3.5-122b-a10b","qwen/qwen3.5-27b","qwen/qwen3.5-35b-a3b","qwen/qwen3.5-397b-a17b","qwen/qwen3.5-9b","qwen/qwen3.5-flash-02-23","qwen/qwen3.5-plus-02-15","qwen/qwen3.5-plus-20260420","qwen/qwen3.6-27b","qwen/qwen3.6-35b-a3b","qwen/qwen3.6-flash","qwen/qwen3.6-plus","qwen/qwen3.7-flash","qwen/qwen3.7-plus","qwen/qwen3.8-27b","qwen/qwen3.8-27b:free","qwen/qwen3.8-flash","qwen/qwen3.8-max-0902","qwen/qwen3.8-max-prime","qwen/qwen3.8-omni-flash","rekaai/reka-edge","sakana/fugu-max","sakana/fugu-ultra","sakana/fugu-ultra-v2","sakana/sakana-namazu","stepfun/step-3.7-flash","thinkingmachines/inkling","thinkingmachines/inkling-small","thinkingmachines/inkling-small:free","thinkingmachines/inkling:free","unbiased/pareto","x-ai/grok-4.20","x-ai/grok-4.20-multi-agent","x-ai/grok-4.3","x-ai/grok-4.3:batch","x-ai/grok-4.5","x-ai/grok-4.6","x-ai/grok-4.7","x-ai/grok-build-0.1","xiaomi/mimo-v2.5","xiaomi/mimo-v2.6-flash","xiaomi/mimo-v2.6-pro","xiaomi/mimo-v2.6-pro-ultraspeed","z-ai/glm-4.5v","z-ai/glm-4.6v","z-ai/glm-5.3-flash","z-ai/glm-5.3-flash:batch","z-ai/glm-5.3-flashx","z-ai/glm-5v-turbo","~anthropic/claude-fable-latest","~anthropic/claude-haiku-latest","~anthropic/claude-opus-latest","~anthropic/claude-sonnet-latest","~deepseek/deepseek-flash-latest","~google/gemini-flash-latest","~google/gemini-pro-latest","~moonshotai/kimi-latest","~openai/gpt-astra-latest","~openai/gpt-luna-latest","~openai/gpt-mini-latest","~openai/gpt-sol-latest","~openai/gpt-terra-latest","~x-ai/grok-latest","~z-ai/glm-flash-latest"];
   const set = new Set(ids);
   for (const id of ids) {
     const bare = id.includes("/") ? id.slice(id.indexOf("/") + 1) : undefined;
