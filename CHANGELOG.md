@@ -2,6 +2,36 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.52.0 — 2026-09-25
+
+### Corrigé
+
+- **Un document joint n'était lu que sur ses deux cents premières lignes.** Il n'y avait aucune
+  limite de lignes nulle part : il y avait **huit constantes de jetons différentes**, une par chemin
+  — 3 000 pour le fichier à l'écran, 6 000 pour le même fichier joint à la main, 2 000 pour une
+  sélection, 4 000 pour une mention, 8 000 pour un collage, plus trois autres pour les membres
+  source IBM i et le diff d'un message de commit. Toutes choisies quand le budget de contexte valait
+  8 000 jetons à plat, et **aucune n'a bougé** quand le budget s'est mis à suivre la fenêtre du
+  modèle. 3 000 jetons, c'est environ **214 lignes de prose**.
+
+  Le plus trompeur : c'est le fichier **ouvert devant vous** qui avait la plus petite part — celui
+  dont on est le moins conscient et dont la question parle le plus souvent — pendant que le même
+  fichier joint explicitement passait presque entier.
+
+  Tout passe désormais par un seul point, `attachmentTokens()`. Sur un modèle courant un document
+  joint monte de 3 000 à **16 000 jetons, soit environ 1 140 lignes**, et `0` dans
+  `hiveyCode.context.attachmentTokens` envoie les fichiers entiers.
+
+  ⚠️ Un test lit désormais **le source** pour refuser toute nouvelle constante de jetons écrite à un
+  point de jonction — c'est là que vivait le défaut : chaque nombre pris isolément était défendable,
+  et le défaut était qu'il y en avait huit. Il en a trouvé cinq de plus que ceux cherchés à la main.
+
+- **La fenêtre du modèle retombait à zéro quand la liste des modèles n'était pas chargée**, et le
+  budget avec elle, jusqu'à son plancher. La liste est récupérée par fournisseur, échoue en silence
+  quand le point d'accès ne répond pas, et est simplement absente pendant les premières secondes de
+  chaque fenêtre. Le catalogue généré prend le relais — il connaît la fenêtre de quatre cents
+  modèles. Le symptôme n'était pas une erreur : c'était une pièce jointe silencieusement coupée.
+
 ## 0.51.0 — 2026-09-15
 
 ### Corrigé

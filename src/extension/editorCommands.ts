@@ -12,6 +12,7 @@ import { isLocalEndpoint, redact, Vault } from "../core/redaction/index.js";
 import { headToTokens } from "../core/util/tokens.js";
 import type { ChatViewProvider } from "./chat.js";
 import { endpointFor, providerFor, readSettings, redactionPolicy, type Keys } from "./config.js";
+import { attachmentTokens } from "./budgets.js";
 import { COMMIT_PROMPT, INLINE_EDIT_PROMPT } from "../core/prompts.js";
 import { relative, type WorkspaceContext } from "./workspace.js";
 import { selectionActions, type SelectionAction } from "../core/agent/selection.js";
@@ -28,7 +29,7 @@ export interface EditorDeps {
 export function registerEditorCommands(context: vscode.ExtensionContext, deps: EditorDeps): void {
   context.subscriptions.push(
     vscode.commands.registerCommand("hiveyCode.askAboutSelection", async () => {
-      const item = deps.workspace.activeContext();
+      const item = deps.workspace.activeContext(attachmentTokens(readSettings()));
       const question = await vscode.window.showInputBox({
         prompt: t("What do you want to know about this selection?"),
         placeHolder: t("Explain what this code does / find the bug / write a test"),
@@ -64,7 +65,7 @@ export function registerEditorCommands(context: vscode.ExtensionContext, deps: E
       }
       const message = await vscode.window.withProgress(
         { location: vscode.ProgressLocation.SourceControl, title: t("Hivey Code: commit message…") },
-        () => oneShot(deps, COMMIT_PROMPT, headToTokens(diff, 6000)),
+        () => oneShot(deps, COMMIT_PROMPT, headToTokens(diff, attachmentTokens(readSettings()))),
       );
       if (message) repo.inputBox.value = stripFence(message).trim();
     }),
@@ -115,7 +116,7 @@ export function registerEditorCommands(context: vscode.ExtensionContext, deps: E
     }),
 
     vscode.commands.registerCommand("hiveyCode.askWith", async (instruction: string) => {
-      await deps.chat.focusWithPrompt(instruction, deps.workspace.activeContext());
+      await deps.chat.focusWithPrompt(instruction, deps.workspace.activeContext(attachmentTokens(readSettings())));
     }),
 
     vscode.commands.registerCommand("hiveyCode.explainTerminalSelection", async () => {
@@ -127,7 +128,7 @@ export function registerEditorCommands(context: vscode.ExtensionContext, deps: E
       await deps.chat.focusWithPrompt(t("Explain this terminal output and propose the fix."), {
         kind: "terminal",
         label: t("terminal output"),
-        body: headToTokens(selection, 3000),
+        body: headToTokens(selection, attachmentTokens(readSettings())),
         untrusted: true,
       });
     }),
@@ -183,7 +184,7 @@ async function selectionMenu(deps: EditorDeps): Promise<void> {
   const action = picked.action;
   if (!action) return;
   if (action.where === "file") await rewriteSelection(deps, action.instruction);
-  else await deps.chat.focusWithPrompt(action.instruction, deps.workspace.activeContext());
+  else await deps.chat.focusWithPrompt(action.instruction, deps.workspace.activeContext(attachmentTokens(readSettings())));
 }
 
 /**

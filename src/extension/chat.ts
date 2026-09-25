@@ -87,7 +87,8 @@ import type {
 } from "../shared/protocol.js";
 import { SECTION, endpointFor, providerFor, readSettings, routerConfig, type Keys, type Settings, writeTarget } from "./config.js";
 import { EgressGate, safeHost } from "./egress.js";
-import { labelFor, listModels, openFiles, openFileUris, supportsReasoning } from "./models.js";
+import { contextWindow, labelFor, listModels, openFiles, openFileUris, supportsReasoning } from "./models.js";
+import { attachmentTokens } from "./budgets.js";
 import { loadPrices } from "./prices.js";
 import { contextBudget, repoMapBudget } from "../core/context/budget.js";
 import { perFileBudget } from "../core/util/tokens.js";
@@ -252,16 +253,18 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    */
   private perFileTokens(adding = 1): number {
     const settings = readSettings();
-    return perFileBudget(
-      this.budgetTokensFor(settings),
-      this.attachments.length + adding,
-      settings.context.attachmentTokens,
-    );
+    return attachmentTokens(settings, this.attachments.length + adding, this.modelWindow(settings));
   }
 
-  /** The selected model's own window, 0 when the catalogue does not know it. */
+  /** The selected model's own window, 0 when nothing knows it. */
   private modelWindow(s: Settings): number {
-    return this.models.find((m) => m.id === hiveyModel(s.chat.model, "everyday"))?.context ?? 0;
+    const id = hiveyModel(s.chat.model, "everyday");
+    // The live list first, because a provider serving its own build of a model knows its window
+    // better than a catalogue does — then the catalogue, because the live list is fetched, fails
+    // silently, and is simply absent for the first seconds of every window. Falling through to zero
+    // sends the budget back to its floor, and the only visible effect of that is an attachment cut
+    // to a fraction of what the model could have read.
+    return this.models.find((m) => m.id === id)?.context || contextWindow(id);
   }
 
   /** An estimate corrected by what this model has been measured to do. */
@@ -477,7 +480,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     // What the editor is showing, offered rather than required. Recomputed on every state send
     // because it follows the active tab; the block list applies, so a file the policy excludes
     // simply does not appear.
-    const implicit = this.workspace.activeContext(3000, s);
+    const implicit = this.workspace.activeContext(this.perFileTokens(), s);
     const contextTokens = this.contextTokens();
     const budgetTokens = this.budgetTokensFor(s);
 
@@ -1022,7 +1025,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           break;
         }
         case "pasteContext": {
-          const item = pastedContext(m);
+          const item = pastedContext(m, this.perFileTokens());
           if (!item) {
             void vscode.window.showWarningMessage(t("Nothing usable was pasted."));
             break;
@@ -1047,7 +1050,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           // Remembered by LABEL rather than as a flag. Dismissing means "not this file", and the
           // suggestion should come back when a different file is opened — which is what the editor's
           // own chat does, and what stops a single dismissal switching the feature off for ever.
-          this.implicitDismissed = m.on ? undefined : this.workspace.activeContext(3000, readSettings())?.label;
+          this.implicitDismissed = m.on ? undefined : this.workspace.activeContext(this.perFileTokens(), readSettings())?.label;
           this.sendState();
           break;
         case "removeAttachment":
@@ -1285,7 +1288,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     switch (what) {
       case "active":
       case "selection": {
-        const item = this.workspace.activeContext();
+        const item = this.workspace.activeContext(this.perFileTokens());
         if (item) this.attachments.push(item);
         break;
       }
@@ -1293,7 +1296,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         // The whole file, whatever is selected. `active` hands back the selection when there is
         // one, so with three lines highlighted there was no way to attach the file they are in —
         // which is the case where you most want to.
-        const item = this.workspace.activeFileContext();
+        const item = this.workspace.activeFileContext(this.perFileTokens());
         if (item) this.attachments.push(item);
         break;
       }
@@ -2165,9 +2168,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       { location: vscode.ProgressLocation.Notification, title: t("Following what {0} uses…", member) },
       () => collectMemberContext(library, sourceFile, member),
     );
-    this.pushContext({ kind: "member", label: root.ref, body: headToTokens(root.text, 6000), untrusted: true });
+    this.pushContext({ kind: "member", label: root.ref, body: headToTokens(root.text, this.perFileTokens()), untrusted: true });
     for (const dep of found) {
-      this.pushContext({ kind: "member", label: dep.ref, body: headToTokens(dep.text, 2500), untrusted: true });
+      this.pushContext({ kind: "member", label: dep.ref, body: headToTokens(dep.text, this.perFileTokens()), untrusted: true });
     }
     if (missing.length) {
       void vscode.window.showInformationMessage(
@@ -2190,7 +2193,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         { location: vscode.ProgressLocation.Window, title: t("Reading {0}…", path) },
         () => readStreamFileText(path),
       );
-      this.pushContext({ kind: "file", label: path.trim(), body: headToTokens(text, 6000), untrusted: true });
+      this.pushContext({ kind: "file", label: path.trim(), body: headToTokens(text, this.perFileTokens()), untrusted: true });
     } catch (error) {
       void vscode.window.showWarningMessage(`Hivey Code: ${(error as Error).message}`);
     }
@@ -2455,6 +2458,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       settings,
       repoMap: () => this.workspace.repoMap(repoMapBudget(this.budgetTokensFor(settings))),
       budgetTokens: this.budgetTokensFor(settings),
+      attachmentTokens: this.perFileTokens(),
     });
     this.attachments.push(...items);
     this.sendState();
@@ -3069,12 +3073,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           settings,
           repoMap: () => this.workspace.repoMap(repoMapBudget(this.budgetTokensFor(settings))),
           budgetTokens: this.budgetTokensFor(settings),
+          attachmentTokens: this.perFileTokens(),
         })
       : [];
     // The file on screen, unless the user waved it away or has already attached it by hand. It goes
     // FIRST, because it is what the question is most likely about, and because a model reads the
     // beginning of a long prompt more reliably than the middle.
-    const implicit = this.workspace.activeContext(3000, settings);
+    const implicit = this.workspace.activeContext(this.perFileTokens(), settings);
     const useImplicit =
       implicit &&
       this.implicitDismissed !== implicit.label &&
@@ -4121,7 +4126,10 @@ async function readOrEmpty(uri: vscode.Uri): Promise<string | undefined> {
  * which would be unreadable in the record, counted as text by every budget, and written to disk
  * with the history. The bytes ride separately, on the message, and go no further than the request.
  */
-function pastedContext(m: { name: string; text?: string; mediaType?: string; data?: string; width?: number; height?: number }): ContextItem | undefined {
+function pastedContext(
+  m: { name: string; text?: string; mediaType?: string; data?: string; width?: number; height?: number },
+  maxTokens: number,
+): ContextItem | undefined {
   if (m.data && m.mediaType?.startsWith("image/")) {
     const kb = Math.round((m.data.length * 3) / 4 / 1024);
     const size = m.width && m.height ? `${m.width}×${m.height}, ${kb} kB` : `${kb} kB`;
@@ -4137,7 +4145,7 @@ function pastedContext(m: { name: string; text?: string; mediaType?: string; dat
   return {
     kind: "paste",
     label: m.name || t("pasted text"),
-    body: headToTokens(text, 8000),
+    body: headToTokens(text, maxTokens),
     // Pasted text was written by somebody else — a log, a page, a colleague's message — so it goes
     // behind the same fence as a file the agent read. The fence is the whole reason an attachment
     // cannot give the model instructions.

@@ -29,6 +29,12 @@ import { ibmiConnected, ibmiInstance } from "./integrations/ibmi.js";
 import { parseMemberRef, formatRows, isReadOnlySql } from "../core/ibmi/sql.js";
 import { perFileBudget } from "../core/util/tokens.js";
 
+/**
+ * The fallback for a mention whose size nobody else bounds.
+ *
+ * Every use of it now prefers `deps.attachmentTokens`, which follows the model and the number of
+ * attachments. It stays as the floor for the paths that have no deps to ask.
+ */
 const MAX_TOKENS = 4000;
 
 export interface ResolveDeps {
@@ -42,6 +48,13 @@ export interface ResolveDeps {
    * as much is an answer given about a file the model only half saw.
    */
   budgetTokens: number;
+  /**
+   * What ONE attachment may take. Distinct from `budgetTokens`, which is the whole turn's: a
+   * mention is one item among several and used to carry a constant of its own — 6 000 for a file,
+   * 2 000 for a selection, 4 000 for everything else — none of which moved when the budget began
+   * following the model's window.
+   */
+  attachmentTokens: number;
 }
 
 export async function resolveMentions(mentions: Mention[], deps: ResolveDeps): Promise<ContextItem[]> {
@@ -67,7 +80,7 @@ async function resolveOne(mention: Mention, deps: ResolveDeps): Promise<ContextI
   switch (mention.kind) {
     case "selection":
     case "editor":
-      return deps.workspace.activeContext(mention.kind === "selection" ? 2000 : 6000);
+      return deps.workspace.activeContext(deps.attachmentTokens);
 
     case "file": {
       const path = mention.argument;
@@ -111,7 +124,7 @@ async function resolveOne(mention: Mention, deps: ResolveDeps): Promise<ContextI
       return {
         kind: "files",
         label: t("open files"),
-        body: headToTokens(items.join("\n\n"), MAX_TOKENS),
+        body: headToTokens(items.join("\n\n"), deps.attachmentTokens),
         untrusted: true,
       };
     }
@@ -130,7 +143,7 @@ async function resolveOne(mention: Mention, deps: ResolveDeps): Promise<ContextI
       // Cut like everything else here. An uncommitted diff is unbounded by nature — a generated
       // file, a lock file, a first commit — and this was the one mention that sent whatever it
       // found. The head is the right half to keep: a diff reads from the top.
-      return { kind: "diff", label: t("uncommitted changes"), body: headToTokens(diff, MAX_TOKENS), untrusted: true };
+      return { kind: "diff", label: t("uncommitted changes"), body: headToTokens(diff, deps.attachmentTokens), untrusted: true };
     }
 
     case "problems": {
@@ -141,7 +154,7 @@ async function resolveOne(mention: Mention, deps: ResolveDeps): Promise<ContextI
         // "None" is information: it tells the model the compiler is happy and the bug is elsewhere.
         // Cut, because a project mid-refactor reports thousands of them and the first hundred say
         // everything the next thousand would.
-        body: body ? headToTokens(body, MAX_TOKENS) : t("The language servers report no errors or warnings."),
+        body: body ? headToTokens(body, deps.attachmentTokens) : t("The language servers report no errors or warnings."),
       };
     }
 
@@ -150,7 +163,7 @@ async function resolveOne(mention: Mention, deps: ResolveDeps): Promise<ContextI
       if (!text) {
         throw new Error(t("Nothing is selected in a terminal. Select the output first, or paste it."));
       }
-      return { kind: "terminal", label: t("terminal"), body: headToTokens(text, MAX_TOKENS), untrusted: true };
+      return { kind: "terminal", label: t("terminal"), body: headToTokens(text, deps.attachmentTokens), untrusted: true };
     }
 
     case "symbol": {
@@ -171,7 +184,7 @@ async function resolveOne(mention: Mention, deps: ResolveDeps): Promise<ContextI
         const text = doc ? doc.getText(new vscode.Range(range.start.line, 0, Math.min(range.end.line + 12, doc.lineCount - 1), 0)) : "";
         lines.push(`--- ${relative(symbol.location.uri)}:${range.start.line + 1}\n${text}`);
       }
-      return { kind: "symbol", label: name, body: headToTokens(lines.join("\n\n"), MAX_TOKENS), untrusted: true };
+      return { kind: "symbol", label: name, body: headToTokens(lines.join("\n\n"), deps.attachmentTokens), untrusted: true };
     }
 
     case "member": {
@@ -183,7 +196,7 @@ async function resolveOne(mention: Mention, deps: ResolveDeps): Promise<ContextI
       return {
         kind: "member",
         label: `${library}/${sourceFile}(${member})`,
-        body: headToTokens(text, MAX_TOKENS),
+        body: headToTokens(text, deps.attachmentTokens),
         untrusted: true,
       };
     }
@@ -200,7 +213,7 @@ async function resolveOne(mention: Mention, deps: ResolveDeps): Promise<ContextI
       return {
         kind: "db2",
         label: t("{0} rows", rows.length),
-        body: headToTokens(`${statement}\n\n${formatRows(rows)}`, MAX_TOKENS),
+        body: headToTokens(`${statement}\n\n${formatRows(rows)}`, deps.attachmentTokens),
         untrusted: true,
       };
     }

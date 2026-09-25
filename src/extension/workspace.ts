@@ -144,7 +144,17 @@ export class WorkspaceContext {
    * refusal, which is a conversation; a `.env` that attaches itself because it happens to be the
    * open tab is the exact failure the block list exists to prevent, and it would happen silently.
    */
-  activeContext(maxTokens = 3000, settings?: Settings): ContextItem | undefined {
+  /**
+   * The file on screen, or what is selected in it.
+   *
+   * `maxTokens` has no default any more, and that is the fix. It used to be 3 000 — about two
+   * hundred lines of prose — chosen when the whole context budget was 8 000 and never revisited
+   * when the budget started following the model's window. It is the attachment the user is least
+   * aware of and most likely to be asking about, so the effect was a document silently cut to its
+   * first two hundred lines while an explicitly attached one was sent in full: "it only reads the
+   * first 200 lines and not the whole file".
+   */
+  activeContext(maxTokens: number, settings?: Settings): ContextItem | undefined {
     const ed = vscode.window.activeTextEditor;
     if (!ed) return undefined;
     // What this excludes is everything that is technically a text document without being a file
@@ -174,7 +184,7 @@ export class WorkspaceContext {
    * the thing you are asking about — and wrong the rest of the time. Attaching the file that three
    * highlighted lines live in was not possible without first clicking somewhere to clear them.
    */
-  activeFileContext(maxTokens = 6000): ContextItem | undefined {
+  activeFileContext(maxTokens: number): ContextItem | undefined {
     const ed = vscode.window.activeTextEditor;
     if (!ed) return undefined;
     return excerptItem(relative(ed.document.uri), ed.document.getText(), maxTokens);

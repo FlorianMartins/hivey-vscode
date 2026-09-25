@@ -37,6 +37,19 @@ function catalogue(): Map<string, { context: number; inUsd: number; outUsd: numb
   return map;
 }
 
+/**
+ * The window a model is known to have, from the generated catalogue alone.
+ *
+ * Needed because the live list is not always there. It is fetched per provider, it fails silently
+ * when the endpoint is unreachable, and a vendor's own endpoint often answers with ids that carry
+ * no window at all — so anything derived from "the selected model's window" fell back to nothing
+ * and, through `contextBudget`, to the old flat floor. The symptom is not an error: it is an
+ * attachment quietly cut to a fraction of what the model could have read.
+ */
+export function contextWindow(id: string): number {
+  return catalogue().get(id)?.context ?? 0;
+}
+
 /** Models a provider is currently serving, or an empty list when it cannot be reached. */
 async function served(settings: Settings, keys: Keys, provider: ProviderId): Promise<string[]> {
   try {
