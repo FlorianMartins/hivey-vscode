@@ -7,7 +7,7 @@
 //
 // The rules live in scripts/update-models.mjs. Read them there before doubting a row.
 
-export const HIVEY_GENERATED_AT = "2026-09-28";
+export const HIVEY_GENERATED_AT = "2026-09-29";
 
 /** variant → role → model id. */
 export const HIVEY_ROUTING: Record<string, Record<string, string>> = {
@@ -19,7 +19,7 @@ export const HIVEY_ROUTING: Record<string, Record<string, string>> = {
   },
   "hivey": {
     "chore": "qwen/qwen3.7-flash",
-    "everyday": "qwen/qwen3.8-max-0902",
+    "everyday": "qwen/qwen3.8-27b",
     "deep": "anthropic/claude-opus-5",
     "completion": "qwen/qwen3-coder-30b-a3b-instruct"
   },
