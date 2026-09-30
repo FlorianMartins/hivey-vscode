@@ -6,7 +6,7 @@
 // rendered incrementally is the answer being streamed, because that one has to be.
 
 import { button, closeMenu, el, icon, ICON, menuIsOpen, searchInput } from "./dom.js";
-import { chatScreen, collapsible, isStreaming, planBlock, setStreaming, stepRow, type ChatDeps, captureDraft, restoreDraft } from "./chat.js";
+import { chatScreen, isStreaming, planBlock, reasoningBlock, setStreaming, stepRow, type ChatDeps, captureDraft, restoreDraft } from "./chat.js";
 import { atEnd, placeAfterChange, type Viewport } from "../core/ui/scroll.js";
 import { historyScreen } from "./history.js";
 import { modelsScreen } from "./models.js";
@@ -284,7 +284,7 @@ class LiveTurn {
   readonly root: HTMLElement;
   private readonly body: HTMLElement;
   private text?: HTMLElement;
-  private thinking?: { wrap: HTMLElement; body: HTMLElement };
+  private thinking?: { wrap: HTMLElement; body: HTMLElement; folded?: boolean };
   private buffer = "";
 
   /**
@@ -310,12 +310,28 @@ class LiveTurn {
   }
 
   appendText(chunk: string): void {
+    // The first word of the answer is the moment the thinking stops being the thing to watch.
+    //
+    // It is open while it is written — that is most of the reason for turning reasoning on, and a
+    // shut block does not grow, so the panel had nothing to follow and sat on the previous answer
+    // for the whole of it. Once the answer starts, the same block is in the way of it. So it folds
+    // itself here, exactly once: reopening it is the reader's business, and a block that shut
+    // itself again on the next token would be a block nobody can read.
+    this.foldThinking();
     this.buffer += chunk;
     if (!this.text) {
       this.text = el("div", "live-text");
       this.body.append(this.text);
     }
     this.scheduleRender();
+  }
+
+  /** Shut the reasoning, once, when the answer takes over from it. */
+  private foldThinking(): void {
+    if (!this.thinking || this.thinking.folded) return;
+    this.thinking.folded = true;
+    this.thinking.body.hidden = true;
+    this.thinking.wrap.classList.remove("open");
   }
 
   /**
@@ -398,13 +414,22 @@ class LiveTurn {
   }
 
   appendReasoning(chunk: string): void {
-    if (!this.thinking) {
-      const wrap = collapsible(t("Reasoning"), "");
-      const body = wrap.querySelector<HTMLElement>(".collapsible-body")!;
-      this.thinking = { wrap, body };
-      this.body.prepend(wrap);
-    }
-    this.thinking.body.textContent = (this.thinking.body.textContent ?? "") + chunk;
+    // Through `following`, like the answer itself — and that was missing.
+    //
+    // While a model thinks, its reasoning is the only thing arriving, so it is the only thing that
+    // can move the page. It was appended outside the follow, and into a block that started shut and
+    // therefore did not grow at all: the panel sat on the previous answer for the whole of the
+    // thinking, and only jumped once the first word of the answer appeared. "When the model thinks,
+    // the chat does not go to the last message."
+    following(() => {
+      if (!this.thinking) {
+        const wrap = reasoningBlock("", { open: true });
+        const body = wrap.querySelector<HTMLElement>(".collapsible-body")!;
+        this.thinking = { wrap, body };
+        this.body.prepend(wrap);
+      }
+      this.thinking.body.textContent = (this.thinking.body.textContent ?? "") + chunk;
+    });
   }
 
   /**

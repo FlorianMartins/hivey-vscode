@@ -10,8 +10,10 @@ Open source (Apache-2.0), **zéro dépendance à l'exécution**, **zéro télém
 
 ![La barre latérale de Hivey Code dans VS Code](docs/images/conversation.fr.png)
 
-*Captures réelles, prises dans un VS Code lancé par la suite d'intégration. Seul le modèle qui
-répond est un serveur de test ; l'interface, elle, est le produit.*
+*Captures réelles, prises dans un VS Code lancé par la suite d'intégration — `node
+scripts/screenshots.mjs` les prend, donc elles ne peuvent pas cesser d'être vraies en silence. Le
+panneau est dans la barre latérale droite, le mobilier de l'éditeur recadré : le sujet, c'est le
+panneau. Seul le modèle qui répond est un serveur de test ; tout le reste est le produit.*
 
 | Choisir un modèle | Conversations |
 |---|---|
@@ -45,7 +47,7 @@ ce qui sort est **anonymisé de façon réversible** avant de partir.
 | **Correctifs rapides** | Sur une erreur signalée par votre serveur de langage : « Corriger avec Hivey Code » et « Expliquer ce problème ». Le compilateur dit **quoi** et **où** ; le modèle n'a plus qu'à corriger — c'est ce qui rend un petit modèle local suffisant sur la majorité des cas. |
 | **Raccourcis de saisie** | `#` ouvre le sélecteur de fichiers de VS Code · `/expliquer`, `/tests`, `/corriger`, `/revue`, `/doc` joignent le fichier actif et posent la bonne question. |
 | **Trois modes** | **Discussion** (aucun outil), **Plan** (lit le dépôt, ne modifie rien), **Agent** (lit, modifie, propose des commandes). Le mode décide de l'outillage **dans le code** : en mode Plan, aucun outil d'écriture n'existe — ce n'est pas une consigne dans un prompt. |
-| **Raisonnement** | Budget de réflexion réglable (direct / bref / standard / approfondi), traduit pour chaque fournisseur — `reasoning.effort` chez OpenRouter, un budget de jetons chez Anthropic. Le texte de réflexion s'affiche dans un bloc repliable et n'est jamais renvoyé au modèle. |
+| **Raisonnement** | Budget de réflexion réglable (direct / bref / standard / approfondi), traduit pour chaque fournisseur — `reasoning.effort` chez OpenRouter, un budget de jetons chez Anthropic. La réflexion **s'affiche pendant qu'elle s'écrit** — c'est l'essentiel de la raison de l'activer — et se replie d'elle-même dès que la réponse commence, parce qu'elle devient alors de la documentation posée entre vous et la réponse. Elle n'est jamais renvoyée au modèle. |
 | **Permissions** | Par action et par forme d'action : « autoriser une fois », « pour cette conversation », « toujours ». Autoriser `npm test` n'autorise pas `npm publish`. Un écran dédié liste ce qui est permanent et ce qui expire. |
 | **Notation de contexte** | `#file:`, `#selection`, `#changes`, `#problems`, `#codebase`, `#terminal`, `#sym:` — la notation de Copilot, parce qu'on ne devrait pas avoir à en apprendre une seconde. Résolue **sur votre machine** avant tout envoi, ce qui est précisément ce qui permet à `#changes` de joindre du code non publié à une conversation avec un modèle local. |
 | **Participants** | `@workspace`, `@editor`, `@terminal`, `@git`, `@ibmi`, `@arcad` — une indication d'où regarder en premier, pas une autre personnalité. |
@@ -59,6 +61,7 @@ ce qui sort est **anonymisé de façon réversible** avant de partir.
 | **Recherche** | Dans la conversation ouverte (`Ctrl+F`, résultats surlignés) **et** dans tout l'historique — la recherche regarde à l'intérieur des messages et montre le fragment qui correspond. |
 | **Filtres d'historique** | Période, mode, « payantes seulement », tri par dernière modification / création / longueur / coût. |
 | **Contrôle du contexte** | Chaque échange peut être **rendu muet** (il reste affiché, il ne part plus), **épinglé** (il survit à la coupe), modifié ou supprimé. C'est le levier le plus direct sur la qualité **et** sur la facture. |
+| **Contexte à la taille du modèle** | Le budget suit la fenêtre du modèle réellement choisi plutôt qu'un nombre fixé une fois — 8 000 jetons, c'est l'essentiel d'un petit modèle local et une erreur d'arrondi sur un modèle moderne, et face à ce plafond une conversation était résumée au bout de trois échanges puis répondue depuis le résumé. Une pièce jointe a son propre plafond (`hiveyCode.context.attachmentTokens`, `0` pour des fichiers entiers), et au-delà un fichier arrive sous forme de **plan** — chaque symbole qu'il déclare avec sa ligne — suivi de son début, plutôt que ses N premières lignes et rien sur le reste. Un fichier joint dans cinq tours n'est envoyé **qu'une fois**, dans le message le plus proche de la question. |
 | **Confidentialité** | Anonymisation réversible, fichiers interdits, consentement avant la première destination, **journal des envois** et **rapport de coûts**. |
 | **Langues** | Anglais et français, selon la langue d'affichage de l'éditeur — ou fixée par `hiveyCode.language`, pour un poste dont l'éditeur est dans une langue et l'utilisateur dans une autre. |
 | **Votre thème** | Chaque couleur du panneau est une variable de l'éditeur. Pas une seule valeur en dur — [le même sélecteur sous un thème clair](docs/images/picker.light.png), pris par le même script. Il suit un changement de thème immédiatement, contraste élevé compris. |

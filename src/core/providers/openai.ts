@@ -114,6 +114,7 @@ export class OpenAICompatibleProvider implements Provider {
    */
   private async post(body: Record<string, unknown>, signal?: AbortSignal): Promise<Response> {
     let attempt = body;
+    let waits = 0;
     for (let tries = 0; ; tries++) {
       const res = await request(`${this.baseUrl}/chat/completions`, {
         method: "POST",
@@ -123,6 +124,28 @@ export class OpenAICompatibleProvider implements Provider {
         timeoutMs: this.opts.timeoutMs ?? 180_000,
         label: "chat",
       });
+
+      // A 402 that carries `Retry-After` is not an empty account.
+      //
+      // OpenRouter answers 402 for two unrelated things. One is the balance, which no retry fixes.
+      // The other is its in-flight spending budget: requests already in flight have provisionally
+      // reserved credit, so a funded account is briefly told it cannot pay — and their
+      // documentation is explicit that this one is a wait-and-retry case, distinguished by the
+      // header. "A 402 Payment Required without the header is not a wait-and-retry case."
+      //
+      // Everything here treated 402 as terminal, and said so in a sentence about the account
+      // balance. Somebody with a valid key and credit to spare was told their account was empty,
+      // and no retry was attempted, so the turn simply ended.
+      //
+      // The header alone decides. Reading the body for `limit_source` would consume it, and a
+      // response whose body has been drunk can no longer explain itself if the wait does not help.
+      const pause = retryAfterMs(res);
+      if (pause !== undefined && waits < 2) {
+        waits += 1;
+        await sleep(pause, signal);
+        continue;
+      }
+
       if (res.ok || res.status !== 400 || tries >= 2) return res;
       // The body has to be read to know what it objected to, which consumes it — so a response that
       // teaches us nothing is rebuilt from what was read rather than returned half-drunk.
@@ -396,6 +419,42 @@ export function isOllama(baseUrl: string): boolean {
  * provider they selected, which is not the one that answered. Naming it turns the message into
  * something a person can act on.
  */
+/**
+ * How long to wait before repeating a request, when the server has said it is worth repeating.
+ *
+ * Only for 402 — the documented wait-and-retry status on OpenRouter, where it means the in-flight
+ * spending budget rather than the balance. A 429 is deliberately NOT handled here: a rate limit is
+ * answered by moving to the next endpoint in the fallback chain, which is both faster and the
+ * behaviour the free preset depends on.
+ *
+ * Bounded at thirty seconds. A server asking for longer than that is not asking for a retry, it is
+ * asking to be left alone, and a request that hangs for a minute with nothing on screen is
+ * indistinguishable from one that is broken.
+ */
+function retryAfterMs(res: Response): number | undefined {
+  if (res.status !== 402) return undefined;
+  const header = res.headers.get("retry-after");
+  if (!header) return undefined;
+  const seconds = Number(header.trim());
+  if (!Number.isFinite(seconds) || seconds < 0 || seconds > 30) return undefined;
+  // Zero is a legitimate answer and means "immediately"; a short floor keeps it from spinning.
+  return Math.max(250, seconds * 1000);
+}
+
+/** A wait a cancelled turn does not sit through. */
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve) => {
+    if (signal?.aborted) return resolve();
+    const timer = setTimeout(done, ms);
+    function done(): void {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", done);
+      resolve();
+    }
+    signal?.addEventListener("abort", done, { once: true });
+  });
+}
+
 export async function describeHttpError(res: Response, provider?: string): Promise<string> {
   let detail = "";
   try {
@@ -408,12 +467,14 @@ export async function describeHttpError(res: Response, provider?: string): Promi
   const hint =
     res.status === 401 || res.status === 403
       ? ` — check the API key for ${provider ?? "this provider"} (Hivey Code: “Store a provider key”).`
-      : // 402 is the provider saying the ACCOUNT is empty, which no key and no retry fixes. It was
-        // falling through to no hint at all, so it arrived as the provider's own sentence about
-        // credits with nothing to say which account it meant — and a Hivey preset always bills the
-        // OpenRouter one, whatever provider the panel is set to.
+      : // 402 covers two unrelated things, and saying the wrong one sends people to look at a
+        // balance that is fine. With `Retry-After` it is a temporary hold — credit reserved by
+        // requests still in flight — and it has already been waited out twice by the time this
+        // message is built. Without it, it really is the balance, and no key and no retry fix that.
         res.status === 402
-        ? ` — this is the account balance at ${provider ?? "the provider"}, not the API key. A Hivey preset always bills your OpenRouter account, whichever provider the panel shows.`
+        ? res.headers.get("retry-after")
+          ? ` — ${provider ?? "the provider"} is holding credit for requests still in flight, not refusing the key. It was retried and still said no; try again in a moment.`
+          : ` — this is the account balance at ${provider ?? "the provider"}, not the API key. A Hivey preset always bills your OpenRouter account, whichever provider the panel shows.`
         : res.status === 404
           ? " — check the endpoint URL and that the model exists on it."
           : res.status === 429

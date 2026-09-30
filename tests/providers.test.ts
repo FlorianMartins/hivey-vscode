@@ -574,3 +574,62 @@ test("an image is still the one thing that forces the array form, asked for or n
   await s.close();
   assert.ok(Array.isArray(s.requests[0]!.body.messages[0].content));
 });
+
+// ── 402 is two different things ─────────────────────────────────────────────────────────────────
+//
+// "The OpenRouter key gives HTTP 402 payment required even with a valid key and unlimited credit."
+//
+// It does, and the account is fine. OpenRouter answers 402 both for an empty balance and for its
+// in-flight spending budget — credit provisionally reserved by requests that have not finished —
+// and their documentation is explicit that the second is a wait-and-retry case, told apart by a
+// `Retry-After` header. Everything here treated 402 as terminal and said so in a sentence about the
+// balance, so a funded account was told it had no money and the turn ended.
+
+test("a 402 carrying Retry-After is waited out and the request repeated", async () => {
+  let calls = 0;
+  const s = await serve((_req, res) => {
+    calls += 1;
+    if (calls === 1) {
+      res.writeHead(402, { "content-type": "application/json", "retry-after": "0" });
+      res.end(JSON.stringify({ error: { message: "in-flight budget", metadata: { limit_source: "openrouter_in_flight_budget" } } }));
+      return;
+    }
+    sse(res, [{ choices: [{ delta: { content: "ok" } }] }]);
+  });
+  const p = new OpenAICompatibleProvider({ id: "openrouter", baseUrl: s.url, apiKey: "k", isLocal: false });
+  const out = await p.chat({ model: "m", messages: [{ role: "user", content: "hello" }] });
+  await s.close();
+  assert.equal(calls, 2, "the request was not repeated, so a temporary hold ended the turn");
+  assert.equal(out.text, "ok");
+});
+
+test("a 402 without Retry-After is not retried, because no retry fixes an empty account", async () => {
+  let calls = 0;
+  const s = await serve((_req, res) => {
+    calls += 1;
+    res.writeHead(402, { "content-type": "application/json" });
+    res.end(JSON.stringify({ error: { message: "Insufficient credits" } }));
+  });
+  const p = new OpenAICompatibleProvider({ id: "openrouter", baseUrl: s.url, apiKey: "k", isLocal: false });
+  const failed = await p.chat({ model: "m", messages: [{ role: "user", content: "hello" }] }).catch((e: Error) => e);
+  await s.close();
+  assert.equal(calls, 1, "an empty account was retried, which only wastes the user's time");
+  assert.ok(failed instanceof Error);
+  assert.match(failed.message, /account balance/, failed.message);
+  assert.match(failed.message, /Insufficient credits/, "the provider's own sentence was dropped");
+});
+
+test("the two 402s do not say the same thing", async () => {
+  // The whole point: one sends you to top up an account, the other tells you to wait. Saying the
+  // first when it is the second sends somebody to stare at a balance that is fine.
+  const held = await serve((_req, res) => {
+    res.writeHead(402, { "content-type": "application/json", "retry-after": "0" });
+    res.end(JSON.stringify({ error: { message: "held" } }));
+  });
+  const p = new OpenAICompatibleProvider({ id: "openrouter", baseUrl: held.url, apiKey: "k", isLocal: false });
+  const failed = await p.chat({ model: "m", messages: [{ role: "user", content: "hello" }] }).catch((e: Error) => e);
+  await held.close();
+  assert.ok(failed instanceof Error);
+  assert.doesNotMatch(failed.message, /account balance/, failed.message);
+  assert.match(failed.message, /in flight|try again/i, failed.message);
+});

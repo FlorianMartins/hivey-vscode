@@ -460,7 +460,15 @@ export function openModelCombo(anchor: HTMLElement, state: UiState, send: (m: To
     const rect = anchor.getBoundingClientRect();
     // The trigger sits at the bottom of the sidebar, so the panel opens upwards whenever it fits —
     // and the panel is never wider than the view, which on a 300 px sidebar is the common case.
-    panel.style.width = `${Math.min(Math.max(rect.width, 320), window.innerWidth - 16)}px`;
+    // As wide as the PANEL allows, not as wide as the control that opened it.
+    //
+    // `rect` is the model button, which is small, so the floor won every time and the picker was
+    // 320 px in a panel of any width — every model name truncated at the same place, every price
+    // pushed against it, and a row of three buttons at the bottom that did not fit on one line and
+    // was clipped by the widget's own `overflow: hidden`. Widening the panel did nothing, which is
+    // the tell: a floating element that ignores the room it has been given.
+    const room = window.innerWidth - 16;
+    panel.style.width = `${Math.max(Math.min(rect.width, room), Math.min(room, 520))}px`;
     const height = panel.offsetHeight;
     const above = rect.top - height - 6;
     panel.style.top = `${above > 8 ? above : Math.min(rect.bottom + 6, Math.max(8, window.innerHeight - height - 8))}px`;

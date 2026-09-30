@@ -2,6 +2,54 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.53.0 — 2026-09-30
+
+### Corrigé
+
+- **La zone de saisie se « verrouillait » en cours de frappe.** Le panneau se reconstruit à chaque
+  message d'état — une soixantaine, dont presque aucun n'est provoqué par l'utilisateur : un fichier
+  enregistré, le curseur qui bouge dans un éditeur, une liste de modèles qui arrive. Chaque
+  reconstruction remplace la zone de texte, donc **le focus partait avec l'ancienne**. Le texte et
+  la position du curseur étaient bien reportés ; le focus, non. Taper une question était donc
+  interrompu par une boîte qui devenait sourde sous les doigts, « comme si on cliquait à côté » —
+  ce qui est exactement ce qui se passait. Le focus est reporté lui aussi, et **seulement s'il y
+  était** : le rendre sans condition arracherait le curseur au fichier en cours d'édition, ce qui
+  est le même défaut dans l'autre sens.
+
+- **HTTP 402 « payment required » avec une clé valide et du crédit.** OpenRouter répond 402 pour
+  deux choses sans rapport : le solde, et son **budget de dépense « en vol »** — du crédit
+  provisoirement réservé par des requêtes qui n'ont pas fini. Leur documentation est explicite : le
+  second cas s'attend et se rejoue, et se reconnaît à un en-tête `Retry-After`. Tout le code
+  traitait le 402 comme définitif et l'annonçait dans une phrase sur le solde du compte. Un compte
+  approvisionné s'entendait donc dire qu'il était vide, sans qu'aucune tentative ne soit faite. Le
+  402 avec en-tête est désormais attendu puis rejoué (deux fois, jamais plus de trente secondes,
+  interrompu par l'arrêt du tour) ; celui sans en-tête n'est pas rejoué, parce qu'aucune tentative
+  ne remplit un compte. Les deux messages ne disent plus la même chose.
+
+- **Le sélecteur de modèles ignorait la place qu'on lui donnait.** Sa largeur était calculée depuis
+  le bouton qui l'ouvre — un petit contrôle — donc le plancher de 320 px gagnait toujours : chaque
+  nom de modèle tronqué au même endroit, et une rangée de trois boutons qui ne tenait pas sur une
+  ligne et dont le dernier était coupé en deux par le `overflow: hidden` du widget. Il prend la
+  largeur du panneau, et la rangée passe à la ligne.
+
+### Modifié
+
+- **Le raisonnement s'affiche pendant qu'il s'écrit, et se replie quand la réponse commence.** Il
+  était replié par défaut, et les deux moitiés du problème n'en faisaient qu'une : un bloc replié ne
+  **grandit pas**, donc pendant toute la réflexion le panneau n'avait rien à suivre et restait sur
+  la réponse précédente. C'est une propriété du **tour**, pas une préférence du lecteur — la bonne
+  réponse change à mi-chemin, toute seule — donc il n'y a pas de réglage.
+
+- **Captures d'écran refaites.** Le panneau est dans la **barre latérale droite**, élargi, la barre
+  latérale gauche et le terminal fermés, la barre de titre et la barre d'état recadrées : le sujet
+  d'une image de panneau latéral, c'est le panneau. Les anciennes portaient sept cents pixels
+  d'éditeur et la sortie de la dernière commande en échec de la machine de build. La conversation
+  repart aussi de zéro après la capture de la carte d'autorisation, dont le refus laissait une ligne
+  rouge en arrière-plan de toutes les images suivantes.
+
+- **README et README.fr à jour** : le contexte à la taille du modèle, le plan d'un gros fichier
+  joint, un fichier envoyé une seule fois, et le comportement du raisonnement.
+
 ## 0.52.0 — 2026-09-25
 
 ### Corrigé

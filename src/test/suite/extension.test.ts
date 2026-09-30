@@ -1300,9 +1300,34 @@ suite("Screenshot", () => {
       // sidebar wide enough to read — the width a user would actually give it.
       // The right-hand copy is opened deliberately: the panel is declared in both places now, and a
       // photograph that shows only one of them would not show what shipped.
-      await vscode.commands.executeCommand("hiveyCode.chatSide.focus").then(undefined, () => {});
-      await vscode.commands.executeCommand("notifications.clearAll").then(undefined, () => {});
-      await vscode.commands.executeCommand("hiveyCode.chat.focus");
+      // The panel lives in the RIGHT-hand bar for these photographs, and everything else is put
+      // away. A README image of a side panel should be a picture of the side panel: the previous
+      // ones carried seven hundred pixels of editor, an activity bar, and whatever the terminal
+      // happened to be showing — which on a build machine is the output of the last failed command.
+      // None of that is the product, and all of it reads as clutter at README width.
+      //
+      // The right-hand bar rather than the left because it is where a chat panel belongs beside an
+      // editor, and because `focus()` returns early when any copy is visible, so the screens that
+      // follow stay in the same bar instead of pulling the panel back to the activity bar.
+      const quietly = (command: string) => vscode.commands.executeCommand(command).then(undefined, () => {});
+      await quietly("workbench.action.closePanel");
+      await quietly("workbench.action.closeSidebar");
+      await quietly("notifications.clearAll");
+      await vscode.commands.executeCommand("hiveyCode.chatSide.focus");
+      await new Promise((r) => setTimeout(r, 800));
+      // Widened to a width somebody would actually work in.
+      //
+      // `decreaseViewWidth`, and the name is not a mistake: these commands act on the EDITOR GROUP,
+      // not on the bar, whatever holds the focus. Pressing "increase" ten times produced a 190 px
+      // panel — the editor grew and the bar was what gave way. Narrowing the editor is what widens
+      // the bar. There is no way to know that from the command names, and no way to check it except
+      // by looking at the photograph, which is the only test a layout command has.
+      await quietly("workbench.action.focusAuxiliaryBar");
+      // Three presses, measured: each one moves the boundary about sixty pixels, and three from the
+      // default lands the bar at roughly 540 px — a width somebody gives a chat panel they use, and
+      // wide enough for the model picker's own buttons, which wrap and clip below it.
+      for (let i = 0; i < 4; i++) await quietly("workbench.action.decreaseViewWidth");
+      await new Promise((r) => setTimeout(r, 500));
       // `increaseViewSize` resizes whatever part has focus. Revealing the view is not the same as
       // focusing the side bar — the editor keeps the focus — so without this the loop below
       // silently widened the editor group instead, and every screenshot showed a 280 px panel
@@ -1408,6 +1433,13 @@ suite("Screenshot", () => {
       await announce("approbation");
       await vscode.commands.executeCommand("hiveyCode.stopAnswer");
       await new Promise((r) => setTimeout(r, 1000));
+      // And start again before the next frame. Stopping resolves the pending approval as refused,
+      // which leaves a red "the user declined" line in the transcript — correct behaviour, and the
+      // subject of its own photograph, but it then sat in the background of every frame after it.
+      // A README should not open on a screenshot of something going wrong.
+      await vscode.commands.executeCommand("hiveyCode.newSession");
+      await new Promise((r) => setTimeout(r, 600));
+      await quietly("notifications.clearAll");
 
       // A screen showing what an attachment actually looks like. Three separate fixes to "attach
       // all open editors" were verified by reasoning about the code, and the feature stayed broken

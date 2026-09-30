@@ -1657,10 +1657,13 @@ pre.code {
 .combo-foot {
   display: flex;
   align-items: center;
+  /* Wraps, because three buttons do not fit on one row in a narrow panel and the widget clips what
+   * overflows: the third one was cut in half — "Refres" — in every screenshot and on every screen
+   * narrower than about six hundred pixels. A row that cannot wrap is a row that loses its last
+   * item silently. */
+  flex-wrap: wrap;
   gap: var(--sp-2);
   padding: var(--sp-2);
-}
-.combo-foot {
   border-top: 1px solid var(--border);
 }
 

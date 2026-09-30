@@ -13,8 +13,9 @@ Open source (Apache-2.0), **zero runtime dependencies**, **zero telemetry**.
 ![Hivey Code's sidebar in VS Code](https://raw.githubusercontent.com/FlorianMartins/hivey-vscode/main/docs/images/conversation.png)
 
 *Real screenshots, taken from a VS Code launched by the integration suite — `node scripts/screenshots.mjs`
-takes them, so they cannot quietly stop being true. Only the model answering is a stub server; the
-interface is the product, at the side bar's default width.*
+takes them, so they cannot quietly stop being true. The panel sits in the right-hand bar with the
+editor's own furniture cropped away, because the subject is the panel. Only the model answering is a
+stub server; everything else is the product.*
 
 | Choosing a model | Conversations |
 |---|---|
@@ -44,7 +45,7 @@ that does leave is **reversibly pseudonymised** first.
 | **Three modes** | **Chat** (no tools), **Plan** (reads the repository, changes nothing), **Agent** (reads, edits, proposes commands). The mode decides the tool set **in code**: in plan mode no writing tool exists — it is not an instruction in a prompt. |
 | **Agent mode** | Reads the repository, searches it, consults the **editor's diagnostics**, edits files and proposes commands — **one approval per action**, a diff before every write, everything in the undo stack. |
 | **Permissions** | Per action and per shape of action: “allow once”, “for this conversation”, “always”. Allowing `npm test` does not allow `npm publish`. A dedicated screen separates what is permanent from what expires. |
-| **Reasoning** | An adjustable thinking budget (direct / brief / standard / deep), translated per provider — `reasoning.effort` on OpenRouter, a token budget on Anthropic. The thinking is shown in a collapsed block and never sent back to the model. |
+| **Reasoning** | An adjustable thinking budget (direct / brief / standard / deep), translated per provider — `reasoning.effort` on OpenRouter, a token budget on Anthropic. The thinking is **shown as it is written** — which is most of the reason for turning it on — and folds itself away the moment the answer starts, because by then it is reference material sitting between you and the answer. It is never sent back to the model. |
 | **It reads what it runs** | `run_command` returns the output and the exit code, through VS Code's shell integration — so "run the tests and fix what fails" is one turn instead of a round trip through you. On a shell with no integration the result says the output could not be read, and never invents an exit code. |
 | **The next edit** | After you change something, the edit that follows from it **elsewhere in the file** — a call site still on the old name, a branch that no longer matches — offered as a hint with a quick fix. It runs on the completion model, so on your machine it costs nothing; on a paid endpoint it stays off until you ask. |
 | **It falls back instead of failing** | A rate limit or a dead network moves the request down a chain — the cheaper model of the same preset, then your own machine — never up into something more expensive, never after a word has reached the screen, and never silently. |
@@ -67,6 +68,7 @@ that does leave is **reversibly pseudonymised** first.
 | **Search** | Inside the open conversation (`Ctrl+F`, matches highlighted) **and** across the whole history — the search looks inside the messages and shows the fragment that matched. |
 | **History filters** | Period, mode, “paid only”, and four sort orders (recently updated, created, longest, most expensive). |
 | **Context control** | Every exchange can be **muted** (stays on screen, stops being sent), **pinned** (survives trimming), edited or deleted. It is the most direct lever there is on both quality **and** cost. |
+| **Context sized by the model** | The budget follows the window of the model actually selected rather than a number chosen once — a fixed 8 000 tokens is most of a small local model and a rounding error on a modern one, and against it a conversation was summarised away after three exchanges and answered from the digest. One attachment is capped separately (`hiveyCode.context.attachmentTokens`, `0` for whole files), and past that cap a file arrives as its **outline** — every symbol it declares with the line it is on — followed by its head, rather than its first N lines and nothing about the rest. A file attached in five turns is sent **once**, in the message nearest the question. |
 | **Privacy** | Reversible pseudonymisation, blocked files, consent before the first destination, an **egress log** and a **cost report**. An image is the one thing none of that can touch — so when one is about to leave, the consent card says exactly that, and the log records it. |
 | **A log you can check** | Every entry in the egress log carries the hash of the one before it, so altering a line means rewriting the whole tail and deleting one leaves a gap the check finds. Exportable as JSONL or RFC 5424 syslog, for the collector that is not on this machine. |
 | **MCP that stays what you approved** | The approval covers the tool **descriptions and schemas**, not just the command that starts the server. A server that rewrites what its tools claim to do asks again, naming what changed — that is what tool poisoning is, and a dialog that only says "something changed" teaches people to click yes. |

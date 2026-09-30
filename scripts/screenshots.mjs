@@ -30,7 +30,10 @@ const display = ":97";
 const HOLD = Number(args.get("hold") ?? 20_000);
 const STARTUP = Number(args.get("startup") ?? 16_000);
 const marker = join(tmpdir(), `hivey-code-shot-${process.pid}`);
-const CROP = Number(args.get("crop") ?? 1000);
+// The width of the right-hand bar in the captured frame, measured once from a real run. The
+// subject of these images is the panel, and it now sits in the auxiliary bar with everything else
+// put away, so what is kept is the right edge of the screen rather than the left.
+const CROP = Number(args.get("crop") ?? 540);
 
 mkdirSync(outDir, { recursive: true });
 
@@ -218,10 +221,19 @@ function capture(name) {
   const path = `${outDir}/${name}${suffix}.png`;
   const shot = spawnSync("import", ["-display", display, "-window", "root", path], { stdio: "inherit" });
   if (shot.status !== 0) return false;
-  // Trim the window's own black margin, then crop away most of the empty editor. The subject of
-  // these images is the panel; a reader looking at a README does not need to see 700 px of unused
-  // background to understand where it lives.
-  spawnSync("convert", [path, "-trim", "+repage", "-crop", `${CROP}x0+0+0`, "+repage", path]);
+  // Trim the window's own black margin, then keep the right-hand bar and nothing else. `-gravity
+  // East` is the whole change from the previous version: the panel moved to the auxiliary bar, and
+  // a crop anchored on the left was photographing the empty editor it used to sit beside.
+  // ...then the editor's window furniture. The title bar and the status bar belong to VS Code and
+  // say nothing about this panel; leaving them in is what made the old images read as "a screenshot
+  // of somebody's editor" rather than as a picture of the thing being described.
+  spawnSync("convert", [
+    path, "-trim", "+repage",
+    "-gravity", "East", "-crop", `${CROP}x0+0+0`, "+repage",
+    "-gravity", "North", "-chop", "0x34",
+    "-gravity", "South", "-chop", "0x32",
+    path,
+  ]);
   console.log(`captured ${path}`);
   return true;
 }

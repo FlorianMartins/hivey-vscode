@@ -538,7 +538,7 @@ function renderEntry(entry: UiEntry, state: UiState, deps: ChatDeps): HTMLElemen
   // The plan first, above the answer: it is the summary of what was done, and someone re-reading a
   // turn wants the shape of it before the prose.
   if (entry.plan) wrap.append(planBlock(entry.plan, false));
-  if (entry.reasoning) wrap.append(collapsible(t("Reasoning"), entry.reasoning));
+  if (entry.reasoning) wrap.append(reasoningBlock(entry.reasoning));
   if (entry.steps?.length) wrap.append(stepList(entry.steps));
 
   if (entry.error) {
@@ -709,19 +709,40 @@ export function stepRow(s: { tool: string; summary: string; ok: boolean; call?: 
   return row;
 }
 
-export function collapsible(title: string, body: string): HTMLElement {
+export function collapsible(
+  title: string,
+  body: string,
+  opts: { open?: boolean; onToggle?: (open: boolean) => void } = {},
+): HTMLElement {
   const wrap = el("div", "collapsible");
   const head = el("button", "collapsible-head");
   head.append(icon("chevron", "collapsible-chevron"));
   head.append(el("span", undefined, title));
   const content = el("div", "collapsible-body", body);
-  content.hidden = true;
+  content.hidden = !opts.open;
+  wrap.classList.toggle("open", Boolean(opts.open));
   head.addEventListener("click", () => {
     content.hidden = !content.hidden;
     wrap.classList.toggle("open", !content.hidden);
+    opts.onToggle?.(!content.hidden);
   });
   wrap.append(head, content);
   return wrap;
+}
+
+/**
+ * A model's reasoning.
+ *
+ * Open while it is being written, shut once it is a record. Thinking is worth watching as it
+ * happens — it is most of the reason for turning reasoning on, and a shut block does not grow, so
+ * the panel had nothing to follow and sat on the previous answer for the whole of it. A finished
+ * one is reference material: it belongs behind a heading, not between the question and the answer.
+ *
+ * Which makes the state a property of the TURN rather than a preference of the reader, and that is
+ * why there is no setting for it: the right answer changes halfway through, by itself.
+ */
+export function reasoningBlock(body: string, opts: { open?: boolean } = {}): HTMLElement {
+  return collapsible(t("Reasoning"), body, opts);
 }
 
 function startEdit(entry: UiEntry, deps: ChatDeps): void {
@@ -748,6 +769,17 @@ export interface Draft {
   start: number;
   end: number;
   editing?: string;
+  /**
+   * Whether the user was typing in it.
+   *
+   * The half of the draft that was missing, and the one that made the panel feel broken. A rebuild
+   * replaces the textarea with a new one, so the old one's focus goes with it — and the panel
+   * rebuilds on any of sixty-odd state messages, none of which the user causes: a file saved, the
+   * caret moved in an editor, a model list arriving. The text and the caret were carried across and
+   * the focus was not, so typing a question was interrupted by the box going dead under the
+   * keyboard, "as if you had clicked somewhere else". Which is exactly what had happened.
+   */
+  focused: boolean;
 }
 
 let lastDeps: ChatDeps | undefined;
@@ -760,21 +792,38 @@ export function captureDraft(): Draft | undefined {
     start: area.selectionStart ?? area.value.length,
     end: area.selectionEnd ?? area.value.length,
     ...(area.dataset["editing"] ? { editing: area.dataset["editing"] } : {}),
+    // `document.activeElement` is the only place this is written down, and it does not survive the
+    // node being replaced.
+    focused: document.activeElement === area,
   };
 }
 
 export function restoreDraft(draft: Draft | undefined): void {
-  if (!draft?.text) return;
+  if (!draft) return;
   const area = document.querySelector<HTMLTextAreaElement>(".composer-input");
-  const hints = document.querySelector<HTMLElement>(".slash-hints");
   if (!area) return;
-  area.value = draft.text;
-  if (draft.editing) area.dataset["editing"] = draft.editing;
-  area.setSelectionRange(draft.start, draft.end);
-  autoGrow(area);
-  // And the completion list with it: it is derived from the caret, so restoring one without the
-  // other leaves the box looking right and the suggestions gone.
-  if (hints && lastDeps) slashHints(hints, area, lastDeps);
+  const hints = document.querySelector<HTMLElement>(".slash-hints");
+
+  if (draft.text) {
+    area.value = draft.text;
+    if (draft.editing) area.dataset["editing"] = draft.editing;
+    area.setSelectionRange(draft.start, draft.end);
+    autoGrow(area);
+    // And the completion list with it: it is derived from the caret, so restoring one without the
+    // other leaves the box looking right and the suggestions gone.
+    if (hints && lastDeps) slashHints(hints, area, lastDeps);
+  }
+
+  // Focus last, and ONLY when it was there: taking it otherwise would pull the cursor out of the
+  // file the user is editing every time the panel redraws — the same defect pointing the other way.
+  //
+  // An empty box that had focus is restored too. It is the ordinary case: the panel rebuilds while
+  // somebody sits in an empty composer deciding what to ask, and a box that goes dead before the
+  // first keystroke is the one that looks most broken.
+  if (draft.focused && document.activeElement !== area) {
+    area.focus({ preventScroll: true });
+    area.setSelectionRange(draft.start, draft.end);
+  }
 }
 
 function composer(state: UiState, deps: ChatDeps): HTMLElement {
