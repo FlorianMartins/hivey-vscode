@@ -13,7 +13,7 @@ import { DEFAULT_GROUPS, type SkillGroup, type SkillPolicy } from "../core/sessi
 import { makeProvider, type Provider, type ProviderId } from "../core/providers/index.js";
 import { defaultEndpoints, endpointSettingKey, REMOTE_VENDORS, vendor } from "../core/providers/vendors.js";
 import { isLocalEndpoint } from "../core/redaction/index.js";
-import { describeUnusableEndpoint, looksLikeApiKey } from "../core/providers/endpoint.js";
+import { describeMissingEndpoint, describeUnusableEndpoint, looksLikeApiKey } from "../core/providers/endpoint.js";
 import { ATTACHMENT_CEILING_TOKENS } from "../core/util/tokens.js";
 import type { RedactionLevel, RedactionPolicy } from "../core/redaction/types.js";
 import type { EscalationPolicy, RouterConfig } from "../core/router/route.js";
@@ -27,6 +27,8 @@ export interface Settings {
   chat: {
     provider: ProviderId;
     model: string;
+    /** How many tokens one answer may be. A thinking model spends this on its thinking too. */
+    maxOutputTokens: number;
     /** Ask for Anthropic's prompt cache through OpenRouter. Off: it changes the request's shape. */
     promptCache: boolean;
   };
@@ -167,6 +169,7 @@ export function readSettings(scope?: vscode.Uri): Settings {
       provider: c.get<ProviderId>("chat.provider", "local"),
       model: c.get<string>("chat.model", "qwen2.5-coder:7b"),
       promptCache: c.get<boolean>("chat.promptCache", false),
+      maxOutputTokens: c.get<number>("chat.maxOutputTokens", 8192),
     },
     completion: {
       provider: c.get<ProviderId | "off">("completion.provider", "local"),
@@ -262,7 +265,14 @@ export function routerConfig(s: Settings): RouterConfig {
 export function endpointFor(s: Settings, id: ProviderId): string {
   const url = s.endpoints[id];
   if (url) return url;
-  throw new Error(t("No endpoint configured for “{0}”. Set {1}.endpoints in the settings.", id, SECTION));
+  // Naming the exact setting, and the screen that fills it in.
+  //
+  // "Set hiveyCode.endpoints in the settings" named a prefix rather than a key, and said nothing
+  // about the panel's own setup screen, which has a field for precisely this. Every other vendor
+  // has a default address; this one cannot — it is somebody's own gateway, and nobody can guess
+  // where it lives — so it is the one provider where this message is the whole of the instruction
+  // somebody gets.
+  throw new Error(describeMissingEndpoint(id, SECTION, endpointSettingKey(id)));
 }
 
 /**

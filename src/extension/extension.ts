@@ -6,6 +6,7 @@ import { showKnowledge } from "./knowledge.js";
 import { setLanguage, t } from "../shared/i18n.js";
 import { Budget } from "../core/router/budget.js";
 import { contextBudget } from "../core/context/budget.js";
+import { MODES, type Mode } from "../core/session/modes.js";
 import { isLocalEndpoint } from "../core/redaction/index.js";
 import { ChatViewProvider, PreviewProvider } from "./chat.js";
 import { HiveyCodeActions } from "./codeActions.js";
@@ -22,6 +23,15 @@ import { ibmiDiagnose, ibmiLibraryList } from "./integrations/ibmi.js";
 import { REMOTE_VENDORS } from "../core/providers/vendors.js";
 import { NextEditWatcher } from "./nextEdit.js";
 import { toJsonl, toSyslog, type Chained } from "../core/audit/chain.js";
+
+/** The three modes, as a quick pick, for the palette entry that names none. */
+async function pickMode(): Promise<Mode | undefined> {
+  const picked = await vscode.window.showQuickPick(
+    MODES.map((m) => ({ label: m.label, description: m.hint, id: m.id })),
+    { placeHolder: t("Which mode?") },
+  );
+  return picked?.id;
+}
 
 export function activate(context: vscode.ExtensionContext): void {
   // The editor knows which language the user reads, unless they said otherwise.
@@ -98,6 +108,13 @@ export function activate(context: vscode.ExtensionContext): void {
     // It briefly asked which kind of conversation to start, and the cost was immediate — anything
     // that invoked it non-interactively waited for ever for an answer nobody was there to give.
     vscode.commands.registerCommand("hiveyCode.newSession", () => chat.newSession()),
+
+    // Chat, plan or agent, from the palette or a keybinding. Asked for when no mode is named, so
+    // the palette entry is usable on its own; the argument is what a keybinding and the tests pass.
+    vscode.commands.registerCommand("hiveyCode.setMode", async (mode?: Mode) => {
+      const wanted = mode ?? (await pickMode());
+      if (wanted) chat.setMode(wanted);
+    }),
 
     /**
      * The guided start, as its own command.

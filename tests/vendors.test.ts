@@ -8,6 +8,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { describeMissingEndpoint } from "../src/core/providers/endpoint.js";
 import { AnthropicProvider, makeProvider, OpenAICompatibleProvider } from "../src/core/providers/index.js";
 import {
   defaultEndpoints,
@@ -113,4 +114,15 @@ test("the vendors a user pays directly are the ones asked what they serve", () =
   for (const id of ["openai", "deepseek", "qwen", "perplexity", "mistral", "google", "groq", "xai"]) {
     assert.ok(ids.includes(id as never), `${id} would never show a model in the picker`);
   }
+});
+
+test("the missing-address message names the setting it is about", () => {
+  // "Set hiveyCode.endpoints in the settings" named a prefix, not a key — and a gateway is the one
+  // provider with no default address, so this message is the whole of the instruction its user
+  // gets. Asserted against the manifest so that a renamed setting breaks the sentence rather than
+  // the user's afternoon.
+  const said = describeMissingEndpoint("openai-compatible", "hiveyCode", endpointSettingKey("openai-compatible"));
+  assert.match(said, /openaiCompatible/, said);
+  assert.match(said, /Set up a model/, "the message does not point at the screen that fills this in");
+  assert.ok(setting("hiveyCode.endpoints.openaiCompatible"), "the setting the message names is not in the manifest");
 });

@@ -643,6 +643,20 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     if (screen === "models" && !this.models.length) void this.loadModels();
   }
 
+  /**
+   * Switch mode from outside the panel.
+   *
+   * It existed only as a click on the composer's own menu, which had two costs. The palette and a
+   * keybinding could not reach it — and neither could the integration suite, so PLAN MODE WAS NEVER
+   * EXERCISED BY A TEST. A mode that changes the system prompt and the whole tool set, with no test
+   * that runs a turn in it, is a mode that breaks quietly.
+   */
+  setMode(mode: Mode): void {
+    this.session.mode = mode;
+    this.savePrefs();
+    this.sendState();
+  }
+
   newSession(): void {
     this.wizard = undefined;
     this.persist();
@@ -3459,14 +3473,18 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       let thought = "";
 
       // One attempt, wrapped so it can be repeated against a different endpoint. See the catch below.
-      const attempt = (useProvider: Provider, useModel: string): Promise<Awaited<ReturnType<typeof runTurn>>> =>
+      const attempt = (
+        useProvider: Provider,
+        useModel: string,
+        outputTokens = settings.chat.maxOutputTokens,
+      ): Promise<Awaited<ReturnType<typeof runTurn>>> =>
         runTurn({
         provider: useProvider,
         model: useModel,
         messages: prepared.messages,
         tools,
         signal: ctl.signal,
-        maxTokens: 4096,
+        maxTokens: outputTokens,
         reasoning: this.reasoning,
         // Nothing from a stopped turn reaches the panel. Cancellation unwinds through a provider
         // and a tool, and anything still in flight would otherwise stream into whatever turn is on
@@ -3547,6 +3565,34 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         const untouched = !streamed && !steps.length;
         if (!untouched || ctl.signal.aborted || !isRetryable(err) || !chain.length) throw err;
         result = await this.runFallback(chain, settings, { provider: providerId, model, why: "" }, attempt, ctl);
+      }
+
+      // Thought until there was nothing left to answer with.
+      //
+      // A model that reasons is charged for its reasoning out of the SAME output budget as its
+      // reply, so a long think can consume the whole of it — and the turn then ends with a full
+      // block of thinking and not one word of answer. The provider says so, in `finish_reason`,
+      // and nothing read it: a truncated turn and a finished one were indistinguishable.
+      //
+      // Repeated once, with four times the budget, and only when there is NOTHING to show. A
+      // truncated answer that reached the user is left alone — it is imperfect and it is theirs,
+      // and asking again would bill them twice for a paragraph they can already read. This is the
+      // one case where the answer is empty, which is worth nothing at all.
+      if (result.truncated && !result.text.trim() && !ctl.signal.aborted) {
+        const roomier = settings.chat.maxOutputTokens * 4;
+        this.log.appendLine(`[turn] the answer budget ran out during reasoning; retrying at ${roomier}`);
+        this.post({ type: "status", text: t("It spent the whole answer on thinking. Asking again with more room…") });
+        thought = "";
+        streamed = "";
+        result = await attempt(provider, model, roomier);
+        // Still nothing, and now it is worth saying rather than showing an empty bubble. The
+        // reasoning is kept: it is what the model did produce, and it is the evidence for raising
+        // hiveyCode.chat.maxOutputTokens rather than guessing.
+        if (!result.text.trim()) {
+          answer.error = t(
+            "The model used its whole answer budget on reasoning and produced no reply. Raise hiveyCode.chat.maxOutputTokens, or use a lower reasoning effort.",
+          );
+        }
       }
 
       // What the provider's cache actually served, accumulated across the conversation. Shown in the

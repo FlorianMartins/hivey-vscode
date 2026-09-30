@@ -1026,6 +1026,159 @@ suite("Hivey Code", () => {
   });
 
   /**
+   * A turn in PLAN mode, answered.
+   *
+   * Plan mode changes the system prompt and the entire tool set — every tool that writes is either
+   * dropped or replaced by a reading-only version of itself — and until this test nothing ever ran
+   * a turn in it. It was reported as thinking and then saying nothing, and the suite could not have
+   * seen that: there was no way to enter the mode except by clicking the composer's menu.
+   *
+   * The reasoning is streamed first, as a thinking model sends it, because "it only does the
+   * reasoning" is the shape of the complaint.
+   */
+  test("plan mode answers, and the answer reaches the conversation", async () => {
+    const ext = vscode.extensions.getExtension(ID)!;
+    await ext.activate();
+
+    const stub = await scriptedStub([
+      { reasoning: "Let me look at how the total is computed.", text: "## What I found\nRounding happens per line." },
+    ]);
+    const config = vscode.workspace.getConfiguration(SECTION);
+    const before = {
+      provider: config.get("chat.provider"),
+      model: config.get("chat.model"),
+      local: config.get("endpoints.local"),
+      confirm: config.get("privacy.confirmSend"),
+    };
+    await config.update("chat.provider", "local", vscode.ConfigurationTarget.Global);
+    await config.update("chat.model", "planner", vscode.ConfigurationTarget.Global);
+    await config.update("endpoints.local", `http://127.0.0.1:${stub.port}/v1`, vscode.ConfigurationTarget.Global);
+    await config.update("privacy.confirmSend", "never", vscode.ConfigurationTarget.Global);
+
+    try {
+      await vscode.commands.executeCommand("hiveyCode.newSession");
+      await vscode.commands.executeCommand("hiveyCode.setMode", "plan");
+      await vscode.commands.executeCommand("hiveyCode.askWith", "How is the total rounded?");
+
+      await vscode.commands.executeCommand("hiveyCode.exportSession");
+      const exported = vscode.window.activeTextEditor?.document.getText() ?? "";
+      await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
+      assert.match(
+        exported,
+        /Rounding happens per line/,
+        `plan mode produced no answer:\n${exported.slice(0, 800)}`,
+      );
+    } finally {
+      await vscode.commands.executeCommand("hiveyCode.setMode", "agent");
+      await config.update("chat.provider", before.provider, vscode.ConfigurationTarget.Global);
+      await config.update("chat.model", before.model, vscode.ConfigurationTarget.Global);
+      await config.update("endpoints.local", before.local, vscode.ConfigurationTarget.Global);
+      await config.update("privacy.confirmSend", before.confirm, vscode.ConfigurationTarget.Global);
+      stub.close();
+    }
+  });
+
+  /**
+   * A gateway is configured by its ADDRESS, and a key is optional there.
+   *
+   * "I configured a local model through our internal proxy and it says: No endpoint configured for
+   * openai-compatible." That vendor is the only one whose address has no default — it is somebody's
+   * own proxy, and nobody can guess where it lives — and it is also the one where a key is not
+   * necessarily required, because a gateway on a private network often has none.
+   */
+  test("a gateway answers once its address is set, with or without a key", async () => {
+    const ext = vscode.extensions.getExtension(ID)!;
+    await ext.activate();
+
+    const stub = await scriptedStub([{ text: "Answered through the gateway." }]);
+    const config = vscode.workspace.getConfiguration(SECTION);
+    const before = {
+      provider: config.get("chat.provider"),
+      model: config.get("chat.model"),
+      gateway: config.get("endpoints.openaiCompatible"),
+      confirm: config.get("privacy.confirmSend"),
+    };
+    await config.update("chat.provider", "openai-compatible", vscode.ConfigurationTarget.Global);
+    // Any open-source model the proxy serves. The gateway is not a catalogue: what it answers with
+    // is whatever it has been given, and naming a model it does not know is the proxy's error to
+    // report, not ours to pre-empt.
+    await config.update("chat.model", "qwen3-coder", vscode.ConfigurationTarget.Global);
+    await config.update("endpoints.openaiCompatible", `http://127.0.0.1:${stub.port}/v1`, vscode.ConfigurationTarget.Global);
+    await config.update("privacy.confirmSend", "never", vscode.ConfigurationTarget.Global);
+
+    try {
+      await vscode.commands.executeCommand("hiveyCode.newSession");
+      await vscode.commands.executeCommand("hiveyCode.askWith", "Are you there?");
+
+      await vscode.commands.executeCommand("hiveyCode.exportSession");
+      const exported = vscode.window.activeTextEditor?.document.getText() ?? "";
+      await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
+      assert.doesNotMatch(exported, /No endpoint configured/, exported.slice(0, 600));
+      assert.match(exported, /Answered through the gateway/, `the gateway never answered:\n${exported.slice(0, 800)}`);
+    } finally {
+      await config.update("chat.provider", before.provider, vscode.ConfigurationTarget.Global);
+      await config.update("chat.model", before.model, vscode.ConfigurationTarget.Global);
+      await config.update("endpoints.openaiCompatible", before.gateway, vscode.ConfigurationTarget.Global);
+      await config.update("privacy.confirmSend", before.confirm, vscode.ConfigurationTarget.Global);
+      stub.close();
+    }
+  });
+
+  /**
+   * A model that thinks until there is nothing left to answer with.
+   *
+   * The reasoning is charged against the same output budget as the reply, so a long think can
+   * consume all of it and the turn ends with a full block of thinking and no answer. The provider
+   * says so in `finish_reason`, and nothing read it. Asked again with more room, once, and only
+   * when there is nothing at all to show — a truncated answer that reached the user is theirs, and
+   * asking twice would bill them again for a paragraph they can already read.
+   */
+  test("a turn whose thinking ate the whole budget is asked again with more room", async () => {
+    const ext = vscode.extensions.getExtension(ID)!;
+    await ext.activate();
+
+    const stub = await scriptedStub([
+      { reasoning: "Thinking at length about the rounding…", truncated: true },
+      { text: "Round the gross total once, to the cent." },
+    ]);
+    const config = vscode.workspace.getConfiguration(SECTION);
+    const before = {
+      provider: config.get("chat.provider"),
+      model: config.get("chat.model"),
+      local: config.get("endpoints.local"),
+      confirm: config.get("privacy.confirmSend"),
+      output: config.get("chat.maxOutputTokens"),
+    };
+    await config.update("chat.provider", "local", vscode.ConfigurationTarget.Global);
+    await config.update("chat.model", "thinker", vscode.ConfigurationTarget.Global);
+    await config.update("endpoints.local", `http://127.0.0.1:${stub.port}/v1`, vscode.ConfigurationTarget.Global);
+    await config.update("privacy.confirmSend", "never", vscode.ConfigurationTarget.Global);
+    await config.update("chat.maxOutputTokens", 1000, vscode.ConfigurationTarget.Global);
+
+    try {
+      await vscode.commands.executeCommand("hiveyCode.newSession");
+      await vscode.commands.executeCommand("hiveyCode.askWith", "How should the rounding work?");
+
+      await vscode.commands.executeCommand("hiveyCode.exportSession");
+      const exported = vscode.window.activeTextEditor?.document.getText() ?? "";
+      await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
+      assert.match(exported, /Round the gross total once/, `no second attempt was made:\n${exported.slice(0, 800)}`);
+
+      // And the second request really did ask for more room, rather than repeating the first.
+      const asked = stub.bodies().map((b) => JSON.parse(b).max_tokens as number);
+      assert.equal(asked[0], 1000, `the first request did not use the setting: ${asked[0]}`);
+      assert.ok((asked[1] ?? 0) > (asked[0] ?? 0), `the retry asked for no more room than the attempt that ran out: ${asked.join(", ")}`);
+    } finally {
+      await config.update("chat.provider", before.provider, vscode.ConfigurationTarget.Global);
+      await config.update("chat.model", before.model, vscode.ConfigurationTarget.Global);
+      await config.update("endpoints.local", before.local, vscode.ConfigurationTarget.Global);
+      await config.update("privacy.confirmSend", before.confirm, vscode.ConfigurationTarget.Global);
+      await config.update("chat.maxOutputTokens", before.output, vscode.ConfigurationTarget.Global);
+      stub.close();
+    }
+  });
+
+  /**
    * A failure has to leave something behind.
    *
    * "I just get a red error message that appears for a microsecond." It was recorded in the
@@ -1413,6 +1566,29 @@ suite("Screenshot", () => {
       // spinner in the frames that follow.
       await new Promise((r) => setTimeout(r, 45_000));
 
+      // PLAN MODE, photographed after it has thought and answered.
+      //
+      // Reported as "it only does the reasoning and gives no answer", and nothing in this suite had
+      // ever run a turn that thinks — let alone looked at one. The export proves the answer reached
+      // the conversation; only the picture proves it reached the screen, and those are different
+      // claims. They were different once already, which is why the transcript is rebuilt from the
+      // state rather than from what was drawn.
+      await vscode.commands.executeCommand("hiveyCode.newSession");
+      await vscode.commands.executeCommand("hiveyCode.setMode", "plan");
+      await vscode.commands.executeCommand("hiveyCode.askWith", "Draw up a plan for the rounding.");
+      await new Promise((r) => setTimeout(r, 1500));
+      await announce("plan");
+      const planned = vscode.window.activeTextEditor;
+      await vscode.commands.executeCommand("hiveyCode.exportSession");
+      const planText = vscode.window.activeTextEditor?.document.getText() ?? "";
+      await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
+      if (planned) await vscode.window.showTextDocument(planned.document);
+      assert.ok(
+        /What I propose|Ce que je propose/.test(planText),
+        `plan mode thought and said nothing:\n${planText.slice(0, 800)}`,
+      );
+      await vscode.commands.executeCommand("hiveyCode.setMode", "agent");
+
       // The card that asks permission, photographed AFTER the panel has been rebuilt under it.
       //
       // A blocked turn is the one state where the screen must contain something to act on, and that
@@ -1490,7 +1666,9 @@ function delay(ms: number): Promise<void> {
  * a specific thing at a specific step — a tool call, then an answer — so that the turn reaches its
  * end and the code under test gets to look at what happened.
  */
-async function scriptedStub(replies: Array<{ tool?: { name: string; args: unknown }; text?: string; status?: number }>): Promise<{
+async function scriptedStub(
+  replies: Array<{ tool?: { name: string; args: unknown }; text?: string; reasoning?: string; truncated?: boolean; status?: number }>,
+): Promise<{
   port: number;
   asked: () => string[];
   bodies: () => string[];
@@ -1536,8 +1714,15 @@ async function scriptedStub(replies: Array<{ tool?: { name: string; args: unknow
         );
         res.write(`data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: "tool_calls" }] })}\n\n`);
       } else {
-        res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: reply.text ?? "done" } }] })}\n\n`);
-        res.write(`data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: "stop" }] })}\n\n`);
+        // Reasoning first when the script asks for it, exactly as a thinking model streams it: the
+        // thinking arrives before a single word of the answer, which is the order that matters.
+        if (reply.reasoning) {
+          res.write(`data: ${JSON.stringify({ choices: [{ delta: { reasoning: reply.reasoning } }] })}\n\n`);
+        }
+        if (reply.text) res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: reply.text } }] })}\n\n`);
+        res.write(
+          `data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: reply.truncated ? "length" : "stop" }] })}\n\n`,
+        );
       }
       res.write("data: [DONE]\n\n");
       res.end();

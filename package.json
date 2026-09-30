@@ -2,7 +2,7 @@
   "name": "hivey-code",
   "displayName": "Hivey Code",
   "description": "%extension.description%",
-  "version": "0.53.0",
+  "version": "0.54.0",
   "publisher": "hivey",
   "license": "Apache-2.0",
   "repository": {
@@ -88,6 +88,11 @@
         "title": "%command.newSession.title%",
         "category": "Hivey Code",
         "icon": "$(add)"
+      },
+      {
+        "command": "hiveyCode.setMode",
+        "title": "%command.setMode.title%",
+        "category": "Hivey Code"
       },
       {
         "command": "hiveyCode.askAboutSelection",
@@ -530,6 +535,11 @@
             ],
             "default": "local",
             "markdownDescription": "%config.chat.provider%"
+          },
+          "hiveyCode.chat.maxOutputTokens": {
+            "type": "number",
+            "default": 8192,
+            "markdownDescription": "%config.chat.maxOutputTokens%"
           },
           "hiveyCode.chat.promptCache": {
             "type": "boolean",

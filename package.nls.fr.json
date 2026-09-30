@@ -121,5 +121,7 @@
   "config.ibmi.integration.on": "Dès que Code for IBM i est installé, connecté ou non.",
   "config.ibmi.integration.off": "Jamais, même si Code for IBM i est présent.",
   "command.diagnoseIbmi.title": "Diagnostiquer la connexion IBM i",
-  "config.context.attachmentTokens": "Ce qu'une pièce jointe peut prendre au maximum, quel que soit le budget de contexte — environ deux mille lignes. Au-delà, le dépassement est remplacé par le **plan** du fichier : chaque symbole qu'il déclare et sa ligne, ce qui en dit plus sur un gros module que ses deux mille premières lignes et coûte vingt fois moins. Baissez-le pour dépenser moins par question ; **0** retire le plafond et envoie les fichiers entiers."
+  "config.context.attachmentTokens": "Ce qu'une pièce jointe peut prendre au maximum, quel que soit le budget de contexte — environ deux mille lignes. Au-delà, le dépassement est remplacé par le **plan** du fichier : chaque symbole qu'il déclare et sa ligne, ce qui en dit plus sur un gros module que ses deux mille premières lignes et coûte vingt fois moins. Baissez-le pour dépenser moins par question ; **0** retire le plafond et envoie les fichiers entiers.",
+  "command.setMode.title": "Changer de mode : discussion, plan ou agent",
+  "config.chat.maxOutputTokens": "Longueur maximale d'une réponse. **Un modèle qui réfléchit avant de répondre dépense ce budget pour sa réflexion aussi**, donc un chiffre confortable pour une réponse de discussion peut ne rien laisser à un modèle de raisonnement — le tour se termine alors sur un bloc de réflexion complet et aucune réponse. Dans ce cas la requête est rejouée une fois avec quatre fois le budget, et vous en êtes informé."
 }

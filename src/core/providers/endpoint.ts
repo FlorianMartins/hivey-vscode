@@ -140,3 +140,19 @@ export function describeUnusableEndpoint(baseUrl: string, provider: string): str
   }
   return undefined;
 }
+
+/**
+ * What to say when a provider has no address at all.
+ *
+ * In core, not beside the caller, because it is the whole of the instruction one class of user
+ * gets. Every vendor but one has a default address; a gateway cannot — it is somebody's own proxy,
+ * and nobody can guess where it lives. The previous wording named a prefix ("set hiveyCode.endpoints
+ * in the settings") rather than a key, and said nothing about the panel's setup screen, which has a
+ * field for exactly this.
+ */
+export function describeMissingEndpoint(provider: string, section: string, settingKey: string): string {
+  return (
+    `“${provider}” has no address yet. Set ${section}.${settingKey}, or open “Hivey Code: Set up a model” ` +
+    `and fill in the address. A key is optional for a gateway — a proxy on your own network often has none.`
+  );
+}

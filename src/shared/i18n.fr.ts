@@ -184,7 +184,6 @@ export const FR: Record<string, string> = {
   "No conversation matches these filters.": "Aucune conversation ne correspond à ces filtres.",
   "No conversation saved yet. They appear here from the first message.": "Aucune conversation enregistrée. Les discussions apparaissent ici dès le premier message.",
   "No cost, no data leaves.": "Coût nul, aucune donnée ne sort.",
-  "No endpoint configured for “{0}”. Set {1}.endpoints in the settings.": "Aucun point de terminaison configuré pour « {0} ». Renseignez {1}.endpoints dans les réglages.",
   "No folder is open and no home directory to write to.": "Aucun dossier ouvert et aucun répertoire personnel où écrire.",
   "No folder is open.": "Aucun dossier ouvert.",
   "No key yet — set one up": "Pas encore de clé — configurez-en une",
@@ -1078,4 +1077,7 @@ export const FR: Record<string, string> = {
   "the conversation": "la conversation",
   "{0} — ~{1} tokens": "{0} — ~{1} jetons",
   " (outline of {0} symbols + head, {1} of {2} tokens)": " (plan de {0} symboles + début, {1} sur {2} jetons)",
+  "Which mode?": "Quel mode ?",
+  "It spent the whole answer on thinking. Asking again with more room…": "Il a dépensé toute la réponse en réflexion. Nouvelle tentative avec plus de place…",
+  "The model used its whole answer budget on reasoning and produced no reply. Raise hiveyCode.chat.maxOutputTokens, or use a lower reasoning effort.": "Le modèle a consommé tout son budget de réponse en raisonnement et n'a rien répondu. Augmentez hiveyCode.chat.maxOutputTokens, ou baissez l'effort de raisonnement.",
 };

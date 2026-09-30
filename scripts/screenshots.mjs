@@ -101,6 +101,40 @@ const LONG =
         "The defect in your code is none of the three: it is that `Math.round` rounds towards positive infinity. On a credit note, so on a negative amount, `-12.5` becomes `-12` rather than `-13`. The customer is refunded a cent less than they were charged, and all your tests pass because they are all on positive amounts.",
       ].join("\n");
 
+/**
+ * Plan mode, with the thinking a model streams before it answers.
+ *
+ * The only fixture that emits `reasoning` deltas, and the reason it exists: plan mode was reported
+ * as "it only does the reasoning and gives no answer", and nothing here had ever photographed a
+ * turn that thinks. A frame taken after the answer has arrived is the proof that the thinking made
+ * way for it.
+ */
+const PLAN_REASONING =
+  locale === "fr"
+    ? "Je regarde d'abord où l'arrondi se produit aujourd'hui. Le total est calculé ligne par ligne, donc la question est de savoir si l'arrondi doit rester là ou remonter au niveau de la facture."
+    : "Let me look at where the rounding happens today. The total is computed line by line, so the question is whether the rounding belongs there or at the invoice level.";
+
+const PLAN_ANSWER =
+  locale === "fr"
+    ? [
+        "**Ce que j'ai trouvé** — `totalTTC` (`totals.ts:1`) somme les lignes en pleine précision puis applique la TVA sans arrondir. Aucun test ne couvre les montants négatifs.",
+        "",
+        "**Ce que je propose**",
+        "1. `totals.ts` — arrondir le total TTC au centime, une seule fois. Réversible.",
+        "2. `totals.test.ts` — ajouter un cas d'avoir (montant négatif). Réversible.",
+        "",
+        "**Ce qui pourrait casser** — les factures déjà émises changent d'un centime si elles sont recalculées. À vérifier avant de rejouer un historique.",
+      ].join("\n")
+    : [
+        "**What I found** — `totalTTC` (`totals.ts:1`) sums the lines at full precision and then applies VAT without rounding. No test covers negative amounts.",
+        "",
+        "**What I propose**",
+        "1. `totals.ts` — round the gross total to the cent, once. Reversible.",
+        "2. `totals.test.ts` — add a credit-note case (negative amount). Reversible.",
+        "",
+        "**What could break** — invoices already issued shift by a cent if they are recomputed. Worth checking before replaying any history.",
+      ].join("\n");
+
 const MODELS = [
   { id: "qwen2.5-coder:7b", name: "Qwen2.5 Coder 7B" },
   { id: "deepseek-coder-v2:16b", name: "DeepSeek Coder V2 16B" },
@@ -154,6 +188,29 @@ const server = createServer((req, res) => {
     res.write(`data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: "tool_calls" }] })}\n\n`);
     res.write("data: [DONE]\n\n");
     res.end();
+    return;
+  }
+  // Plan mode: reasoning first, then the plan. The only fixture that streams both.
+  if (/draw up a plan|propose un plan/i.test(sent)) {
+    const think = PLAN_REASONING.match(/[\s\S]{1,20}/g) ?? [];
+    const say = PLAN_ANSWER.match(/[\s\S]{1,20}/g) ?? [];
+    let k = 0;
+    const tick = setInterval(() => {
+      if (k < think.length) {
+        res.write(`data: ${JSON.stringify({ choices: [{ delta: { reasoning: think[k++] } }] })}\n\n`);
+        return;
+      }
+      const j = k - think.length;
+      if (j >= say.length) {
+        clearInterval(tick);
+        res.write(`data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: "stop" }] })}\n\n`);
+        res.write("data: [DONE]\n\n");
+        res.end();
+        return;
+      }
+      k += 1;
+      res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: say[j] } }] })}\n\n`);
+    }, 40);
     return;
   }
   const slow = /step by step|en détail/i.test(sent);
@@ -249,7 +306,7 @@ function announced() {
 
 // Wait for the harness to name a screen, photograph it once it has settled, and move on. There is
 // no clock here beyond a timeout: the editor decides when it is ready, and says so.
-const SCREENS = ["conversation", "pendant", "approbation", "contexte", "setup", "picker", "historique", "modeles", "permissions"];
+const SCREENS = ["conversation", "pendant", "plan", "approbation", "contexte", "setup", "picker", "historique", "modeles", "permissions"];
 // One hold per screen is not the budget: the fixture drives a real conversation between them, and
 // the frame taken mid-answer waits for a deliberately slow one to finish. Two screens' worth of
 // slack plus a flat minute covers the talking; a deadline that expires mid-run reports every

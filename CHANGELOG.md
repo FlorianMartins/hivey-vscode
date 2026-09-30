@@ -2,6 +2,40 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.54.0 — 2026-09-30
+
+### Corrigé
+
+- **Le modèle réfléchissait et ne répondait pas, surtout en mode Plan.** La boucle d'agent
+  **jetait** la raison d'arrêt du fournisseur : une réponse coupée par la limite de sortie et une
+  réponse terminée étaient indiscernables. Or un modèle qui raisonne paie sa réflexion **sur le même
+  budget de sortie que sa réponse** — avec un `max_tokens` de 4 096 écrit en dur, une longue
+  réflexion consommait tout et le tour se terminait sur un bloc de raisonnement complet et pas un
+  mot de réponse. Le mode Plan le sentait en premier : c'est celui qui demande d'enquêter avant
+  d'écrire.
+
+  - La troncature remonte jusqu'à l'appelant (`TurnResult.truncated`).
+  - Le budget de sortie devient un réglage, **`hiveyCode.chat.maxOutputTokens`, défaut 8 192**.
+  - Quand il ne reste **rien** à montrer, la requête est **rejouée une fois avec quatre fois la
+    place**, et c'est dit. Une réponse tronquée mais lisible est laissée telle quelle : elle est
+    imparfaite et elle est à vous, redemander la ferait payer deux fois.
+  - Si elle reste vide, la conversation le dit en toutes lettres et nomme le réglage à augmenter.
+
+- **Mode Plan jamais couvert par un test.** Il change le prompt système **et tout l'outillage**, et
+  aucun test n'y jouait un tour — parce qu'il n'y avait aucun moyen d'y entrer hors du menu du
+  composeur. Nouvelle commande **`hiveyCode.setMode`** (palette et raccourci : *Hivey Code : changer
+  de mode*), et deux gardes : un tour de bout en bout en mode Plan, et **une capture d'écran** du
+  résultat — l'export prouve que la réponse a atteint la conversation, seule l'image prouve qu'elle
+  a atteint l'écran, et ce sont deux affirmations différentes.
+
+- **« No endpoint configured for openai-compatible ».** La phrase nommait un préfixe et non une clé,
+  et ignorait l'écran de configuration du panneau qui a un champ pour exactement ça. C'est pourtant
+  le seul fournisseur sans adresse par défaut — c'est la passerelle de quelqu'un, personne ne peut
+  deviner où elle vit — donc ce message est toute l'instruction que son utilisateur reçoit. Il nomme
+  désormais le réglage exact, renvoie vers *Hivey Code : configurer un modèle*, et précise qu'**une
+  clé est facultative** pour une passerelle. Deux tests neufs : une passerelle répond dès que son
+  adresse est posée, sans clé ; et le message nomme un réglage qui existe dans le manifeste.
+
 ## 0.53.0 — 2026-09-30
 
 ### Corrigé

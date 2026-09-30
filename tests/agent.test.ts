@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { runTurn, type Tool } from "../src/core/agent/loop.js";
 import type { ChatRequest, ChatResult, Provider } from "../src/core/providers/types.js";
 
-type Scripted = { text?: string; toolCalls?: Array<{ id: string; name: string; args: string }> };
+type Scripted = { text?: string; toolCalls?: Array<{ id: string; name: string; args: string }>; truncated?: boolean };
 
 function scriptedProvider(script: Scripted[]): Provider & { seen: ChatRequest[] } {
   let i = 0;
@@ -26,7 +26,7 @@ function scriptedProvider(script: Scripted[]): Provider & { seen: ChatRequest[] 
         reasoning: "",
         toolCalls: s.toolCalls ?? [],
         usage: { promptTokens: 10, completionTokens: 5, cachedTokens: 0 },
-        stopReason: s.toolCalls?.length ? "tool_calls" : "stop",
+        stopReason: s.truncated ? "length" : s.toolCalls?.length ? "tool_calls" : "stop",
       };
     },
     async listModels() {
@@ -280,4 +280,38 @@ test("a short request is not marked even when it is asked for, because the write
   const provider = scriptedProvider([{ text: "ok" }]);
   await runTurn({ ...base, provider, promptCache: true, messages: [{ role: "user", content: "write a commit message" }] });
   assert.ok(!provider.seen[0]!.messages.some((m) => m.cacheable));
+});
+
+// ── Running out of room is not the same as finishing ────────────────────────────────────────────
+//
+// The provider says which of the two happened, in `finish_reason`, and nothing read it — so an
+// answer cut off mid-sentence and a complete one were indistinguishable to everything above. On a
+// model that thinks before it answers the consequence is worse than a missing paragraph: the
+// reasoning is charged against the same output budget, so a long think can consume all of it and
+// the turn ends with a full block of thinking and no reply. Reported as "it only does the reasoning
+// and gives no answer", and felt first in plan mode — the mode that asks the model to investigate
+// before it writes.
+
+test("a turn cut off by the output budget says so", () => {
+  const provider = scriptedProvider([{ text: "As I was say", truncated: true }]);
+  return runTurn({ ...base, provider, messages: [{ role: "user", content: "hello" }] }).then((result) => {
+    assert.equal(result.truncated, true, "the turn claims to have finished when it was cut off");
+  });
+});
+
+test("a turn that finished does not claim to have been cut off", () => {
+  const provider = scriptedProvider([{ text: "All of it." }]);
+  return runTurn({ ...base, provider, messages: [{ role: "user", content: "hello" }] }).then((result) => {
+    assert.equal(result.truncated, false);
+  });
+});
+
+test("the budget the caller asked for is the budget that is sent", () => {
+  // The turn used a constant of 4 096 written at the call site, which is comfortable for a chat
+  // reply and not enough for a reasoning model writing a plan. It is a setting now, and this is the
+  // assertion that it reaches the provider rather than being decoration.
+  const provider = scriptedProvider([{ text: "ok" }]);
+  return runTurn({ ...base, provider, maxTokens: 12_345, messages: [{ role: "user", content: "hi" }] }).then(() => {
+    assert.equal(provider.seen[0]!.maxTokens, 12_345);
+  });
 });

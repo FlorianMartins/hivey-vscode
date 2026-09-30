@@ -114,6 +114,18 @@ export interface TurnResult {
   /** The tool calls made during this turn, for the transcript and the audit log. */
   trace: Array<{ call: ToolCall; result: ToolResult; approved: boolean }>;
   stoppedBecause: "answer" | "max-steps" | "cancelled";
+  /**
+   * The model ran out of output budget rather than finishing.
+   *
+   * It was thrown away — the provider reports `finish_reason: "length"` and nothing read it — so a
+   * sentence cut in half and a finished answer looked identical to everything above. On a model
+   * that thinks before answering the consequence is worse than a missing paragraph: the reasoning
+   * is charged against the same budget, so a long think leaves nothing for the answer and the turn
+   * ends with a full block of thinking and no reply at all. Which is precisely how it was reported
+   * — "it only does the reasoning and gives no answer" — and why plan mode felt it first: it is the
+   * mode that asks the model to investigate before it writes.
+   */
+  truncated: boolean;
 }
 
 const DEFAULT_MAX_STEPS = 12;
@@ -169,6 +181,8 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
   const usage: Usage = { promptTokens: 0, completionTokens: 0, cachedTokens: 0, costUsd: 0 };
   let text = "";
   let reasoning = "";
+  /** Set by the last response that ran out of output budget. See `TurnResult.truncated`. */
+  let truncated = false;
 
   for (let step = 0; step < maxSteps; step++) {
     if (opts.signal?.aborted) return done("cancelled");
@@ -206,6 +220,7 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
     usage.cachedTokens += res.usage.cachedTokens;
     if (typeof res.usage.costUsd === "number") usage.costUsd = (usage.costUsd ?? 0) + res.usage.costUsd;
 
+    truncated = res.stopReason === "length";
     const answer = opts.afterResponse ? opts.afterResponse(res.text) : res.text;
     if (answer) text = text ? `${text}\n${answer}` : answer;
     if (res.reasoning) reasoning += res.reasoning;
@@ -322,6 +337,6 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
   return done("max-steps");
 
   function done(stoppedBecause: TurnResult["stoppedBecause"]): TurnResult {
-    return { text, reasoning, steps: trace.length, usage, trace, stoppedBecause };
+    return { text, reasoning, steps: trace.length, usage, trace, stoppedBecause, truncated };
   }
 }
