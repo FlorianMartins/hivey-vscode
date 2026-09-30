@@ -531,9 +531,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       // A preset is served from the catalogue, so it is remote whatever the provider setting still
       // says. Getting this wrong would not merely mislabel a row: this flag is what the empty
       // conversation reads to promise that nothing leaves the machine.
-      // "Remote" here means "costs money", which is what the row it drives is about. A gateway is
-      // not remote in that sense however far away it is — see `core/router/billing.ts`.
-      remote: isHivey(s.chat.model) || billsTheUser(s.chat.provider),
+      // Where the answer comes from. NOT whether it costs anything — those were the same field for
+      // two releases and a gateway broke both of them at once.
+      remote: isHivey(s.chat.model) || !isLocalEndpoint(baseUrl),
+      billed: isHivey(s.chat.model) || billsTheUser(s.chat.provider),
       contextTokens,
       sentTokens: this.session.plannedTokens(budgetTokens),
       contextBudget: budgetTokens,
@@ -674,6 +675,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this.session.mode = mode;
     this.savePrefs();
     this.sendState();
+  }
+
+  /** Rebuild the model list. Used when a setting the list depends on changes under it. */
+  reloadModels(): void {
+    void this.loadModels();
   }
 
   newSession(): void {

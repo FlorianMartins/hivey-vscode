@@ -248,7 +248,17 @@ export interface UiState {
   model: string;
   modelLabel: string;
   provider: string;
+  /**
+   * The answer comes from somewhere other than this machine.
+   *
+   * About WHERE, never about money. The two were briefly the same field and a gateway broke both:
+   * it bills nobody, so the cost row was right to be quiet — and the composer then labelled it
+   * "Local" whatever provider was selected, because the label reads this. Choosing "Your own
+   * gateway" appeared to do nothing at all.
+   */
   remote: boolean;
+  /** Whether this provider charges the user. Drives the cost row, and nothing else. */
+  billed: boolean;
   contextTokens: number;
   /**
    * Of that, how much actually goes with the next question.

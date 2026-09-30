@@ -175,7 +175,6 @@ export const FR: Record<string, string> = {
   "Models": "Modèles",
   "More with Hivey Code…": "Plus avec Hivey Code…",
   "Most expensive": "La plus coûteuse",
-  "Needs an address and a key — set them up": "Il faut une adresse et une clé — configurez-les",
   "New conversation": "Nouvelle conversation",
   "New sub-agent…": "Nouveau sous-agent…",
   "No API key stored for “{0}”. Run “Hivey Code: Store a provider key”.": "Aucune clé enregistrée pour « {0} ». Lancez « Hivey Code : Enregistrer une clé de fournisseur ».",
@@ -1083,4 +1082,6 @@ export const FR: Record<string, string> = {
   "On your gateway": "Sur votre passerelle",
   "use this name on the gateway — it serves what it has, not a catalogue": "utiliser ce nom sur la passerelle — elle sert ce qu'elle a, pas un catalogue",
   "Hivey Code: your gateway address had been mistaken for a key and moved to the secret store. It is back in the settings ({0}). If it also needs a key, add it from the setup screen.": "Hivey Code : votre adresse de passerelle avait été prise pour une clé et déplacée dans le coffre. Elle est de retour dans les réglages ({0}). Si elle demande aussi une clé, ajoutez-la depuis l'écran de configuration.",
+  "Needs an address — set it up": "Il faut une adresse — configurez-la",
+  "Whatever your proxy has been given. Nothing is billed through this extension, which has no price list for it.": "Ce que votre proxy a reçu. Rien n'est facturé par cette extension, qui n'a pas sa grille tarifaire.",
 };

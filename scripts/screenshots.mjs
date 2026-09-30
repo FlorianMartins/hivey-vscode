@@ -306,7 +306,7 @@ function announced() {
 
 // Wait for the harness to name a screen, photograph it once it has settled, and move on. There is
 // no clock here beyond a timeout: the editor decides when it is ready, and says so.
-const SCREENS = ["conversation", "pendant", "plan", "approbation", "contexte", "setup", "picker", "historique", "modeles", "permissions"];
+const SCREENS = ["conversation", "pendant", "plan", "approbation", "contexte", "passerelle", "setup", "picker", "historique", "modeles", "permissions"];
 // One hold per screen is not the budget: the fixture drives a real conversation between them, and
 // the frame taken mid-answer waits for a deliberately slow one to finish. Two screens' worth of
 // slack plus a flat minute covers the talking; a deadline that expires mid-run reports every

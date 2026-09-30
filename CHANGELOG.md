@@ -2,6 +2,44 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.58.0 — 2026-09-30
+
+### Corrigé
+
+- **La passerelle ne pouvait pas être choisie, et affichait « Local » quand on la choisissait.**
+  Quatre défauts distincts, tous sur le même chemin, tous passés à travers les tests existants.
+
+  - `providerReady` demandait une **clé avant de regarder l'adresse**. Une passerelle avec une
+    adresse et sans clé n'était donc jamais « prête », et le menu du composeur refuse de basculer
+    vers ce qui ne l'est pas : il ouvrait l'écran de configuration à la place. Choisir « Votre
+    propre passerelle » ne faisait rien, jamais. ⚠️ Cette règle **contredisait `providerFor`**, qui
+    autorise explicitement une clé absente pour une passerelle — un proxy sur son propre réseau n'en
+    a généralement pas. Un test affirmait même l'ancien comportement.
+  - **La puce affichait « Local ».** En 0.55.0 j'ai réutilisé `state.remote` — qui voulait dire
+    « ça quitte la machine » — pour dire « ça coûte de l'argent ». Une passerelle ne facture rien,
+    donc l'étiquette la déclarait locale quel que soit le fournisseur choisi. Les deux faits sont
+    séparés à nouveau : `remote` pour l'endroit, `billed` pour l'argent.
+  - **La liste n'était pas reconstruite** quand le fournisseur ou une adresse changeait, alors que
+    ce qu'elle a le droit d'offrir en dépend. On basculait sur la passerelle et le sélecteur
+    continuait d'afficher les 457 lignes calculées quand le fournisseur local était sélectionné.
+  - **Les modèles de la passerelle étaient avalés** par la déduplication : un proxy servant les
+    mêmes noms qu'un Ollama local ne produisait aucune ligne. Ce sont deux destinations — une autre
+    machine, une autre facture, une autre fenêtre — donc deux lignes.
+
+- **L'écran Modèles a sa propre section « Sur votre passerelle »**, comme le sélecteur l'avait déjà.
+  Les deux ne s'accordaient pas : une passerelle interne étant en loopback, ses modèles tombaient
+  dans « Sur votre machine » et ressemblaient à des doublons. ⚠️ C'est exactement pourquoi cela
+  paraissait correct à un endroit et faux à l'autre.
+
+- **Sur la passerelle, le catalogue OpenRouter disparaît même si une clé OpenRouter existe.** Qui
+  travaille par son proxy choisit entre les trois ou quatre modèles qu'il sert ; 457 lignes ne sont
+  pas une liste plus longue pour lui, c'est la raison pour laquelle il ne trouve pas la courte.
+
+### Ajouté
+
+- Une **capture d'écran permanente** de la passerelle sélectionnée. Quatre versions de ce chemin ont
+  été livrées cassées en passant les tests qui existaient ; aucune ne survit à une photographie.
+
 ## 0.57.0 — 2026-09-30
 
 ### Corrigé

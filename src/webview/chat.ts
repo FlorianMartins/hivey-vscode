@@ -17,6 +17,7 @@ import type { Mode, Reasoning, ToExtension, UiApproval, UiEntry, UiSkill, UiStat
 import { applySuggestion, suggestionsFor, type Suggestion } from "../core/session/mentions.js";
 import { BUILTIN_SKILLS, type BuiltinSkill } from "../core/session/skills.js";
 import { planComplete, planSummary, type Plan } from "../core/agent/plan.js";
+import { providerIsReady, whatIsMissing, type ProviderState } from "../core/providers/ready.js";
 
 const MODES: Array<{ id: Mode; label: string; hint: string }> = [
   { id: "chat", label: t("Chat"), hint: t("Answers from what you attach. No access to the repository.") },
@@ -1045,7 +1046,7 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
   //
   // Hidden entirely on a local model with nothing spent — a figure that is structurally zero is not
   // a reading, it is a decoration that teaches people to ignore the row it sits in.
-  if (state.sessionCostUsd > 0 || state.remote) {
+  if (state.sessionCostUsd > 0 || state.billed) {
     meter.append(el("span", "composer-sep", "\u2022"));
     const cost = el("span", "composer-cost", formatCost(state.sessionCostUsd));
     cost.title = t("What this conversation has cost. Today's total is in the cost report.");
@@ -1359,18 +1360,31 @@ const PROVIDERS: Array<{ id: string; short: string; label: string; hint: string 
  * drawn from the same `state.setup` — it simply was not being consulted at the moment the choice is
  * actually made.
  */
-export function providerReady(id: string, state: UiState): boolean {
-  if (id === "local") return state.setup.probing || state.setup.runtimes.length > 0;
-  if (!state.setup.hasKey[id]) return false;
-  // A gateway that is only an API shape needs to be told where it lives.
-  if (vendor(id)?.needsUrl) return Boolean(state.setup.endpoints?.[id]);
-  return true;
+/** The pieces `providerIsReady` needs, read off the state the panel already has. */
+function readiness(id: string, state: UiState): ProviderState {
+  return {
+    hasKey: Boolean(state.setup.hasKey[id]),
+    hasEndpoint: Boolean(state.setup.endpoints?.[id]),
+    needsUrl: Boolean(vendor(id)?.needsUrl),
+    localFound: state.setup.probing || state.setup.runtimes.length > 0,
+  };
 }
 
-function missingFor(id: string): string {
-  if (id === "local") return t("No model server found on this machine — set one up");
-  if (vendor(id)?.needsUrl) return t("Needs an address and a key — set them up");
-  return t("No key yet — set one up");
+export function providerReady(id: string, state: UiState): boolean {
+  return providerIsReady(id, readiness(id, state));
+}
+
+function missingFor(id: string, state: UiState): string {
+  switch (whatIsMissing(id, readiness(id, state))) {
+    case "runtime":
+      return t("No model server found on this machine — set one up");
+    case "endpoint":
+      // Not "an address and a key". A proxy on your own network usually has no key, and asking for
+      // one that is not needed is how this provider became impossible to select.
+      return t("Needs an address — set it up");
+    default:
+      return t("No key yet — set one up");
+  }
 }
 
 /**
@@ -1405,7 +1419,7 @@ function providerButton(state: UiState, deps: ChatDeps): HTMLElement {
               // What is missing, in the place where the choice is made. Picking a gateway with no key
               // used to switch in silence and fail one question later with an HTTP 401 — the worst
               // moment and the worst place to learn that a key was needed.
-              hint: ready ? p.hint : missingFor(p.id),
+              hint: ready ? p.hint : missingFor(p.id, state),
               detail: ready ? undefined : t("not set up"),
               selected: p.id === state.provider,
               onClick: () => {

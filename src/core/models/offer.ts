@@ -20,12 +20,22 @@ import type { UiModel } from "../../shared/protocol.js";
 export interface Reach {
   /** A key is stored for OpenRouter, so the catalogue and the presets are reachable. */
   openrouter: boolean;
+  /**
+   * The provider currently selected.
+   *
+   * A gateway settles the question on its own, key or no key elsewhere: somebody working through
+   * their own proxy is choosing between the three or four models it serves, and four hundred
+   * OpenRouter rows are not a longer list for them — they are the reason they cannot find the
+   * short one. Switching away is one click on the composer's provider button, which is where
+   * changing provider belongs.
+   */
+  provider?: string;
 }
 
 export function offerable(all: UiModel[], reach: Reach): UiModel[] {
-  if (reach.openrouter) return all;
-
   const throughOpenRouter = (m: UiModel): boolean => m.provider === "openrouter";
+  const onTheGateway = reach.provider === "openai-compatible";
+  if (reach.openrouter && !onTheGateway) return all;
 
   // A source of their OWN that they had to configure: a gateway, or a vendor they hold a key for.
   //
@@ -39,7 +49,7 @@ export function offerable(all: UiModel[], reach: Reach): UiModel[] {
   // chosen to have any but these — and hiding the catalogue would remove the only thing that says
   // what connecting a provider would buy. Somebody who has configured a proxy HAS chosen, and four
   // hundred models they cannot send a question to are in their way.
-  const configured = all.some((m) => m.provider !== "local" && !throughOpenRouter(m));
+  const configured = onTheGateway || all.some((m) => m.provider !== "local" && !throughOpenRouter(m));
   if (!configured) return all;
 
   // The selected model always survives, whatever it is reached through. A picker whose trigger

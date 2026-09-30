@@ -47,12 +47,22 @@ export function modelsScreen(state: UiState, send: (m: ToExtension) => void, rer
   );
 
   const presets = matching.filter((m) => isHivey(m.id));
-  const local = matching.filter((m) => m.local);
+  // The gateway is its own bucket, ahead of "on your machine" and separate from it.
+  //
+  // It was falling into the local one, because an internal proxy has a loopback or RFC1918 address
+  // and is therefore marked local — so a gateway serving the same names as the laptop's Ollama
+  // produced six rows under "On your machine", three of them apparently duplicates. The picker had
+  // already learned this lesson and grown its own group; this screen had not, and the two
+  // disagreeing is why it looked right in one place and wrong in the other.
+  const gateway = matching.filter((m) => m.provider === "openai-compatible");
+  const local = matching.filter((m) => m.local && m.provider !== "openai-compatible");
   // Served by a vendor the user pays directly. Kept out of "Remote", which is the OpenRouter
   // catalogue: the same model appears in both, and the difference — whose account is billed — is
   // the only thing that separates the two rows.
-  const own = matching.filter((m) => !m.local && isDirectVendor(m.provider));
-  const remote = matching.filter((m) => !m.local && !isHivey(m.id) && !isDirectVendor(m.provider));
+  const own = matching.filter((m) => !m.local && m.provider !== "openai-compatible" && isDirectVendor(m.provider));
+  const remote = matching.filter(
+    (m) => !m.local && m.provider !== "openai-compatible" && !isHivey(m.id) && !isDirectVendor(m.provider),
+  );
 
   const list = el("div", "models-list");
   // The presets first, and not because they are better: they answer a different question. Everything
@@ -72,6 +82,15 @@ export function modelsScreen(state: UiState, send: (m: ToExtension) => void, rer
   if (local.length) {
     list.append(sectionTitle(t("On your machine"), t("No cost, no data leaves.")));
     for (const m of local) list.append(modelRow(m, send));
+  }
+  if (gateway.length) {
+    list.append(
+      sectionTitle(
+        t("On your gateway"),
+        t("Whatever your proxy has been given. Nothing is billed through this extension, which has no price list for it."),
+      ),
+    );
+    for (const m of gateway) list.append(modelRow(m, send));
   }
   if (own.length) {
     list.append(

@@ -81,3 +81,42 @@ test("a key with a vendor of their own also settles where their models come from
   const all = [...catalogue, model("claude-x", "anthropic")];
   assert.deepEqual(offerable(all, { openrouter: false }).map((m) => m.id), ["claude-x"]);
 });
+
+test("on the gateway, the catalogue goes even when OpenRouter is configured", () => {
+  // The case the first version of this rule missed. Somebody with an OpenRouter key AND a private
+  // proxy was shown all four hundred and fifty-seven rows while working through the proxy — which
+  // is not a longer list for them, it is the reason they cannot find the short one. Switching away
+  // is one click on the composer's provider button.
+  const all = [
+    ...catalogue,
+    model("qwen3-coder", "openai-compatible", { local: true, loopback: true }),
+    model("deepseek-r2", "openai-compatible", { local: true, loopback: true }),
+  ];
+  const offered = offerable(all, { openrouter: true, provider: "openai-compatible" });
+  assert.deepEqual(offered.map((m) => m.id), ["qwen3-coder", "deepseek-r2"]);
+});
+
+test("off the gateway, an OpenRouter key brings the catalogue back", () => {
+  const all = [...catalogue, model("qwen3-coder", "openai-compatible", { local: true })];
+  assert.equal(offerable(all, { openrouter: true, provider: "openrouter" }).length, all.length);
+});
+
+test("a gateway with no models yet still clears the catalogue away", () => {
+  // A proxy whose /models is slow, or not implemented, contributes no rows. Leaving four hundred
+  // and fifty-seven OpenRouter rows in their place would answer the wrong question loudly: the
+  // picker's own empty state, plus the row that lets a name be typed, is the honest answer.
+  const offered = offerable(catalogue, { openrouter: true, provider: "openai-compatible" });
+  assert.deepEqual(offered, []);
+});
+
+test("a gateway serving the same name as a local runtime is still its own row", () => {
+  // Two destinations, not one row: a different machine, a different bill, a different window. The
+  // list deduplicated by name alone, so whichever came first — the local one, always — hid the
+  // other, and a proxy serving the same names as the laptop contributed nothing and looked broken.
+  const all = [
+    model("qwen3-coder", "local"),
+    model("qwen3-coder", "openai-compatible", { local: true, loopback: true }),
+  ];
+  const offered = offerable(all, { openrouter: false, provider: "openai-compatible" });
+  assert.equal(offered.length, 2, "the gateway's copy was swallowed by the local one");
+});

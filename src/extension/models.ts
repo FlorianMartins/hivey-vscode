@@ -189,8 +189,16 @@ export async function listModels(settings: Settings, keys: Keys, current: string
   const gatewayUrl = safe(() => endpointFor(settings, "openai-compatible"));
   if (gatewayUrl) {
     for (const id of await served(settings, keys, "openai-compatible")) {
-      if (seen.has(id)) continue;
-      seen.add(id);
+      // Keyed by destination, like the direct vendors just below, and NOT by name alone.
+      //
+      // A gateway serving `qwen3-coder` and an Ollama on this machine serving `qwen3-coder` are two
+      // different places to send a question: a different machine, a different bill, a different
+      // window. Deduplicating by id alone let whichever came first — the local one, always — hide
+      // the other, so a proxy serving the same names as the laptop contributed nothing at all and
+      // looked broken.
+      const key = `${id}@gateway`;
+      if (seen.has(key)) continue;
+      seen.add(key);
       const local = isLocalEndpoint(gatewayUrl);
       out.push({
         id,
@@ -271,7 +279,7 @@ export async function listModels(settings: Settings, keys: Keys, current: string
   // Only what this installation can actually reach. See `core/models/offer.ts` — the catalogue and
   // the presets both go through OpenRouter, and a user whose access is a private gateway was being
   // shown four hundred models they had no way to send a question to.
-  return offerable(out, { openrouter: Boolean(await keys.get("openrouter")) });
+  return offerable(out, { openrouter: Boolean(await keys.get("openrouter")), provider: settings.chat.provider });
 }
 
 /** A short label for the composer button: the name without the vendor, plus a price hint. */

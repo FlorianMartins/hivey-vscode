@@ -1825,6 +1825,29 @@ suite("Screenshot", () => {
       }
       await vscode.commands.executeCommand("hiveyCode.attachOpenEditors");
       await announce("contexte");
+      // THE GATEWAY, selected and offering its own models.
+      //
+      // Four attempts at this path shipped broken — the provider that could not be selected, the
+      // label that said "Local" whatever was chosen, the picker that buried three models under four
+      // hundred and fifty-seven. Every one of them passed the tests that existed. None of them
+      // survives a photograph, which is why there is one.
+      await vscode.workspace
+        .getConfiguration(SECTION)
+        .update("endpoints.openaiCompatible", process.env["HIVEY_CODE_SCREENSHOT"], vscode.ConfigurationTarget.Global);
+      await vscode.workspace
+        .getConfiguration(SECTION)
+        .update("chat.provider", "openai-compatible", vscode.ConfigurationTarget.Global);
+      await new Promise((r) => setTimeout(r, 1500));
+      await vscode.commands.executeCommand("hiveyCode.showModels");
+      await announce("passerelle");
+      await vscode.workspace
+        .getConfiguration(SECTION)
+        .update("chat.provider", "local", vscode.ConfigurationTarget.Global);
+      await vscode.workspace
+        .getConfiguration(SECTION)
+        .update("endpoints.openaiCompatible", undefined, vscode.ConfigurationTarget.Global);
+      await new Promise((r) => setTimeout(r, 800));
+
       for (const [command, name] of [
         ["hiveyCode.setup", "setup"],
         ["hiveyCode.pickModel", "picker"],
