@@ -107,16 +107,24 @@ function toItems(state: UiState): ComboItem[] {
       // free, and they are not the same offer: one keeps working on a train, the other is a shared
       // machine somebody else can reboot. Collapsing them would hide the only difference that
       // matters when choosing between them.
-      group: model.local
-        ? model.loopback === false
-          ? t("On your network")
-          : t("On your machine")
-        : // A model served by the vendor's own API is not the same row as the same model behind
-          // OpenRouter: another account, another bill, another rate limit. Grouped under the
-          // account rather than under the vendor name, so the two never look like duplicates.
-          isDirectVendor(model.provider)
-          ? t("Your account: {0}", vendor)
-          : vendorLabel(vendor),
+      group:
+        // A gateway is the user's own infrastructure, like the two below it, and it belongs with
+        // them rather than alphabetically among the vendors. It is also usually a short list — the
+        // three or four models a proxy has been given — and the point of a short list is that you
+        // can switch between them without hunting: "so I can switch easily between the models
+        // available through the gateway".
+        model.provider === "openai-compatible"
+          ? t("On your gateway")
+          : model.local
+            ? model.loopback === false
+              ? t("On your network")
+              : t("On your machine")
+            : // A model served by the vendor's own API is not the same row as the same model behind
+              // OpenRouter: another account, another bill, another rate limit. Grouped under the
+              // account rather than under the vendor name, so the two never look like duplicates.
+              isDirectVendor(model.provider)
+              ? t("Your account: {0}", vendor)
+              : vendorLabel(vendor),
       model,
     };
   });
@@ -124,8 +132,13 @@ function toItems(state: UiState): ComboItem[] {
   // Inside a group: best first, then cheapest. Across groups: local first, then vendors A-Z. The
   // local models lead because they are the ones that cost nothing and send nothing, which is the
   // whole argument of this extension — burying them under Anthropic would contradict it.
+  // Yours first, then everyone else's. A gateway ranks with the local runtimes whether or not its
+  // address happens to be on this machine: it is infrastructure the user runs, it is the short list
+  // they switch between, and sorting it as "g" between DeepSeek and Google buried it.
+  const mine = (i: ComboItem): number => (i.local ? 0 : i.provider === "openai-compatible" ? 1 : 2);
   items.sort((a, b) => {
-    if (a.local !== b.local) return a.local ? -1 : 1;
+    const rank = mine(a) - mine(b);
+    if (rank !== 0) return rank;
     if (a.group !== b.group) return a.group.localeCompare(b.group);
     return a.model.inUsd - b.model.inUsd || a.label.localeCompare(b.label);
   });
@@ -233,9 +246,41 @@ export function openModelCombo(anchor: HTMLElement, state: UiState, send: (m: To
   const buildList = () => {
     if (!list) return;
     list.textContent = "";
-    const matching = applySort(toItems(state).filter((item) => passes(item, query.trim().toLowerCase())));
+    const typed = query.trim();
+    const matching = applySort(toItems(state).filter((item) => passes(item, typed.toLowerCase())));
+
+    // A gateway is not a catalogue.
+    //
+    // It serves whatever it has been given — qwen, deepseek, a fine-tune with a name nobody else
+    // uses — and plenty of proxies answer nothing at all on `/models`, which is optional in the
+    // OpenAI API. There was then no row to pick and no way to name a model except by editing
+    // settings.json, which is not something the picker should send anybody off to do. So a name
+    // typed into the search box is offered as a choice on the gateway when nothing matches it.
+    const gateway = state.models.find((m) => m.provider === "openai-compatible");
+    const known = state.models.some((m) => m.id === typed);
+    if (gateway && typed.length > 1 && !known) {
+      const use = el("div", "combo-group", t("On your gateway"));
+      list.append(use);
+      list.append(
+        row({
+          value: typed,
+          label: typed,
+          detail: t("use this name on the gateway — it serves what it has, not a catalogue"),
+          provider: "openai-compatible",
+          vendor: t("gateway"),
+          tier: "free",
+          local: Boolean(gateway.local),
+          current: false,
+          group: t("On your gateway"),
+          model: { ...gateway, id: typed, name: typed, current: false },
+        }),
+      );
+    }
+
     if (!matching.length) {
-      list.append(el("div", "combo-empty", state.modelsLoading ? t("Loading…") : t("No model matches.")));
+      if (!gateway || typed.length <= 1 || known) {
+        list.append(el("div", "combo-empty", state.modelsLoading ? t("Loading…") : t("No model matches.")));
+      }
       return;
     }
     let lastGroup: string | undefined;

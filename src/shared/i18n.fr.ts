@@ -1080,4 +1080,6 @@ export const FR: Record<string, string> = {
   "Which mode?": "Quel mode ?",
   "It spent the whole answer on thinking. Asking again with more room…": "Il a dépensé toute la réponse en réflexion. Nouvelle tentative avec plus de place…",
   "The model used its whole answer budget on reasoning and produced no reply. Raise hiveyCode.chat.maxOutputTokens, or use a lower reasoning effort.": "Le modèle a consommé tout son budget de réponse en raisonnement et n'a rien répondu. Augmentez hiveyCode.chat.maxOutputTokens, ou baissez l'effort de raisonnement.",
+  "On your gateway": "Sur votre passerelle",
+  "use this name on the gateway — it serves what it has, not a catalogue": "utiliser ce nom sur la passerelle — elle sert ce qu'elle a, pas un catalogue",
 };

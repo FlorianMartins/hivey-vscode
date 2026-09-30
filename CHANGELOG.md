@@ -2,6 +2,44 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.55.0 — 2026-09-30
+
+### Modifié
+
+- **Le sélecteur n'offre plus que ce que vous pouvez atteindre.** Il portait ses 457 lignes de
+  catalogue quelle que soit votre configuration — or **toutes passent par OpenRouter**, comme les
+  trois préréglages Hivey qui sont un routage sur le même catalogue. Sans clé là-bas, ce ne sont pas
+  des choix : c'est une vitrine. Utile à qui n'a encore rien configuré, et du bruit pour qui accède
+  à ses modèles par une passerelle privée qui en sert trois.
+
+  La règle porte sur l'**atteignabilité**, pas sur les passerelles : dès que vous avez configuré une
+  source à vous — une passerelle, ou un fournisseur dont vous détenez la clé — et pas de clé
+  OpenRouter, le catalogue disparaît. ⚠️ Un modèle **local découvert ne compte pas** : quelqu'un qui
+  a seulement Ollama n'a pas choisi d'où viennent ses modèles distants, et lui cacher le catalogue
+  retirerait la seule chose qui dit ce qu'une connexion apporterait. Le modèle sélectionné n'est
+  jamais retiré, quoi qu'il arrive.
+
+- **Les modèles de la passerelle sont groupés avec votre infrastructure**, sous « Sur votre
+  passerelle », juste après votre machine et votre réseau — au lieu d'être classés à la lettre « g »
+  entre DeepSeek et Google. ⚠️ Le classement ne pouvait pas se faire sur « est-ce distant ? » : une
+  passerelle interne est en loopback ou sur un réseau privé, donc marquée locale.
+
+- **Un nom tapé dans la recherche est proposé sur la passerelle** quand rien ne lui correspond. Une
+  passerelle n'est pas un catalogue : elle sert ce qu'on lui a donné, et `/models` est facultatif
+  dans l'API OpenAI. Il n'y avait alors aucune ligne à choisir et aucun moyen de nommer un modèle
+  hors de `settings.json`.
+
+- **Plus de carte d'estimation quand rien n'est facturé.** Elle s'ouvrait à chaque tour, y compris
+  local, pour annoncer « sur votre machine, rien n'est facturé » — et attendre un clic. Une question
+  dont la réponse est toujours zéro n'est pas une question, c'est une étape. Elle est désormais
+  réservée aux fournisseurs qui facturent : vos clés et OpenRouter. La passerelle en est exemptée
+  pour la même raison qu'elle n'a pas de prix dans le sélecteur — c'est votre proxy, et cette
+  extension n'a pas sa grille tarifaire.
+
+  ⚠️ La règle porte sur le **fournisseur choisi**, pas sur l'adresse. La version « prudente » qui
+  regardait aussi l'adresse rendait la carte **intestable** — tous les stubs de la suite écoutent en
+  loopback — et c'est précisément ainsi qu'était née la carte d'approbation que personne ne voyait.
+
 ## 0.54.0 — 2026-09-30
 
 ### Corrigé

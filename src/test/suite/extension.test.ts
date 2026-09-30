@@ -9,7 +9,7 @@ import * as fs from "node:fs/promises";
 import { SECTION, readSettings, providerFor, Keys } from "../../extension/config.js";
 import { buildTools } from "../../extension/tools.js";
 import { buildKnowledgeTools, knowledgeAmbient } from "../../extension/knowledge.js";
-import { openFileUris } from "../../extension/models.js";
+import { listModels, openFileUris } from "../../extension/models.js";
 import { DefinitionStore } from "../../extension/definitions.js";
 import { join } from "node:path";
 import { homedir, tmpdir } from "node:os";
@@ -372,7 +372,9 @@ suite("Hivey Code", () => {
     const ext = vscode.extensions.getExtension(ID)!;
     await ext.activate();
     const stub = await streamingStub();
-    const restore = await useStub(stub.port, "always");
+    // A provider that BILLS: the card exists to consent to a price, and is not opened when there is
+    // no price to consent to. On the local provider there is nothing for this test to stop on.
+    const restore = await useStub(stub.port, "always", "openrouter");
 
     try {
       const turn = vscode.commands.executeCommand("hiveyCode.askWith", "a question nobody confirms");
@@ -1179,6 +1181,121 @@ suite("Hivey Code", () => {
   });
 
   /**
+   * A gateway offers ITS models, and you can switch between them.
+   *
+   * "When a gateway is configured it should offer only the models the proxy serves." It offered
+   * them, underneath four hundred and fifty-seven catalogue rows that go through OpenRouter — which
+   * a user whose access is a private proxy has no key for and no way to reach. Finding two names in
+   * that haystack is not choosing between them.
+   */
+  test("a configured gateway offers its own models and nothing it cannot reach", async () => {
+    const ext = vscode.extensions.getExtension(ID)!;
+    await ext.activate();
+
+    // A proxy that serves two open-source models, which is what one looks like.
+    const proxy = createServer((req, res) => {
+      if (req.url?.includes("/models")) {
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({ data: [{ id: "qwen3-coder" }, { id: "deepseek-r2" }] }));
+        return;
+      }
+      res.writeHead(404).end();
+    });
+    await new Promise<void>((r) => proxy.listen(0, "127.0.0.1", () => r()));
+    const port = (proxy.address() as { port: number }).port;
+
+    const config = vscode.workspace.getConfiguration(SECTION);
+    const before = { gateway: config.get("endpoints.openaiCompatible"), provider: config.get("chat.provider") };
+    await config.update("endpoints.openaiCompatible", `http://127.0.0.1:${port}/v1`, vscode.ConfigurationTarget.Global);
+    await config.update("chat.provider", "openai-compatible", vscode.ConfigurationTarget.Global);
+
+    // No key anywhere: a proxy on a private network usually needs none, and OpenRouter is
+    // unreachable, which is the whole point of the assertion.
+    const nothing: vscode.SecretStorage = {
+      get: async () => undefined,
+      store: async () => undefined,
+      delete: async () => undefined,
+      keys: async () => [],
+      onDidChange: new vscode.EventEmitter<vscode.SecretStorageChangeEvent>().event,
+    };
+
+    try {
+      const models = await listModels(readSettings(), new Keys(nothing), "qwen3-coder");
+      const ids = models.map((m) => m.id);
+      assert.deepEqual(
+        ids.filter((id) => id === "qwen3-coder" || id === "deepseek-r2"),
+        ["qwen3-coder", "deepseek-r2"],
+        `the proxy's models are missing from the picker: ${ids.slice(0, 20).join(", ")}`,
+      );
+      // Both of them, so there is something to switch BETWEEN.
+      assert.ok(
+        models.filter((m) => m.provider === "openai-compatible").length >= 2,
+        "a gateway serving two models offered fewer than two",
+      );
+      assert.equal(
+        models.some((m) => m.provider === "openrouter"),
+        false,
+        `the catalogue is still there: ${models.filter((m) => m.provider === "openrouter").length} rows nobody can reach`,
+      );
+    } finally {
+      await config.update("endpoints.openaiCompatible", before.gateway, vscode.ConfigurationTarget.Global);
+      await config.update("chat.provider", before.provider, vscode.ConfigurationTarget.Global);
+      proxy.close();
+    }
+  });
+
+  /**
+   * Nothing to consent to, so nothing is asked.
+   *
+   * The card that quotes tokens and dollars was opened for every turn, local ones included, where
+   * it said "on this machine, nothing billed" and waited for a click. A question whose answer is
+   * always zero is not a question, it is a step — and the argument for running a model on your own
+   * machine is precisely that nobody has to think about what a question costs.
+   *
+   * Asserted with the setting left ON, which is the only way to tell "it did not ask" from "asking
+   * is switched off".
+   */
+  test("a local turn is not interrupted by a card about money", async () => {
+    const ext = vscode.extensions.getExtension(ID)!;
+    await ext.activate();
+
+    const stub = await scriptedStub([{ text: "Nothing was billed for this." }]);
+    const config = vscode.workspace.getConfiguration(SECTION);
+    const before = {
+      provider: config.get("chat.provider"),
+      model: config.get("chat.model"),
+      local: config.get("endpoints.local"),
+      confirm: config.get("privacy.confirmSend"),
+    };
+    await config.update("chat.provider", "local", vscode.ConfigurationTarget.Global);
+    await config.update("chat.model", "free-one", vscode.ConfigurationTarget.Global);
+    await config.update("endpoints.local", `http://127.0.0.1:${stub.port}/v1`, vscode.ConfigurationTarget.Global);
+    // Left ON. With "never" this test would pass without the fix.
+    await config.update("privacy.confirmSend", "ask", vscode.ConfigurationTarget.Global);
+
+    try {
+      await vscode.commands.executeCommand("hiveyCode.newSession");
+      // Awaited: `askWith` resolves when the turn ENDS. A card nobody clicks never ends, so this
+      // resolving at all is half the assertion.
+      await Promise.race([
+        vscode.commands.executeCommand("hiveyCode.askWith", "Does this cost anything?"),
+        delay(8000).then(() => assert.fail("the turn is still waiting — something asked for a click")),
+      ]);
+
+      await vscode.commands.executeCommand("hiveyCode.exportSession");
+      const exported = vscode.window.activeTextEditor?.document.getText() ?? "";
+      await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
+      assert.match(exported, /Nothing was billed for this/, `the turn produced no answer:\n${exported.slice(0, 600)}`);
+    } finally {
+      await config.update("chat.provider", before.provider, vscode.ConfigurationTarget.Global);
+      await config.update("chat.model", before.model, vscode.ConfigurationTarget.Global);
+      await config.update("endpoints.local", before.local, vscode.ConfigurationTarget.Global);
+      await config.update("privacy.confirmSend", before.confirm, vscode.ConfigurationTarget.Global);
+      stub.close();
+    }
+  });
+
+  /**
    * A failure has to leave something behind.
    *
    * "I just get a red error message that appears for a microsecond." It was recorded in the
@@ -1804,22 +1921,34 @@ async function streamingStub(opts: { delayAfterFirst?: number } = {}): Promise<{
  * on a used one — which is precisely what happened: these tests passed on a developer machine and
  * failed in CI, and the difference was this setting.
  */
-async function useStub(port: number, confirmSend: "always" | "never" = "never"): Promise<() => Promise<void>> {
+/**
+ * Point the extension at a stub.
+ *
+ * `provider` matters for one thing and it is worth saying: the card that quotes a price is only
+ * opened for a provider that bills, so a test about that card cannot use the local one. The card is
+ * drawn before any key is needed, which is why a vendor with no key stored still reaches it.
+ */
+async function useStub(
+  port: number,
+  confirmSend: "always" | "never" = "never",
+  provider: "local" | "openrouter" = "local",
+): Promise<() => Promise<void>> {
   const config = vscode.workspace.getConfiguration(SECTION);
+  const key = provider === "local" ? "endpoints.local" : "endpoints.openrouter";
   const before = {
     provider: config.get("chat.provider"),
     model: config.get("chat.model"),
-    endpoint: config.get("endpoints.local"),
+    endpoint: config.get(key),
     confirmSend: config.get("privacy.confirmSend"),
   };
-  await config.update("chat.provider", "local", vscode.ConfigurationTarget.Global);
+  await config.update("chat.provider", provider, vscode.ConfigurationTarget.Global);
   await config.update("chat.model", "stub-model", vscode.ConfigurationTarget.Global);
-  await config.update("endpoints.local", `http://127.0.0.1:${port}/v1`, vscode.ConfigurationTarget.Global);
+  await config.update(key, `http://127.0.0.1:${port}/v1`, vscode.ConfigurationTarget.Global);
   await config.update("privacy.confirmSend", confirmSend, vscode.ConfigurationTarget.Global);
   return async () => {
     await config.update("chat.provider", before.provider, vscode.ConfigurationTarget.Global);
     await config.update("chat.model", before.model, vscode.ConfigurationTarget.Global);
-    await config.update("endpoints.local", before.endpoint, vscode.ConfigurationTarget.Global);
+    await config.update(key, before.endpoint, vscode.ConfigurationTarget.Global);
     await config.update("privacy.confirmSend", before.confirmSend, vscode.ConfigurationTarget.Global);
   };
 }

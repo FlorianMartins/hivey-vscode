@@ -8,6 +8,7 @@
 import * as vscode from "vscode";
 import { t } from "../shared/i18n.js";
 import { GENERATED_MODELS } from "../core/router/catalog.generated.js";
+import { offerable } from "../core/models/offer.js";
 import { isLocalEndpoint, isLoopbackEndpoint } from "../core/redaction/index.js";
 import { discoverLocal, rankModels } from "../core/providers/discover.js";
 import { request } from "../core/util/http.js";
@@ -246,7 +247,10 @@ export async function listModels(settings: Settings, keys: Keys, current: string
     });
   }
 
-  return out;
+  // Only what this installation can actually reach. See `core/models/offer.ts` — the catalogue and
+  // the presets both go through OpenRouter, and a user whose access is a private gateway was being
+  // shown four hundred models they had no way to send a question to.
+  return offerable(out, { openrouter: Boolean(await keys.get("openrouter")) });
 }
 
 /** A short label for the composer button: the name without the vendor, plus a price hint. */

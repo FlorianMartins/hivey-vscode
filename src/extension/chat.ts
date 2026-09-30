@@ -88,6 +88,7 @@ import type {
 import { SECTION, endpointFor, providerFor, readSettings, routerConfig, type Keys, type Settings, writeTarget } from "./config.js";
 import { EgressGate, safeHost } from "./egress.js";
 import { contextWindow, labelFor, listModels, openFiles, openFileUris, supportsReasoning } from "./models.js";
+import { billsTheUser } from "../core/router/billing.js";
 import { attachmentTokens } from "./budgets.js";
 import { loadPrices } from "./prices.js";
 import { contextBudget, repoMapBudget } from "../core/context/budget.js";
@@ -516,7 +517,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       // A preset is served from the catalogue, so it is remote whatever the provider setting still
       // says. Getting this wrong would not merely mislabel a row: this flag is what the empty
       // conversation reads to promise that nothing leaves the machine.
-      remote: isHivey(s.chat.model) || !isLocalEndpoint(baseUrl),
+      // "Remote" here means "costs money", which is what the row it drives is about. A gateway is
+      // not remote in that sense however far away it is — see `core/router/billing.ts`.
+      remote: isHivey(s.chat.model) || billsTheUser(s.chat.provider),
       contextTokens,
       sentTokens: this.session.plannedTokens(budgetTokens),
       contextBudget: budgetTokens,
@@ -3336,7 +3339,18 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     // the message is on that screen. "Always" switches it off for good, so anyone who does not want
     // it pays for it once. Nothing about it is a privacy control; the egress gate is separate and
     // untouched by the answer given here.
-    if (settings.privacy.confirmSend !== "never") {
+    // Asked only when there is a bill to consent to.
+    //
+    // It was asked for every turn, local ones included, where it quoted "~2 100 tokens · on this
+    // machine, nothing billed" and waited for a click. A question whose answer is always zero is
+    // not a question, it is a step — and the whole argument of running a model on your own machine
+    // is that nobody has to think about what a question costs. The gateway counts as free for the
+    // same reason it has no price in the picker: it is the user's own proxy and this extension has
+    // no price list for it. See `core/router/billing.ts`.
+    //
+    // Nothing here is a privacy control. What leaves the machine is the egress gate's question,
+    // asked separately, and untouched by this.
+    if (settings.privacy.confirmSend !== "never" && billsTheUser(providerId)) {
       const price = this.priceLookup(model);
       // Corrected by what this model has actually been counting, so the figure the user is
       // shown before sending is the one they will be billed against rather than a safe-side guess.
@@ -3428,7 +3442,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       // runaway prompt still does not (see `hiveyCode.budget.*`). And going over the cap is now a
       // question in the conversation instead of a silent end: a guard whose only move is to kill
       // the turn without a readable reason protects the user from nothing.
-      if (!isLocal && !this.budgetWaived) {
+      if (billsTheUser(providerId) && !this.budgetWaived) {
         const estimate = estimateCost(this.tokensFor(model, prepared.estimatedTokens), this.priceLookup(model));
         const verdict = this.gate.budget.check(estimate);
         if (!verdict.ok) {
