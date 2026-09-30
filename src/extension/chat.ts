@@ -87,7 +87,8 @@ import type {
 } from "../shared/protocol.js";
 import { SECTION, endpointFor, providerFor, readSettings, routerConfig, type Keys, type Settings, writeTarget } from "./config.js";
 import { EgressGate, safeHost } from "./egress.js";
-import { contextWindow, labelFor, listModels, openFiles, openFileUris, supportsReasoning } from "./models.js";
+import { contextWindow, labelFor, listModels, openFiles, openFileUris, ownModelIds, supportsReasoning } from "./models.js";
+import { servedSetChanged } from "../core/models/watch.js";
 import { billsTheUser } from "../core/router/billing.js";
 import { attachmentTokens } from "./budgets.js";
 import { loadPrices } from "./prices.js";
@@ -387,13 +388,26 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     // Whichever one the user brings forward becomes the one commands act on. Without this, opening
     // the right-hand copy would leave `openSearch` and friends talking to the hidden left one.
     view.onDidChangeVisibility(() => {
-      if (view.visible) this.view = view;
+      if (!view.visible) return;
+      this.view = view;
+      // Coming back to the panel is the likeliest moment for the list to be stale: pulling a model
+      // happens in a terminal, which means somewhere else.
+      void this.checkOwnModels();
     });
     view.webview.options = {
       enableScripts: true,
       localResourceRoots: [vscode.Uri.joinPath(this.ctx.extensionUri, "media")],
     };
     view.webview.html = this.html(view.webview);
+    // One timer for the whole provider, however many copies of the panel are resolved. It does
+    // nothing while every copy is hidden and nothing while a turn is running; two minutes is slow
+    // enough to be invisible in a proxy's access log and fast enough that a model pulled during a
+    // build is there by the time anybody looks.
+    if (!this.watchingOwnModels) {
+      this.watchingOwnModels = true;
+      const timer = setInterval(() => void this.checkOwnModels(), 120_000);
+      this.ctx.subscriptions.push(new vscode.Disposable(() => clearInterval(timer)));
+    }
     view.webview.onDidReceiveMessage((m: ToExtension) => void this.onMessage(m));
     // The list of open editors is part of the UI, so it has to follow the editor.
     const refresh = () => this.screen === "chat" && this.sendState();
@@ -644,6 +658,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this.screen = screen;
     this.sendState();
     if (screen === "models" && !this.models.length) void this.loadModels();
+    // Opening the list is the moment being out of date actually costs something.
+    else if (screen === "models") void this.checkOwnModels();
   }
 
   /**
@@ -971,6 +987,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         }
         case "refreshModels":
           await this.loadModels(true);
+          break;
+        case "pollModels":
+          await this.checkOwnModels();
           break;
         case "setHistoryFilter":
           this.historyFilter = { ...this.historyFilter, ...m.filter };
@@ -1360,6 +1379,45 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       }
     }
     this.sendState();
+  }
+
+  /**
+   * What the user's own sources were serving when we last looked. See `ownModelIds`.
+   *
+   * `undefined` until the first look, which is not the same as "nothing there": treating the first
+   * observation as a change would rebuild the list once for no reason on every window.
+   */
+  private ownSeen: string[] | undefined;
+  /** One timer for the provider, not one per resolved view. */
+  private watchingOwnModels = false;
+
+  /**
+   * Notice a model appearing on a machine the user controls.
+   *
+   * `ollama pull` is a thing people do WHILE the editor is open, and so is adding a model to an
+   * internal proxy. The list was fetched once when the panel woke up and then only when somebody
+   * pressed Refresh — a button nobody presses, because nobody knows the list is stale until they
+   * have failed to find what they just installed.
+   *
+   * Only the user's own sources are probed, and only while the panel is on screen. The vendors are
+   * left alone: those are calls against an account with a rate limit, and their catalogues change a
+   * few times a year rather than a few times an afternoon. The probe is cheap because it is against
+   * loopback or a machine on the same network, and it is silent because it does nothing at all
+   * unless the answer has changed — in which case the list is rebuilt the proper way, so the result
+   * is exactly what pressing Refresh would have given.
+   */
+  private async checkOwnModels(): Promise<void> {
+    if (this.turn) return; // A running turn has better uses for the socket and the attention.
+    if (![...this.views].some((v) => v.visible)) return;
+    let now: string[];
+    try {
+      now = await ownModelIds(readSettings(), this.keys);
+    } catch {
+      return; // A server that is down is not news. It will be there, or not, next time.
+    }
+    const changed = servedSetChanged(this.ownSeen, now);
+    this.ownSeen = now;
+    if (changed) await this.loadModels();
   }
 
   private async loadModels(force = false): Promise<void> {

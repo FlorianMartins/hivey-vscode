@@ -2,6 +2,33 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.56.0 — 2026-09-30
+
+### Ajouté
+
+- **Les modèles de vos propres serveurs se synchronisent tout seuls.** `ollama pull` se fait dans un
+  terminal, c'est-à-dire ailleurs — et un modèle ajouté à un proxy interne encore plus. La liste
+  était construite une fois au réveil du panneau, puis seulement si quelqu'un appuyait sur
+  *Actualiser* : un bouton que personne n'utilise, parce que personne ne sait qu'une liste est
+  périmée avant d'avoir cherché en vain ce qu'il vient d'installer.
+
+  Trois moments : **à l'ouverture du sélecteur** (c'est là que ça coûte quelque chose), **au retour
+  sur le panneau**, et **toutes les deux minutes** tant qu'il est visible. Seules **vos** sources
+  sont interrogées — la machine, le réseau, la passerelle. Les fournisseurs distants sont laissés
+  tranquilles : ce sont des appels contre un compte avec une limite de débit, et leurs catalogues
+  changent quelques fois par an, pas quelques fois par après-midi.
+
+  Rien n'est rebâti si la réponse n'a pas changé ; quand elle change, la liste est reconstruite
+  exactement comme *Actualiser* l'aurait fait. ⚠️ Le **premier** regard est une référence et jamais
+  une nouvelle — écrit dans l'autre sens, chaque fenêtre ouverte reconstruisait sa liste pour rien.
+  Et l'ordre n'est pas une information : deux serveurs qui répondent dans un ordre différent ne sont
+  pas un modèle de plus.
+
+- **Le sélecteur ouvert se redessine** quand la liste arrive. Il capturait l'état de son ouverture,
+  donc la réponse à la question qu'il venait lui-même de poser ne changeait rien sous lui : le
+  modèle fraîchement installé n'apparaissait qu'à la deuxième ouverture. Le texte de recherche et le
+  curseur ne sont pas touchés — seules les lignes sont redessinées.
+
 ## 0.55.0 — 2026-09-30
 
 ### Modifié

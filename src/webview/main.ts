@@ -16,7 +16,7 @@ import type { ToExtension, ToPanel, UiState } from "../shared/protocol.js";
 import type { Plan } from "../core/agent/plan.js";
 import { t } from "../shared/i18n.js";
 import { usePrefStore } from "./prefs.js";
-import { closeModelCombo, openModelCombo } from "./modelCombo.js";
+import { closeModelCombo, openModelCombo, refreshModelCombo } from "./modelCombo.js";
 import { setupScreen } from "./setup.js";
 
 declare function acquireVsCodeApi(): { postMessage(m: unknown): void; getState(): unknown; setState(s: unknown): void };
@@ -70,6 +70,9 @@ function render(): void {
   // it up over the permissions screen is not a stale menu, it is a menu belonging to a screen that
   // is no longer there.
   if (state.screen !== "chat") closeModelCombo();
+  // An open picker is a floating element on <body>, so a rebuild of the panel leaves it alone —
+  // including when the state that arrived is the one it asked for.
+  else refreshModelCombo(state);
 
   switch (state.screen) {
     case "history":

@@ -207,17 +207,37 @@ function applySort(items: ComboItem[]): ComboItem[] {
 // ── The panel ──────────────────────────────────────────────────────────────────────────────────
 
 let open: HTMLElement | undefined;
+/** Redraws the open picker's rows from a newer state. Set while one is open, cleared with it. */
+let rebuild: ((next: UiState) => void) | undefined;
 
 export function closeModelCombo(): void {
   open?.remove();
   open = undefined;
+  rebuild = undefined;
 }
 
 export function isModelComboOpen(): boolean {
   return Boolean(open);
 }
 
+/**
+ * A model that appeared while the picker was open.
+ *
+ * The picker captures the state it was opened with, so a list arriving afterwards changed nothing
+ * under it — and the whole point of asking the machine what it serves at the moment the picker
+ * opens is that the answer lands a fraction of a second later. Without this the model somebody had
+ * just pulled appeared only the second time they looked.
+ */
+export function refreshModelCombo(next: UiState): void {
+  if (open) rebuild?.(next);
+}
+
 export function openModelCombo(anchor: HTMLElement, state: UiState, send: (m: ToExtension) => void): void {
+  // Ask whether anything has appeared on the user's own machines since the list was built. Cheap by
+  // construction — it touches loopback and the gateway and nothing else — and this is the moment it
+  // matters: somebody who has just run `ollama pull` in a terminal is about to look for the model
+  // here. The answer arrives as a new state, which redraws the list under the open picker.
+  send({ type: "pollModels" });
   closeModelCombo();
 
   const panel = el("div", "combo");
@@ -291,6 +311,13 @@ export function openModelCombo(anchor: HTMLElement, state: UiState, send: (m: To
       }
       list.append(row(item));
     }
+  };
+
+  // Keeps the open picker honest about a list that arrives after it. The search text and the caret
+  // live in the DOM and are not touched: only the rows are redrawn.
+  rebuild = (next: UiState) => {
+    state = next;
+    buildList();
   };
 
   const row = (item: ComboItem): HTMLElement => {

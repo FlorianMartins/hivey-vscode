@@ -102,6 +102,27 @@ async function localServers(settings: Settings): Promise<Array<{ name: string; b
   }
 }
 
+/**
+ * What the user's OWN sources are serving right now — every local runtime, plus the gateway.
+ *
+ * Ids only, and nothing else, because this is a signal rather than a list: it is asked on a timer
+ * to notice that somebody has pulled a model or added one to their proxy, and the moment it differs
+ * from what the picker holds the picker is rebuilt properly. Building the rows here as well would
+ * be a second assembly of the same thing, drifting from the first.
+ *
+ * Deliberately NOT the vendors. Those are network calls against somebody's account with a rate
+ * limit on it, and their catalogues do not change while you work — a model is added to OpenAI a few
+ * times a year, and to your Ollama several times an afternoon.
+ */
+export async function ownModelIds(settings: Settings, keys: Keys): Promise<string[]> {
+  const ids: string[] = [];
+  for (const server of await localServers(settings)) ids.push(...server.models);
+  if (safe(() => endpointFor(settings, "openai-compatible"))) {
+    ids.push(...(await served(settings, keys, "openai-compatible")));
+  }
+  return [...new Set(ids)].sort();
+}
+
 export async function listModels(settings: Settings, keys: Keys, current: string): Promise<UiModel[]> {
   const out: UiModel[] = [];
   const seen = new Set<string>();

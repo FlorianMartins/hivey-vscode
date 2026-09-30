@@ -383,6 +383,12 @@ export type ToExtension =
   /** `baseUrl` accompanies a model served by a machine other than the configured one. */
   | { type: "setModel"; model: string; provider: string; baseUrl?: string }
   | { type: "refreshModels" }
+  /**
+   * The picker was opened. Not a refresh: it asks the extension to look at what the user's OWN
+   * sources are serving — loopback and the gateway — and rebuild the list only if that has changed.
+   * The vendors are not touched, which is what makes it cheap enough to send on every open.
+   */
+  | { type: "pollModels" }
   | { type: "setHistoryFilter"; filter: Partial<UiHistoryFilter> }
   | { type: "search"; query: string }
   | { type: "setIncluded"; id: string; included: boolean }
