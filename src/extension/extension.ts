@@ -11,7 +11,16 @@ import { isLocalEndpoint } from "../core/redaction/index.js";
 import { ChatViewProvider, PreviewProvider } from "./chat.js";
 import { HiveyCodeActions } from "./codeActions.js";
 import { InlineCompletionProvider } from "./completion.js";
-import { Keys, endpointFor, providerFor, readSettings, recoverMisplacedKeys, SECTION, writeTarget } from "./config.js";
+import {
+  Keys,
+  endpointFor,
+  providerFor,
+  readSettings,
+  recoverMisplacedKeys,
+  restoreMisplacedGatewayAddress,
+  SECTION,
+  writeTarget,
+} from "./config.js";
 import { EgressGate, WorkspaceSpendStore, safeHost } from "./egress.js";
 import { registerEditorCommands } from "./editorCommands.js";
 import { showEgressReport, showCostReport } from "./reports.js";
@@ -48,6 +57,8 @@ export function activate(context: vscode.ExtensionContext): void {
   // Before anything is sent. Someone whose key is in the wrong box has an extension that cannot
   // work, and the sooner they are told the fewer questions they ask into the void.
   void recoverMisplacedKeys(keys, log);
+  // And undo the ones it got wrong before the detector was narrowed. See the note on the function.
+  void restoreMisplacedGatewayAddress(keys, log);
   const budget = new Budget(new WorkspaceSpendStore(context.globalState), readSettings().budget);
   const gate = new EgressGate(context.globalState, budget);
 

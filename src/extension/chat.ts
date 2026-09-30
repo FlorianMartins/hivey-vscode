@@ -1233,8 +1233,24 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           const config = vscode.workspace.getConfiguration(SECTION);
           // The manifest spells `openai-compatible` differently from the provider id, because a
           // hyphen is not a legal settings key segment. The vendor table owns that translation.
-          const key = endpointSettingKey(m.provider as ProviderId);
+          const provider = m.provider as ProviderId;
+          const key = endpointSettingKey(provider);
           await config.update(key, checked.url, vscode.ConfigurationTarget.Global);
+
+          // Typing a gateway's address IS choosing the gateway.
+          //
+          // Saving a key switched the provider — "somebody who pastes an OpenRouter key wants to use
+          // OpenRouter" — and saving an address did not. Which left the one vendor that may need no
+          // key at all with no way to be selected: the user filled in their proxy's address, the
+          // composer went on saying "Local", and the models the proxy serves never appeared. "When I
+          // click on gateway it shows local."
+          //
+          // Only for a vendor whose address has no default. Editing OpenAI's base URL for an Azure
+          // deployment is a change of address, not a change of mind about which provider to use.
+          if (vendor(provider)?.needsUrl && readSettings().chat.provider !== provider) {
+            await config.update("chat.provider", provider, vscode.ConfigurationTarget.Global);
+            void this.loadModels(true);
+          }
           await this.refreshSetup();
           break;
         }

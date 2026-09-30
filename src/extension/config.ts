@@ -13,7 +13,7 @@ import { DEFAULT_GROUPS, type SkillGroup, type SkillPolicy } from "../core/sessi
 import { makeProvider, type Provider, type ProviderId } from "../core/providers/index.js";
 import { defaultEndpoints, endpointSettingKey, REMOTE_VENDORS, vendor } from "../core/providers/vendors.js";
 import { isLocalEndpoint } from "../core/redaction/index.js";
-import { describeMissingEndpoint, describeUnusableEndpoint, looksLikeApiKey } from "../core/providers/endpoint.js";
+import { checkEndpoint, describeMissingEndpoint, describeUnusableEndpoint, looksLikeApiKey } from "../core/providers/endpoint.js";
 import { ATTACHMENT_CEILING_TOKENS } from "../core/util/tokens.js";
 import type { RedactionLevel, RedactionPolicy } from "../core/redaction/types.js";
 import type { EscalationPolicy, RouterConfig } from "../core/router/route.js";
@@ -157,6 +157,46 @@ export async function recoverMisplacedKeys(keys: Keys, log?: { appendLine(line: 
       t("Hivey Code: your {0} key was in the address setting. It has been moved to the secret store — ask your question again.", v.label),
     );
   }
+}
+
+/**
+ * Put back a gateway address this extension mistook for a key and took away.
+ *
+ * The repair above used to decide "this is a credential" partly by guessing — no dots, no slashes,
+ * long enough. An internal hostname is exactly that, so `llm-gateway-internal-prod-01` was moved
+ * into the secret store and erased from the settings, automatically, at every configuration change.
+ * The user was then unable to choose their gateway or see its models, and nothing on screen
+ * connected either symptom to an address they had typed days earlier.
+ *
+ * The detector is prefix-only now, so it cannot happen again. This undoes the installations it
+ * already happened to, and it is deliberately narrow: only the gateway, which is the only vendor
+ * whose address has no default and can therefore be empty, and only when what is stored as its key
+ * is a usable address that carries no vendor's prefix. Announced rather than silent — a value
+ * moving back is as surprising as a value moving away, and this extension has now done both.
+ */
+export async function restoreMisplacedGatewayAddress(
+  keys: Keys,
+  log?: { appendLine(line: string): void },
+): Promise<void> {
+  const id: ProviderId = "openai-compatible";
+  const setting = endpointSettingKey(id);
+  const config = vscode.workspace.getConfiguration(SECTION);
+  if (config.get<string>(setting, "")) return; // An address is set: nothing was lost.
+
+  const stored = (await keys.get(id))?.trim();
+  if (!stored || looksLikeApiKey(stored)) return; // A real key, left where it belongs.
+  const check = checkEndpoint(stored);
+  if (!check.url) return;
+
+  log?.appendLine(`[setup] ${setting} was empty and its key held an address; putting it back`);
+  await config.update(setting, check.url, vscode.ConfigurationTarget.Global);
+  await keys.delete(id);
+  void vscode.window.showInformationMessage(
+    t(
+      "Hivey Code: your gateway address had been mistaken for a key and moved to the secret store. It is back in the settings ({0}). If it also needs a key, add it from the setup screen.",
+      check.url,
+    ),
+  );
 }
 
 export function readSettings(scope?: vscode.Uri): Settings {

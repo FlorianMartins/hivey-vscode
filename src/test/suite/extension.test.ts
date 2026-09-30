@@ -6,7 +6,7 @@ import * as vscode from "vscode";
 import * as fs from "node:fs/promises";
 // The settings namespace has one definition; a test that repeats it as a literal is a test that
 // keeps passing after a rename has broken the product.
-import { SECTION, readSettings, providerFor, Keys } from "../../extension/config.js";
+import { SECTION, readSettings, providerFor, restoreMisplacedGatewayAddress, Keys } from "../../extension/config.js";
 import { buildTools } from "../../extension/tools.js";
 import { buildKnowledgeTools, knowledgeAmbient } from "../../extension/knowledge.js";
 import { listModels, openFileUris } from "../../extension/models.js";
@@ -1292,6 +1292,85 @@ suite("Hivey Code", () => {
       await config.update("endpoints.local", before.local, vscode.ConfigurationTarget.Global);
       await config.update("privacy.confirmSend", before.confirm, vscode.ConfigurationTarget.Global);
       stub.close();
+    }
+  });
+
+  /**
+   * A gateway address this extension took away, put back.
+   *
+   * The repair that moves a pasted key out of the address setting used to decide "this is a
+   * credential" partly by guessing: no dots, no slashes, long enough. An internal hostname is
+   * exactly that, so `llm-gateway-internal-prod-01` was moved into the secret store and erased from
+   * the settings, automatically, at every configuration change. The user could then neither choose
+   * their gateway nor see its models.
+   *
+   * The detector is prefix-only now, so it cannot happen again; this is the undo for the
+   * installations it already happened to.
+   */
+  test("a gateway address mistaken for a key is put back where it belongs", async () => {
+    const ext = vscode.extensions.getExtension(ID)!;
+    await ext.activate();
+
+    const config = vscode.workspace.getConfiguration(SECTION);
+    const before = config.get("endpoints.openaiCompatible");
+    await config.update("endpoints.openaiCompatible", undefined, vscode.ConfigurationTarget.Global);
+
+    // The store, holding what the old repair put there.
+    let held: string | undefined = "llm-gateway-internal-prod-01";
+    const store: vscode.SecretStorage = {
+      get: async () => held,
+      store: async (_k, v) => void (held = v),
+      delete: async () => void (held = undefined),
+      keys: async () => (held ? ["x"] : []),
+      onDidChange: new vscode.EventEmitter<vscode.SecretStorageChangeEvent>().event,
+    };
+
+    try {
+      await restoreMisplacedGatewayAddress(new Keys(store));
+      assert.equal(
+        vscode.workspace.getConfiguration(SECTION).get<string>("endpoints.openaiCompatible"),
+        "https://llm-gateway-internal-prod-01",
+        "the address was not put back",
+      );
+      assert.equal(held, undefined, "it was left in the secret store as well, so it is now in two places");
+    } finally {
+      await config.update("endpoints.openaiCompatible", before, vscode.ConfigurationTarget.Global);
+    }
+  });
+
+  /**
+   * And a real key is left exactly where it belongs.
+   *
+   * The undo above must not become the mirror image of the defect it repairs: a gateway that needs
+   * a key, and has one, must not have it promoted to an address the next time the extension starts.
+   */
+  test("a real gateway key is not mistaken for an address", async () => {
+    const ext = vscode.extensions.getExtension(ID)!;
+    await ext.activate();
+
+    const config = vscode.workspace.getConfiguration(SECTION);
+    const before = config.get("endpoints.openaiCompatible");
+    await config.update("endpoints.openaiCompatible", undefined, vscode.ConfigurationTarget.Global);
+
+    let held: string | undefined = `${["sk", "or", "v1-"].join("-")}0123456789abcdef0123456789abcdef`;
+    const store: vscode.SecretStorage = {
+      get: async () => held,
+      store: async (_k, v) => void (held = v),
+      delete: async () => void (held = undefined),
+      keys: async () => ["x"],
+      onDidChange: new vscode.EventEmitter<vscode.SecretStorageChangeEvent>().event,
+    };
+
+    try {
+      await restoreMisplacedGatewayAddress(new Keys(store));
+      assert.ok(held, "a real key was taken out of the secret store");
+      assert.equal(
+        vscode.workspace.getConfiguration(SECTION).get<string>("endpoints.openaiCompatible", ""),
+        "",
+        "a key was written into the address setting",
+      );
+    } finally {
+      await config.update("endpoints.openaiCompatible", before, vscode.ConfigurationTarget.Global);
     }
   });
 

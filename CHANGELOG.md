@@ -2,6 +2,34 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.57.0 — 2026-09-30
+
+### Corrigé
+
+- ⚠️ **Une adresse de passerelle prise pour une clé, déplacée dans le coffre et effacée des
+  réglages.** Le détecteur ajouté en 0.48.0 ne se contentait pas des préfixes que les fournisseurs
+  publient : il **devinait** aussi — pas de point, pas de barre oblique, vingt-quatre caractères ou
+  plus, et sûrement rien d'autre ne ressemble à ça. Un nom d'hôte interne ressemble exactement à ça.
+  `llm-gateway-internal-prod-01` était donc déplacé dans le coffre **et supprimé des réglages**,
+  automatiquement, à chaque changement de configuration. On ne pouvait alors plus ni choisir sa
+  passerelle ni voir ses modèles, et rien à l'écran ne reliait ces deux symptômes à une adresse
+  saisie des jours plus tôt.
+
+  Le détecteur ne reconnaît plus une clé **que par un préfixe publié par un fournisseur**. Un faux
+  négatif coûte un message confus ; un faux positif détruit un réglage — quand la preuve est une
+  supposition, il n'y a pas de preuve. Et les installations déjà touchées sont **réparées au
+  démarrage** : une adresse utilisable rangée comme clé de passerelle, alors qu'aucune adresse n'est
+  configurée, retourne dans les réglages et vous en êtes informé. Un vrai préfixe de clé n'est
+  jamais promu en adresse.
+
+- **« Enregistrer l'adresse » ne choisissait pas la passerelle.** Enregistrer une *clé* changeait de
+  fournisseur — « quelqu'un qui colle une clé OpenRouter veut utiliser OpenRouter » — et enregistrer
+  une *adresse* ne le faisait pas. Ce qui laissait le seul fournisseur pouvant se passer de clé sans
+  aucun moyen d'être sélectionné : on saisissait l'adresse de son proxy, le composeur continuait
+  d'afficher « Local », et les modèles servis n'apparaissaient jamais. Uniquement pour un
+  fournisseur dont l'adresse n'a pas de valeur par défaut : modifier l'URL d'OpenAI pour un
+  déploiement Azure est un changement d'adresse, pas un changement d'avis sur le fournisseur.
+
 ## 0.56.0 — 2026-09-30
 
 ### Ajouté

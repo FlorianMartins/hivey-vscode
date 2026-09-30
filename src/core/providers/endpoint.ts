@@ -42,16 +42,23 @@ const KEY_PREFIXES: string[] = [
  * it is the last thing they read before giving up. A key has no scheme because a key is not an
  * address, and the repair that has "exactly one plausible reading" has none at all here.
  *
- * Deliberately conservative: anything containing a dot, a slash or a colon could be an address and
- * is left alone. What is left is a bare run of key characters — either carrying a prefix a vendor
- * publishes, or long enough that no hostname looks like it.
+ * ONLY a published vendor prefix, and that restriction was learned expensively. The first version
+ * also guessed: no dots, no slashes, twenty-four characters or more of key-ish characters, and
+ * surely nothing else looks like that. An internal gateway does —
+ * `llm-gateway-internal-prod-01` is a hostname, and it was taken for a credential, MOVED into the
+ * secret store and erased from the settings by the repair below. The user could then neither choose
+ * their gateway nor see its models, and nothing on screen connected that to an address they had
+ * typed days earlier.
+ *
+ * A false negative here costs a confusing error message. A false positive destroys a setting. When
+ * the evidence is a guess rather than a prefix a vendor publishes, there is no evidence.
+ *
+ * Anything containing a dot, a slash or a colon is an address and is left alone regardless.
  */
 export function looksLikeApiKey(text: string): boolean {
   const value = (text ?? "").trim();
   if (!value || value.includes("/") || value.includes(".") || value.includes(":")) return false;
-  if (KEY_PREFIXES.some((prefix) => value.toLowerCase().startsWith(prefix.toLowerCase()))) return true;
-  // No vendor prefix, no dots: `localhost` and `myproxy` are hosts, forty random characters are not.
-  return value.length >= 24 && /^[A-Za-z0-9_-]+$/.test(value);
+  return KEY_PREFIXES.some((prefix) => value.toLowerCase().startsWith(prefix.toLowerCase()));
 }
 
 export interface EndpointCheck {

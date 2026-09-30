@@ -132,7 +132,30 @@ test("an address is still an address, and nothing here second-guesses one", () =
   }
 });
 
-test("a bare hostname is not long enough to be mistaken for a key", () => {
-  assert.equal(looksLikeApiKey("localhost"), false);
-  assert.equal(looksLikeApiKey("gateway"), false);
+test("an internal hostname is never mistaken for a key, however long", () => {
+  // The regression this test exists for, and it was mine. The first version of the detector also
+  // GUESSED: no dots, no slashes, twenty-four characters or more of key-ish characters, and surely
+  // nothing else looks like that. An internal gateway does. `llm-gateway-internal-prod-01` was
+  // taken for a credential, moved into the secret store and ERASED from the settings by the repair
+  // that runs on every configuration change — so the user could neither choose their gateway nor
+  // see its models, and nothing on screen connected either symptom to an address typed days before.
+  //
+  // A false negative here costs a confusing message. A false positive destroys a setting.
+  for (const host of [
+    "localhost",
+    "gateway",
+    "llm-gateway-internal-prod-01",
+    "ollama-server-datacenter-01",
+    "proxy-ia-interne-production",
+    "a-very-long-internal-hostname-with-no-dots-at-all",
+  ]) {
+    assert.equal(looksLikeApiKey(host), false, `${host} would be swallowed as a credential`);
+  }
+});
+
+test("a key is recognised only by a prefix its vendor publishes", () => {
+  // Which is the whole rule now. Everything else is a guess, and a guess is not evidence when
+  // being wrong deletes what somebody typed.
+  assert.equal(looksLikeApiKey(`${OPENROUTER_PREFIX}${FAKE_KEY_BODY}`), true);
+  assert.equal(looksLikeApiKey(FAKE_KEY_BODY), false, "a bare run of hex is not evidence of anything");
 });
