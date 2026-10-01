@@ -8,7 +8,7 @@ import * as fs from "node:fs/promises";
 // keeps passing after a rename has broken the product.
 import { SECTION, readSettings, providerFor, restoreMisplacedGatewayAddress, Keys } from "../../extension/config.js";
 import { buildTools } from "../../extension/tools.js";
-import { buildKnowledgeTools, knowledgeAmbient } from "../../extension/knowledge.js";
+import { buildKnowledgeTools, knowledgeAmbient, knowledgeStore } from "../../extension/knowledge.js";
 import { listModels, openFileUris } from "../../extension/models.js";
 import { DefinitionStore } from "../../extension/definitions.js";
 import { join } from "node:path";
@@ -1371,6 +1371,50 @@ suite("Hivey Code", () => {
       );
     } finally {
       await config.update("endpoints.openaiCompatible", before, vscode.ConfigurationTarget.Global);
+    }
+  });
+
+  /**
+   * A folder of internal documentation, read and never written to.
+   *
+   * The asked-for shape: point this at a share of internal documentation and let the agent search
+   * it. The two halves that matter are that ORDINARY Markdown is readable — nobody is adding a
+   * `title:` header to four hundred wiki pages — and that nothing this extension does can write
+   * into it. A team's documentation is not a scratchpad an agent may edit.
+   */
+  test("a shared documentation folder is read, and is never written to", async () => {
+    const ext = vscode.extensions.getExtension(ID)!;
+    await ext.activate();
+
+    const shared = await fs.mkdtemp(join(tmpdir(), "hivey-doc-"));
+    await fs.writeFile(
+      join(shared, "creation-client.md"),
+      "# Création d'un client\n\nOuvrir TSTCFC, lancer CRTCUST, saisir le SIRET.\n",
+      "utf8",
+    );
+
+    const config = vscode.workspace.getConfiguration(SECTION);
+    const before = { folders: config.get("knowledge.folders"), enabled: config.get("knowledge.enabled") };
+    await config.update("knowledge.folders", [shared], vscode.ConfigurationTarget.Global);
+    await config.update("knowledge.enabled", true, vscode.ConfigurationTarget.Global);
+
+    try {
+      const store = knowledgeStore(readSettings());
+      assert.ok(store, "no knowledge store, although the base is switched on");
+      const notes = await store.list();
+      const found = notes.find((n) => n.id.includes("creation-client"));
+      assert.ok(found, `the shared folder contributed nothing: ${notes.map((n) => n.id).join(", ")}`);
+      assert.equal(found.title, "Création d'un client", "the title was not taken from the heading");
+
+      // And it stays as it was. `/remember` writes to a base this extension owns, never into
+      // somebody's documentation share.
+      await store.write({ id: "a-new-note", title: "A new note", body: "Written by the agent.", tags: [], sources: [], updated: "" });
+      const still = await fs.readdir(shared);
+      assert.deepEqual(still, ["creation-client.md"], `the extension wrote into the share: ${still.join(", ")}`);
+    } finally {
+      await config.update("knowledge.folders", before.folders, vscode.ConfigurationTarget.Global);
+      await config.update("knowledge.enabled", before.enabled, vscode.ConfigurationTarget.Global);
+      await fs.rm(shared, { recursive: true, force: true });
     }
   });
 

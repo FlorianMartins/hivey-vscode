@@ -2,6 +2,53 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.60.0 — 2026-10-01
+
+### Ajouté
+
+- **`hiveyCode.ibmi.writableLibraries` — la production devient inatteignable.** La demande n'était
+  pas une fonctionnalité mais une condition : « les agents ne doivent jamais interagir avec la
+  prod ». Une condition pareille ne peut pas vivre dans un prompt — un prompt est une requête faite
+  à un modèle, et un modèle qui la lit de travers est le cas ordinaire. C'est donc une **barrière
+  dans le code**, du même genre que l'outillage du mode Plan.
+
+  Quand la liste est renseignée (`["TSTCFC", "DEVCFC"]`), toute commande CL ou instruction SQL qui
+  **modifie** quelque chose doit nommer sa bibliothèque, et chacune doit y figurer. Trois rigueurs
+  assumées, parce qu'être souple aux trois endroits reviendrait à deviner : ⚠️ **inconnu = écrivain**
+  (un verbe CL absent de la courte liste des lecteurs compte comme modifiant — se tromper ainsi coûte
+  un refus qu'on lève, se tromper dans l'autre sens coûte un fichier de production) ; ⚠️ **non
+  qualifié = refusé** (`DLTOBJ OBJ(CUSTMAST)` se résout sur la liste de bibliothèques du travail, qui
+  n'est pas connaissable ici) ; ⚠️ **toutes** les bibliothèques nommées comptent, pas la première
+  (`CPYF FROMFILE(PRDCFC/…) TOFILE(TSTCFC/…)` touche la production). La lecture n'est jamais
+  restreinte. Vide par défaut : un défaut serait les noms d'une entreprise livrés à toutes les
+  autres.
+
+- **`hiveyCode.knowledge.folders` — de la documentation interne depuis n'importe quel chemin.** Un
+  partage réseau, un wiki récupéré. ⚠️ Ces dossiers sont lus **tels quels** : pas de
+  `.hiveycode/knowledge` en dessous, et **pas d'en-tête `title:` exigé** — une documentation interne
+  est du Markdown ordinaire, et personne ne va ajouter un en-tête à quatre cents pages de wiki. Le
+  titre vient du premier titre de niveau 1, sinon du nom de fichier. Le format strict reste là où il
+  se mérite : les bases que l'extension **écrit**, où l'en-tête est un contrat. ⚠️⚠️ **Lecture
+  seule** : `/remember` n'y écrit jamais et retirer une note n'en sort jamais une de là — la
+  documentation d'une équipe n'est pas un brouillon qu'un agent modifie. Un test d'intégration le
+  vérifie en lisant le dossier après coup.
+
+### Corrigé
+
+- **Toutes les bibliothèques n'étaient pas proposées.** Les deux catalogues interrogés étaient
+  traités comme des **alternatives** (`if (added) break`) alors qu'ils sont **complémentaires** :
+  `OBJECT_STATISTICS` porte les descriptions et dépend des droits objet, `SYSSCHEMAS` liste ce que
+  SQL voit. Le premier qui répondait décidait donc de toute la liste, et les bibliothèques que seul
+  l'autre connaissait n'étaient jamais offertes. Les deux sont désormais fusionnés.
+
+### Non fait, et pourquoi
+
+- **Piloter le 5250 de Code for i.** Écrire dans le terminal est possible, **lire l'écran ne l'est
+  pas** — une session 5250 n'a pas d'intégration shell, donc rien ne permet de savoir ce qui
+  s'affiche. Piloter un écran vert à l'aveugle, c'est taper des touches en espérant. Pour « créer un
+  client en suivant la procédure », la voie est `ibmi_command` (CALL du programme) ou `ibmi_sql` :
+  scriptable, vérifiable, et soumis à la barrière ci-dessus.
+
 ## 0.59.0 — 2026-10-01
 
 ### Corrigé

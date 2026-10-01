@@ -325,7 +325,7 @@ export function buildTools(deps: ToolDeps): Tool[] {
     ...(gitAvailable() ? buildGitTools() : []),
     // The same gate as the menu: a model that is told it can read source members on a machine with
     // no partition will try, and spend a turn discovering what the settings already knew.
-    ...(ibmiEnabled(readSettings().ibmi.integration) ? buildIbmiTools() : []),
+    ...(ibmiEnabled(readSettings().ibmi.integration) ? buildIbmiTools(readSettings().ibmi.writableLibraries) : []),
     ...(arcadInstalled() && deps.arcad ? buildArcadTools(deps.arcad) : []),
     // Same gate as the rest: a model told it can consult a knowledge base that is switched off
     // spends a call finding out. Off by default, because a base nobody asked for is a folder of

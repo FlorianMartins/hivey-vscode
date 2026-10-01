@@ -28,6 +28,7 @@ import {
   serialiseNote,
   today,
   validId,
+  parseSharedNote,
   type KnowledgeNote,
 } from "../core/knowledge/note.js";
 import { nearDuplicates, searchNotes } from "../core/knowledge/search.js";
@@ -43,11 +44,22 @@ const SUB = "knowledge";
 const ARCHIVE = ".archive";
 
 /** Where a note is written when it is new. The team's base by default: knowledge is usually theirs. */
-export type Scope = "project" | "personal";
+/**
+ * Where a note lives.
+ *
+ * `shared` is a folder somebody pointed this at — a network drive of internal documentation, a
+ * checked-out wiki — and it is READ-ONLY by construction, which is the whole reason it is a third
+ * scope rather than another personal root. Documentation written by a team is not a scratchpad an
+ * agent may edit: `/remember` must never land in it and retiring a note must never move one out of
+ * it. Both of those are enforced below rather than promised here.
+ */
+export type Scope = "project" | "personal" | "shared";
 
 interface Root {
   scope: Scope;
   uri: vscode.Uri;
+  /** False for anything this extension may write back to. */
+  readOnly?: boolean;
 }
 
 /**
@@ -65,11 +77,17 @@ export class FileKnowledgeStore implements KnowledgeStore {
   /** Where each id was last read from, so a note is written back where it came from. */
   private origin = new Map<string, Scope>();
 
-  constructor(private readonly scope: "project" | "personal" | "both") {}
+  constructor(
+    private readonly scope: "project" | "personal" | "both",
+    /** Extra folders to read, as absolute paths. See `hiveyCode.knowledge.folders`. */
+    private readonly shared: string[] = [],
+  ) {}
 
   describe(): string {
     return this.roots()
-      .map((r) => (r.scope === "project" ? `${FOLDER}/${SUB}` : `~/${FOLDER}/${SUB}`))
+      .map((r) =>
+        r.scope === "project" ? `${FOLDER}/${SUB}` : r.scope === "personal" ? `~/${FOLDER}/${SUB}` : r.uri.fsPath,
+      )
       .join(", ");
   }
 
@@ -83,6 +101,16 @@ export class FileKnowledgeStore implements KnowledgeStore {
       const home = process.env["HOME"] ?? process.env["USERPROFILE"];
       if (home) out.push({ scope: "personal", uri: vscode.Uri.joinPath(vscode.Uri.file(home), FOLDER, SUB) });
     }
+    // Folders somebody pointed this at: a share of internal documentation, a checked-out wiki.
+    //
+    // Read as they are — no `.hiveycode/knowledge` underneath them, because the documentation was
+    // not written for this extension and will not be reorganized for it. Last, so a note of the
+    // same name in the repository or in the personal base still wins: the one under review is the
+    // one to trust.
+    for (const folder of this.shared) {
+      const path = folder.trim();
+      if (path) out.push({ scope: "shared", uri: vscode.Uri.file(path), readOnly: true });
+    }
     return out;
   }
 
@@ -94,7 +122,10 @@ export class FileKnowledgeStore implements KnowledgeStore {
         // The project's copy wins a collision: a team note and a personal note of the same name are
         // the same subject, and the one under review is the one to trust.
         if (notes.has(id) && this.origin.get(id) === "project") continue;
-        const parsed = parseNote(id, await read(uri));
+        // A shared folder is read as it is — see `parseSharedNote`. The strict header is a
+        // contract for the bases this extension writes, not a condition for reading somebody's wiki.
+        const text = await read(uri);
+        const parsed = root.scope === "shared" ? parseSharedNote(id, text) : parseNote(id, text);
         if (!parsed.note) continue;
         notes.set(id, parsed.note);
         this.origin.set(id, root.scope);
@@ -121,8 +152,11 @@ export class FileKnowledgeStore implements KnowledgeStore {
   }
 
   async write(note: KnowledgeNote): Promise<void> {
-    const roots = this.roots();
-    if (!roots.length) throw new Error("No knowledge base is available: open a folder, or set a personal one.");
+    // Writable roots only. A shared folder is somebody else's documentation — reading it is the
+    // point, and editing it would be this extension writing into a team's wiki because a model
+    // decided something was worth recording.
+    const roots = this.roots().filter((r) => !r.readOnly);
+    if (!roots.length) throw new Error("No knowledge base is available to write to: open a folder, or set a personal one.");
     const wanted = this.origin.get(note.id);
     const root = roots.find((r) => r.scope === wanted) ?? roots[0]!;
     const uri = vscode.Uri.joinPath(root.uri, notePath(note.id));
@@ -139,7 +173,7 @@ export class FileKnowledgeStore implements KnowledgeStore {
    * the only written record of how something works.
    */
   async remove(id: string, reason: string): Promise<void> {
-    for (const root of this.roots()) {
+    for (const root of this.roots().filter((r) => !r.readOnly)) {
       const from = vscode.Uri.joinPath(root.uri, notePath(id));
       let text: string;
       try {
@@ -192,7 +226,7 @@ export function knowledgeStore(settings: Settings): KnowledgeStore | undefined {
   if (endpoint) {
     return new HttpKnowledgeStore(endpoint, (url, init) => request(url, { ...init, label: "knowledge", timeoutMs: 20_000 }));
   }
-  return new FileKnowledgeStore(settings.knowledge.scope);
+  return new FileKnowledgeStore(settings.knowledge.scope, settings.knowledge.folders);
 }
 
 /**

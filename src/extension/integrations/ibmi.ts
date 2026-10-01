@@ -18,6 +18,7 @@ import { t } from "../../shared/i18n.js";
 import type { Tool, ToolResult } from "../../core/agent/loop.js";
 import { headToTokens } from "../../core/util/tokens.js";
 import { cell, formatRows, isReadOnlySql, matchesName, parseMemberRef } from "../../core/ibmi/sql.js";
+import { clOnlyReads, refuseChange, type Refusal } from "../../core/ibmi/guard.js";
 import { extractCalledPrograms, extractCopyDirectives } from "../../core/ibmi/symbols.js";
 
 const EXTENSION_ID = "halcyontechltd.code-for-ibmi";
@@ -156,7 +157,7 @@ export async function ibmiAllLibraries(): Promise<Array<{ name: string; text?: s
   // Two ways of asking, because one of them coming back empty is indistinguishable from a machine
   // with no libraries — and what the user sees then is their own library list and nothing else,
   // which looks exactly like "it only takes my library list". It was that.
-  const attempts = [
+  const sources = [
     // Objects of type *LIB live in QSYS. This carries the text description, which is why it is
     // first: a screen of library names with no descriptions is a screen nobody can choose from.
     `SELECT * FROM TABLE(QSYS2.OBJECT_STATISTICS('QSYS', '*LIB')) X ORDER BY 1`,
@@ -164,11 +165,21 @@ export async function ibmiAllLibraries(): Promise<Array<{ name: string; text?: s
     // catalogue does not — and a name alone is still a name you can pick.
     `SELECT * FROM QSYS2.SYSSCHEMAS ORDER BY 1`,
   ];
-  for (const statement of attempts) {
+
+  // BOTH, merged — they were alternatives and should always have been complementary.
+  //
+  // The loop stopped at the first query that returned anything, which is the right shape for
+  // "try this, else that" and the wrong one here: the two do not see the same thing. The object
+  // catalogue carries descriptions and is subject to object authority; the schema catalogue has no
+  // descriptions and lists what SQL can see. Whichever answered first therefore decided the whole
+  // list, and the libraries only the other one knew about were never offered — reported as "the
+  // list does not show all the libraries".
+  //
+  // Order matters only in that descriptions arrive first: a name already seen is not replaced, so
+  // the row that carries a text description wins over the bare one.
+  for (const statement of sources) {
     try {
-      const rows = await content.runSQL(statement);
-      let added = 0;
-      for (const row of rows) {
+      for (const row of await content.runSQL(statement)) {
         const name = cell(row, "OBJNAME", "OBJECT_NAME", "SCHEMA_NAME", "SYSTEM_SCHEMA_NAME");
         if (!name || inList.has(name.toUpperCase())) continue;
         inList.add(name.toUpperCase());
@@ -177,11 +188,10 @@ export async function ibmiAllLibraries(): Promise<Array<{ name: string; text?: s
           text: cell(row, "OBJTEXT", "TEXT_DESCRIPTION", "SCHEMA_TEXT") || undefined,
           inList: false,
         });
-        added += 1;
       }
-      if (added) break;
     } catch {
-      // Try the next one. The library list alone is still a list, and the caller offers a field.
+      // One catalogue that cannot be read is one fewer looked in. The library list alone is still a
+      // list, and the caller offers a field to type a name into.
     }
   }
   return out;
@@ -500,7 +510,26 @@ export async function ibmiDiagnose(library: string): Promise<string> {
   return lines.join("\n");
 }
 
-export function buildIbmiTools(): Tool[] {
+/**
+ * What the gate says, as a tool result.
+ *
+ * A refusal rather than a dialog, and that distinction is the whole point: a dialog asks a person
+ * to approve something the policy already forbids, which is how a policy becomes a habit of
+ * clicking yes. The message says what to do about it, because the two ways out — qualify the
+ * command, or widen the list — are both the user's to take and neither is obvious from "refused".
+ */
+function refusal(where: Refusal, writable: string[]): ToolResult {
+  const list = writable.join(", ");
+  return {
+    isError: true,
+    content:
+      where.reason === "unqualified"
+        ? `Refused: this changes something and does not say which library. It would resolve against the job's library list, which cannot be checked from here. Name the library — LIBRARY/OBJECT — and it will run if the library is one of: ${list}.`
+        : `Refused: ${where.libraries.join(", ")} ${where.libraries.length > 1 ? "are" : "is"} not in hiveyCode.ibmi.writableLibraries, which allows: ${list}. Reading is unrestricted; this would have changed something.`,
+  };
+}
+
+export function buildIbmiTools(writable: string[] = []): Tool[] {
   const sql: Tool = {
     schema: {
       name: "ibmi_sql",
@@ -519,6 +548,8 @@ export function buildIbmiTools(): Tool[] {
     },
     async run(args, ctx): Promise<ToolResult> {
       const statement = String(args["statement"] ?? "").replace(/;\s*$/, "");
+      const refused = refuseChange(statement, !isReadOnlySql(statement), { writable });
+      if (refused) return refusal(refused, writable);
       const rows = await connection().getContent().runSQL(statement);
       ctx.report(t("{0} rows from Db2 for i", rows.length));
       return { content: headToTokens(formatRows(rows, MAX_ROWS), MAX_TOKENS) };
@@ -558,6 +589,8 @@ export function buildIbmiTools(): Tool[] {
     async run(args, ctx): Promise<ToolResult> {
       const cmd = String(args["command"] ?? "");
       const environment = (args["environment"] as "ile" | "qsh" | "pase" | undefined) ?? "ile";
+      const refused = refuseChange(cmd, !clOnlyReads(cmd), { writable });
+      if (refused) return refusal(refused, writable);
       const result = await connection().runCommand({ command: cmd, environment });
       ctx.report(t("ran {0}", cmd.split(/\s+/)[0] ?? cmd));
       const body = [result.stdout, result.stderr].filter((s) => s?.trim()).join("\n");

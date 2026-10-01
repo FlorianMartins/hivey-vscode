@@ -67,6 +67,8 @@ export interface Settings {
   };
   knowledge: {
     enabled: boolean;
+    /** Extra folders of documentation to READ, as absolute paths. Never written to. */
+    folders: string[];
     scope: "project" | "personal" | "both";
     /** A base served over HTTP. Empty means the files on this machine. */
     endpoint: string;
@@ -81,7 +83,17 @@ export interface Settings {
    * work. `on` is for the case `auto` cannot cover — wanting the rows visible while disconnected,
    * to be told to connect rather than to wonder where they went.
    */
-  ibmi: { integration: "auto" | "on" | "off" };
+  ibmi: {
+    integration: "auto" | "on" | "off";
+    /**
+     * Libraries the agent may change. Empty means the gate is off.
+     *
+     * Not a default this ships with: a default would be one company's library names handed to
+     * everybody else's. See `core/ibmi/guard.ts` for what it refuses and why it refuses an
+     * unqualified command.
+     */
+    writableLibraries: string[];
+  };
   /** Which families are in play, and which individual skills are off inside them. */
   skills: SkillPolicy;
   /** Which sub-agents the user has switched off, by name. */
@@ -259,8 +271,12 @@ export function readSettings(scope?: vscode.Uri): Settings {
       scope: c.get<"project" | "personal" | "both">("knowledge.scope", "both"),
       endpoint: c.get<string>("knowledge.endpoint", ""),
       indexTokens: c.get<number>("knowledge.indexTokens", 1200),
+      folders: c.get<string[]>("knowledge.folders", []),
     },
-    ibmi: { integration: c.get<"auto" | "on" | "off">("ibmi.integration", "auto") },
+    ibmi: {
+      integration: c.get<"auto" | "on" | "off">("ibmi.integration", "auto"),
+      writableLibraries: c.get<string[]>("ibmi.writableLibraries", []),
+    },
     skills: {
       // Families are opt-in and default to the ones that apply whatever is open. Everything else
       // arrives switched off, which is the difference between offering a choice and pre-answering
