@@ -2050,9 +2050,25 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         { location: vscode.ProgressLocation.Notification, title: t("Searching {0}…", names.join(", ")) },
         async (progress) => {
           for (const library of names) {
-            progress.report({ message: t("{0} — {1} found", library, hits.length) });
+            // What it is doing, not a count of something it has not counted yet.
+            //
+            // It reported "LIB — 0 found" once, before doing any work, and never again: with one
+            // library — which is the ordinary case — the number sat at zero from the first moment
+            // to the last while thousands of members were being read. A figure that cannot move is
+            // worse than no figure, because it reads as a search that has found nothing.
+            //
+            // Members READ, which is what is known while reading. How many of them MATCH is not
+            // known until the filtering below, and the picker says it in its own title.
+            progress.report({ message: t("{0} — reading the member list…", library) });
             try {
-              for (const member of await ibmiAllMembers(library)) {
+              const members = await ibmiAllMembers(library, (read, sourceFile) => {
+                progress.report({
+                  message: sourceFile
+                    ? t("{0}/{1} — {2} members read", library, sourceFile, read)
+                    : t("{0} — {1} members read", library, read),
+                });
+              });
+              for (const member of members) {
                 if (matchesName(member.name, pattern)) hits.push({ library, ...member });
               }
             } catch {
@@ -2158,9 +2174,18 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         { location: vscode.ProgressLocation.Notification, title: t("Looking for {0}…", pattern) },
         async (progress) => {
           for (const library of chosen) {
-            progress.report({ message: t("{0} — {1} found", library.label, hits.length) });
+            // Same counter, same defect, same fix — see the member search above. A figure reported
+            // once before any work and never again reads as a search that has found nothing.
+            progress.report({ message: t("{0} — reading the member list…", library.label) });
             try {
-              for (const member of await ibmiAllMembers(library.label)) {
+              const members = await ibmiAllMembers(library.label, (read, sourceFile) => {
+                progress.report({
+                  message: sourceFile
+                    ? t("{0}/{1} — {2} members read", library.label, sourceFile, read)
+                    : t("{0} — {1} members read", library.label, read),
+                });
+              });
+              for (const member of members) {
                 if (matchesName(member.name, pattern)) hits.push({ library: library.label, ...member });
               }
             } catch {

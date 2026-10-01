@@ -439,7 +439,6 @@ export const FR: Record<string, string> = {
   "{0} — nothing selected, the current line is used": "{0} — rien de sélectionné, la ligne courante est utilisée",
   "{0} — proposed by Hivey Code": "{0} — proposition de Hivey Code",
   "{0} — refused by a rule": "{0} — refusé par une règle",
-  "{0} — {1} found": "{0} — {1} trouvé(s)",
   "{0} ↔ proposal": "{0} ↔ proposition",
   "{0}% of the context budget — click to change it": "{0} % du budget de contexte — cliquez pour le changer",
   "{0}, {1} line(s) selected": "{0}, {1} ligne(s) sélectionnée(s)",
@@ -1084,4 +1083,7 @@ export const FR: Record<string, string> = {
   "Hivey Code: your gateway address had been mistaken for a key and moved to the secret store. It is back in the settings ({0}). If it also needs a key, add it from the setup screen.": "Hivey Code : votre adresse de passerelle avait été prise pour une clé et déplacée dans le coffre. Elle est de retour dans les réglages ({0}). Si elle demande aussi une clé, ajoutez-la depuis l'écran de configuration.",
   "Needs an address — set it up": "Il faut une adresse — configurez-la",
   "Whatever your proxy has been given. Nothing is billed through this extension, which has no price list for it.": "Ce que votre proxy a reçu. Rien n'est facturé par cette extension, qui n'a pas sa grille tarifaire.",
+  "{0} — reading the member list…": "{0} — lecture de la liste des membres…",
+  "{0} — {1} members read": "{0} — {1} membres lus",
+  "{0}/{1} — {2} members read": "{0}/{1} — {2} membres lus",
 };

@@ -2,6 +2,27 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.58.1 — 2026-10-01
+
+### Corrigé
+
+- **Le compteur de la recherche de membres IBM i restait à 0 pendant toute la recherche.** Il était
+  publié **une fois, avant le travail**, et jamais ensuite : avec une seule bibliothèque — le cas
+  ordinaire — « BIB — 0 trouvé » s'affichait du premier instant au dernier pendant que des milliers
+  de membres étaient lus. Un chiffre qui ne peut pas bouger est pire que pas de chiffre : il se lit
+  comme une recherche qui ne trouve rien.
+
+  La notification dit maintenant ce qu'elle **fait** : « BIB — lecture de la liste des membres… »,
+  puis « BIB/QRPGLESRC — 1 240 membres lus » au fil du parcours. Des membres **lus**, qui est ce que
+  l'on sait pendant qu'on lit ; combien d'entre eux **correspondent** n'est connu qu'après le
+  filtrage, et c'est le sélecteur qui le dit dans son propre titre.
+
+  ⚠️ Les deux chemins de lecture n'ont pas la même marge : la requête SQL unique est un aller-retour
+  qui ne peut rien annoncer entre-temps, le repli parcourt les fichiers source un par un et a
+  quelque chose de vrai à dire à chaque étape. `ibmiAllMembers` rend compte des deux. Et le même
+  défaut existait dans la **seconde** recherche de membres — celle des bibliothèques de version —
+  corrigé aussi.
+
 ## 0.58.0 — 2026-09-30
 
 ### Corrigé

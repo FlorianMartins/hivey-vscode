@@ -195,8 +195,18 @@ export async function ibmiAllLibraries(): Promise<Array<{ name: string; text?: s
  * every file in the schema, which is the whole answer in a single call, and the source files fall
  * out of it as the distinct file names. When it is not available the per-file walk is still there.
  */
+/**
+ * Every source member of a library.
+ *
+ * `onProgress` exists because the two paths below take very different amounts of time and only one
+ * of them can say anything while it runs. The SQL path is a single round trip: it returns
+ * everything or nothing, and the only honest thing to say during it is that it is reading. The
+ * fallback walks the source files one at a time, which on a library with a hundred of them is a
+ * long wait with something true to say at every step.
+ */
 export async function ibmiAllMembers(
   library: string,
+  onProgress?: (read: number, sourceFile?: string) => void,
 ): Promise<Array<MemberRow & { sourceFile: string }>> {
   const lib = library.toUpperCase();
   const content = connection().getContent();
@@ -213,7 +223,10 @@ export async function ibmiAllMembers(
         lines: Number(cell(row, "NUMBER_ROWS")) || undefined,
       }))
       .filter((m) => m.sourceFile && m.name);
-    if (out.length) return out;
+    if (out.length) {
+      onProgress?.(out.length);
+      return out;
+    }
   } catch {
     // Fall through to the per-file walk.
   }
@@ -224,6 +237,7 @@ export async function ibmiAllMembers(
       for (const member of await content.getMemberList({ library: lib, sourceFile: file.name })) {
         out.push({ ...member, sourceFile: file.name });
       }
+      onProgress?.(out.length, file.name);
     } catch {
       // One file that cannot be listed is one fewer, not a failure.
     }
