@@ -15,7 +15,7 @@
  * Chosen from what the box can hold rather than from a round number: the composer grows to about
  * eight lines before it starts eating the transcript, which at a typical wrapped width is roughly
  * this many characters. Below it, the paste behaves the way it does in every other text field in
- * the world — which is the behaviour nobody should have to learn.
+ * the world — which is the behavior nobody should have to learn.
  */
 export const ATTACH_TEXT_CHARS = 1200;
 

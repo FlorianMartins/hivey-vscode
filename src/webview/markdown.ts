@@ -233,7 +233,7 @@ export function codeBlock(code: string, lang: string, actions?: CodeActions): HT
 
   const pre = el("pre", "code");
   const node = el("code");
-  // Colour comes from the theme, always. Each token kind maps to a CSS class and the stylesheet
+  // Color comes from the theme, always. Each token kind maps to a CSS class and the stylesheet
   // maps that class to one of VS Code's own variables, so a snippet reads correctly on a light
   // theme, a dark one and a high-contrast one without this file knowing which is installed.
   for (const token of highlightCode(code, lang)) {

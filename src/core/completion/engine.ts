@@ -1,5 +1,5 @@
 // One completion, end to end. Written provider-agnostic and editor-agnostic so the whole
-// behaviour — budgets, caches, trimming, the decision not to ask at all — is testable without an
+// behavior — budgets, caches, trimming, the decision not to ask at all — is testable without an
 // editor, which is what keeps it honest.
 
 import type { Provider } from "../providers/types.js";

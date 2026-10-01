@@ -82,10 +82,10 @@ test("compacting is offered once the conversation genuinely fills the budget", (
 });
 
 test("it is never offered on a short conversation, whatever the ratio", () => {
-  // On a small budget four exchanges cross two thirds, and nobody wants to be asked to summarise
+  // On a small budget four exchanges cross two thirds, and nobody wants to be asked to summarize
   // four exchanges.
   assert.equal(shouldSuggestCompact(900, 1000, 10), false, "under the token floor");
-  assert.equal(shouldSuggestCompact(9000, 10_000, 2), false, "too few exchanges to summarise");
+  assert.equal(shouldSuggestCompact(9000, 10_000, 2), false, "too few exchanges to summarize");
 });
 
 test("it is not offered while there is room", () => {
@@ -105,7 +105,7 @@ test("the brief asks for the state of the work, not for prose", () => {
   assert.match(brief, /rejected/i);
   assert.match(brief, /verbatim/i);
   assert.match(brief, /next step/i);
-  assert.match(brief, /dense/i, "and a length budget, or it summarises to two thirds of the original");
+  assert.match(brief, /dense/i, "and a length budget, or it summarizes to two thirds of the original");
 });
 
 // ── The same file is not sent five times ────────────────────────────────────────────────────────

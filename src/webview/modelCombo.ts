@@ -19,7 +19,7 @@
 //
 //   • COLOUR COMES FROM THE THEME. The sidebar hard-codes #34d399 and friends because a native
 //     <option> cannot be styled. Here the rows are real elements, so a band maps to one of VS
-//     Code's own chart colours and the picker reads correctly on light, dark and high-contrast
+//     Code's own chart colors and the picker reads correctly on light, dark and high-contrast
 //     themes without knowing which one is on.
 //   • THE QUALITY METRIC FOLLOWS THE MODE. The sidebar ranks by the active tab's specialty; the
 //     equivalent here is the mode, so switching from chat to agent re-ranks the list by how well
@@ -51,16 +51,16 @@ interface ComboItem {
 }
 
 /**
- * Price bucket → colour.
+ * Price bucket → color.
  *
- * These were `--vscode-charts-*` and that was a mistake worth naming: chart colours are FILL
- * colours, chosen to sit behind a legend as a solid block. At eleven pixels of text they are
+ * These were `--vscode-charts-*` and that was a mistake worth naming: chart colors are FILL
+ * colors, chosen to sit behind a legend as a solid block. At eleven pixels of text they are
  * muddy, and `charts.orange` in particular is a dark amber that disappears on a dark background.
  * The tokens below are the ones the editor uses for TEXT it needs you to read — the same green a
  * new file gets in the explorer, the same amber a warning gets, the same red an error gets.
  *
- * Only the ends are coloured. A mid-priced model gets the ordinary foreground, because colouring
- * every row means colouring nothing: if all five buckets shout, the two that matter stop being
+ * Only the ends are colored. A mid-priced model gets the ordinary foreground, because coloring
+ * every row means coloring nothing: if all five buckets shout, the two that matter stop being
  * visible.
  */
 const TIER_COLOUR: Record<PriceTier, string> = {
@@ -337,8 +337,8 @@ export function openModelCombo(anchor: HTMLElement, state: UiState, send: (m: To
     main.append(el("div", `ci-detail${item.why ? " why" : ""}`, detail));
     node.append(main);
 
-    // Each segment keeps its OWN colour: the quality estimate in its band's colour, the price in
-    // its bucket's. A single colour for the pair would make one of the two numbers a lie.
+    // Each segment keeps its OWN color: the quality estimate in its band's color, the price in
+    // its bucket's. A single color for the pair would make one of the two numbers a lie.
     const badge = el("div", "ci-badge");
     const price = el("span", "ci-price", priceBadge(item.model));
     price.style.color = TIER_COLOUR[item.tier];
@@ -402,7 +402,7 @@ export function openModelCombo(anchor: HTMLElement, state: UiState, send: (m: To
     const wrap = el("div", "combo-filters");
     const p = prefs();
 
-    const section = (title: string, options: Array<{ id: string; label: string; colour?: string }>, selected: string[], key: "tiers" | "providers") => {
+    const section = (title: string, options: Array<{ id: string; label: string; color?: string }>, selected: string[], key: "tiers" | "providers") => {
       const box = el("div", "combo-filter-sec");
       box.append(el("div", "combo-filter-title", title));
       const rows = el("div", "combo-filter-rows");
@@ -422,7 +422,7 @@ export function openModelCombo(anchor: HTMLElement, state: UiState, send: (m: To
         });
         label.append(input);
         const text = el("span", "combo-filter-label", option.label);
-        if (option.colour) text.style.color = option.colour;
+        if (option.color) text.style.color = option.color;
         label.append(text);
         rows.append(label);
       }
@@ -433,7 +433,7 @@ export function openModelCombo(anchor: HTMLElement, state: UiState, send: (m: To
     wrap.append(
       section(
         t("Price"),
-        TIERS.map((tier) => ({ id: tier, label: tierLabel(tier), colour: TIER_COLOUR[tier] })),
+        TIERS.map((tier) => ({ id: tier, label: tierLabel(tier), color: TIER_COLOUR[tier] })),
         p.tiers,
         "tiers",
       ),

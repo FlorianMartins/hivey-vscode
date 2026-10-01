@@ -81,7 +81,7 @@ export function headToTokens(text: string, maxTokens: number): string {
  *
  * It exists because the budget is a ceiling on the CONVERSATION and was being read as a target for
  * each file in it. Somebody who raises the budget to work on a long conversation has not asked for
- * a hundred thousand tokens of one file, and would not recognise the request if they saw it —
+ * a hundred thousand tokens of one file, and would not recognize the request if they saw it —
  * "a prompt plus two files, 234 000 tokens".
  */
 export const ATTACHMENT_CEILING_TOKENS = 16_000;

@@ -47,7 +47,7 @@ interface CliConfig {
  * The provider named in the environment, if it is one this build knows.
  *
  * Validated rather than cast. `provider` selects the wire format — Anthropic's API is not the
- * OpenAI one — so an unrecognised value must fall back to something that works rather than reach
+ * OpenAI one — so an unrecognized value must fall back to something that works rather than reach
  * `makeProvider` and produce a request nobody can read. It was previously not read at all, which
  * meant the editor could open a terminal pointed at Anthropic and the client would speak OpenAI to
  * it.
@@ -298,7 +298,7 @@ async function main(): Promise<void> {
       });
       outgoing = messages;
       if (findings.length) {
-        console.log(C.dim(t("pseudonymised: {0}", vault.summary().map((s) => `${s.label}×${s.count}`).join(", "))));
+        console.log(C.dim(t("pseudonymized: {0}", vault.summary().map((s) => `${s.label}×${s.count}`).join(", "))));
       }
       if (hasSecret) {
         const ok = (await rl.question(C.red(t("A credential was detected and masked. Send anyway? [y/N] ")))).toLowerCase();
@@ -404,7 +404,7 @@ async function repoMap(cwd: string, budgetTokens: number): Promise<string | unde
   return buildRepoMap(files, budgetTokens).text;
 }
 
-/** A line diff, enough to see what is about to change. No dependency, no colours beyond two. */
+/** A line diff, enough to see what is about to change. No dependency, no colors beyond two. */
 function printDiff(path: string, before: string, after: string): void {
   console.log(C.bold(`\n  ${path}`));
   const a = before.split("\n");

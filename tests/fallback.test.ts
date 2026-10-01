@@ -27,12 +27,12 @@ test("a wrong request is not", () => {
   // Sending a malformed body somewhere else sends a malformed body twice, and on a paid provider
   // it bills for both. A bad key is not fixed by a retry either.
   assert.equal(isRetryable(Object.assign(new Error("no such model"), { status: 400 })), false);
-  assert.equal(isRetryable(Object.assign(new Error("unauthorised"), { status: 401 })), false);
+  assert.equal(isRetryable(Object.assign(new Error("unauthorized"), { status: 401 })), false);
   assert.equal(isRetryable(Object.assign(new Error("forbidden"), { status: 403 })), false);
   assert.equal(isRetryable(Object.assign(new Error("not found"), { status: 404 })), false);
 });
 
-test("a dead socket is recognised by what it says, since it carries no status", () => {
+test("a dead socket is recognized by what it says, since it carries no status", () => {
   assert.equal(isRetryable(new Error("connect ECONNREFUSED 127.0.0.1:11434")), true);
   assert.equal(isRetryable(new Error("fetch failed")), true);
   assert.equal(isRetryable(new Error("api.example.com sent nothing within 180s")), true);

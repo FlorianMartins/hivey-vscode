@@ -2,7 +2,7 @@
 //
 // The notation is borrowed from Copilot deliberately — a developer should not have to learn a
 // second syntax for the same idea — and the tests are almost entirely about the things that look
-// like the notation and are not: a Markdown heading, a colour, a URL fragment, an e-mail address.
+// like the notation and are not: a Markdown heading, a color, a URL fragment, an e-mail address.
 // Getting those wrong is not a cosmetic failure. `#ff8800` silently attaching a file, or `@alice`
 // in a sentence being eaten before the question is sent, both change what the model is asked.
 
@@ -22,7 +22,7 @@ const kinds = (input: string) => parsePrompt(input).mentions.map((m) => m.kind);
 
 // ── What is a mention ────────────────────────────────────────────────────────────────────────
 
-test("the bare notations are recognised", () => {
+test("the bare notations are recognized", () => {
   assert.deepEqual(kinds("what is wrong with #selection"), ["selection"]);
   assert.deepEqual(kinds("#changes — is this ready to commit?"), ["changes"]);
   assert.deepEqual(kinds("fix #problems"), ["problems"]);
@@ -55,9 +55,9 @@ test("a Markdown heading is not a mention", () => {
   assert.deepEqual(kinds("## Section"), []);
 });
 
-test("a colour is not a mention", () => {
+test("a color is not a mention", () => {
   assert.deepEqual(kinds("why is the border #ff8800 here?"), []);
-  assert.deepEqual(kinds("#fff"), [], "three hex digits are still a colour");
+  assert.deepEqual(kinds("#fff"), [], "three hex digits are still a color");
 });
 
 test("a URL fragment is not a mention", () => {

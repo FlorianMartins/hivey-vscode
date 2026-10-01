@@ -21,7 +21,7 @@ import { REMOTE_VENDORS } from "./vendors.js";
  *
  * Read off the placeholders rather than listed again here, so a vendor that changes the shape of
  * its keys changes it in one place and this follows. A placeholder with nothing before the ellipsis
- * contributes nothing, which is correct: that vendor's keys have no recognisable prefix.
+ * contributes nothing, which is correct: that vendor's keys have no recognizable prefix.
  */
 const KEY_PREFIXES: string[] = [
   ...new Set(

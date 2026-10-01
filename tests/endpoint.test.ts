@@ -89,13 +89,13 @@ test("a trailing slash alone is not reported as a problem to the user", () => {
 const FAKE_KEY_BODY = "0123456789abcdef0123456789abcdef";
 const OPENROUTER_PREFIX = ["sk", "or", "v1-"].join("-");
 
-test("a pasted key is recognised as a key, for every vendor that publishes a prefix", () => {
+test("a pasted key is recognized as a key, for every vendor that publishes a prefix", () => {
   const body = FAKE_KEY_BODY;
   for (const v of REMOTE_VENDORS) {
     const prefix = v.placeholder.replace(/[….]+$/u, "").trim();
     if (prefix.length < 3) continue;
     const key = `${prefix}${body}`;
-    assert.ok(looksLikeApiKey(key), `${v.id}: ${key} was not recognised as a key`);
+    assert.ok(looksLikeApiKey(key), `${v.id}: ${key} was not recognized as a key`);
     const check = checkEndpoint(key);
     assert.ok(check.credential, `${v.id}: the check did not say it was a credential`);
     assert.equal(check.url, undefined, `${v.id}: a key was turned into an address`);
@@ -153,7 +153,7 @@ test("an internal hostname is never mistaken for a key, however long", () => {
   }
 });
 
-test("a key is recognised only by a prefix its vendor publishes", () => {
+test("a key is recognized only by a prefix its vendor publishes", () => {
   // Which is the whole rule now. Everything else is a guess, and a guess is not evidence when
   // being wrong deletes what somebody typed.
   assert.equal(looksLikeApiKey(`${OPENROUTER_PREFIX}${FAKE_KEY_BODY}`), true);

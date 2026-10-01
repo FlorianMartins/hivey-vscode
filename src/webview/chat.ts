@@ -212,7 +212,7 @@ function welcome(state: UiState, deps: ChatDeps): HTMLElement {
       "p",
       "welcome-lede",
       state.remote
-        ? t("The selected model is remote: what leaves is pseudonymised, and you are asked before the first request.")
+        ? t("The selected model is remote: what leaves is pseudonymized, and you are asked before the first request.")
         : t("The model runs on your machine. Nothing you write here leaves the network."),
     ),
   );
@@ -453,7 +453,7 @@ function renderEntry(entry: UiEntry, state: UiState, deps: ChatDeps): HTMLElemen
   if (entry.pinned) {
     // A mark, not a word, and never faded.
     //
-    // Pinning worked and looked as though it did not: it printed "pinned" in the muted colour, in
+    // Pinning worked and looked as though it did not: it printed "pinned" in the muted color, in
     // the row that fades to nothing when the pointer leaves — so the one visible consequence of the
     // button disappeared a second after it was pressed. What a pinned message needs is what a
     // pinned message has everywhere else: a mark that stays, and an edge you can see down the
@@ -877,7 +877,7 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
     for (const a of state.attachments) {
       const chip = el("span", "chip removable");
       chip.append(icon(chipIcon(a.kind, a.label), "chip-ico"));
-      // The file NAME, with its folder after it in the muted colour — the editor's own shape for
+      // The file NAME, with its folder after it in the muted color — the editor's own shape for
       // this, and the right one: `src/webview/chat.ts` truncated from the left is unreadable, and
       // truncated from the right is every file in the folder. The name identifies, the folder
       // disambiguates, and only the second is allowed to be cut.
@@ -1099,28 +1099,15 @@ function compactOffer(state: UiState, deps: ChatDeps): HTMLElement | undefined {
   body.append(el("div", "compact-title", t("This conversation fills {0}% of the context.", Math.round(state.contextFill * 100))));
   // Says what it does to the transcript, because "compact" alone reads as "delete". Nothing is
   // deleted, and that is the first thing anyone wants to know before pressing it.
-  body.append(el("div", "compact-hint", t("Summarising replaces it in the prompt. Nothing leaves the screen.")));
+  body.append(el("div", "compact-hint", t("Summarizing replaces it in the prompt. Nothing leaves the screen.")));
   wrap.append(body);
 
   wrap.append(
     button({
-      label: t("Summarise"),
+      label: t("Summarize"),
       className: "btn tiny primary",
       onClick: () => {
         compactDismissedAt = undefined;
-        deps.send({ type: "compact" });
-      },
-    }),
-    // Answering the question the offer raises the second time it appears: "must I keep saying yes?"
-    // Putting the setting here rather than only in the settings file is the difference between a
-    // preference and a preference anyone finds.
-    button({
-      label: t("Always"),
-      className: "btn tiny",
-      title: t("Summarise by itself from now on, at this same point."),
-      onClick: () => {
-        compactDismissedAt = undefined;
-        deps.send({ type: "setAutoCompact", on: true });
         deps.send({ type: "compact" });
       },
     }),
@@ -1222,7 +1209,7 @@ function contextRing(state: UiState, deps: ChatDeps): HTMLElement {
     menu(wrap, (close) => {
       const panel = el("div", "menu-list");
       panel.append(...contextBudgetSection(state, deps, close));
-      // Summarising lives here, under the number it moves.
+      // Summarizing lives here, under the number it moves.
       //
       // It was briefly a row in the view's ⋯ menu, which was wrong for a reason worth writing down:
       // that menu holds the things that are true of the extension — where the panel sits, what left
@@ -1231,19 +1218,10 @@ function contextRing(state: UiState, deps: ChatDeps): HTMLElement {
       panel.append(separator(), menuTitle(t("This conversation")));
       panel.append(
         menuItem({
-          label: t("Summarise it now"),
+          label: t("Summarize it now"),
           hint: t("{0} in the prompt. The summary replaces them and nothing leaves the screen.", formatTokens(state.contextTokens)),
           onClick: () => {
             deps.send({ type: "compact" });
-            close();
-          },
-        }),
-        menuItem({
-          label: t("Summarise automatically"),
-          hint: t("At two thirds of the budget, without asking. Costs one request each time."),
-          selected: state.autoCompact,
-          onClick: () => {
-            deps.send({ type: "setAutoCompact", on: !state.autoCompact });
             close();
           },
         }),
@@ -1394,7 +1372,7 @@ function missingFor(id: string, state: UiState): string {
  * a local model for the ordinary work, something larger for the one hard question — and a decision
  * made that often has to be one click from the box you type in.
  *
- * The label says which, and the colour says whether anything leaves the machine. That second fact
+ * The label says which, and the color says whether anything leaves the machine. That second fact
  * is the whole argument of this extension and it should never take reading to establish.
  */
 function providerButton(state: UiState, deps: ChatDeps): HTMLElement {
@@ -1404,7 +1382,7 @@ function providerButton(state: UiState, deps: ChatDeps): HTMLElement {
     label: state.remote ? current.short : t("Local"),
     trailingIcon: ICON.chevron,
     title: state.remote
-      ? t("{0} — what leaves is pseudonymised first", current.label)
+      ? t("{0} — what leaves is pseudonymized first", current.label)
       : t("Runs on this machine: nothing leaves, nothing is billed"),
     className: `btn ghost tiny provider${state.remote ? " remote" : " local"}`,
     onClick: () =>
@@ -1541,7 +1519,7 @@ function modelButton(state: UiState, deps: ChatDeps): HTMLElement {
     title:
       `${state.model}\n` +
       (state.remote
-        ? t("Remote model — it is billed, and what you send is pseudonymised first.")
+        ? t("Remote model — it is billed, and what you send is pseudonymized first.")
         : t("Local model — nothing leaves this machine.")),
     className: `btn ghost model${state.remote ? " remote" : " local"}`,
     onClick: () => {
@@ -1570,7 +1548,7 @@ function contextBudgetSection(state: UiState, deps: ChatDeps, close: () => void)
     ),
   ];
   // First, and the default: let it follow the model. A fixed figure chosen once, on whatever model
-  // was selected that day, is how a conversation on a 200k model ended up being summarised away
+  // was selected that day, is how a conversation on a 200k model ended up being summarized away
   // after three exchanges.
   out.push(
     menuItem({
@@ -1632,7 +1610,7 @@ export function contextBudgets(modelContext: number): number[] {
   const out: number[] = [];
   for (const fraction of [1 / 8, 1 / 4, 1 / 2, 3 / 4, 1]) {
     // The whole window is used exactly, not rounded: rounding 1 000 000 up would offer more than
-    // the model holds, and rounding it down would print a number nobody recognises.
+    // the model holds, and rounding it down would print a number nobody recognizes.
     const value = fraction === 1 ? modelContext : roundTokens(modelContext * fraction);
     if (value > 0 && !out.includes(value)) out.push(value);
   }

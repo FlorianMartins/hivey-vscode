@@ -528,7 +528,7 @@ async function announce(context: vscode.ExtensionContext, log: vscode.OutputChan
     local
       ? t("Hivey Code is active. Everything stays on your machine: completion and chat talk to your local server.")
       : t(
-          "Hivey Code is active. Chat uses {0}; what leaves is pseudonymised and will be shown to you before the first request.",
+          "Hivey Code is active. Chat uses {0}; what leaves is pseudonymized and will be shown to you before the first request.",
           safeHost(chatUrl),
         ),
     t("Open the settings"),

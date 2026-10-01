@@ -188,7 +188,7 @@ export function permissionsScreen(state: UiState, send: (m: ToExtension) => void
       "p",
       "screen-note",
       t(
-        "A refusal always beats an authorisation, and paths outside the workspace — or covered by the " +
+        "A refusal always beats an authorization, and paths outside the workspace — or covered by the " +
           "privacy policy — stay forbidden whatever these rules say.",
       ),
     ),

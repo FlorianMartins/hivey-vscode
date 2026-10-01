@@ -39,7 +39,7 @@ export function showEgressReport(gate: EgressGate, settings: Settings): void {
       ${card(t("Remote requests"), String(totals.calls))}
       ${card(t("Tokens"), totals.tokens.toLocaleString(uiLocale()))}
       ${card(t("Total cost"), `$${totals.usd.toFixed(4)}`)}
-      ${card(t("Pseudonymised values"), String(totals.redactions))}
+      ${card(t("Pseudonymized values"), String(totals.redactions))}
     </div>
     <p class="note">
       ${escapeHtml(t("Redaction policy:"))} <code>${escapeHtml(settings.privacy.redaction)}</code> ·
@@ -49,7 +49,7 @@ export function showEgressReport(gate: EgressGate, settings: Settings): void {
     ${
       ledger.length
         ? `<table>
-      <thead><tr>${[t("When"), t("Destination"), t("Model"), t("Tokens"), t("Cache"), t("Cost"), t("Pseudonymised")].map((h) => `<th>${escapeHtml(h)}</th>`).join("")}</tr></thead>
+      <thead><tr>${[t("When"), t("Destination"), t("Model"), t("Tokens"), t("Cache"), t("Cost"), t("Pseudonymized")].map((h) => `<th>${escapeHtml(h)}</th>`).join("")}</tr></thead>
       <tbody>${ledger.map(row).join("")}</tbody>
     </table>`
         : `<p class="empty">${escapeHtml(t("No remote request recorded. Everything happened on this machine."))}</p>`
@@ -107,7 +107,7 @@ export function showCostReport(gate: EgressGate, settings: Settings): void {
         )
         .join("")}</tbody>
     </table>`
-        : `<p class="empty">${escapeHtml(t("Nothing spent. That is the default behaviour."))}</p>`
+        : `<p class="empty">${escapeHtml(t("Nothing spent. That is the default behavior."))}</p>`
     }
     <p class="note">${escapeHtml(t("Price catalogue updated {0}.", catalogueAge()))}</p>`,
   );

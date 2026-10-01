@@ -142,7 +142,7 @@ test("a failing test suite is still a failed turn", () => {
   }
 });
 
-test("a command nobody recognises is not evidence in either direction", () => {
+test("a command nobody recognizes is not evidence in either direction", () => {
   // Escalating on it would spend money on a guess; declaring success would be worse. Silence is the
   // only honest answer, and the diagnostics still speak for themselves.
   assert.equal(verifyTurn([bad("run_command", "./scripts/deploy.sh")]).kind, "none");

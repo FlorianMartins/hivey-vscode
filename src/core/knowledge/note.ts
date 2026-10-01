@@ -65,8 +65,8 @@ export function parseNote(id: string, text: string): NoteParse {
   const problems: string[] = [];
   if (!validId(id)) problems.push(`${id}: not a usable id. Lowercase letters, digits, hyphens, and / to group.`);
 
-  const normalised = text.replace(/\r\n/g, "\n");
-  const match = /^\s*---\n([\s\S]*?)\n---\n?([\s\S]*)$/.exec(normalised);
+  const normalized = text.replace(/\r\n/g, "\n");
+  const match = /^\s*---\n([\s\S]*?)\n---\n?([\s\S]*)$/.exec(normalized);
   if (!match) {
     return {
       problems: [

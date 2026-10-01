@@ -86,7 +86,7 @@ const PARTICIPANTS: Record<string, Participant> = {
  * A `#` that starts a mention rather than something else.
  *
  * The three things this must not match are a Markdown heading (`# Title`, and the panel renders
- * Markdown), a colour (`#ff8800`) and a URL fragment (`…/page#section`). The rule that separates
+ * Markdown), a color (`#ff8800`) and a URL fragment (`…/page#section`). The rule that separates
  * them: a mention's `#` is preceded by the start of the string or by whitespace, and followed
  * immediately by a letter.
  */

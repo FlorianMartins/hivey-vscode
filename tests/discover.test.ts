@@ -134,13 +134,13 @@ test("coding models come first, so the default offered is a sensible one", () =>
   assert.equal(ranked.at(-1), "nomic-embed-text", "an embedding model is not something to write code with");
 });
 
-test("an unrecognised model is ranked low but never hidden", () => {
+test("an unrecognized model is ranked low but never hidden", () => {
   const ranked = rankModels(["my-private-finetune", "qwen2.5-coder:7b"]);
   assert.equal(ranked.length, 2, "someone running a model we do not know still gets to pick it");
   assert.ok(ranked.includes("my-private-finetune"));
 });
 
-test("models that cannot write code are recognised as such", () => {
+test("models that cannot write code are recognized as such", () => {
   for (const id of ["nomic-embed-text", "bge-large", "whisper-large", "llava:7b", "stable-diffusion"]) {
     assert.equal(looksLikeCodeModel(id), false, id);
   }

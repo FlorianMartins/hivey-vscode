@@ -1440,7 +1440,7 @@ suite("Hivey Code", () => {
 
     const stub = await scriptedStub([
       // The local model runs something that fails, then answers as though it were done — which is
-      // exactly the behaviour that made "ask the user what it printed" so expensive.
+      // exactly the behavior that made "ask the user what it printed" so expensive.
       // A real check, not just any failing command: a non-zero exit is how half the shell reports
       // "no" — `grep` finding nothing, `git diff --quiet` finding changes — and escalating on those
       // bought a second turn on a larger model nearly every time an agent searched for something.
@@ -1806,7 +1806,7 @@ suite("Screenshot", () => {
       await vscode.commands.executeCommand("hiveyCode.stopAnswer");
       await new Promise((r) => setTimeout(r, 1000));
       // And start again before the next frame. Stopping resolves the pending approval as refused,
-      // which leaves a red "the user declined" line in the transcript — correct behaviour, and the
+      // which leaves a red "the user declined" line in the transcript — correct behavior, and the
       // subject of its own photograph, but it then sat in the background of every frame after it.
       // A README should not open on a screenshot of something going wrong.
       await vscode.commands.executeCommand("hiveyCode.newSession");
@@ -1818,7 +1818,10 @@ suite("Screenshot", () => {
       // for the person using it — because nothing in the suite ever LOOKED at the result. This
       // opens real tabs and photographs the composer with them attached.
       const dir = await fs.mkdtemp(join(tmpdir(), "hivey-ctx-"));
-      for (const name of ["invoice.ts", "rounding.ts", "totals.ts"]) {
+      // One name long enough to prove the chip truncates rather than pushing its own cross off the
+      // screen. It used to carry the excerpt note as well — "(outline of 211 symbols + head, …)" —
+      // appended to the name, which made the attachment impossible to remove at all.
+      for (const name of ["invoice.ts", "rounding.ts", "invoice-rounding-and-vat-adjustments.ts", "totals.ts"]) {
         const file = vscode.Uri.file(join(dir, name));
         await fs.writeFile(file.fsPath, `export const ${name.split(".")[0]} = 1;\n`, "utf8");
         await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(file), { preview: false });

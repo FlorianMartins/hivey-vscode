@@ -43,7 +43,7 @@ import {
   BUILTIN_SKILLS,
   detectGroups,
   isSkillEnabled,
-  normaliseGroups,
+  normalizeGroups,
   SKILL_GROUPS,
   skillInvocation,
   toggleSkill,
@@ -546,13 +546,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       contextFill: budgetTokens > 0 ? Math.min(1, contextTokens / budgetTokens) : 0,
       ...(this.cacheSeen.prompt > 0 ? { cacheHitRate: this.cacheSeen.cached / this.cacheSeen.prompt } : {}),
       // Computed here rather than in the panel because the budget is a setting, and a panel that
-      // guessed at it would offer to summarise a conversation that fits comfortably.
+      // guessed at it would offer to summarize a conversation that fits comfortably.
       // No offer when it happens by itself: a banner proposing what is already scheduled to
       // happen at that exact threshold is a question with one answer.
       suggestCompact:
-        !s.context.autoCompact &&
         shouldSuggestCompact(contextTokens, budgetTokens, this.session.entries.filter((e) => e.included).length),
-      autoCompact: s.context.autoCompact,
       busy: this.turn !== undefined,
       budget: { spentTodayUsd: this.gate.budget.spentToday(), dailyUsd: s.budget.dailyUsd },
       sessionCostUsd: this.session.totalCostUsd(),
@@ -573,7 +571,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         kind: c.kind,
         label: c.label,
         tokens: c.image ? IMAGE_TOKENS : estimateTokens(c.body),
-        ...(c.image ? { detail: c.body.replace(/^\[[^:]*:\s*/, "").replace(/\]$/, "") } : {}),
+        ...(c.note
+          ? { detail: c.note }
+          : c.image
+            ? { detail: c.body.replace(/^\[[^:]*:\s*/, "").replace(/\]$/, "") }
+            : {}),
       })),
       ...(implicit ? { implicit: { kind: implicit.kind, label: implicit.label, tokens: estimateTokens(implicit.body) } } : {}),
       implicitOn: Boolean(implicit) && this.implicitDismissed !== implicit?.label,
@@ -828,7 +830,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             this.wizard.families = m.value as SkillGroup[];
             await config.update(
               "skills.groups",
-              normaliseGroups(this.wizard.families),
+              normalizeGroups(this.wizard.families),
               vscode.ConfigurationTarget.Global,
             );
             this.wizard.step = "skills";
@@ -837,7 +839,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             // off — which is only correct because the offer was limited to the chosen families.
             const on = new Set(m.value);
             const offered = BUILTIN_SKILLS.filter(
-              (sk) => normaliseGroups(this.wizard!.families).includes(sk.group) && !ALWAYS_ON.has(sk.name),
+              (sk) => normalizeGroups(this.wizard!.families).includes(sk.group) && !ALWAYS_ON.has(sk.name),
             );
             let disabled = readSettings().skills.disabled;
             for (const sk of offered) disabled = toggleSkill(disabled, sk.name, on.has(sk.name));
@@ -870,7 +872,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           // questions and are stored separately for that reason.
           await config.update(
             "skills.groups",
-            normaliseGroups(m.groups as SkillGroup[]),
+            normalizeGroups(m.groups as SkillGroup[]),
             vscode.ConfigurationTarget.Global,
           );
           this.sendState();
@@ -961,16 +963,6 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         case "setContextBudget": {
           const config = vscode.workspace.getConfiguration(SECTION);
           await config.update("context.maxTokens", m.tokens, writeTarget());
-          this.sendState();
-          break;
-        }
-        case "setAutoCompact": {
-          const config = vscode.workspace.getConfiguration(SECTION);
-          await config.update("context.autoCompact", m.on, writeTarget());
-          // Turning it on after one failure switched it off: the user has said, explicitly, to try
-          // again, and refusing on the strength of an earlier failure would be a setting that does
-          // nothing when set.
-          if (m.on) this.autoCompactOff = false;
           this.sendState();
           break;
         }
@@ -1478,7 +1470,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    * A nested turn with a narrower tool set and its own prompt — and with the SAME approver, the
    * same egress gate and the same vault as its parent. Being called by a sub-agent is not a way
    * around a dialog: a tool that asks before writing still asks, and what leaves the machine is
-   * pseudonymised on exactly the same path.
+   * pseudonymized on exactly the same path.
    *
    * The sub-agent sees only the task it was given. That is the point of one: it starts on a clean
    * context, so a long conversation does not have to be re-read to answer a small question.
@@ -1633,7 +1625,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       this.persist();
       this.sendState();
       void vscode.window.setStatusBarMessage(
-        pinned ? t("Answer pinned — it stays when the context is trimmed or summarised.") : t("Answer unpinned."),
+        pinned ? t("Answer pinned — it stays when the context is trimmed or summarized.") : t("Answer unpinned."),
         4000,
       );
       return pinned;
@@ -1737,27 +1729,6 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       .reduce((sum, e) => sum + estimateTokens(e.text) + (e.context ?? []).reduce((a, c) => a + estimateTokens(c.body), 0), 0);
   }
 
-  /** Switched off for the rest of the session after one failure, rather than failing every turn. */
-  private autoCompactOff = false;
-
-  /**
-   * Summarise before asking, when the setting says to and the conversation has grown enough.
-   *
-   * Called BEFORE the new question is recorded, and that ordering is the whole subtlety: compacting
-   * mutes everything it summarises, so a question added first would be summarised and muted in the
-   * same breath — asked, replaced by a summary of itself, and never answered.
-   *
-   * One failure switches it off for the session. The alternative is an error before every question
-   * from here on, which is a worse conversation than a full one: the thing the user came to do
-   * still works, and the thing that did not is not going to start working by being retried on a
-   * timer.
-   */
-  private async autoCompactIfFull(settings: Settings): Promise<void> {
-    if (!settings.context.autoCompact || this.autoCompactOff) return;
-    const included = this.session.entries.filter((e) => e.included).length;
-    if (!shouldSuggestCompact(this.contextTokens(), this.budgetTokensFor(settings), included)) return;
-    if (!(await this.compact())) this.autoCompactOff = true;
-  }
 
   /**
    * One of the four lists, rewritten.
@@ -1853,7 +1824,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
   private uiWizard(): UiWizard {
     const w = this.wizard!;
-    const policy = { groups: normaliseGroups(w.families), disabled: readSettings().skills.disabled };
+    const policy = { groups: normalizeGroups(w.families), disabled: readSettings().skills.disabled };
     return {
       step: w.step,
       ...(w.mode ? { mode: w.mode } : {}),
@@ -2714,7 +2685,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       if (picked) {
         await config.update(
           "skills.groups",
-          normaliseGroups(picked.map((row) => row.id)),
+          normalizeGroups(picked.map((row) => row.id)),
           vscode.ConfigurationTarget.Global,
         );
         this.sendState();
@@ -3048,7 +3019,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this.frozenMap = undefined;
     const covered = this.session.entries.filter((e) => e.included && !e.error && e.text.trim());
     if (covered.length < 2) {
-      void vscode.window.showInformationMessage(t("There is not enough conversation to summarise yet."));
+      void vscode.window.showInformationMessage(t("There is not enough conversation to summarize yet."));
       return false;
     }
 
@@ -3057,9 +3028,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const ctl = new AbortController();
     this.turn = ctl;
     this.post({ type: "turnStart" });
-    this.post({ type: "status", text: t("Summarising the conversation…") });
+    this.post({ type: "status", text: t("Summarizing the conversation…") });
 
-    // Summarising is a chore, not a conversation: it reads a transcript and writes a page of prose,
+    // Summarizing is a chore, not a conversation: it reads a transcript and writes a page of prose,
     // and a preset says so — this is exactly the traffic the cheap tier exists for. On a preset the
     // provider follows the model, because the catalogue it routes over is OpenRouter's.
     const providerId = isHivey(settings.chat.model) ? "openrouter" : settings.chat.provider;
@@ -3155,7 +3126,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       this.post({
         type: "status",
         text: t(
-          "{0} exchanges summarised: {1} → {2} tokens. Everything stays on screen.",
+          "{0} exchanges summarized: {1} → {2} tokens. Everything stays on screen.",
           covered.length,
           before,
           after,
@@ -3188,7 +3159,6 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const parsed = parsePrompt(text);
     this.participant = parsed.participant;
     const settings = readSettings();
-    await this.autoCompactIfFull(settings);
     const resolved = parsed.mentions.length
       ? await resolveMentions(parsed.mentions, {
           workspace: this.workspace,
@@ -3399,7 +3369,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
     // Counted once, used twice: on the card the user consents with, and in the ledger row the
     // request leaves behind. This is the one thing in a request the redaction cannot touch —
-    // everything else has been through the pseudonymiser, and a screenshot leaves as it is.
+    // everything else has been through the pseudonymizer, and a screenshot leaves as it is.
     const outgoingImages = built.messages.reduce((n, msg) => n + (msg.images?.length ?? 0), 0);
 
     const lastUser = [...this.session.entries].reverse().find((e) => e.role === "user");
@@ -3470,7 +3440,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         // turn the figure into something that can be argued with.
         ...this.whereTheTokensWent(systemPrompt, ambientText),
       ];
-      if (outgoingImages && !isLocal) detail.push(t("{0} image(s), sent as they are — an image cannot be pseudonymised", outgoingImages));
+      if (outgoingImages && !isLocal) detail.push(t("{0} image(s), sent as they are — an image cannot be pseudonymized", outgoingImages));
       const answer = await new Promise<"once" | "session" | "always" | "no">((resolve) => {
         // Through the same path as the other two, which is the point: a card that exists only as a
         // message the panel has already consumed dies with the next rebuild, and the promise behind
@@ -4355,12 +4325,12 @@ function isInsideWorkspace(path: string): boolean {
   const absolute = /^([a-zA-Z]:)?[/\\]/.test(path)
     ? path.replace(/\\/g, "/")
     : `${root}/${path.replace(/\\/g, "/")}`;
-  const resolved = normalise(absolute);
+  const resolved = normalize(absolute);
   return resolved === root || resolved.startsWith(`${root}/`);
 }
 
 /** Collapse `.` and `..` without touching the filesystem — the path may not exist yet. */
-function normalise(path: string): string {
+function normalize(path: string): string {
   const out: string[] = [];
   for (const part of path.split("/")) {
     if (!part || part === ".") continue;

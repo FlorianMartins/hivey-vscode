@@ -108,7 +108,7 @@ export function modelsScreen(state: UiState, send: (m: ToExtension) => void, rer
     list.append(
       sectionTitle(
         t("Remote"),
-        t("Prices in dollars per million tokens. What leaves is pseudonymised and counted against the budget."),
+        t("Prices in dollars per million tokens. What leaves is pseudonymized and counted against the budget."),
       ),
     );
     for (const [vendor, models] of byVendor(remote)) {

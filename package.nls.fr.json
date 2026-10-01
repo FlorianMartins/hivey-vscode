@@ -60,7 +60,6 @@
   "config.knowledge.scope.both": "Les deux, celle du dépôt l’emportant si une note existe des deux côtés",
   "config.knowledge.endpoint": "Une base servie en HTTP plutôt que les fichiers de cette machine — pour une équipe qui la centralise. Quatre routes : `GET /notes`, `GET /notes/{id}`, `PUT /notes/{id}`, `DELETE /notes/{id}`. Vide = les fichiers.",
   "config.knowledge.indexTokens": "Plafond de la liste de titres transportée à chaque question. Au-delà, les plus anciennes sortent de la liste et restent accessibles par la recherche.",
-  "config.context.autoCompact": "Résumer la conversation de lui-même dès qu’elle occupe les deux tiers du budget, au lieu de le proposer. Le résumé coûte une requête, et rien n’est supprimé : les échanges remplacés restent à l’écran, en sourdine.",
   "config.context.repoMap": "Joindre une carte des symboles du dépôt plutôt que des fichiers entiers.",
   "config.privacy.customTerms": "Mots propres à l'organisation à toujours remplacer avant un envoi distant : noms de clients, de projets, de marques internes.",
   "config.escalation.policy": "Quand le modèle local ne suffit pas (contexte trop grand, question de diagnostic ou d'architecture) : `never` refuse, `ask` propose, `auto` bascule seul vers le modèle d'escalade.",

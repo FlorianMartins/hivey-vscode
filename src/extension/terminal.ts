@@ -109,7 +109,7 @@ export async function runCommandInTerminal(opts: RunOptions): Promise<RunResult>
   if (!integration) {
     // The honest branch. The command still runs and the user still sees it; what is missing is the
     // reading, and saying so is what stops the model from inventing a result. This is the whole of
-    // the old behaviour, kept for the shells that cannot do better.
+    // the old behavior, kept for the shells that cannot do better.
     terminal.sendText(command, true);
     opts.report?.(t("started: {0}", command));
     return {

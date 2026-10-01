@@ -2,6 +2,44 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.59.0 — 2026-10-01
+
+### Corrigé
+
+- **Une pièce jointe au nom long ne pouvait plus être retirée du contexte.** La croix était poussée
+  hors d'une boîte en `overflow: hidden` : présente dans le DOM, absente de l'écran. Deux causes.
+  Le nom était en `flex: 0 0 auto` — il ne pouvait pas rétrécir du tout — alors que seul le dossier
+  avait le droit de céder ; il cède maintenant **en dernier**, le dossier mille fois plus volontiers,
+  et ce qui ne cède jamais est la croix. Et surtout, la note d'extrait ajoutée en 0.50.0
+  — « (outline of 211 symbols + head, 16 000 of 48 177 tokens) » — était **collée au nom** : elle
+  décrit ce qui a été fait au fichier, pas son identité, et elle vit désormais dans l'infobulle.
+
+### Modifié
+
+- **Le résumé automatique disparaît ; l'offre reste.** La bascule « Summarise automatically » est
+  retirée du menu du budget de contexte, avec le réglage et la compaction silencieuse qui allaient
+  avec. Ce qui reste est le résumé **manuel** et l'offre dans la conversation, qui apparaît
+  désormais à **70 %** du budget plutôt qu'aux deux tiers : une proposition ne vaut d'être faite que
+  lorsqu'elle est presque nécessaire, et une bannière qui arrive tôt apprend à fermer les bannières.
+
+- **Orthographe anglaise unifiée sur l'américain**, qui est celle de VS Code : `summarize`,
+  `pseudonymize`, `behavior`, `color`, `center`, `license` et leur famille — 76 fichiers, le code,
+  les tests, les scripts, les textes d'interface et le README. ⚠️ Ce n'étaient pas des fautes mais
+  de l'anglais britannique, cohérent d'un bout à l'autre ; l'uniformiser sur la convention de
+  l'éditeur est néanmoins le bon choix pour une extension VS Code. Les **valeurs françaises** de la
+  table de traduction n'ont pas été touchées — `mise`, `utilise`, `reprise` y sont français — seules
+  les **clés** ont suivi leur source, ce que les deux tests i18n prouvent ligne par ligne. Le
+  CHANGELOG est laissé tel quel : c'est un registre de ce qui a été écrit, pas un texte courant.
+
+### Ajouté
+
+- **`/compile`** — compiler un membre et corriger ce que dit le compilateur. La plomberie existait
+  déjà (`ibmi_command` exécute du CL et cite `CRTBNDRPG` ; `run_command` couvre Maven, Gradle, npm,
+  make) : ce qui manquait n'était pas un outil mais **de savoir comment un atelier compile**. La
+  compétence fait déduire la commande du type source, lire la directive de compilation en tête du
+  membre, reprendre les options de l'objet existant plutôt que de les inventer, puis lire les
+  identifiants de message (RNF…, SQL…, CPD…) et ne corriger que ce dont le compilateur s'est plaint.
+
 ## 0.58.1 — 2026-10-01
 
 ### Corrigé

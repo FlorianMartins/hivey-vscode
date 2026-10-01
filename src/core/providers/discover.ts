@@ -81,7 +81,7 @@ export async function discoverLocal(opts: DiscoverOptions): Promise<LocalRuntime
       try {
         const body = await opts.fetchJson(`${t.baseUrl}/models`, timeoutMs);
         const models = modelIds(body);
-        // A server that answers `/models` with something unrecognisable is still a server; report
+        // A server that answers `/models` with something unrecognizable is still a server; report
         // it with no models rather than hiding it, so the user can decide.
         return { name: t.name, baseUrl: t.baseUrl, models, port: t.port };
       } catch {
@@ -125,7 +125,7 @@ export function modelIds(body: unknown): string[] {
 /**
  * Whether a model is one worth writing code with.
  *
- * Used to sort, never to hide: someone running a model this does not recognise still gets to pick
+ * Used to sort, never to hide: someone running a model this does not recognize still gets to pick
  * it. What it prevents is a setup screen that offers an embedding model as the default because it
  * happened to be listed first.
  */

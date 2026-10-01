@@ -12,7 +12,7 @@ import { cleanTerminalOutput, describeOutcome, stripAnsi, tailOutput } from "../
 const ESC = "";
 const BEL = "";
 
-test("colour codes come off, the coloured text stays", () => {
+test("color codes come off, the colored text stays", () => {
   const raw = `${ESC}[31mFAIL${ESC}[0m src/app.test.ts`;
   assert.equal(stripAnsi(raw), "FAIL src/app.test.ts");
 });

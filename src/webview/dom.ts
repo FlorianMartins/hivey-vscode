@@ -129,7 +129,7 @@ const PATHS = {
  *
  * The ellipsis was three zero-length segments with round caps, which at stroke-width 1.3 produces
  * three dots 1.3 px across — a quarter of the ink of any other icon in the row, and it read as
- * disabled next to them. The colour was never wrong: it is `currentColor`, the same as its
+ * disabled next to them. The color was never wrong: it is `currentColor`, the same as its
  * neighbours. A dot has to be filled to have the weight of a line.
  */
 const FILLED = new Set<IconName>(["more", "sparkle"]);

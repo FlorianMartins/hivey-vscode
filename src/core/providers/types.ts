@@ -13,7 +13,7 @@ export interface ToolCall {
  *
  * Kept beside the text rather than folded into `content` as a multimodal array, and that is a
  * deliberate narrowing. Every other part of this extension treats a message's content as a string —
- * the pseudonymiser, the budget, the transcript, the compaction — and turning it into a union would
+ * the pseudonymizer, the budget, the transcript, the compaction — and turning it into a union would
  * put a `typeof` in each of them, which is how the one place that forgot to check becomes the place
  * a credential leaves unredacted. Here the text stays text, and the image is an explicit extra that
  * each provider assembles at the last moment.
@@ -31,7 +31,7 @@ export interface ChatMessage {
   /**
    * Images the user attached to this message.
    *
-   * The honest warning that belongs with this field: an image CANNOT be pseudonymised. The whole
+   * The honest warning that belongs with this field: an image CANNOT be pseudonymized. The whole
    * privacy architecture here works on text — names, hosts, credentials, all found and replaced —
    * and none of it can touch a screenshot, which may carry a whole desktop. So an image leaving the
    * machine is a decision the user makes with that said plainly, never a side effect of pasting.

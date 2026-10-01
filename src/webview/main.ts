@@ -187,7 +187,7 @@ function header(s: UiState): HTMLElement {
         else if (ev.key === "Escape") { ev.preventDefault(); commit(false); }
       });
       // Leaving the field keeps what was typed. Discarding an edit because focus moved is the
-      // behaviour people learn to distrust.
+      // behavior people learn to distrust.
       input.addEventListener("blur", () => commit(true));
       left.replaceChild(input, title);
       input.focus();
@@ -519,7 +519,7 @@ class LiveTurn {
  * Close a fence the model has opened and not yet closed.
  *
  * Mid-stream, an answer is routinely cut in the middle of a code block. Handed to the renderer as
- * it stands, the opening ``` has no partner, so the block is not recognised and its contents render
+ * it stands, the opening ``` has no partner, so the block is not recognized and its contents render
  * as paragraphs — then snap into a code block the moment the closing fence arrives. Adding the
  * missing fence to the COPY being rendered (never to the buffer) means a code block appears as a
  * code block from its first line and simply grows.

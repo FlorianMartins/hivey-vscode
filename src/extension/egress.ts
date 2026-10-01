@@ -6,7 +6,7 @@
 //
 // The gate does four things, in this order, because each one can stop the next:
 //   1. BLOCK  — a path matching a blocked glob is not sent, at all, whatever else is configured.
-//   2. REDACT — reversible pseudonymisation of everything else.
+//   2. REDACT — reversible pseudonymization of everything else.
 //   3. REFUSE — a credential that survives redaction stops the request. Redaction removes it, so
 //               reaching this point means something was shaped like a secret and could not be
 //               replaced safely; sending it anyway is not a choice worth offering.
@@ -45,7 +45,7 @@ export interface EgressRecord {
    * How many images went with it, when any did.
    *
    * The one thing in a request that the redaction count says nothing about: an image cannot be
-   * pseudonymised, so a row reading "0 redactions" on a turn that sent a screenshot would be true
+   * pseudonymized, so a row reading "0 redactions" on a turn that sent a screenshot would be true
    * and misleading. Absent rather than zero on the ordinary turn, so the log does not grow a column
    * of noughts.
    */
@@ -138,7 +138,7 @@ export class EgressGate {
       return true;
     }
 
-    const summary = summarise(findings);
+    const summary = summarize(findings);
     // Asked in the conversation rather than in a modal over the editor. The consent itself is not
     // negotiable — it is the whole privacy argument — but a modal at the moment of sending stops
     // the world for a question about a routine action, and a question that stops the world gets
@@ -146,7 +146,7 @@ export class EgressGate {
     const answer = this.ask
       ? await this.ask({
           description: t("Send ~{0} tokens to {1} ({2})?", tokens, host, target.model),
-          detail: [summary ? t("Pseudonymised: {0}.", summary) : t("No sensitive data detected.")],
+          detail: [summary ? t("Pseudonymized: {0}.", summary) : t("No sensitive data detected.")],
         })
       : "no";
     if (answer === "no") return false;
@@ -218,7 +218,7 @@ export class EgressGate {
   }
 }
 
-export function summarise(findings: Finding[]): string {
+export function summarize(findings: Finding[]): string {
   if (!findings.length) return "";
   const counts = new Map<string, number>();
   for (const f of findings) {

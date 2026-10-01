@@ -92,7 +92,7 @@ export function setupScreen(state: UiState, send: (m: ToExtension) => void, rere
     el(
       "p",
       "setup-lede",
-      t("Hivey Code runs on a model you choose. On your machine it costs nothing and sends nothing; through a gateway it is billed, and what leaves is pseudonymised first."),
+      t("Hivey Code runs on a model you choose. On your machine it costs nothing and sends nothing; through a gateway it is billed, and what leaves is pseudonymized first."),
     ),
   );
   wrap.append(head);
@@ -188,7 +188,7 @@ export function setupScreen(state: UiState, send: (m: ToExtension) => void, rere
  * Two fields and no explanation of what a base URL is, because the placeholder is the explanation:
  * someone who runs a model server knows their address, and someone who does not is not on this
  * card. What the note under it says is the part that is NOT obvious — that an address on your own
- * network is treated exactly like localhost, so nothing is pseudonymised and nothing is billed.
+ * network is treated exactly like localhost, so nothing is pseudonymized and nothing is billed.
  */
 function serverForm(send: (m: ToExtension) => void, rerender: () => void): HTMLElement {
   const box = el("div", "setup-server-form");
@@ -225,7 +225,7 @@ function serverForm(send: (m: ToExtension) => void, rerender: () => void): HTMLE
     el(
       "p",
       "setup-note",
-      t("An address on your own network counts as local: nothing is pseudonymised, nothing is billed, nothing leaves it."),
+      t("An address on your own network counts as local: nothing is pseudonymized, nothing is billed, nothing leaves it."),
     ),
   );
   return box;

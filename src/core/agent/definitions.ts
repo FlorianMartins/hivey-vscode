@@ -146,9 +146,9 @@ export const BUILTIN_AGENTS: AgentDefinition[] = [
  */
 export function parseDefinition(kind: "skill" | "agent", source: string, text: string): ParseResult {
   const problems: string[] = [];
-  const normalised = text.replace(/\r\n/g, "\n");
+  const normalized = text.replace(/\r\n/g, "\n");
 
-  const match = /^\s*---\n([\s\S]*?)\n---\n?([\s\S]*)$/.exec(normalised);
+  const match = /^\s*---\n([\s\S]*?)\n---\n?([\s\S]*)$/.exec(normalized);
   if (!match) {
     return {
       problems: [
@@ -254,7 +254,7 @@ function splitList(value: string): string[] {
  * The tools a sub-agent actually gets.
  *
  * An intersection, never a union. The definition file may have arrived with a cloned repository, so
- * treating its `tools:` line as an authorisation would let a file grant itself `run_command` in a
+ * treating its `tools:` line as an authorization would let a file grant itself `run_command` in a
  * mode that has no `run_command` — and the mode would become a suggestion. Listing a tool the mode
  * does not offer is not an error either; it is a definition written for agent mode being used in
  * plan mode, which should quietly do less rather than refuse.

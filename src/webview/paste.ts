@@ -37,7 +37,7 @@ function readText(file: File): Promise<string> {
  *
  * Through an `<img>` and a `<canvas>` rather than `createImageBitmap`, because the result has to be
  * re-encoded anyway and this path is the one that works in every webview. PNG out: a screenshot is
- * flat colour and text, which JPEG turns into a smear exactly where the text is — and text is what
+ * flat color and text, which JPEG turns into a smear exactly where the text is — and text is what
  * somebody pastes a screenshot of a stack trace FOR.
  */
 async function shrink(dataUrl: string, mediaType: string): Promise<{ mediaType: string; data: string; width: number; height: number }> {

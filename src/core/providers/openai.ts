@@ -210,7 +210,7 @@ export class OpenAICompatibleProvider implements Provider {
         function: { name: t.name, description: t.description, parameters: t.parameters },
       }));
     }
-    // Reasoning. OpenRouter normalises it under `reasoning`; OpenAI's own API and several
+    // Reasoning. OpenRouter normalizes it under `reasoning`; OpenAI's own API and several
     // gateways take `reasoning_effort`. Sending both is safe: an unknown field is dropped, and a
     // server that knows one of them gets the intent.
     if (req.reasoning && req.reasoning !== "none") {
@@ -250,7 +250,7 @@ export class OpenAICompatibleProvider implements Provider {
       if (!choice) continue;
       if (choice.finish_reason === "length") stopReason = "length";
       const delta = choice.delta ?? {};
-      // DeepSeek names it reasoning_content, OpenRouter normalises to reasoning.
+      // DeepSeek names it reasoning_content, OpenRouter normalizes to reasoning.
       const r = delta.reasoning_content ?? delta.reasoning;
       if (typeof r === "string" && r) {
         reasoning += r;
@@ -425,7 +425,7 @@ export function isOllama(baseUrl: string): boolean {
  * Only for 402 — the documented wait-and-retry status on OpenRouter, where it means the in-flight
  * spending budget rather than the balance. A 429 is deliberately NOT handled here: a rate limit is
  * answered by moving to the next endpoint in the fallback chain, which is both faster and the
- * behaviour the free preset depends on.
+ * behavior the free preset depends on.
  *
  * Bounded at thirty seconds. A server asking for longer than that is not asking for a retry, it is
  * asking to be left alone, and a request that hangs for a minute with nothing on screen is

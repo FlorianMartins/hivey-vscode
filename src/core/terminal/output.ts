@@ -1,6 +1,6 @@
 // What a terminal actually wrote, once the terminal's own furniture is removed.
 //
-// VS Code's shell integration hands back the RAW stream: colour codes, cursor moves, hyperlinks,
+// VS Code's shell integration hands back the RAW stream: color codes, cursor moves, hyperlinks,
 // the shell's own OSC 633 markers, the prompt it redraws afterwards, and every intermediate frame
 // of a progress bar. Handing that to a model is worse than handing it nothing — several hundred
 // tokens of escape sequences around the twelve characters that matter, and a model that starts
@@ -24,7 +24,7 @@ const ESCAPES = new RegExp(
     "\\u001b\\][\\s\\S]*?(?:\\u0007|\\u001b\\\\|$)",
     // DCS, SOS, PM, APC — same shape, different introducer.
     "\\u001b[P^_X][\\s\\S]*?(?:\\u0007|\\u001b\\\\|$)",
-    // CSI — colours, cursor moves, erase-line. Parameters, then intermediates, then a final byte.
+    // CSI — colors, cursor moves, erase-line. Parameters, then intermediates, then a final byte.
     "\\u001b\\[[0-?]*[ -/]*[@-~]",
     // Two- and three-character escapes: charset selection, save/restore cursor, reverse index.
     "\\u001b[()#][0-9A-Za-z]",
@@ -34,7 +34,7 @@ const ESCAPES = new RegExp(
 );
 
 /**
- * Colour codes, cursor moves and shell markers removed; the text itself untouched.
+ * Color codes, cursor moves and shell markers removed; the text itself untouched.
  *
  * The second pass drops the control characters that are NOT part of a sequence — a bare bell, a
  * stray NUL from a program writing binary to stdout — while keeping tab, newline and the carriage

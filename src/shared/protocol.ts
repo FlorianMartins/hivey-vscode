@@ -148,7 +148,7 @@ import type { Plan } from "../core/agent/plan.js";
  *
  * It is EPHEMERAL. Nothing here is a message: the steps are drawn from this state, and when the
  * first real question is asked they are gone, leaving a conversation that looks like any other. A
- * wizard that left three of its own messages at the top of every specialised conversation would be
+ * wizard that left three of its own messages at the top of every specialized conversation would be
  * a wizard people stop using on the second day.
  */
 export interface UiWizard {
@@ -283,7 +283,7 @@ export interface UiState {
   skills: UiSkill[];
   /** The families, with whether each is currently in play and whether the workspace suggests it. */
   skillGroups: UiSkillGroup[];
-  /** The guided setup, when a specialised conversation is being started. */
+  /** The guided setup, when a specialized conversation is being started. */
   wizard?: UiWizard;
   /**
    * The most recent conversations, unfiltered.
@@ -318,7 +318,7 @@ export interface UiState {
   searchQuery: string;
   setup: UiSetup;
   /**
-   * True when the conversation is long enough that summarising it is worth offering.
+   * True when the conversation is long enough that summarizing it is worth offering.
    *
    * Computed by the extension, which is the only side that knows the model's context window. The
    * panel drawing this from its own token count would be guessing at a number it does not have.
@@ -335,8 +335,6 @@ export interface UiState {
    * Undefined until something has actually been sent to a provider that reports it.
    */
   cacheHitRate?: number;
-  /** True when summarising happens by itself at the threshold instead of being offered. */
-  autoCompact: boolean;
   /**
    * Whether a turn is running, according to the side that runs it.
    *
@@ -367,7 +365,7 @@ export type ToExtension =
   | { type: "setSkillEnabled"; name: string; enabled: boolean }
   /** Choose the families in play — everything else is switched off in one write. */
   | { type: "setSkillGroups"; groups: string[] }
-  /** Start the guided setup for a specialised conversation. */
+  /** Start the guided setup for a specialized conversation. */
   | { type: "startWizard" }
   /** Answer the step on screen. `value` is a mode, a list of families, or a list of skills. */
   | { type: "wizardAnswer"; step: "mode" | "family" | "skills"; value: string[] }
@@ -389,7 +387,6 @@ export type ToExtension =
   | { type: "setMode"; mode: Mode }
   | { type: "setReasoning"; reasoning: Reasoning }
   | { type: "setContextBudget"; tokens: number }
-  | { type: "setAutoCompact"; on: boolean }
   /** `baseUrl` accompanies a model served by a machine other than the configured one. */
   | { type: "setModel"; model: string; provider: string; baseUrl?: string }
   | { type: "refreshModels" }
@@ -489,7 +486,7 @@ export type ToPanel =
       command?: string;
       /** Which answers to offer. Defaults to all four; egress consent has no "this session". */
       choices?: Array<"once" | "session" | "always" | "no">;
-      /** Extra lines under the question — what was pseudonymised, what it will cost. */
+      /** Extra lines under the question — what was pseudonymized, what it will cost. */
       detail?: string[];
     }
   | { type: "error"; message: string }

@@ -7,7 +7,7 @@
 //
 //   • drop      — the exchange leaves the transcript for good;
 //   • exclude   — the exchange stays visible to the user and stops being sent to the model. This
-//                 is the sidebar behaviour we keep: a wrong answer can be muted without losing
+//                 is the sidebar behavior we keep: a wrong answer can be muted without losing
 //                 the trail of what was tried;
 //   • pin       — the exchange survives context trimming when the budget gets tight.
 //
@@ -32,6 +32,15 @@ export interface ContextItem {
   body: string;
   /** Content the user did not write (a page, a log, a dependency) is fenced as untrusted. */
   untrusted?: boolean;
+  /**
+   * What was done to it on the way in — "outline of 211 symbols + head, 16 000 of 48 177 tokens".
+   *
+   * Beside the label, never inside it. It was appended to the name, which made the chip in the
+   * composer wider than the row it sits in: the cross that removes the attachment was pushed out of
+   * a box with `overflow: hidden`, so the file could not be taken out of the context at all. A name
+   * identifies a thing; what was done to it is a remark about it, and remarks belong in the tooltip.
+   */
+  note?: string;
   /**
    * An image, when the attachment is one. `body` then holds what the TRANSCRIPT says about it —
    * a name and a size — because a base64 blob in the conversation record would be unreadable, would

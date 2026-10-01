@@ -67,7 +67,7 @@ export function selectionActions(): SelectionAction[] {
       id: "usage",
       label: t("Show me how it is used"),
       where: "chat",
-      instruction: t("Find where this is called from in the workspace and summarise how the callers use it."),
+      instruction: t("Find where this is called from in the workspace and summarize how the callers use it."),
     },
     {
       id: "simplify",
@@ -85,7 +85,7 @@ export function selectionActions(): SelectionAction[] {
       id: "types",
       label: t("Add the types"),
       where: "file",
-      instruction: t("Add or tighten the type annotations for this code. Change no runtime behaviour."),
+      instruction: t("Add or tighten the type annotations for this code. Change no runtime behavior."),
     },
   ];
 }

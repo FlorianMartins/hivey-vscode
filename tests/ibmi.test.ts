@@ -74,7 +74,7 @@ exec sql fetch custCursor into :custName;
 
 // ── Detection ────────────────────────────────────────────────────────────────────────────────
 
-test("a fully free member is recognised by its own switch, not by its name", () => {
+test("a fully free member is recognized by its own switch, not by its name", () => {
   const lang = detectIbmiLanguage("src/CALCVAT.rpgle", FREE_RPG);
   assert.equal(lang?.id, "rpgle-free");
   assert.equal(lang?.fixedForm, false);

@@ -3,7 +3,7 @@
 **A coding assistant for VS Code that does not send your code away.**
 Local models (Ollama, LM Studio, vLLM, llama.cpp), a gateway (OpenRouter, Azure, LiteLLM) or your own
 account with OpenAI, Anthropic, Gemini, DeepSeek, Qwen, Mistral, xAI, Groq or Perplexity — your
-choice, per role, and **pseudonymised when it does leave**.
+choice, per role, and **pseudonymized when it does leave**.
 
 Open source (Apache-2.0), **zero runtime dependencies**, **zero telemetry**.
 
@@ -34,7 +34,7 @@ GitHub Copilot is excellent, and it presents a company with two problems:
 
 Hivey Code inverts both: **the default is the model already running on your machine**, the remote one is
 an **escalation** that has to be justified, consented to, and paid for out of a budget; and anything
-that does leave is **reversibly pseudonymised** first.
+that does leave is **reversibly pseudonymized** first.
 
 ## What it does
 
@@ -61,19 +61,19 @@ that does leave is **reversibly pseudonymised** first.
 | **IBM i** | Db2 for i, CL commands, source members, object lists and the library list, over the connection Code for IBM i has already negotiated. And the part that decides whether the code compiles: **the dialect is detected from the member, and its column rules go into the prompt** — RPG III, fixed and free ILE RPG, SQLRPGLE, CL, DDS (PF/LF/DSPF/PRTF), Db2 for i, COBOL. |
 | **ARCAD Elias** | Check-out, check-in, compile, cross-references and the Transformer RPG conversion, through the `arcad.*` commands Elias itself registers — plus calls to the REST server you have already configured. |
 | **MCP** | Connect any Model Context Protocol server, stdio or HTTP. Its tools join the set, under the same permissions. A local server never starts until you have said so in a dialog that names the command. |
-| **Compacting** | When a conversation fills its budget, one command — `/compact`, *This conversation → Summarise it now* under the context ring, or the offer that appears at two thirds (which can be set to **Always**, and then it happens by itself) — replaces it in the prompt with a summary the model writes, **and deletes nothing**: every exchange stays on screen, muted, one click from coming back. The gain is measured and shown (`8 200 → 900 tokens`), not asserted. |
+| **Compacting** | When a conversation fills its budget, one command — `/compact`, *This conversation → Summarize it now* under the context ring, or the offer that appears at two thirds (which can be set to **Always**, and then it happens by itself) — replaces it in the prompt with a summary the model writes, **and deletes nothing**: every exchange stays on screen, muted, one click from coming back. The gain is measured and shown (`8 200 → 900 tokens`), not asserted. |
 | **Knowledge base** | Optional, off by default. What has been established about this system, this business and these tools, kept as Markdown files in `.hiveycode/knowledge/` (versioned with the code) or `~/.hiveycode/knowledge/` (yours, across projects) — or on a server you plug in. The agent searches it before answering, and records what it learns with `/remember`. Only the **list of titles** travels with each question, a dozen tokens a note; a note is read when it is needed. Writing a note whose subject already exists is refused, with the notes that cover it, so the base is corrected rather than piled up; retiring moves a note to the archive with a reason rather than deleting it. |
 | **Conversations as context** | Any earlier conversation can be **attached** to the current one from the history rather than opened. “What did we settle about the invoices last week” is a question about today's work. |
-| **Rendered as it streams** | Headings, tables, checklists, quotes and **syntax-coloured** code appear formatted while the answer is being written, not after — including RPG, DDS, CL and Db2 for i. Every colour is one of the editor's own variables. |
+| **Rendered as it streams** | Headings, tables, checklists, quotes and **syntax-colored** code appear formatted while the answer is being written, not after — including RPG, DDS, CL and Db2 for i. Every color is one of the editor's own variables. |
 | **Search** | Inside the open conversation (`Ctrl+F`, matches highlighted) **and** across the whole history — the search looks inside the messages and shows the fragment that matched. |
 | **History filters** | Period, mode, “paid only”, and four sort orders (recently updated, created, longest, most expensive). |
 | **Context control** | Every exchange can be **muted** (stays on screen, stops being sent), **pinned** (survives trimming), edited or deleted. It is the most direct lever there is on both quality **and** cost. |
-| **Context sized by the model** | The budget follows the window of the model actually selected rather than a number chosen once — a fixed 8 000 tokens is most of a small local model and a rounding error on a modern one, and against it a conversation was summarised away after three exchanges and answered from the digest. One attachment is capped separately (`hiveyCode.context.attachmentTokens`, `0` for whole files), and past that cap a file arrives as its **outline** — every symbol it declares with the line it is on — followed by its head, rather than its first N lines and nothing about the rest. A file attached in five turns is sent **once**, in the message nearest the question. |
-| **Privacy** | Reversible pseudonymisation, blocked files, consent before the first destination, an **egress log** and a **cost report**. An image is the one thing none of that can touch — so when one is about to leave, the consent card says exactly that, and the log records it. |
+| **Context sized by the model** | The budget follows the window of the model actually selected rather than a number chosen once — a fixed 8 000 tokens is most of a small local model and a rounding error on a modern one, and against it a conversation was summarized away after three exchanges and answered from the digest. One attachment is capped separately (`hiveyCode.context.attachmentTokens`, `0` for whole files), and past that cap a file arrives as its **outline** — every symbol it declares with the line it is on — followed by its head, rather than its first N lines and nothing about the rest. A file attached in five turns is sent **once**, in the message nearest the question. |
+| **Privacy** | Reversible pseudonymization, blocked files, consent before the first destination, an **egress log** and a **cost report**. An image is the one thing none of that can touch — so when one is about to leave, the consent card says exactly that, and the log records it. |
 | **A log you can check** | Every entry in the egress log carries the hash of the one before it, so altering a line means rewriting the whole tail and deleting one leaves a gap the check finds. Exportable as JSONL or RFC 5424 syslog, for the collector that is not on this machine. |
 | **MCP that stays what you approved** | The approval covers the tool **descriptions and schemas**, not just the command that starts the server. A server that rewrites what its tools claim to do asks again, naming what changed — that is what tool poisoning is, and a dialog that only says "something changed" teaches people to click yes. |
 | **Languages** | English and French, following the editor's display language — or pinned with `hiveyCode.language`, for a machine whose editor is in one language and whose user reads another. |
-| **Your theme** | Every colour in the panel is one of the editor's own variables. Not one hex value — [the same picker under a light theme](https://raw.githubusercontent.com/FlorianMartins/hivey-vscode/main/docs/images/picker.light.png), captured by the same script. It follows a theme change immediately, high contrast included. |
+| **Your theme** | Every color in the panel is one of the editor's own variables. Not one hex value — [the same picker under a light theme](https://raw.githubusercontent.com/FlorianMartins/hivey-vscode/main/docs/images/picker.light.png), captured by the same script. It follows a theme change immediately, high contrast included. |
 
 ## How the cost tends to zero
 
@@ -190,9 +190,9 @@ Four steps, in this order, on everything bound for a remote provider:
 
 1. **Blocked.** A file matching `privacy.blockedGlobs` (`.env`, keys, `secrets/**`…) is never
    attached, neither in chat nor in completion.
-2. **Reversible pseudonymisation.** Credentials (known shapes + an entropy safety net), e-mail
+2. **Reversible pseudonymization.** Credentials (known shapes + an entropy safety net), e-mail
    addresses, phone numbers, IP addresses, internal hosts, account names in paths, and the
-   **organisation-specific terms** you list. `alice@corp.fr` becomes `⟨EMAIL_1⟩` — **always the same
+   **organization-specific terms** you list. `alice@corp.fr` becomes `⟨EMAIL_1⟩` — **always the same
    marker**, so the model can still reason — and becomes `alice@corp.fr` again on your machine,
    including in the code it sends back.
 3. **Refused.** A detected credential raises a modal warning; it has already been replaced anyway.
@@ -207,9 +207,9 @@ what you were trying to keep private is not a privacy feature.
 The places where others get this wrong, and which are handled here:
 
 - **The endpoint decides, not the setting name.** Pointing the “local” provider at a public URL
-  triggers pseudonymisation and consent like any other.
+  triggers pseudonymization and consent like any other.
 - **Every agent step goes through the gate again.** A file the agent just read is new text: it is
-  pseudonymised again before the next call.
+  pseudonymized again before the next call.
 - **Attached content is fenced.** Files, logs and pages arrive inside a block closed by a
   **per-turn nonce**; an injection hidden in a file cannot close a block whose delimiter it cannot
   guess.
@@ -410,7 +410,7 @@ the day's spend.
 - Serve one model for everyone: **vLLM** or **Ollama** behind an internal URL, declared in
   `hiveyCode.endpoints.servers` (or pushed through VS Code's settings policy). Its models appear in
   the picker under **“On your network”**, beside whatever is running on the laptop. An address on
-  your own network counts as local: nothing is billed and nothing is pseudonymised, because nothing
+  your own network counts as local: nothing is billed and nothing is pseudonymized, because nothing
   leaves it.
 - Lock down what needs it: `privacy.blockedGlobs`, `privacy.customTerms` (client and project
   names), `privacy.egressPolicy: "ask-always"`, `budget.dailyUsd`.
@@ -489,6 +489,6 @@ conditions it was written for. That last list is not empty and it is named.
 
 Not on the Marketplace yet — see [Install](#install).
 
-## Licence
+## License
 
 Apache-2.0.

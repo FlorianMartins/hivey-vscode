@@ -28,7 +28,7 @@ const CFG = (model: string): RouterConfig => ({
   localContextTokens: 32000,
 });
 
-test("a preset is recognised, and a stale one is not sent as it stands", () => {
+test("a preset is recognized, and a stale one is not sent as it stands", () => {
   assert.ok(isHivey("hivey"));
   assert.ok(isHivey("hivey/smart"));
   assert.ok(!isHivey("anthropic/claude-opus-5"));

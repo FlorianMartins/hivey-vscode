@@ -38,7 +38,7 @@ test("the repository map does not grow with the budget for ever", () => {
   assert.ok(repoMapBudget(1_000_000) <= 12_000);
 });
 
-test("a conversation on a modern model survives more than three exchanges before being summarised", () => {
+test("a conversation on a modern model survives more than three exchanges before being summarized", () => {
   // The reported symptom, as an assertion: "three messages and I had used almost the whole context,
   // without getting a single answer". Compaction fires at two thirds of the budget and REPLACES the
   // transcript with a summary in the prompt, so a budget too small for the model does not save
@@ -49,6 +49,6 @@ test("a conversation on a modern model survives more than three exchanges before
   while (!shouldSuggestCompact(perExchange * (exchanges + 1), budget, (exchanges + 1) * 2)) exchanges += 1;
   assert.ok(
     exchanges >= 10,
-    `summarising begins after ${exchanges} exchanges on a 200k model (budget ${budget}, ratio ${COMPACT_RATIO})`,
+    `summarizing begins after ${exchanges} exchanges on a 200k model (budget ${budget}, ratio ${COMPACT_RATIO})`,
   );
 });

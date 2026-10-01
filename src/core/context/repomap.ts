@@ -59,7 +59,7 @@ function baseScore(path: string): number {
   if (/^(?:index|main|app|mod|lib)\.[a-z]+$/i.test(name)) s += 3;
   if (/^(?:README|ARCHITECTURE|CONTRIBUTING)/i.test(name)) s += 3;
   if (/(?:package\.json|pyproject\.toml|Cargo\.toml|go\.mod|pom\.xml|composer\.json)$/.test(name)) s += 4;
-  if (/(?:\.test\.|\.spec\.|_test\.|^test_)/.test(name)) s -= 2; // tests describe behaviour, but there are many
+  if (/(?:\.test\.|\.spec\.|_test\.|^test_)/.test(name)) s -= 2; // tests describe behavior, but there are many
   if (/\.d\.ts$/.test(name)) s -= 3;
   s -= Math.min(3, path.split("/").length - 1) * 0.3; // shallow files are usually the entry points
   return s;

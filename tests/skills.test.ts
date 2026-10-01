@@ -9,7 +9,7 @@ import {
   detectGroups,
   enabledSkills,
   isSkillEnabled,
-  normaliseGroups,
+  normalizeGroups,
   SKILL_GROUPS,
   skillInvocation,
   toggleSkill,
@@ -123,7 +123,7 @@ test("only the general family is in play to begin with", () => {
 });
 
 test("choosing a family brings all of its skills, without touching the others", () => {
-  const policy = { groups: normaliseGroups(["python"]), disabled: [] };
+  const policy = { groups: normalizeGroups(["python"]), disabled: [] };
   const on = enabledSkills(policy).map((s) => s.name);
   assert.ok(on.includes("/pytest"));
   assert.ok(on.includes("/fix"), "general comes along, always");
@@ -132,19 +132,19 @@ test("choosing a family brings all of its skills, without touching the others", 
 
 test("general survives every choice", () => {
   // A profile that silenced /fix because you said "Rust" is a profile nobody uses twice.
-  assert.ok(normaliseGroups(["rust"]).includes("general"));
-  assert.ok(normaliseGroups([]).includes("general"));
+  assert.ok(normalizeGroups(["rust"]).includes("general"));
+  assert.ok(normalizeGroups([]).includes("general"));
 });
 
 test("families are returned in catalogue order, deduplicated, and unknown ones dropped", () => {
-  const out = normaliseGroups(["rust", "python", "rust", "nonsense" as never]);
+  const out = normalizeGroups(["rust", "python", "rust", "nonsense" as never]);
   assert.deepEqual(out, SKILL_GROUPS.map((g) => g.id).filter((id) => out.includes(id)));
   assert.equal(new Set(out).size, out.length);
   assert.ok(!out.includes("nonsense" as never));
 });
 
 test("a skill switched off inside an active family stays off", () => {
-  const policy = { groups: normaliseGroups(["python"]), disabled: ["/pytest"] };
+  const policy = { groups: normalizeGroups(["python"]), disabled: ["/pytest"] };
   assert.equal(isSkillEnabled("/pytest", policy), false);
   assert.equal(isSkillEnabled("/hints", policy), true);
 });
@@ -153,7 +153,7 @@ test("a skill switched off in a family that is not in play does not come back on
   // Because the two lists answer different questions: membership and per-skill preference. Turning
   // Python on must not undo the four Python skills you switched off last week.
   const disabled = ["/pytest"];
-  assert.equal(isSkillEnabled("/pytest", { groups: normaliseGroups(["python"]), disabled }), false);
+  assert.equal(isSkillEnabled("/pytest", { groups: normalizeGroups(["python"]), disabled }), false);
 });
 
 test("compacting survives an empty policy", () => {
@@ -169,7 +169,7 @@ test("what the editor has open suggests the families, and nothing else", () => {
   assert.ok(detectGroups(["dds.dspf"]).includes("dds"));
 });
 
-test("an unrecognised workspace suggests nothing, rather than guessing", () => {
+test("an unrecognized workspace suggests nothing, rather than guessing", () => {
   // The caller reads an empty list as "ask, do not assume".
   assert.deepEqual(detectGroups(["cobol", "fortran"]), []);
   assert.deepEqual(detectGroups([]), []);

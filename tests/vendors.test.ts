@@ -75,7 +75,7 @@ test("the dialect follows the vendor, not the caller", () => {
   for (const v of REMOTE_VENDORS.filter((x) => x.wire === "openai")) {
     const p = makeProvider({ id: v.id, baseUrl: v.baseUrl || "https://gateway.example/v1", apiKey: "k" });
     assert.ok(p instanceof OpenAICompatibleProvider, `${v.id} would be spoken to in the wrong dialect`);
-    assert.equal(p.isLocal, false, `${v.id} would skip pseudonymisation`);
+    assert.equal(p.isLocal, false, `${v.id} would skip pseudonymization`);
   }
 });
 

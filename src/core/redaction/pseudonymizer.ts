@@ -1,6 +1,6 @@
 // The vault: the only place where "what the model saw" and "what the user wrote" are connected.
 //
-// Design choice that makes anonymisation usable rather than merely safe: replacement is
+// Design choice that makes anonymization usable rather than merely safe: replacement is
 // REVERSIBLE and CONSISTENT. `alice@corp.fr` becomes `⟨EMAIL_1⟩` everywhere in the session, so the
 // model can still reason ("the same address appears in the test and in the fixture") and every
 // placeholder it echoes back is turned into the real value before the user ever sees it. A

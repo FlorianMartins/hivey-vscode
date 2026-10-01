@@ -3460,14 +3460,25 @@ pre.code code {
   height: 13px;
   opacity: 0.8;
 }
-/* The name identifies and is kept whole; the folder disambiguates and is what gives way. */
+/* The name identifies and gives way LAST; the folder disambiguates and gives way first.
+ *
+ * "Last", not "never", and that is the fix. The name was `flex: 0 0 auto` — it could not shrink at
+ * all — so a long one pushed the cross out of a box with `overflow: hidden`: present in the DOM,
+ * off the screen, and the attachment could not be removed at all. A source member path or a
+ * generated file name is long enough on its own, with no folder to give way on its behalf.
+ *
+ * Both may shrink now, and the order between them is the shrink factor rather than a rule saying
+ * one of them cannot: the folder yields a thousand times more readily, so it is still gone before
+ * the first character of the name is. What never yields is the cross, which is the only control
+ * here and the whole reason the chip is interactive. */
 .chip .chip-label {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  min-width: 2.5em;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .chip .chip-dir {
-  flex: 0 1 auto;
+  flex: 0 999 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3714,7 +3725,11 @@ pre.code code {
 }
 .chip-label {
   direction: ltr;
-  flex: 0 0 auto;
+  /* See `.chip .chip-label` above: it gives way last, not never. */
+  flex: 0 1 auto;
+  min-width: 2.5em;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .chip-dir {
   color: var(--muted);

@@ -129,7 +129,7 @@ test("attribution headers go to OpenRouter and nowhere else", async () => {
   await or.close();
 });
 
-test("an Ollama server on an unusual port is recognised by probing it, not by its URL", async () => {
+test("an Ollama server on an unusual port is recognized by probing it, not by its URL", async () => {
   // The whole point: this server is on a random port and still gets the fill-in-the-middle path.
   const s = await serve((req, res) => {
     if (req.url === "/api/version") {
@@ -240,7 +240,7 @@ test("Anthropic: the stable prefix is marked for the prompt cache", async () => 
 });
 
 test("reasoning effort is translated per provider, not passed through", async () => {
-  // OpenRouter normalises it under `reasoning`; an OpenAI-shaped gateway takes `reasoning_effort`.
+  // OpenRouter normalizes it under `reasoning`; an OpenAI-shaped gateway takes `reasoning_effort`.
   const or = await serve((_req, res) => sse(res, [{ choices: [{ delta: { content: "x" } }] }]));
   await new OpenAICompatibleProvider({ id: "openrouter", baseUrl: or.url, isLocal: false, apiKey: "k" }).chat({
     model: "m",
@@ -504,13 +504,13 @@ test("Anthropic: the system blocks and the messages share the same budget of fou
 test("an authentication or balance failure names the provider that actually answered", async () => {
   // With a Hivey preset the panel shows one provider and OpenRouter answers. "Check the API key" is
   // unhelpful advice to somebody who has just checked the API key — of the provider they selected.
-  const unauthorised = await serve((_req, res) => {
+  const unauthorized = await serve((_req, res) => {
     res.writeHead(401, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ error: { message: "No auth credentials found" } }));
   });
-  const p = new OpenAICompatibleProvider({ id: "openrouter", baseUrl: unauthorised.url, apiKey: "k", isLocal: false });
+  const p = new OpenAICompatibleProvider({ id: "openrouter", baseUrl: unauthorized.url, apiKey: "k", isLocal: false });
   await assert.rejects(() => p.chat({ model: "m", messages: [{ role: "user", content: "hi" }] }), /API key for openrouter/);
-  await unauthorised.close();
+  await unauthorized.close();
 
   // 402 is the account, not the key, and no retry or new key fixes it. It had no hint at all, so it
   // arrived as the provider's own sentence about credits with nothing saying whose account it meant.

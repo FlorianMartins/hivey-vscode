@@ -1,11 +1,11 @@
-// Modes, permissions, history: the three behaviours the new panel is built on. All of them live in
+// Modes, permissions, history: the three behaviors the new panel is built on. All of them live in
 // core precisely so they can be tested here, in a millisecond, instead of by clicking.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { toolsForMode, promptForMode, MODES } from "../src/core/session/modes.js";
 import { Permissions, MemoryPermissionStore, commandPrefix } from "../src/core/agent/permissions.js";
-import { filterHistory, searchTranscript, excerptAround, normalise, upsertSession } from "../src/core/session/history.js";
+import { filterHistory, searchTranscript, excerptAround, normalize, upsertSession } from "../src/core/session/history.js";
 import { Session, type SessionData } from "../src/core/session/session.js";
 import type { Tool } from "../src/core/agent/loop.js";
 
@@ -135,7 +135,7 @@ test("trusting `npm test` does not trust `npm publish`", () => {
   assert.equal(p.allows("run_command", { command: "rm -rf /" }), false);
 });
 
-test("a refusal beats an authorisation, whichever was written first", () => {
+test("a refusal beats an authorization, whichever was written first", () => {
   const p = new Permissions(new MemoryPermissionStore());
   p.remember("run_command", { command: "git push" }, "always");
   p.remember("run_command", {}, "never", true);
@@ -206,7 +206,7 @@ test("search looks inside the messages and says which fragment matched", () => {
 });
 
 test("search ignores case and accents, because nobody types them twice the same way", () => {
-  assert.equal(normalise("Déployé"), "deploye");
+  assert.equal(normalize("Déployé"), "deploye");
   assert.equal(filterHistory(SESSIONS, { query: "FACTURATION" }, NOW).length, 1);
   assert.equal(filterHistory(SESSIONS, { query: "decouper" }, NOW).length, 1);
 });

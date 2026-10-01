@@ -264,10 +264,13 @@ export function relative(uri: vscode.Uri): string {
 function excerptItem(label: string, text: string, maxTokens: number): ContextItem {
   const excerpt = fileExcerpt(label, text, maxTokens);
   const total = estimateTokens(text);
-  const suffix = excerpt.outlined
-    ? t(" (outline of {0} symbols + head, {1} of {2} tokens)", excerpt.symbols, maxTokens, total)
+  const note = excerpt.outlined
+    ? t("outline of {0} symbols + head, {1} of {2} tokens", excerpt.symbols, maxTokens, total)
     : total > maxTokens
-      ? t(" (first {0} of {1} tokens)", maxTokens, total)
+      ? t("first {0} of {1} tokens", maxTokens, total)
       : "";
-  return { kind: "file", label: `${label}${suffix}`, body: excerpt.body, untrusted: true };
+  // The note rides BESIDE the name. Appended to it, it made the chip wider than the row and pushed
+  // the cross that removes the attachment off the screen — so the one thing the chip is for became
+  // impossible. It is still said, in the tooltip, where a remark about a file belongs.
+  return { kind: "file", label, body: excerpt.body, untrusted: true, ...(note ? { note } : {}) };
 }

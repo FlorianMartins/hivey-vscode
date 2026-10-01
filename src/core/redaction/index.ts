@@ -7,11 +7,11 @@
 // question "is this endpoint ours?" is answered.
 
 import { scanShapes, scanEntropy, scanTerms, resolveOverlaps, type RawSpan } from "./detectors.js";
-import { Vault } from "./pseudonymiser.js";
+import { Vault } from "./pseudonymizer.js";
 import { DEFAULT_POLICY, kindsFor, type Finding, type RedactionPolicy } from "./types.js";
 
 export * from "./types.js";
-export { Vault } from "./pseudonymiser.js";
+export { Vault } from "./pseudonymizer.js";
 export { entropy } from "./detectors.js";
 
 export interface RedactionResult {
@@ -80,7 +80,7 @@ export function redactMessages<T extends { content: string }>(
  * Strictly this machine: loopback only.
  *
  * `isLocalEndpoint` answers a question about TRUST — may this text leave without being
- * pseudonymised — and a server on the office network qualifies. This answers a different question,
+ * pseudonymized — and a server on the office network qualifies. This answers a different question,
  * about PLACE: is the model running on the laptop in front of you, or on a machine down the
  * corridor. Both are private; only one works on a train, and only one is somebody else's to
  * switch off. The interface names them separately because a user choosing a model cares which.

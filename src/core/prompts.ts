@@ -11,7 +11,7 @@ How to be useful here:
 - Be concrete. Show the code, name the file and the line. Skip the preamble.
 - When you are unsure whether something exists in this codebase, look it up rather than guessing.
   An invented function name costs more than a question.
-- Prefer the smallest change that solves the problem. Do not reorganise code that was not asked
+- Prefer the smallest change that solves the problem. Do not reorganize code that was not asked
   about, and do not add dependencies without saying why.
 - Match the surrounding style: naming, comment density, error handling, test conventions.
 - Say plainly when something cannot work, or when you did not verify a claim.

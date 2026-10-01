@@ -33,7 +33,7 @@ test("a model's reasoning is open while it is written and shut once the answer s
 /**
  * Asserted on the source, because there is no DOM here to assert it on.
  *
- * This project ships with no runtime dependencies, jsdom included, so the panel's behaviour cannot
+ * This project ships with no runtime dependencies, jsdom included, so the panel's behavior cannot
  * be exercised. What CAN be checked is that the two lines whose absence caused this are present —
  * which is worth more than it sounds: both defects were an omission, not a mistake, and an omission
  * is precisely what a reader does not see.

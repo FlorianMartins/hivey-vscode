@@ -1,4 +1,4 @@
-// Syntax colouring for the code blocks in an answer.
+// Syntax coloring for the code blocks in an answer.
 //
 // Written by hand, like the rest of this codebase's plumbing, because the alternative is shipping a
 // grammar engine and a few hundred kilobytes of TextMate rules into an extension whose selling
@@ -10,7 +10,7 @@
 // One invariant governs the whole file and is asserted by the tests: concatenating the tokens
 // reproduces the input, character for character. A highlighter that silently eats a backslash or a
 // half-open quote has corrupted code the user is about to paste into their repository, which is a
-// far worse failure than a keyword rendered in the ordinary colour.
+// far worse failure than a keyword rendered in the ordinary color.
 
 export type TokenKind = "plain" | "comment" | "string" | "number" | "keyword" | "type" | "function" | "meta";
 
@@ -90,7 +90,7 @@ interface Rules {
   quotes: string[];
   /** True where a word may hold a hyphen: `end-proc`, `dcl-ds`, `CHGVAR`. */
   hyphenWords?: boolean;
-  /** Preprocessor and directive lines, coloured as meta. */
+  /** Preprocessor and directive lines, colored as meta. */
   directive?: RegExp;
   caseSensitive?: boolean;
 }
@@ -193,7 +193,7 @@ function scan(code: string, rules: Rules): Token[] {
       const key = rules.caseSensitive ? word : word.toLowerCase();
       if (rules.keywords.has(key)) push(out, word, "keyword");
       // A name followed by `(` is being called or defined. It is the one structural fact worth
-      // colouring without a parser, and it is the one that makes a snippet scannable.
+      // coloring without a parser, and it is the one that makes a snippet scannable.
       else if (code[j] === "(") push(out, word, "function");
       // Type-ish by convention: `Foo`, `HTTPServer`. A convention, so it is applied only where the
       // language has one — SQL and RPG are case-insensitive and would light up at random.
@@ -221,7 +221,7 @@ function readString(code: string, from: number, quote: string): [string, number]
       continue;
     }
     if (c === quote) {
-      // `'it''s'` is one string in SQL and in RPG, and closing at the middle quote would colour the
+      // `'it''s'` is one string in SQL and in RPG, and closing at the middle quote would color the
       // rest of the statement as if it were text.
       if (code[i + 1] === quote) {
         i += 2;
@@ -253,10 +253,10 @@ function isWordChar(c: string, rules: Rules): boolean {
  * RPG III, RPG IV fixed and DDS all put meaning in fixed positions, and the one that matters for
  * reading a snippet is the comment: an asterisk in column 7 comments the line out. Column 6 carries
  * the specification letter (H, F, D, C, O in RPG; A in DDS), which is what tells you what kind of
- * line you are looking at — so it is coloured as the structural marker it is.
+ * line you are looking at — so it is colored as the structural marker it is.
  *
  * Everything to the right of that stays plain. Guessing at operands inside a fixed layout is where
- * a naive highlighter starts colouring column boundaries as operators.
+ * a naive highlighter starts coloring column boundaries as operators.
  */
 function highlightFixed(code: string): Token[] {
   const out: Token[] = [];

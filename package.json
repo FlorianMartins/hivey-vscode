@@ -2,7 +2,7 @@
   "name": "hivey-code",
   "displayName": "Hivey Code",
   "description": "%extension.description%",
-  "version": "0.58.1",
+  "version": "0.59.0",
   "publisher": "hivey",
   "license": "Apache-2.0",
   "repository": {
@@ -914,11 +914,6 @@
             "type": "boolean",
             "default": true,
             "description": "%config.context.repoMap%"
-          },
-          "hiveyCode.context.autoCompact": {
-            "type": "boolean",
-            "default": false,
-            "markdownDescription": "%config.context.autoCompact%"
           },
           "hiveyCode.knowledge.enabled": {
             "type": "boolean",

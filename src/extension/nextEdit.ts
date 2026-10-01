@@ -22,7 +22,7 @@ import {
   checkNextEdit,
   describeRecentWork,
   parseNextEdit,
-  summarise,
+  summarize,
   type EditEvent,
   type NextEdit,
 } from "../core/completion/nextEdit.js";
@@ -198,7 +198,7 @@ export class NextEditWatcher {
         document.positionAt(check.offset!),
         document.positionAt(check.offset! + parsed.find.length),
       );
-      const summary = summarise(parsed);
+      const summary = summarize(parsed);
       const diagnostic = new vscode.Diagnostic(range, t("Hivey Code: {0}", summary), vscode.DiagnosticSeverity.Hint);
       diagnostic.source = "Hivey Code";
       // `Unnecessary` would grey the code out, which is a claim about the code rather than a

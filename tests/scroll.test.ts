@@ -93,7 +93,7 @@ test("a reader at the end still follows, anchor or no anchor", () => {
   assert.equal(placeAfterChange(view(600, 300), view(900, 300), { before: 100, after: 400 }), 900);
 });
 
-test("without an anchor the old behaviour is unchanged", () => {
+test("without an anchor the old behavior is unchanged", () => {
   // Every caller that has nothing above the reader to anchor against — an empty transcript, a
   // mutation at the very top — keeps the two-outcome contract.
   assert.equal(placeAfterChange(view(2000, 800), view(2120, 800)), undefined);
