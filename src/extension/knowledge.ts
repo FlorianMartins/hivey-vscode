@@ -30,8 +30,12 @@ import {
   validId,
   parseSharedNote,
   type KnowledgeNote,
+  sharedNoteId,
+  sharedDocKind,
 } from "../core/knowledge/note.js";
 import { nearDuplicates, searchNotes } from "../core/knowledge/search.js";
+import { docxText } from "../core/docs/docx.js";
+import { pdfText } from "../core/docs/pdf.js";
 import { knowledgeIndex } from "../core/knowledge/index.js";
 import { HttpKnowledgeStore, type KnowledgeStore } from "../core/knowledge/store.js";
 import { request } from "../core/util/http.js";
@@ -118,14 +122,23 @@ export class FileKnowledgeStore implements KnowledgeStore {
     const notes = new Map<string, KnowledgeNote>();
     this.origin.clear();
     for (const root of this.roots()) {
-      for (const [id, uri] of await this.walk(root.uri)) {
+      for (const [id, uri] of await this.walk(root.uri, "", 0, root.scope === "shared")) {
         // The project's copy wins a collision: a team note and a personal note of the same name are
         // the same subject, and the one under review is the one to trust.
         if (notes.has(id) && this.origin.get(id) === "project") continue;
         // A shared folder is read as it is — see `parseSharedNote`. The strict header is a
         // contract for the bases this extension writes, not a condition for reading somebody's wiki.
+        if (root.scope === "shared") {
+          const document = await readDocument(uri);
+          if (!document) continue; // Said once, in the log, rather than as a problem per file.
+          const parsed = parseSharedNote(id, document);
+          if (!parsed.note) continue;
+          notes.set(id, { ...parsed.note, title: parsed.note.title || titleFromPath(uri) });
+          this.origin.set(id, root.scope);
+          continue;
+        }
         const text = await read(uri);
-        const parsed = root.scope === "shared" ? parseSharedNote(id, text) : parseNote(id, text);
+        const parsed = parseNote(id, text);
         if (!parsed.note) continue;
         notes.set(id, parsed.note);
         this.origin.set(id, root.scope);
@@ -192,7 +205,7 @@ export class FileKnowledgeStore implements KnowledgeStore {
   }
 
   /** Every `.md` under a root, id first, skipping the archive. */
-  private async walk(root: vscode.Uri, prefix = "", depth = 0): Promise<Array<[string, vscode.Uri]>> {
+  private async walk(root: vscode.Uri, prefix = "", depth = 0, shared = false): Promise<Array<[string, vscode.Uri]>> {
     if (depth > 3) return [];
     let entries: Array<[string, vscode.FileType]>;
     try {
@@ -205,14 +218,42 @@ export class FileKnowledgeStore implements KnowledgeStore {
       if (name.startsWith(".")) continue;
       const uri = vscode.Uri.joinPath(root, name);
       if (type === vscode.FileType.Directory) {
-        out.push(...(await this.walk(uri, `${prefix}${name}/`, depth + 1)));
+        out.push(...(await this.walk(uri, `${prefix}${name}/`, depth + 1, shared)));
         continue;
       }
-      const id = noteId(`${prefix}${name}`);
+      // A shared folder holds documentation, not notes: Word and PDF are what internal
+      // documentation is actually written in, and its file names were not chosen for this
+      // extension. See `sharedNoteId`.
+      const id = shared ? sharedNoteId(`${prefix}${name}`) : noteId(`${prefix}${name}`);
       if (id) out.push([id, uri]);
     }
     return out;
   }
+}
+
+/**
+ * A file in a shared folder, as text — Markdown as it is, Word and PDF through the extractors.
+ *
+ * `undefined` means "do not offer this": a PDF that is a scan, one whose fonts cannot be read, an
+ * encrypted file. The project's rule about those is older than this feature and still right —
+ * attaching mojibake would be worse than refusing, because the model would answer confidently about
+ * the noise — and what changed is only that the decision is now taken on the OUTPUT rather than on
+ * the file extension.
+ */
+async function readDocument(uri: vscode.Uri): Promise<string | undefined> {
+  const kind = sharedDocKind(uri.path);
+  if (!kind) return undefined;
+  const bytes = Buffer.from(await vscode.workspace.fs.readFile(uri));
+  if (kind === "text") return new TextDecoder().decode(bytes);
+  if (kind === "docx") return docxText(bytes);
+  const out = pdfText(bytes);
+  return out.confident ? out.text : undefined;
+}
+
+/** The file's own name, for a document whose first line is not a heading. */
+function titleFromPath(uri: vscode.Uri): string {
+  const name = uri.path.split("/").pop() ?? uri.path;
+  return name.replace(/\.[^.]+$/, "");
 }
 
 async function read(uri: vscode.Uri): Promise<string> {

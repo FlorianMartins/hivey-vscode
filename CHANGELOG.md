@@ -2,6 +2,42 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.61.0 — 2026-10-01
+
+### Ajouté
+
+- **La base de connaissance lit les Word et les PDF.** Toute la documentation interne est dans ces
+  formats, donc les refuser revenait à refuser la fonctionnalité. Les deux extracteurs sont **écrits
+  à la main**, dans `core/docs/`, comme le rendu Markdown, le diff, le glob et le client MCP l'ont
+  été : `node:zlib` est un module du runtime et non une dépendance, donc la promesse de **zéro
+  dépendance** tient.
+
+  - Un `.docx` est une archive ZIP dont `word/document.xml` porte la prose. Le lecteur ZIP lit le
+    **répertoire central** plutôt que les en-têtes locaux, parce qu'un en-tête local peut annoncer
+    des tailles nulles avec les vraies derrière les données. Ce qui est perdu est de la mise en
+    forme, pas du contenu : les cellules d'un tableau deviennent du texte séparé par des tabulations.
+  - Un `.pdf` est plus rude, et l'ancienne prudence du projet était justifiée. L'extracteur est
+    borné — flux `FlateDecode`, opérateurs `Tj`/`TJ`, chaînes littérales et hexadécimales — et
+    surtout **il dit s'il faut le croire**. Un scan sans couche de texte, un fichier chiffré, ou des
+    polices sous-ensemble dont les octets sont des indices de glyphes : le résultat est **écarté**
+    plutôt qu'attaché. ⚠️ *La règle n'a pas changé — attacher du charabia est pire que refuser,
+    parce qu'un modèle y répond avec une parfaite assurance — c'est la décision qui se prend
+    désormais sur le RÉSULTAT et non sur l'extension du fichier.*
+  - ⚠️ Les noms de fichiers ne sont plus jugés : « Création d'un client.docx » devient un identifiant
+    utilisable, et le **titre garde l'original**, qui est ce qu'on reconnaît dans l'index.
+
+### Précisé
+
+- `hiveyCode.knowledge.folders` et `hiveyCode.ibmi.writableLibraries` sont des **listes**, modifiables
+  par chacun et inscriptibles au niveau du dépôt (`.vscode/settings.json`, versionné) comme au niveau
+  de l'utilisateur. Plusieurs chemins, plusieurs bibliothèques : c'était déjà le cas depuis la
+  0.60.0, et la documentation le dit maintenant.
+
+- Le commentaire de `isTextLike` disait que `.docx` et `.pdf` ne sont pas lisibles « faute d'un
+  analyseur que ce projet ne livre pas ». Ce n'est plus vrai de la base de connaissance ; cela reste
+  vrai d'un **collage**, qui n'a nulle part où poser la question à laquelle ces extracteurs répondent
+  — est-ce le document, ou est-ce du bruit ?
+
 ## 0.60.0 — 2026-10-01
 
 ### Ajouté

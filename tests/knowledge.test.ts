@@ -2,7 +2,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { noteId, parseNote, serialiseNote, validId, type KnowledgeNote, parseSharedNote } from "../src/core/knowledge/note.js";
+import { noteId, parseNote, serialiseNote, validId, type KnowledgeNote, parseSharedNote, sharedNoteId, sharedDocKind } from "../src/core/knowledge/note.js";
 import { nearDuplicates, scoreNote, searchNotes, terms } from "../src/core/knowledge/search.js";
 import { knowledgeIndex } from "../src/core/knowledge/index.js";
 
@@ -141,4 +141,24 @@ test("a note written in the strict format is still read as one, wherever it live
 
 test("an empty file is not a note", () => {
   assert.ok(parseSharedNote("blank", "   \n").problems.length);
+});
+
+test("a document is identified by what it is, not by whether it was named for us", () => {
+  // `noteId` requires `.md` and an id that is already lowercase and unaccented, because the bases
+  // this extension writes are written by it. A folder of internal documentation is not: its files
+  // are called `Création d'un client.docx`, and refusing them for their name would refuse the
+  // feature. The id is folded; the title keeps the original.
+  assert.equal(sharedNoteId("Création d'un client.docx"), "creation-d-un-client");
+  assert.equal(sharedNoteId("Procédures/Clôture mensuelle.pdf"), "procedures/cloture-mensuelle");
+  assert.equal(sharedNoteId("notes.md"), "notes");
+  assert.equal(sharedNoteId("budget.xlsx"), undefined, "a spreadsheet is not documentation we can read");
+  assert.equal(sharedNoteId("photo.png"), undefined);
+});
+
+test("the kind decides how it is read", () => {
+  assert.equal(sharedDocKind("a.md"), "text");
+  assert.equal(sharedDocKind("A.TXT"), "text");
+  assert.equal(sharedDocKind("Création.docx"), "docx");
+  assert.equal(sharedDocKind("manuel.PDF"), "pdf");
+  assert.equal(sharedDocKind("archive.zip"), undefined);
 });

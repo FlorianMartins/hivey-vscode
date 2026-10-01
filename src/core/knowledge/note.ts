@@ -190,3 +190,37 @@ export function parseSharedNote(id: string, text: string): NoteParse {
     },
   };
 }
+
+/** What a file in a shared folder is, by extension. `undefined` means "not documentation". */
+export function sharedDocKind(relativePath: string): "text" | "docx" | "pdf" | undefined {
+  const lower = relativePath.toLowerCase();
+  if (/\.(?:md|markdown|txt|text)$/.test(lower)) return "text";
+  if (lower.endsWith(".docx")) return "docx";
+  if (lower.endsWith(".pdf")) return "pdf";
+  return undefined;
+}
+
+/**
+ * An id for a file nobody named for this extension.
+ *
+ * `noteId` requires `.md` and an id that is already lowercase, hyphenated and unaccented, because
+ * the bases this extension writes are written by it. A folder of internal documentation is not: its
+ * files are called `Création d'un client.docx`, and refusing them for their name would refuse the
+ * feature. So the name is folded into an id instead of being judged against one — accents dropped,
+ * spaces and punctuation to hyphens — and the TITLE keeps the original, which is what anyone
+ * reading the index will recognize.
+ */
+export function sharedNoteId(relativePath: string): string | undefined {
+  if (!sharedDocKind(relativePath)) return undefined;
+  const withoutExtension = relativePath.replace(/\.[^./]+$/, "");
+  const id = withoutExtension
+    .replace(/\\/g, "/")
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9/]+/g, "-")
+    .replace(/-{2,}/g, "-")
+    .replace(/(^|\/)-+|-+($|\/)/g, "$1")
+    .replace(/\/{2,}/g, "/");
+  return id && validId(id) ? id : undefined;
+}

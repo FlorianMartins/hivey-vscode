@@ -15,6 +15,7 @@ import { join } from "node:path";
 import { homedir, tmpdir } from "node:os";
 import { suite, test } from "./tiny.js";
 import { createServer, type Server } from "node:http";
+import * as zlib from "node:zlib";
 import { HIVEY_ROUTING } from "../../core/router/hivey.generated.js";
 
 const ID = "hivey.hivey-code";
@@ -1392,6 +1393,12 @@ suite("Hivey Code", () => {
       "# Création d'un client\n\nOuvrir TSTCFC, lancer CRTCUST, saisir le SIRET.\n",
       "utf8",
     );
+    // And a Word document, because that is what internal documentation is actually written in —
+    // named the way a person names a file, not the way this extension names a note.
+    const xml =
+      "<w:document><w:body><w:p><w:r><w:t>Clôture mensuelle</w:t></w:r></w:p>" +
+      "<w:p><w:r><w:t>Lancer FINCLO dans DEVCFC le dernier jour.</w:t></w:r></w:p></w:body></w:document>";
+    await fs.writeFile(join(shared, "Clôture mensuelle.docx"), minimalDocx(xml));
 
     const config = vscode.workspace.getConfiguration(SECTION);
     const before = { folders: config.get("knowledge.folders"), enabled: config.get("knowledge.enabled") };
@@ -1406,11 +1413,20 @@ suite("Hivey Code", () => {
       assert.ok(found, `the shared folder contributed nothing: ${notes.map((n) => n.id).join(", ")}`);
       assert.equal(found.title, "Création d'un client", "the title was not taken from the heading");
 
+      // The Word document too, read without a parser shipped as a dependency.
+      const word = notes.find((n) => n.id.includes("cloture-mensuelle"));
+      assert.ok(word, `the Word document was not read: ${notes.map((n) => n.id).join(", ")}`);
+      assert.match(word.body, /Lancer FINCLO dans DEVCFC/, "the document's prose did not come through");
+
       // And it stays as it was. `/remember` writes to a base this extension owns, never into
       // somebody's documentation share.
       await store.write({ id: "a-new-note", title: "A new note", body: "Written by the agent.", tags: [], sources: [], updated: "" });
-      const still = await fs.readdir(shared);
-      assert.deepEqual(still, ["creation-client.md"], `the extension wrote into the share: ${still.join(", ")}`);
+      const still = (await fs.readdir(shared)).sort();
+      assert.deepEqual(
+        still,
+        ["Clôture mensuelle.docx", "creation-client.md"].sort(),
+        `the extension wrote into the share: ${still.join(", ")}`,
+      );
     } finally {
       await config.update("knowledge.folders", before.folders, vscode.ConfigurationTarget.Global);
       await config.update("knowledge.enabled", before.enabled, vscode.ConfigurationTarget.Global);
@@ -2100,4 +2116,41 @@ async function useStub(
     await config.update(key, before.endpoint, vscode.ConfigurationTarget.Global);
     await config.update("privacy.confirmSend", before.confirmSend, vscode.ConfigurationTarget.Global);
   };
+}
+
+/**
+ * The smallest thing Word would recognize: a ZIP holding `word/document.xml`.
+ *
+ * Built here rather than committed as a binary fixture, so what is tested is the bytes a real
+ * document has rather than a file nobody can read in a diff.
+ */
+function minimalDocx(documentXml: string): Buffer {
+  const name = Buffer.from("word/document.xml", "utf8");
+  const body = zlib.deflateRawSync(Buffer.from(documentXml, "utf8"));
+  const raw = Buffer.from(documentXml, "utf8");
+
+  const local = Buffer.alloc(30);
+  local.writeUInt32LE(0x04034b50, 0);
+  local.writeUInt16LE(8, 8);
+  local.writeUInt32LE(body.length, 18);
+  local.writeUInt32LE(raw.length, 22);
+  local.writeUInt16LE(name.length, 26);
+
+  const dir = Buffer.alloc(46);
+  dir.writeUInt32LE(0x02014b50, 0);
+  dir.writeUInt16LE(8, 10);
+  dir.writeUInt32LE(body.length, 20);
+  dir.writeUInt32LE(raw.length, 24);
+  dir.writeUInt16LE(name.length, 28);
+  dir.writeUInt32LE(0, 42);
+
+  const files = Buffer.concat([local, name, body]);
+  const directory = Buffer.concat([dir, name]);
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0);
+  end.writeUInt16LE(1, 8);
+  end.writeUInt16LE(1, 10);
+  end.writeUInt32LE(directory.length, 12);
+  end.writeUInt32LE(files.length, 16);
+  return Buffer.concat([files, directory, end]);
 }
