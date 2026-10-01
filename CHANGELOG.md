@@ -2,6 +2,31 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.62.0 — 2026-10-01
+
+### Corrigé
+
+- **Chantier 0.1 — les marqueurs n'arrivaient pas jusqu'aux arguments des outils.** `vault.restore()`
+  s'appliquait à ce que l'utilisateur **lit** — la réponse, la réflexion — et pas à ce que les outils
+  **font**. En mode agent contre un point d'accès distant, c'est la différence entre une
+  modification qui aboutit et une qui ne peut pas : `write_file` écrivait `⟨HOST_1⟩` sur le disque,
+  et `edit_file` cherchait dans un fichier un extrait contenant un marqueur que ce fichier n'a
+  jamais porté.
+
+  La restauration est désormais appliquée **récursivement à toutes les chaînes** d'un appel d'outil
+  — clés comprises, car un outil indexé par chemin porterait sinon un marqueur comme nom de la chose
+  à modifier — et elle a lieu **avant la validation du schéma, avant la carte d'autorisation et
+  avant l'exécution** : la phrase que vous approuvez décrit ce qui va réellement se passer. Seuls
+  les marqueurs que ce coffre a émis sont remplacés ; un marqueur inventé par le modèle ou tapé par
+  l'utilisateur reste tel quel, parce que lui en substituer un serait inventer une valeur. Le client
+  terminal reçoit le même correctif.
+
+  ⚠️ Vérifié en retirant le correctif : le test retombe. ⚠️ **Non vérifiable en test d'intégration
+  ici** — `EgressGate.prepare` saute la porte de sortie pour un point d'accès local, et tous les
+  stubs de la suite écoutent en loopback, donc aucun coffre ne peut être peuplé. L'invariant est
+  gardé autrement : un test lit le source et refuse qu'un tour restaure sa réponse sans restaurer
+  ses arguments.
+
 ## 0.61.0 — 2026-10-01
 
 ### Ajouté

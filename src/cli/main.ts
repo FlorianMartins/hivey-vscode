@@ -349,6 +349,7 @@ async function main(): Promise<void> {
           return answer === "y" || answer === "o" || answer === "yes" || answer === "oui";
         },
         afterResponse: (t) => vault.restore(t),
+        restoreArgs: (t) => vault.restore(t),
       });
       if (printed) stdout.write("\n");
 

@@ -6,6 +6,25 @@ Ce document décrit l'état à la version **0.39.0**. Il était resté figé à 
 versions, ce qui est sa propre leçon : une feuille de route périmée dit « projet abandonné » à
 quelqu'un qui l'ouvre, et elle le dit avant que la moindre ligne de code soit lue.
 
+
+## Feuille de route pilotée (docs/PROMPT-ROADMAP.md)
+
+Les chantiers de `docs/PROMPT-ROADMAP.md`, avec leur état. Chaque point est classé **testé**,
+**vérifié à la main** ou **non vérifié** ; ce qui exige une partition IBM i, un GPU ou un service
+externe non exécuté ici est « non vérifié ».
+
+### Phase 0 — Fondations
+
+| Chantier | État | Vérification |
+|---|---|---|
+| 0.1 Marqueurs dans les arguments d'outils | fait | **testé** (unitaire, retombe sans le correctif) ; intégration impossible ici — la porte de sortie est sautée en loopback, donc aucun coffre peuplé ; invariant gardé par un test qui lit le source |
+| 0.2 Marqueur coupé entre deux fragments | à faire | — |
+| 0.3 Fermer `QSH` dans la garde IBM i | à faire | — |
+| 0.4 Suite de tests sous Node 22 | à faire | — |
+| 0.5 Des chiffres qui ne peuvent plus vieillir | à faire | — |
+| 0.6 Mesurer la qualité sur de vrais modèles | à faire | — |
+
+
 ## Comment lire les affirmations ci-dessous
 
 Trois niveaux, jamais mélangés :

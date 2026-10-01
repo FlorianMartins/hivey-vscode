@@ -113,3 +113,31 @@ export function isLocalEndpoint(baseUrl: string): boolean {
     return false;
   }
 }
+
+/**
+ * Put the real values back into every string of a tool call's arguments.
+ *
+ * The vault reached what the user READS — the answer and the reasoning — and not what the tools DO.
+ * Against a remote endpoint in agent mode that is the difference between an edit that lands and one
+ * that cannot: `write_file` writes `⟨HOST_1⟩` to disk, and `edit_file` searches a file for an
+ * excerpt containing a placeholder the file has never held.
+ *
+ * Recursive, because an argument is not always a string: a list of paths, an object of options, a
+ * nested edit. Everything that is not a string is passed through untouched — a number is not text
+ * and a boolean cannot hold a secret — and the shape is rebuilt rather than mutated, so the caller's
+ * parsed object is still what the model actually sent.
+ */
+export function restoreDeep<T>(value: T, restore: (text: string) => string): T {
+  if (typeof value === "string") return restore(value) as unknown as T;
+  if (Array.isArray(value)) return value.map((item) => restoreDeep(item, restore)) as unknown as T;
+  if (value && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
+      // The KEY is restored too: a tool whose arguments are keyed by path would otherwise carry a
+      // placeholder as the name of the thing to act on.
+      out[restore(key)] = restoreDeep(item, restore);
+    }
+    return out as unknown as T;
+  }
+  return value;
+}

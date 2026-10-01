@@ -1528,6 +1528,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         return again.messages;
       },
       afterResponse: (text) => env.vault.restore(text),
+      restoreArgs: (text) => env.vault.restore(text),
       report: (message) => run.report(`${definition.name}: ${message}`),
       onUsage: (info) => this.noteUsage(info),
     });
@@ -3076,6 +3077,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           this.post({ type: "delta", text: vault.restore(d.text) });
         },
         afterResponse: (text) => vault.restore(text),
+        restoreArgs: (text) => vault.restore(text),
       });
 
       const summary = (result.text || streamed).trim();
@@ -3639,6 +3641,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           return again.messages;
         },
         afterResponse: (t) => vault.restore(t),
+        restoreArgs: (t) => vault.restore(t),
         onUsage: (info) => this.noteUsage(info),
         ...(settings.chat.promptCache ? { promptCache: true } : {}),
         });
@@ -3888,6 +3891,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         messages: prepared.messages,
         maxTokens: 2048,
         afterResponse: (text) => vault.restore(text),
+        restoreArgs: (text) => vault.restore(text),
         onUsage: (info) => this.noteUsage(info),
       });
       entry.text = result.text;

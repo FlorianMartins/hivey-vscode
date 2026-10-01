@@ -20,6 +20,7 @@
 import type { ChatMessage, ChatResult, Provider, ReasoningEffort, ToolCall, ToolSchema, Usage } from "../providers/types.js";
 import { coerceArgs, parseToolArgs, unknownToolMessage, validateArgs } from "./toolcall.js";
 import { estimateMessageTokens } from "../util/tokens.js";
+import { restoreDeep } from "../redaction/index.js";
 
 export interface ToolContext {
   /** Cancels when the user stops the turn. */
@@ -103,6 +104,15 @@ export interface TurnOptions {
   beforeRequest?: (messages: ChatMessage[]) => Promise<ChatMessage[]> | ChatMessage[];
   /** Applied to text coming back, to put real values behind the placeholders. */
   afterResponse?: (text: string) => string;
+  /**
+   * Put the real values back into a tool call's arguments, before anything looks at them.
+   *
+   * The same vault as `afterResponse`, applied to what the tools DO rather than to what the user
+   * reads. It runs before validation, before the approval card and before execution, so the schema
+   * check, the sentence the user approves and the diff all show what will actually happen — a card
+   * saying `write_file ⟨HOST_1⟩` asks somebody to approve a thing they cannot see.
+   */
+  restoreArgs?: (text: string) => string;
   report?: (message: string) => void;
 }
 
@@ -272,14 +282,17 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
         continue;
       }
       if (parsed.repaired) opts.report?.(`repaired the arguments of ${call.name}`);
+      // Before the schema check, the approval and the tool — see `restoreArgs`. Only placeholders
+      // this vault issued are put back; anything else is left exactly as the model sent it.
+      const real = opts.restoreArgs ? restoreDeep(parsed.args, opts.restoreArgs) : parsed.args;
       // Checked against the schema before the tool sees them, so a missing field is one corrective
       // sentence rather than an exception from inside a tool that says nothing useful.
-      const invalid = validateArgs(tool.schema, parsed.args);
+      const invalid = validateArgs(tool.schema, real);
       if (invalid) {
         planned.push({ call, settled: invalid, parallel: false });
         continue;
       }
-      const args: Record<string, unknown> = coerceArgs(tool.schema, parsed.args);
+      const args: Record<string, unknown> = coerceArgs(tool.schema, real);
 
       const needs = tool.approval(args);
       let approved = true;

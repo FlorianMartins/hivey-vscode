@@ -315,3 +315,62 @@ test("the budget the caller asked for is the budget that is sent", () => {
     assert.equal(provider.seen[0]!.maxTokens, 12_345);
   });
 });
+
+// ── The vault has to reach the tool arguments ───────────────────────────────────────────────────
+//
+// `vault.restore()` was applied to what the user READS — the answer, the reasoning — and not to what
+// the tools DO. In agent mode against a remote endpoint that is the difference between an edit that
+// lands and one that cannot: `write_file` writes the placeholder to disk, and `edit_file` looks for
+// an excerpt containing `⟨HOST_1⟩` in a file that has the real host in it, and finds nothing.
+
+test("a placeholder inside a tool call is the real value by the time the tool runs", async () => {
+  const seen: Array<Record<string, unknown>> = [];
+  const tool: Tool = {
+    schema: { name: "write_file", description: "", parameters: { type: "object", properties: { path: { type: "string" }, body: { type: "string" } }, required: ["path"] } },
+    approval: () => false,
+    async run(args) {
+      seen.push(args);
+      return { content: "written" };
+    },
+  };
+  const provider = scriptedProvider([
+    { toolCalls: [{ id: "1", name: "write_file", args: JSON.stringify({ path: "a.ts", body: "connect(⟨HOST_1⟩)" }) }] },
+    { text: "done" },
+  ]);
+
+  await runTurn({
+    ...base,
+    provider,
+    tools: [tool],
+    restoreArgs: (text) => text.replace("⟨HOST_1⟩", "db.internal.example"),
+    messages: [{ role: "user", content: "write it" }],
+  });
+
+  assert.equal(seen[0]?.["body"], "connect(db.internal.example)", "the tool was handed a placeholder");
+});
+
+test("arguments the vault does not know are left exactly as they are", async () => {
+  // A marker the model invented, or one the user typed themselves, is not a secret this vault hid:
+  // substituting it would be inventing a value, and leaving it is the only honest answer.
+  const seen: Array<Record<string, unknown>> = [];
+  const tool: Tool = {
+    schema: { name: "write_file", description: "", parameters: { type: "object", properties: { body: { type: "string" } } } },
+    approval: () => false,
+    async run(args) {
+      seen.push(args);
+      return { content: "ok" };
+    },
+  };
+  const provider = scriptedProvider([
+    { toolCalls: [{ id: "1", name: "write_file", args: JSON.stringify({ body: "⟨UNKNOWN_9⟩" }) }] },
+    { text: "done" },
+  ]);
+  await runTurn({
+    ...base,
+    provider,
+    tools: [tool],
+    restoreArgs: (text) => text.replace("⟨HOST_1⟩", "db.internal.example"),
+    messages: [{ role: "user", content: "write it" }],
+  });
+  assert.equal(seen[0]?.["body"], "⟨UNKNOWN_9⟩");
+});

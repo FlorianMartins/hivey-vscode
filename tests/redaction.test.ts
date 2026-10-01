@@ -3,7 +3,8 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { redact, redactMessages, isLocalEndpoint, Vault, entropy, DEFAULT_POLICY } from "../src/core/redaction/index.js";
+import { readFileSync } from "node:fs";
+import { redact, redactMessages, isLocalEndpoint, Vault, entropy, DEFAULT_POLICY, restoreDeep } from "../src/core/redaction/index.js";
 import { scanShapes } from "../src/core/redaction/detectors.js";
 
 const strict = { ...DEFAULT_POLICY };
@@ -184,4 +185,68 @@ test("tightening that rule did not blind it to real credentials", () => {
   assert.ok(found('const apiKey = "sk-proj-9f3Ab2Cd4Ef6Gh8Ij0Kl2Mn4Op6Qr8St";') > 0);
   assert.ok(found('token: "ghp_16C7e42F292c6912E7710c838347Ae178B4a"') > 0);
   assert.ok(found('password = "Tr0ub4dor&3xK"') > 0);
+});
+
+// ── The vault reaching a tool's arguments ───────────────────────────────────────────────────────
+
+test("every string in a tool call is restored, however deeply it sits", () => {
+  const restore = (t: string) => t.replace("⟨HOST_1⟩", "db.internal.example");
+  const args = {
+    path: "config/⟨HOST_1⟩.json",
+    edits: [{ find: "connect(⟨HOST_1⟩)", replace: "connect(localhost)" }],
+    retries: 3,
+    dryRun: false,
+    nested: { deeper: ["⟨HOST_1⟩"] },
+  };
+  const out = restoreDeep(args, restore);
+  assert.equal(out.path, "config/db.internal.example.json");
+  assert.equal(out.edits[0]?.find, "connect(db.internal.example)");
+  assert.deepEqual(out.nested.deeper, ["db.internal.example"]);
+  // Everything that is not text is passed through: a number is not text, and a boolean cannot hold
+  // a secret.
+  assert.equal(out.retries, 3);
+  assert.equal(out.dryRun, false);
+});
+
+test("a key is restored as well as a value", () => {
+  // A tool keyed by path would otherwise carry a placeholder as the name of the thing to act on.
+  const out = restoreDeep({ "⟨HOST_1⟩": "x" }, (t) => t.replace("⟨HOST_1⟩", "real"));
+  assert.deepEqual(out, { real: "x" });
+});
+
+test("restoring rebuilds the shape rather than editing it", () => {
+  // The caller still holds what the model actually sent, which is what the trace and the audit log
+  // are about.
+  const original = { body: "⟨HOST_1⟩" };
+  const out = restoreDeep(original, (t) => t.replace("⟨HOST_1⟩", "real"));
+  assert.equal(original.body, "⟨HOST_1⟩");
+  assert.equal(out.body, "real");
+  assert.notEqual(out, original);
+});
+
+test("null and undefined survive", () => {
+  assert.deepEqual(restoreDeep({ a: null, b: undefined }, (t) => t), { a: null, b: undefined });
+});
+
+/**
+ * Asserted on the source, because the risk is a call site that forgets.
+ *
+ * Every integration stub in this repository listens on loopback, and `EgressGate.prepare` skips the
+ * whole gate for a local endpoint — redacting text that never leaves the machine costs answer
+ * quality and buys nothing. So no integration test can produce a populated vault, and the invariant
+ * that CAN be checked is the one that was actually broken: a turn that restores what the user reads
+ * and forgets what the tools do.
+ */
+test("a turn that restores its answer also restores its tool arguments", () => {
+  for (const file of ["src/extension/chat.ts", "src/cli/main.ts"]) {
+    const source = readFileSync(file, "utf8");
+    const answers = (source.match(/afterResponse:/g) ?? []).length;
+    const arguments_ = (source.match(/restoreArgs:/g) ?? []).length;
+    assert.equal(
+      arguments_,
+      answers,
+      `${file}: ${answers} turn(s) restore the answer and ${arguments_} restore the arguments — ` +
+        `a tool would be handed a placeholder`,
+    );
+  }
 });

@@ -69,7 +69,10 @@ peuvent pas faire, c'est reconnaître un secret **dans** une image.
 Le remplacement est **stable et réversible** : la même valeur donne toujours le même marqueur dans
 une conversation (le modèle peut donc encore raisonner : « la même adresse apparaît dans le test et
 dans la fixture »), et les marqueurs redeviennent les vraies valeurs sur votre machine, y compris
-dans le code renvoyé.
+dans le code renvoyé **et dans les arguments des outils** — ce que l'agent écrit sur le disque, le
+chemin qu'il ouvre et l'extrait qu'il cherche portent la vraie valeur, pas le marqueur. La
+restauration a lieu avant la vérification des arguments, avant la carte d'autorisation et avant
+l'exécution : la phrase que vous approuvez décrit donc ce qui va réellement se passer.
 
 ## Configuration recommandée en entreprise
 
