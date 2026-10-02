@@ -156,6 +156,31 @@ export const BUILTIN_SKILLS: BuiltinSkill[] = [
   { group: "security", name: "/security", hint: t("security review"), prompt: t("Review this for security: injection through anything that reaches a query, a shell or a template; authorization checked at the boundary rather than in the caller; secrets in code or logs; unsafe deserialisation. Rank by exploitability and say what an attacker would need."), attach: true },
 
 
+  {
+    group: "rpg",
+    name: "/deliver",
+    hint: t("hand the change to ARCAD, ready for a person to release"),
+    evalTask: "ibmi-rpg-unittest",
+    // The last step is the one that does not exist, and saying so is the whole skill: an agent that
+    // promotes to production is an agent nobody can let near a managed partition.
+    prompt: t(
+      "Get this change ready to hand to ARCAD.\n\n" +
+        "1. Compile it with ibmi_compile. A member that does not compile has produced no object: there " +
+        "is nothing to deliver and nothing to discuss.\n" +
+        "2. Run the tests with ibmi_test. Compiling proves it is a program; it does not prove it still " +
+        "does what it did. If there are no tests for what you changed, say so plainly rather than " +
+        "treating a clean compile as a pass.\n" +
+        "3. Only then check it in with the arcad checkin action, and ask ARCAD Builder for a build with " +
+        "request_build — in that order, because a build asked for before the check-in builds the " +
+        "previous version and reports success.\n" +
+        "4. Report what you did with the evidence attached: the compile, the tests, and the component you " +
+        "checked in.\n" +
+        "5. Do NOT promote anything. Moving a change towards production is a release decision and it " +
+        "belongs to whoever is accountable for the release — say that the change is ready and who has to " +
+        "take it from here. There is no tool for it and there is not meant to be.",
+    ),
+    attach: true,
+  },
   // ── IBM i, the families the roadmap asks to complete ─────────────────────────────────────────
   {
     group: "rpg",

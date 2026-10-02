@@ -94,6 +94,18 @@ C'est un problème de vigilance humaine, pas d'exécution.
   hasard ;
 - l'absence de rappel d'approbation vaut refus (`runTurn` : le silence n'est pas un consentement).
 
+**La promotion vers la production n'est pas un outil de l'agent**, et ne peut pas être configurée
+pour l'être. Sur une partition gérée par ARCAD Elias, un changement n'entre pas en production parce
+que quelqu'un a édité un membre : il est extrait, modifié, réintégré, construit, puis **promu** par
+une personne qui en répond. La dernière étape est une décision de livraison, et une décision de
+livraison n'est pas un appel d'outil. La garantie tient à la **liste blanche** d'actions `arcad.*`
+que le pont expose (`extension/integrations/arcad.ts`) et non à une consigne : un test lit cette
+liste dans le source et refuse toute entrée qui ressemble à une promotion
+(`looksLikePromotion`, `src/core/ibmi/delivery.ts`), parce que la promesse se tient par le fait que
+personne n'ajoute la mauvaise commande dans six mois. Et l'agent ne propose la réintégration qu'une
+fois le changement **compilé et testé dans le tour** : réintégrer un membre qui ne compile pas remet
+un composant cassé à la construction de tout le monde.
+
 **QTEMP est la seule bibliothèque qu'un outil en lecture peut écrire**, et la garde le sait
 explicitement (`SCRATCH_LIBRARY`, `src/core/ibmi/guard.ts`). La raison n'est pas une convention mais
 une propriété de la bibliothèque : elle est créée par travail, détruite avec lui, invisible des

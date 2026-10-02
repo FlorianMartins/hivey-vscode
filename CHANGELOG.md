@@ -2,6 +2,41 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.74.0 — 2026-10-02
+
+### Ajouté
+
+- **Chantier 1.7 — remettre le changement à ARCAD, et la seule chose que l'agent ne fera jamais.**
+  Sur une partition gérée par ARCAD Elias, un changement n'entre pas en production parce que
+  quelqu'un a édité un membre : il est extrait, modifié, réintégré, construit, puis **promu** par une
+  personne qui en répond.
+
+  Une compétence **`/deliver`** prépare la remise, et l'ordre des étapes est le contenu de la
+  compétence : compiler, **puis** tester, **puis** réintégrer, **puis** demander la construction.
+  Chacune de ces préconditions a une raison qu'un modèle n'invente pas — un membre qui ne compile
+  pas n'a produit aucun objet, donc il n'y a rien à livrer ; compiler prouve que c'est un programme
+  et pas qu'il fait encore ce qu'il faisait ; et une construction demandée **avant** la
+  réintégration construit la version précédente et annonce une réussite. `readyToDeliver` tient ces
+  règles dans le noyau, avec la même règle « c'est le dernier qui compte » que `verifyTurn` : un tour
+  qui a compilé, échoué, corrigé et recompilé a bien gagné sa remise.
+
+### Précisé
+
+- ⚠️⚠️ **La promotion vers la production n'est pas un outil de l'agent, et ne peut pas être
+  configurée pour l'être.** La garantie tient à la **liste blanche** d'actions `arcad.*` que le pont
+  expose, et non à une consigne dans un prompt : **un test lit cette liste dans le source** et refuse
+  toute entrée qui ressemble à une promotion. C'est le même raisonnement que l'outillage du mode Plan
+  et que la garde des bibliothèques inscriptibles — un modèle qui lit mal une consigne est le cas
+  ordinaire, pas l'exception — et c'est surtout ce qui tient la promesse dans six mois, quand
+  quelqu'un ajoutera une commande à la liste. Prouvé en ajoutant une commande de promotion : le test
+  rougit.
+- Et le refus **dit qui le fait à la place**. « Je ne peux pas faire ça » sans étape suivante est la
+  façon dont quelqu'un finit par le faire à la main, hors d'ARCAD, à dix-sept heures.
+- ⚠️ **Non vérifié** : rien de ceci n'a tourné contre une installation ARCAD. Les actions employées
+  sont celles que l'extension Elias enregistre elle-même — une surface déclarée et versionnée — et
+  aucun chemin REST n'est inventé, conformément à la position déjà écrite en tête de
+  `integrations/arcad.ts`.
+
 ## 0.73.0 — 2026-10-02
 
 ### Ajouté

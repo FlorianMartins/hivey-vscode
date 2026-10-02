@@ -2,7 +2,7 @@
 
 Honnête plutôt que flatteur : ce qui marche, ce qui manque, ce qui n'est pas vérifié.
 
-Ce document décrit l'état à la version **0.73.0**. Les chiffres qu'il annonce — version, tests, tâches d'évaluation — sont
+Ce document décrit l'état à la version **0.74.0**. Les chiffres qu'il annonce — version, tests, tâches d'évaluation — sont
 vérifiés par `npm run check:numbers`, que la CI exécute : ils ne peuvent plus vieillir en silence.
 Il était resté figé à `0.3.0` pendant trente-cinq
 versions, ce qui est sa propre leçon : une feuille de route périmée dit « projet abandonné » à
@@ -36,7 +36,7 @@ externe non exécuté ici est « non vérifié ».
 | 1.4 Performance Db2 for i | fait | **testé** — 16 tests : requêtes et échappement des quotes, lecture des lignes sous plusieurs orthographes, index temporaire reconnu comme le signal le plus fort, **un chiffre absent reste absent** (trouvé par un test), taille avant conseil, « aucun conseil » jamais rendu par « les index sont bons », les 5 mises en garde présentes dans chaque réponse, `CREATE INDEX` soumis à la garde, `/sql` n'ose plus proposer un index sans l'outil. ⚠️ **non vérifié** : aucune exécution réelle |
 | 1.5 Messages et documentation de la maison | fait | **testé** — 16 tests : fichier de messages par préfixe, préfixe inconnu cherché partout, second niveau conservé, identifiants cités extraits des notes, note citante rendue avec la ligne suivante, **les deux autorités étiquetées et dans l'ordre**, silence de la doc dit explicitement, lacune ≠ absence. ⚠️ **non vérifié** : aucune exécution réelle |
 | 1.6 Au moins 40 compétences IBM i | fait | **testé** — 40 compétences (14 RPG, 7 DDS, 11 Db2 for i, 8 CL), chacune **déclarant** la tâche qui l'éprouve ; 5 tests : le compte et sa répartition, la tâche existe sur le disque, c'est bien une tâche IBM i, les lacunes sont ≤ 4 et disent ce qui manque (retombe en retirant un adossement). Banc 40 → **51 tâches**, 51/51 honnêtes dans les deux sens. ⚠️ **non vérifié** : aucune compétence exécutée contre un modèle réel ; 2 compétences (`/impact`, `/whouses`) ont une **lacune déclarée** — elles exigent une partition vivante |
-| 1.7 Livraison par ARCAD | à faire | — |
+| 1.7 Livraison par ARCAD | fait | **testé** — 10 tests : compiler puis tester comme préconditions, « c'est le dernier qui compte », l'ordre réintégration → construction, et **la garantie** : un test lit la liste blanche d'actions `arcad.*` dans le source et refuse toute promotion (prouvé en ajoutant `arcad.promoteToProduction` : le test rougit). ⚠️ **non vérifié** : aucune installation ARCAD ici |
 
 
 ## Comment lire les affirmations ci-dessous
@@ -49,6 +49,16 @@ Trois niveaux, jamais mélangés :
   nommés.
 
 ## Fait
+
+### Remettre à ARCAD, sans jamais promouvoir (0.74.0)
+
+- **`/deliver` prépare la remise dans l'ordre qui a une raison** (testé) : compiler, tester,
+  réintégrer, demander la construction — une construction demandée avant la réintégration construit
+  la version précédente et annonce une réussite.
+- ⚠️⚠️ **La promotion vers la production n'est pas un outil de l'agent** (testé, retombe si on ajoute
+  une commande de promotion) : la garantie tient à la liste blanche lue **dans le source** par un
+  test, pas à une consigne. Et le refus dit qui le fait à la place.
+
 
 ### Quarante compétences IBM i, et la tâche derrière chacune (0.73.0)
 
@@ -194,7 +204,7 @@ Trois niveaux, jamais mélangés :
 ### Avant 0.39.0
 
 - Noyau indépendant de l'éditeur : anonymisation, fournisseurs, routeur, budget, complétion, session,
-  carte du dépôt, boucle d'agent. **855 tests unitaires** plus **41 tests d'intégration dans un vrai
+  carte du dépôt, boucle d'agent. **865 tests unitaires** plus **41 tests d'intégration dans un vrai
   VS Code**.
 - Barre latérale : conversation, historique, modèles, permissions, configuration ; modes
   discussion / plan / agent ; budget de raisonnement ; contexte explicite.
