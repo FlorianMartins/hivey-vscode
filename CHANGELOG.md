@@ -2,6 +2,58 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.69.0 — 2026-10-02
+
+### Ajouté
+
+- **Chantier 1.1 — compiler, lire les erreurs, corriger : la boucle qu'IBM Bob ne revendique pas.**
+  `ibmi_compile` compile un membre sur la partition avec la commande de son type (`CRTBNDRPG`,
+  `CRTSQLRPGI`, `CRTRPGMOD`, `CRTBNDCL`, `CRTPF`, `CRTLF`, `CRTDSPF`, `CRTPRTF`) et revient avec ce
+  que le compilateur a dit : identifiant, gravité, membre, ligne, texte.
+
+  **Et c'est un verdict sur le tour**, au même titre qu'une suite de tests. Sur IBM i la
+  vérification n'est pas graduelle : un membre qui ne compile pas n'a pas produit un résultat
+  partiel, il n'a rien produit — il n'y a pas d'objet. `ibmi_compile` rejoint donc `VERIFIERS` dans
+  `core/router/outcome.ts`, avec la règle « c'est le dernier qui compte » : compiler, lire RNF7030,
+  corriger et recompiler n'est pas un échec, tandis qu'une compilation encore en échec à la fin du
+  tour achète l'escalade avec la liste d'erreurs. Contrairement à `run_command`, le code de retour
+  compte **toujours** — un `grep` qui échoue est une réponse, un `CRTBNDRPG` qui échoue n'en est pas
+  une. Voir [ADR-0016](docs/adr/0016-compiler-est-un-verdict.md).
+
+  Trois sources expliquent le verdict, chacune tentée séparément : ce que la commande a imprimé, la
+  liste de compilation du fichier spoulé (la seule qui porte des numéros de ligne) et le journal du
+  travail. ⚠️ Le journal est lu pour **le travail que le spoule désigne** et non pour « le travail
+  courant » : la commande tourne dans un travail et le SQL dans un autre, donc `JOBLOG_INFO('*')`
+  aurait renvoyé un journal sans rien sur la compilation, présenté comme la sortie du compilateur.
+  Ce qui n'a pas pu être lu est dit, parce qu'un modèle à qui l'on annonce seulement « ça a échoué »
+  invente une cause.
+
+  Pas de compilateur en mode Plan, et pas par un drapeau que l'outil se donne : `READ_ONLY` est une
+  liste blanche, et créer un objet n'y figure pas.
+
+### Corrigé
+
+- **Un type de membre inconnu n'est plus compilé avec le compilateur le plus proche.** Il est
+  refusé. RPG III est le cas tentant — `.rpg` ressemble à du RPG et `CRTBNDRPG` existe — mais un
+  compilateur lancé sur une source qu'il ne comprend pas produit une liste pleine d'erreurs
+  crédibles à propos de code qui va bien, ce qui est une pire réponse qu'un refus.
+
+### Précisé
+
+- **Chaque nom est refusé plutôt qu'échappé.** Bibliothèque, fichier source, membre et bibliothèque
+  cible viennent du modèle et sont interpolés dans une commande CL et dans du SQL.
+  `CUSTRPT) MONMSG MSGID(CPF0000) DLTLIB LIB(PROD` est une chaîne acceptable et une commande
+  catastrophique, et la garde de production ne peut rien y faire : elle relit une commande *après*
+  sa construction, et celle-ci aurait été construite par nous pour le compte du modèle. Le nom de
+  travail que la partition renvoie subit le même contrôle avant de repartir dans une requête.
+- `hiveyCode.ibmi.writableLibraries` borne aussi la compilation, à une différence près : la liste
+  vide ne désactive pas la barrière, elle la rend **visible** — la compilation est toujours soumise
+  à approbation et la carte dit que rien ne la borne.
+- ⚠️ **Non vérifié, et dit clairement** : les fixtures de l'analyseur sont **construites d'après les
+  dispositions documentées, pas enregistrées** sur une vraie partition. Elles établissent le
+  comportement qui nous appartient ; elles n'établissent pas « ça marche sur une V7R5 ». D'où un
+  analyseur qui ne dépend d'aucune colonne fixe.
+
 ## 0.68.1 — 2026-10-02
 
 ### Corrigé

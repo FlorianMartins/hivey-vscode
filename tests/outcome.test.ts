@@ -158,3 +158,48 @@ test("being stuck is judged on repetition, not on what the command was", () => {
   ]);
   assert.equal(verdict.kind, "stuck");
 });
+
+// ── A compilation is a verdict on the work ───────────────────────────────────────────────────────
+//
+// On IBM i the check is not `npm test`, it is the compiler: a member that does not compile is not
+// a partial success, it is nothing — no object was created. So a compile has to count exactly as a
+// test suite counts, including the part that makes the rule usable rather than expensive: the LAST
+// one wins, because an agent that compiles, reads RNF7030, fixes the name and compiles again has a
+// failing step in its trace and a working program.
+
+test("a compilation that failed and was then fixed is not a failure", () => {
+  const verdict = verifyTurn([
+    ok("ibmi_source_member", "DEVCFC/QRPGLESRC(CUSTRPT)"),
+    bad("ibmi_compile", "CRTBNDRPG DEVCFC/CUSTRPT", "2 error(s): RNF7030, RNF5377"),
+    ok("edit_file", "DEVCFC/QRPGLESRC(CUSTRPT)"),
+    ok("ibmi_compile", "CRTBNDRPG DEVCFC/CUSTRPT", "compiled, 0 error(s)"),
+  ]);
+  assert.equal(verdict.kind, "none", verdict.why);
+});
+
+test("a compilation still failing at the end of the turn is a verified failure", () => {
+  const verdict = verifyTurn([
+    ok("edit_file", "DEVCFC/QRPGLESRC(CUSTRPT)"),
+    bad("ibmi_compile", "CRTBNDRPG DEVCFC/CUSTRPT", "1 error(s): RNF7030"),
+  ]);
+  assert.equal(verdict.kind, "verification", "a member that does not compile produced no object at all");
+  assert.match(verdict.why, /CRTBNDRPG/);
+  assert.equal(verdict.evidence.at(-1)?.summary, "1 error(s): RNF7030");
+});
+
+test("a failed compilation counts whatever command it ran, unlike a shell exit code", () => {
+  // `run_command` only counts when the command looked like a check, because a non-zero exit is how
+  // half the shell answers a question. A compile has no such ambiguity: there is no sense in which
+  // CRTDSPF exiting non-zero means "no, and that is the answer you wanted".
+  for (const command of ["CRTSQLRPGI OBJ(DEVCFC/INVCALC)", "CRTDSPF FILE(DEVCFC/ORDDSP)", "CRTPF FILE(DEVCFC/ARCSTG)"]) {
+    const verdict = verifyTurn([ok("edit_file", "DEVCFC/QRPGLESRC(CUSTRPT)"), bad("ibmi_compile", command)]);
+    assert.equal(verdict.kind, "verification", command);
+  }
+});
+
+test("a compilation that worked means the turn changed something", () => {
+  // It creates an object on the partition. An unverified failure after that has consequences that
+  // outlive the conversation, which is what `turnChangedSomething` is asked about.
+  assert.equal(turnChangedSomething([ok("ibmi_compile", "CRTBNDRPG DEVCFC/CUSTRPT")]), true);
+  assert.equal(turnChangedSomething([bad("ibmi_compile", "CRTBNDRPG DEVCFC/CUSTRPT")]), false);
+});

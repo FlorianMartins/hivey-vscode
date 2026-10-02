@@ -94,6 +94,20 @@ C'est un problème de vigilance humaine, pas d'exécution.
   hasard ;
 - l'absence de rappel d'approbation vaut refus (`runTurn` : le silence n'est pas un consentement).
 
+**Compiler** (`src/core/ibmi/compile.ts`) crée un objet, donc c'est une écriture et elle est bornée
+par la même liste — avec deux précisions qui lui sont propres :
+
+- la liste vide ne désactive pas la barrière, elle la rend **visible** : la compilation est toujours
+  soumise à approbation et la carte dit que rien ne la borne. Une barrière silencieusement inactive
+  sur l'opération qui crée des objets serait le pire des deux mondes ;
+- **chaque nom est refusé plutôt qu'échappé.** Bibliothèque, fichier source, membre et bibliothèque
+  cible viennent du modèle et sont interpolés dans une commande CL et dans du SQL. Un nom qui n'est
+  pas un nom IBM i valide (dix caractères, lettre ou `# $ @` en tête) est rejeté : `CUSTRPT) MONMSG
+  MSGID(CPF0000) DLTLIB LIB(PROD` est une chaîne acceptable et une commande catastrophique, et la
+  garde CL ne peut rien y faire — elle relit une commande *après* sa construction, et celle-ci
+  aurait été construite par nous pour le compte du modèle. Idem pour le nom de travail que la
+  partition renvoie avant qu'il ne reparte dans une requête.
+
 **Sur IBM i** (`src/core/ibmi/guard.ts`), `hiveyCode.ibmi.writableLibraries` ajoute une barrière
 dans le code, du même genre que l'outillage du mode Plan :
 

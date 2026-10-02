@@ -2,7 +2,7 @@
 
 Honnête plutôt que flatteur : ce qui marche, ce qui manque, ce qui n'est pas vérifié.
 
-Ce document décrit l'état à la version **0.68.1**. Les chiffres qu'il annonce — version, tests, tâches d'évaluation — sont
+Ce document décrit l'état à la version **0.69.0**. Les chiffres qu'il annonce — version, tests, tâches d'évaluation — sont
 vérifiés par `npm run check:numbers`, que la CI exécute : ils ne peuvent plus vieillir en silence.
 Il était resté figé à `0.3.0` pendant trente-cinq
 versions, ce qui est sa propre leçon : une feuille de route périmée dit « projet abandonné » à
@@ -26,6 +26,18 @@ externe non exécuté ici est « non vérifié ».
 | 0.5 Des chiffres qui ne peuvent plus vieillir | fait | **testé** — le contrôleur refuse un chiffre faux et le répare (prouvé dans les deux sens) ; son câblage en CI est gardé par un test |
 | 0.6 Mesurer la qualité sur de vrais modèles | fait (harnais) | **testé** — rapport JSON+Markdown prouvé de bout en bout contre un faux serveur de modèle ; les règles « n'invente aucun chiffre » tenues par 9 tests dans `core` ; banc porté à 40 tâches, 40/40 échouent sur la fixture intacte **et** passent sur leur solution (deux portes de CI). ⚠️ **non mesuré** : aucun modèle réel joignable d'ici — les chiffres de qualité restent à produire |
 
+### Phase 1 — Dépasser IBM Bob sur IBM i
+
+| Chantier | État | Vérification |
+|---|---|---|
+| 1.1 Boucle compiler, lire, corriger | fait | **testé** — 37 tests : table des commandes, analyseur sur RPG III / ILE fixe / ILE libre / SQLRPGLE / CL / DDS, piège du sommaire (retombe sans la règle), noms refusés plutôt qu'échappés, les trois sources et leurs chemins d'échec, le journal lu pour le bon travail, verdict dans `verifyTurn` (retombe sans le câblage). ⚠️ **non vérifié** : fixtures **construites** d'après les dispositions documentées, pas enregistrées sur une partition ; aucune exécution réelle possible ici |
+| 1.2 Tests unitaires RPG exécutés | à faire | — |
+| 1.3 Analyse d'impact | à faire | — |
+| 1.4 Performance Db2 for i | à faire | — |
+| 1.5 Messages et documentation de la maison | à faire | — |
+| 1.6 Au moins 40 compétences IBM i | à faire | — |
+| 1.7 Livraison par ARCAD | à faire | — |
+
 
 ## Comment lire les affirmations ci-dessous
 
@@ -37,6 +49,22 @@ Trois niveaux, jamais mélangés :
   nommés.
 
 ## Fait
+
+### Compiler est un verdict (0.69.0)
+
+- **`ibmi_compile` compile sur la partition et rend les erreurs du compilateur** (testé sur
+  fixtures ; **non vérifié** sur une vraie partition). La commande vient du type du membre ; un type
+  inconnu est refusé plutôt que compilé avec le compilateur le plus proche.
+- **Une compilation est une vérification du tour** (testé, retombe sans le câblage) : la dernière
+  compte, donc corriger puis recompiler n'est pas un échec, et une compilation encore rouge à la fin
+  achète l'escalade avec la liste d'erreurs.
+- **Trois sources, et une lacune nommée plutôt qu'un silence** (testé, y compris chaque chemin
+  d'échec) : la sortie de la commande, la liste spoulée — la seule qui porte des numéros de ligne —
+  et le journal du travail, lu pour **le travail que le spoule désigne** et non pour le travail
+  courant.
+- **Les noms sont refusés, pas échappés** (testé) : ils viennent du modèle et finissent dans une
+  commande CL et dans du SQL.
+
 
 ### Mesurer la qualité, sans pouvoir se mentir (0.68.0)
 
@@ -120,7 +148,7 @@ Trois niveaux, jamais mélangés :
 ### Avant 0.39.0
 
 - Noyau indépendant de l'éditeur : anonymisation, fournisseurs, routeur, budget, complétion, session,
-  carte du dépôt, boucle d'agent. **741 tests unitaires** plus **41 tests d'intégration dans un vrai
+  carte du dépôt, boucle d'agent. **778 tests unitaires** plus **41 tests d'intégration dans un vrai
   VS Code**.
 - Barre latérale : conversation, historique, modèles, permissions, configuration ; modes
   discussion / plan / agent ; budget de raisonnement ; contexte explicite.

@@ -19,6 +19,14 @@ import type { Tool, ToolResult } from "../../core/agent/loop.js";
 import { headToTokens } from "../../core/util/tokens.js";
 import { cell, formatRows, isReadOnlySql, matchesName, parseMemberRef } from "../../core/ibmi/sql.js";
 import { clOnlyReads, refuseChange, type Refusal } from "../../core/ibmi/guard.js";
+import {
+  compilableTypes,
+  compileAllowed,
+  compileApproval,
+  errorsOnly,
+  formatReport,
+  runCompile,
+} from "../../core/ibmi/compile.js";
 import { extractCalledPrograms, extractCopyDirectives } from "../../core/ibmi/symbols.js";
 
 const EXTENSION_ID = "halcyontechltd.code-for-ibmi";
@@ -539,6 +547,22 @@ function refusal(where: Refusal, writable: string[]): ToolResult {
   }
 }
 
+
+/**
+ * A member reference, or nothing.
+ *
+ * `approval()` is called with whatever the model sent, before anything has validated it, and it
+ * runs while the card is being built — so it must not throw. `parseMemberRef` does, correctly, for
+ * a reference it cannot read; here the fallback is a plainer sentence rather than a broken card.
+ */
+function safeRef(ref: string): { library: string; sourceFile: string; member: string } | undefined {
+  try {
+    return parseMemberRef(ref);
+  } catch {
+    return undefined;
+  }
+}
+
 export function buildIbmiTools(writable: string[] = []): Tool[] {
   const sql: Tool = {
     schema: {
@@ -795,5 +819,113 @@ export function buildIbmiTools(writable: string[] = []): Tool[] {
     },
   };
 
-  return [sql, command, readMember, programContext, whereIsMember, listMembers, listObjects, libraryList];
+
+  /**
+   * Compile a member on the partition, and come back with what the compiler said.
+   *
+   * The loop this exists for is the one IBM Bob does not claim: write it, compile it, READ THE
+   * ERRORS, fix them. On IBM i that is the only loop worth having, because a member that does not
+   * compile produced nothing at all — there is no object, and nothing partial to inspect. Which is
+   * why `core/router/outcome.ts` counts a compile as a verdict on the turn, exactly as it counts a
+   * test suite: a compile still failing when the turn ends buys the escalation, with the error list
+   * attached.
+   *
+   * It is absent from plan mode, and not by a flag it sets on itself: `READ_ONLY` in
+   * `core/session/modes.ts` is an allow-list, and this creates objects, so it is simply not in it.
+   */
+  const compile: Tool = {
+    schema: {
+      name: "ibmi_compile",
+      description:
+        "Compile a source member into an object on the partition and return the compiler's errors — " +
+        "identifier, severity, line and text. Use this to CHECK your own change: a member that does " +
+        "not compile has produced no object at all. The command follows the member's type " +
+        `(${compilableTypes().join(", ")}); the target library must be one the user allows.`,
+      parameters: {
+        type: "object",
+        properties: {
+          member: { type: "string", description: "LIB/SRCFILE(MEMBER) or /LIB/SRCFILE/MEMBER.RPGLE" },
+          target: { type: "string", description: "The library the object is created in. Defaults to the source library." },
+          type: { type: "string", description: "The member type (rpgle, sqlrpgle, clle, pf, lf, dspf, prtf). Looked up when omitted." },
+          module: { type: "boolean", description: "Create an ILE *MODULE instead of a bound program." },
+        },
+        required: ["member"],
+      },
+    },
+    // Always. It creates an object on a real partition, and when `writableLibraries` is empty the
+    // sentence says that nothing is bounding it — which is the one state the user needs told.
+    approval: (args) => {
+      const ref = safeRef(String(args["member"] ?? ""));
+      if (!ref) return t("compile {0}", String(args["member"] ?? ""));
+      return compileApproval(
+        {
+          source: { ...ref, extension: String(args["type"] ?? "") },
+          targetLibrary: String(args["target"] ?? ref.library),
+          ...(args["module"] ? { module: true } : {}),
+        },
+        writable,
+      );
+    },
+    async run(args, ctx): Promise<ToolResult> {
+      const ref = parseMemberRef(String(args["member"] ?? ""));
+      const targetLibrary = String(args["target"] ?? ref.library);
+      const verdict = compileAllowed(targetLibrary, writable);
+      if (!verdict.allow) return { content: verdict.reason, isError: true };
+
+      // The member's type, from the member itself when the model did not say. `getMemberList` is
+      // the same call the member browser uses, so the answer is whatever Code for IBM i believes.
+      let extension = String(args["type"] ?? "").replace(/^\./, "");
+      if (!extension) {
+        try {
+          const found = await connection()
+            .getContent()
+            .getMemberList({ library: ref.library, sourceFile: ref.sourceFile, members: ref.member });
+          extension = found.find((m) => m.name.toUpperCase() === ref.member)?.extension ?? "";
+        } catch {
+          /* asked for below instead of guessed */
+        }
+      }
+      if (!extension) {
+        return {
+          content:
+            `I could not establish the type of ${ref.library}/${ref.sourceFile}(${ref.member}), and I will not ` +
+            `guess it: compiling a member with the wrong compiler produces a listing full of real-looking ` +
+            `errors about code that is fine. Pass "type" — one of ${compilableTypes().join(", ")}.`,
+          isError: true,
+        };
+      }
+
+      const conn = connection();
+      const outcome = await runCompile(
+        {
+          source: { ...ref, extension },
+          targetLibrary,
+          ...(args["module"] ? { module: true } : {}),
+        },
+        {
+          command: (command) => conn.runCommand({ command, environment: "ile" }),
+          sql: (statement) => conn.getContent().runSQL(statement),
+          read: cell,
+          user: conn.currentUser,
+        },
+      );
+      if ("refused" in outcome) return { content: outcome.refused, isError: true };
+
+      const { report } = outcome;
+      const errors = errorsOnly(report.messages).length;
+      ctx.report(
+        report.ok
+          ? t("compiled {0}/{1}", report.target.library, report.target.object)
+          : t("{0} failed, {1} error(s)", report.command.split(/\s+/)[0] ?? "compile", errors),
+      );
+      return {
+        content: headToTokens(formatReport(report), MAX_TOKENS),
+        // The verdict is the command's, so the step is red when the object was not created — which
+        // is what `verifyTurn` reads to decide whether the turn finished.
+        isError: !report.ok,
+      };
+    },
+  };
+
+  return [sql, command, compile, readMember, programContext, whereIsMember, listMembers, listObjects, libraryList];
 }
