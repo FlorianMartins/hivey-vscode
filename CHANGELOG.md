@@ -2,6 +2,16 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.68.1 — 2026-10-02
+
+### Corrigé
+
+- **Le banc d'évaluation partait dans le `.vsix`** : 156 fichiers et 57 Ko de quarante dépôts cassés
+  exprès, de leurs solutions de référence et des résultats qu'une campagne avait laissés. `eval/` est
+  dans `.gitignore` pour ses résultats, ce qui n'a rien à voir avec être exclu du paquet — `vsce`
+  empaquette ce qui est sur le disque. Même argument que `dist-integration/**` juste au-dessus dans
+  `.vscodeignore`, et la même erreur un dossier plus loin. Le paquet passe de 193 à 37 fichiers.
+
 ## 0.68.0 — 2026-10-02
 
 ### Ajouté

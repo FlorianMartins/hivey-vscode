@@ -25,3 +25,8 @@ esbuild.mjs
 # extension or the terminal client runs imports it, so shipping it would be dead weight in the
 # download — the same mistake as the stale bundle this file's header describes, one order smaller.
 dist/eval-report.mjs
+# And the bench itself: forty broken repositories, their reference solutions and whatever results a
+# run left behind. It is `.gitignore`d, which is not the same as excluded from the package — vsce
+# packages what is on disk. It was 156 files and 57 KB of the download, and it is test material: the
+# same argument as `dist-integration/**` above, and the same mistake one directory along.
+eval/**
