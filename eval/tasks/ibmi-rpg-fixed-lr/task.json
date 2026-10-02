@@ -1,0 +1,7 @@
+{
+  "title": "A fixed-format program that never ends",
+  "kind": "ibmi",
+  "prompt": "CUSTLST.rpgle runs to the end of its C specs without setting LR, so it stays active in the activation group with its files open and the next call sees the previous position. Set the last record indicator before the program returns. Keep the program in fixed format: this source is maintained by people who read it that way.",
+  "check": "grep -qE '^     [CDFH]' CUSTLST.rpgle && ! grep -qiE '^\\*\\*free' CUSTLST.rpgle && codeonly CUSTLST.rpgle | grep -qiE '(SETON +.*LR|\\*INLR)' && grep -qi 'CUSTMAST' CUSTLST.rpgle",
+  "timeoutMs": 180000
+}

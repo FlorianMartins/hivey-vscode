@@ -2,7 +2,7 @@
   "name": "hivey-code",
   "displayName": "Hivey Code",
   "description": "%extension.description%",
-  "version": "0.67.0",
+  "version": "0.68.0",
   "publisher": "hivey",
   "license": "Apache-2.0",
   "repository": {
@@ -1043,6 +1043,7 @@
     "models:check": "node scripts/update-models.mjs --check",
     "eval": "node scripts/evaluate.mjs",
     "eval:verify": "node scripts/evaluate.mjs --verify-tasks",
+    "eval:solutions": "node scripts/evaluate.mjs --verify-solutions",
     "scan:secrets": "node scripts/scan-secrets.mjs",
     "check:numbers": "node scripts/check-numbers.mjs",
     "test:integration": "node esbuild.mjs && node esbuild.mjs --integration && node dist-integration/runTest.js",

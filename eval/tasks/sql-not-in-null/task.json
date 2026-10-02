@@ -1,0 +1,8 @@
+{
+  "title": "A list of unpaid invoices that is always empty",
+  "kind": "bug",
+  "prompt": "unpaid.sql should list the invoices with no payment, and it returns nothing at all even though two are unpaid. Fix unpaid.sql so the output matches expected.txt.",
+  "setup": "sqlite3 shop.db < schema.sql",
+  "check": "sqlite3 shop.db < unpaid.sql | diff -u expected.txt -",
+  "timeoutMs": 180000
+}

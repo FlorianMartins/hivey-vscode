@@ -1,0 +1,7 @@
+{
+  "title": "Two equal accounts that a HashSet counts twice",
+  "kind": "bug",
+  "prompt": "AccountKey overrides equals and not hashCode, so two equal keys land in different buckets and a HashMap loses the entry. Fix it, using the standard library rather than hand-written arithmetic, and keep equals consistent with hashCode.",
+  "check": "codeonly AccountKey.java | grep -q 'public int hashCode' && codeonly AccountKey.java | grep -q 'Objects.hash' && codeonly AccountKey.java | grep -q 'public boolean equals' && codeonly AccountKey.java | grep -q '@Override'",
+  "timeoutMs": 180000
+}

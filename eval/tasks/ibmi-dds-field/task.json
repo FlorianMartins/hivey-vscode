@@ -1,0 +1,7 @@
+{
+  "title": "A display file missing the field the screen needs",
+  "kind": "ibmi",
+  "prompt": "ORDDSP.dspf shows an order header and the users need the customer reference beside the order number. Add a field CUSREF, 15 characters, output only, on the same line as ORDNBR at column 45, with a constant label 'Cust ref' in front of it. Keep the DDS in fixed format.",
+  "check": "grep -qE '^     A' ORDDSP.dspf && codeonly ORDDSP.dspf | grep -qiE 'CUSREF +15A' && codeonly ORDDSP.dspf | grep -qiE \"'Cust ref'\" && codeonly ORDDSP.dspf | grep -qE 'CUSREF +15A +O'",
+  "timeoutMs": 180000
+}

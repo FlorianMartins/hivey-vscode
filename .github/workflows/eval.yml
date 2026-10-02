@@ -48,6 +48,11 @@ jobs:
       - name: Tasks are honest
         run: npm run eval:verify
 
+      # And the other direction, which is the one that makes a bad score believable: a check that
+      # CANNOT pass scores every model zero and looks exactly like a hard task.
+      - name: Checks are satisfiable
+        run: npm run eval:solutions
+
       - name: Build the terminal client
         run: npm run build
 
@@ -62,7 +67,17 @@ jobs:
             echo "No endpoint configured — set the HIVEY_EVAL_URL and HIVEY_EVAL_MODELS repository variables."
             exit 0
           fi
-          node scripts/evaluate.mjs --url "$URL" --model "$MODELS" | tee eval-report.txt
+          node scripts/evaluate.mjs --url "$URL" --model "$MODELS" --report report | tee eval-report.txt
+
+      # The report in the run's summary, not only in an artifact nobody downloads. This is the whole
+      # point of generating Markdown: the comparison between two nights has to be readable without
+      # unzipping anything.
+      - name: Put the report in the summary
+        if: always()
+        run: |
+          if [ -f report/report.md ]; then
+            cat report/report.md >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: Keep the report
         if: always()
@@ -71,6 +86,7 @@ jobs:
           name: evaluation
           path: |
             eval-report.txt
+            report/
             eval/results/
           if-no-files-found: ignore
           retention-days: 30

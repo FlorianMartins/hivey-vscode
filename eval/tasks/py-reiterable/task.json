@@ -1,0 +1,7 @@
+{
+  "title": "The report is empty the second time it is read",
+  "kind": "bug",
+  "prompt": "The summary at the bottom of the report always says zero, although the rows above it are right. The tests in test_report.py reproduce it. Fix report.py, and keep reading the file only once.",
+  "check": "python3 -m unittest discover -q",
+  "timeoutMs": 180000
+}

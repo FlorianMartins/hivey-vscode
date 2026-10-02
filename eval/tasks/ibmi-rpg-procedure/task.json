@@ -1,0 +1,7 @@
+{
+  "title": "The same VAT calculation written out three times",
+  "kind": "ibmi",
+  "prompt": "INVCALC.sqlrpgle computes VAT in three places with the same six lines, and one of the three already drifted. Extract it into a subprocedure with a prototype, call it from all three places, and leave the behaviour of the correct two unchanged.",
+  "check": "codeonly INVCALC.sqlrpgle | grep -qi 'dcl-proc' && codeonly INVCALC.sqlrpgle | grep -qi 'end-proc' && [ $(codeonly INVCALC.sqlrpgle | grep -ci 'calcVat') -ge 4 ] && [ $(codeonly INVCALC.sqlrpgle | grep -c '0.21') -le 1 ]",
+  "timeoutMs": 180000
+}

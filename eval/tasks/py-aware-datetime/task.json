@@ -1,0 +1,7 @@
+{
+  "title": "Comparing a naive clock to a timestamp with an offset",
+  "kind": "bug",
+  "prompt": "session.py raises TypeError when a token carries a UTC offset, and the tests show it. Make it work for a timestamp with an offset and for one without, treating a bare timestamp as UTC. Do not change the tests.",
+  "check": "python3 -m unittest discover -q",
+  "timeoutMs": 180000
+}

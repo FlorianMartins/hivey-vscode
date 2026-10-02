@@ -86,6 +86,13 @@ jobs:
       - name: Evaluation tasks are honest
         run: npm run eval:verify
 
+      # The opposite gate. `eval:verify` catches a task that passes before the model touches it;
+      # this one catches a task that can NEVER pass — a typo in a grep, a compiler the runner does
+      # not have, a condition the prompt never asks for. Such a task scores every model zero and
+      # becomes evidence against the models rather than against itself.
+      - name: Evaluation checks are satisfiable
+        run: npm run eval:solutions
+
       - name: Dependencies — known vulnerabilities
         # The extension ships zero runtime dependency; this covers the dev toolchain, which is
         # still code that runs on a maintainer's machine.

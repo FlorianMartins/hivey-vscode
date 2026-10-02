@@ -1,0 +1,51 @@
+#!/bin/sh
+# A source file with its comments removed.
+#
+# For the checks that look at the SHAPE of the code rather than running it — "no `any` remains",
+# "no `finally` block", "the library is qualified". Those checks are greps, and a grep reads the
+# comments too, so a correct answer that EXPLAINS itself gets refused for quoting the thing it
+# removed. That is not a hypothetical: it refused three of the checks written today and one that
+# had been in the repository for weeks, and in every case the text that tripped it was a sentence
+# saying what had been replaced.
+#
+# It lives in the repository and is put on PATH by `scripts/evaluate.mjs`, NOT in the task fixture:
+# a helper inside the working copy is a file the agent can edit, and a check the agent can edit is
+# not a check.
+#
+# Deliberately not a parser. It handles line comments and block comments, including block comments
+# spanning several lines, and it does not understand a comment marker inside a string literal —
+# which would only ever make it strip slightly too much, never too little, so a check cannot be
+# fooled into passing by it.
+
+for file in "$@"; do
+  case "$file" in
+    *.sql)
+      sed 's|--.*||' "$file"
+      ;;
+    *.clle | *.clp | *.cl)
+      # CL has only /* … */, and it spans lines.
+      awk '
+        { line = $0
+          while (match(line, /\/\*.*\*\//)) line = substr(line, 1, RSTART - 1) substr(line, RSTART + RLENGTH)
+          if (inblock) { if (match(line, /\*\//)) { line = substr(line, RSTART + RLENGTH); inblock = 0 } else next }
+          if (match(line, /\/\*/)) { line = substr(line, 1, RSTART - 1); inblock = 1 }
+          print line }
+      ' "$file"
+      ;;
+    *.dspf | *.prtf | *.lf | *.pf | *.dds)
+      # DDS: an A followed by an asterisk in the function column is a comment line.
+      grep -v '^     A\*' "$file"
+      ;;
+    *)
+      # C, Java, JavaScript, TypeScript and free-form RPG: // to end of line, /* … */ across lines.
+      awk '
+        { line = $0
+          while (match(line, /\/\*.*\*\//)) line = substr(line, 1, RSTART - 1) substr(line, RSTART + RLENGTH)
+          if (inblock) { if (match(line, /\*\//)) { line = substr(line, RSTART + RLENGTH); inblock = 0 } else next }
+          if (match(line, /\/\*/)) { line = substr(line, 1, RSTART - 1); inblock = 1 }
+          sub(/\/\/.*/, "", line)
+          print line }
+      ' "$file"
+      ;;
+  esac
+done

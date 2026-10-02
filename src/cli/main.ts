@@ -15,10 +15,11 @@ import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, dirname } from "node:path";
 import { stdin, stdout } from "node:process";
-import { runTurn } from "../core/agent/loop.js";
+import { runTurn, type TurnResult } from "../core/agent/loop.js";
 import { makeProvider, PROVIDER_IDS, type ProviderId } from "../core/providers/index.js";
 import { isLocalEndpoint, redactMessages, Vault, streamingRestorer } from "../core/redaction/index.js";
 import type { RedactionLevel } from "../core/redaction/types.js";
+import type { RunRecord } from "../core/eval/report.js";
 import { Budget, type Spend, type SpendStore } from "../core/router/budget.js";
 import { costOf, makeLookup } from "../core/router/pricing.js";
 import { GENERATED_PRICES } from "../core/router/catalog.generated.js";
@@ -325,6 +326,7 @@ async function main(): Promise<void> {
     );
 
     let printed = false;
+    const startedAt = Date.now();
     // One restorer for the whole stream. A terminal cannot repaint what it has already written, so
     // a marker shown in halves stays in halves. See `streamingRestorer`.
     const live = streamingRestorer((text) => vault.restore(text));
@@ -365,8 +367,11 @@ async function main(): Promise<void> {
       if (printed) stdout.write("\n");
 
       const answer = session.add({ role: "assistant", text: result.text, model: cfg.model });
+      // Computed whatever the endpoint is, and reported only when it is known. A local model is
+      // not free — it is unpriced — and the two have to stay distinguishable for the evaluation
+      // report, which is forbidden to print a figure it did not measure.
+      const cost = costOf(result.usage, prices(cfg.model));
       if (!isLocal) {
-        const cost = costOf(result.usage, prices(cfg.model));
         answer.usdCost = cost.usd;
         budget.record(cost.usd);
         console.log(
@@ -377,6 +382,7 @@ async function main(): Promise<void> {
         );
       }
       if (result.stoppedBecause === "max-steps") console.log(C.amber(t("  (stopped at the maximum number of steps)")));
+      writeRunRecord(result, Date.now() - startedAt, cfg.model, !isLocal && cost.known ? cost.usd : undefined);
     } catch (err) {
       console.log(C.red(`\n${(err as Error).message}`));
     } finally {
@@ -438,6 +444,45 @@ function randomNonce(): string {
   const bytes = new Uint8Array(16);
   (globalThis.crypto ?? require("node:crypto").webcrypto).getRandomValues(bytes);
   return [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/**
+ * One line of JSON per turn, when the evaluation harness asks for it.
+ *
+ * `HIVEY_CODE_RUN_REPORT=<file>` and nothing else: no flag, because the one-off prompt is built by
+ * joining every argument that is not `--yes`, so a flag with a value would end up inside the
+ * question. It follows the other harness hooks (`HIVEY_CODE_YES`, `_URL`, `_MODEL`, `_PROVIDER`),
+ * which are all environment too.
+ *
+ * It writes to a local file and nowhere else. That is what keeps it out of the no-telemetry rule:
+ * the path comes from the person running the command, there is no default, and the only caller is
+ * `scripts/evaluate.mjs` running in a throwaway directory.
+ *
+ * Appended rather than overwritten, because one task may take several turns and the harness wants
+ * all of them. A failure to write is swallowed: an evaluation hook must never be able to break the
+ * turn it is measuring.
+ */
+function writeRunRecord(result: TurnResult, ms: number, model: string, usd: number | undefined): void {
+  const path = process.env["HIVEY_CODE_RUN_REPORT"];
+  if (!path) return;
+  const tools: Record<string, number> = {};
+  for (const step of result.trace) tools[step.call.name] = (tools[step.call.name] ?? 0) + 1;
+  const record: RunRecord = {
+    model,
+    steps: result.steps,
+    promptTokens: result.usage.promptTokens,
+    completionTokens: result.usage.completionTokens,
+    ...(usd === undefined ? {} : { usd }),
+    stoppedBecause: result.stoppedBecause,
+    truncated: result.truncated,
+    tools,
+    ms,
+  };
+  try {
+    require("node:fs").appendFileSync(path, `${JSON.stringify(record)}\n`, "utf8");
+  } catch {
+    /* measuring must never break the thing being measured */
+  }
 }
 
 void main();

@@ -41,9 +41,16 @@ const flag = (name, fallback) => {
 const has = (name) => args.includes(`--${name}`);
 
 /** Run a shell command in a directory, capturing everything, with a deadline. */
-function sh(command, cwd, timeoutMs = 120_000) {
+function sh(command, cwd, timeoutMs = 120_000, env = {}) {
   return new Promise((resolveRun) => {
-    const child = spawn(command, { cwd, shell: true, env: { ...process.env } });
+    const child = spawn(command, {
+      cwd,
+      shell: true,
+      // `eval/bin` on PATH, which is how a check gets `codeonly` — a structural check must look at
+      // the code and not at the comments, and the helper that strips them has to live OUTSIDE the
+      // working copy: a tool the agent can edit is not a check. See `eval/bin/codeonly`.
+      env: { ...process.env, PATH: `${join(ROOT, "eval", "bin")}:${process.env.PATH ?? ""}`, ...env },
+    });
     let out = "";
     let killed = false;
     const timer = setTimeout(() => {
@@ -78,9 +85,14 @@ async function loadTasks() {
 }
 
 /** A throwaway copy of a task's fixture. Nothing is ever run in the repository itself. */
-async function checkout(task) {
+async function checkout(task, { withSolution = false } = {}) {
   const dir = await mkdtemp(join(tmpdir(), `hivey-eval-${task.id}-`));
   await cp(join(task.dir, "files"), dir, { recursive: true });
+  // The reference solution, laid over the fixture. Only for `--verify-solutions`; a model never
+  // sees it, and it is not what a model is scored against — see `verifySolutions`.
+  if (withSolution && existsSync(join(task.dir, "solution"))) {
+    await cp(join(task.dir, "solution"), dir, { recursive: true });
+  }
   if (task.setup) {
     const setup = await sh(task.setup, dir, 60_000);
     if (setup.code !== 0) throw new Error(`setup failed for ${task.id}: ${setup.out}`);
@@ -115,15 +127,62 @@ async function verifyTasks(tasks) {
   return broken === 0;
 }
 
+/**
+ * Every check, against the reference solution. Each one MUST pass.
+ *
+ * The other half of `--verify-tasks`, and the half that was missing. `--verify-tasks` catches a
+ * task that passes before the model touches it; nothing caught a task that **can never pass** —
+ * a check with a typo in a grep, a command that needs a compiler this machine does not have, a
+ * condition the prompt never asks for. Such a task scores every model 0 % and looks exactly like a
+ * hard task, which is worse than looking broken: it becomes evidence against the models.
+ *
+ * So every task ships a `solution/` laid over the fixture, and the check must go green on it. The
+ * solution is one way to do the task, not the way: the model is still scored by the command, and
+ * two models solving it differently both pass. It exists to prove the command is satisfiable.
+ *
+ * A task with no `solution/` is reported, not skipped silently — an unprovable check is exactly
+ * what this exists to find.
+ */
+async function verifySolutions(tasks) {
+  let bad = 0;
+  for (const task of tasks) {
+    if (!existsSync(join(task.dir, "solution"))) {
+      bad++;
+      console.log(`✗ ${task.id}: no solution/, so nothing proves this check CAN pass`);
+      continue;
+    }
+    const dir = await checkout(task, { withSolution: true });
+    try {
+      const result = await sh(task.check, dir, task.timeoutMs ?? 180_000);
+      if (result.code === 0) {
+        console.log(`✓ ${task.id}: passes on the reference solution`);
+      } else {
+        bad++;
+        console.log(`✗ ${task.id}: FAILS on its own solution (exit ${result.code}) — the check is unsatisfiable`);
+        console.log(`    ${result.out.trim().split("\n").slice(-4).join("\n    ")}`);
+      }
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  }
+  console.log(`\n${tasks.length - bad}/${tasks.length} checks are satisfiable`);
+  return bad === 0;
+}
+
 /** One task, one model, from a clean copy to a verdict. */
 async function runTask(task, model, endpoint) {
   const dir = await checkout(task);
+  // OUTSIDE the working copy, deliberately. A file the agent can see is a file it can read, edit or
+  // delete, and a check that globs the directory would trip over it — the measurement must not be
+  // part of what is measured.
+  const reportFile = join(await mkdtemp(join(tmpdir(), "hivey-eval-run-")), "run.jsonl");
   const started = Date.now();
   try {
     const attempt = await sh(
       `node ${JSON.stringify(CLI)} --yes ${JSON.stringify(task.prompt)}`,
       dir,
       task.timeoutMs ?? 180_000,
+      { HIVEY_CODE_RUN_REPORT: reportFile },
     );
     // Re-run the setup before checking: a task whose check needs a database must not be scored on
     // one the model happened to leave behind.
@@ -136,13 +195,43 @@ async function runTask(task, model, endpoint) {
       passed: check.code === 0,
       seconds: Math.round((Date.now() - started) / 100) / 10,
       agentExit: attempt.code,
+      // What the client reported about the turn: steps, tokens, cost, how it stopped. Empty when it
+      // reported nothing, which the report renders as an absence and never as a zero.
+      runs: await readRunRecords(reportFile),
       // Only on failure, and only the tail: the interesting part of a failed run is what the check
       // said, and a results file that carries every successful log is unreadable.
       ...(check.code === 0 ? {} : { why: check.out.slice(-2000), agent: attempt.out.slice(-2000) }),
     };
   } finally {
     await rm(dir, { recursive: true, force: true });
+    await rm(dirname(reportFile), { recursive: true, force: true });
   }
+}
+
+/**
+ * What the terminal client wrote about its turns, or nothing.
+ *
+ * Nothing is an ordinary outcome: a run that died before the first response, an older client, a
+ * line cut short by a kill. A malformed line is dropped rather than failing the run — the verdict
+ * is the check, not the bookkeeping.
+ */
+async function readRunRecords(file) {
+  let text;
+  try {
+    text = await readFile(file, "utf8");
+  } catch {
+    return [];
+  }
+  const out = [];
+  for (const line of text.split("\n")) {
+    if (!line.trim()) continue;
+    try {
+      out.push(JSON.parse(line));
+    } catch {
+      /* a half-written line is not a measurement */
+    }
+  }
+  return out;
 }
 
 function table(results, models) {
@@ -178,6 +267,10 @@ async function main() {
     process.exit((await verifyTasks(tasks)) ? 0 : 1);
   }
 
+  if (has("verify-solutions")) {
+    process.exit((await verifySolutions(tasks)) ? 0 : 1);
+  }
+
   if (!existsSync(CLI)) {
     console.error(`${CLI} is missing — run \`npm run build\` first.`);
     process.exit(2);
@@ -185,11 +278,17 @@ async function main() {
 
   const endpoint = flag("url", process.env["HIVEY_CODE_URL"] ?? "");
   const models = flag("model", process.env["HIVEY_CODE_MODEL"] ?? "").split(",").map((m) => m.trim()).filter(Boolean);
+  const reportDir = flag("report", "");
+
   if (!endpoint || !models.length) {
     // Not an error, and this is deliberate: the nightly workflow has no model unless somebody
     // configures one, and a scheduled job that goes red every night is a job people mute.
     console.log("No endpoint or model given (--url / --model). Nothing to evaluate.");
     console.log("The task set itself can still be checked with --verify-tasks.");
+    // And when a report was asked for, it is still written — saying it was not measured. A missing
+    // file is read as "the job did not run"; an empty table of zeros is read as a score. Neither is
+    // what happened, and only one of the three can be said out loud.
+    if (reportDir) await writeReport(reportDir, { at: new Date().toISOString(), endpoint, models, outcomes: [] });
     process.exit(0);
   }
 
@@ -215,9 +314,41 @@ async function main() {
   await writeFile(file, JSON.stringify({ at: new Date().toISOString(), endpoint, models, results }, null, 2) + "\n");
   console.log(`\nwritten: ${file}`);
 
+  if (reportDir) {
+    const written = await writeReport(reportDir, {
+      at: new Date().toISOString(),
+      endpoint,
+      models,
+      outcomes: results,
+    });
+    console.log(`written: ${written.join(", ")}`);
+  }
+
   // The exit code reports whether the harness ran, not whether the models are good. A model that
   // fails four tasks is information; it is not a broken build.
   process.exit(0);
+}
+
+/**
+ * The report, in both forms, from the arithmetic in `src/core/eval/report.js`.
+ *
+ * The rules about what may and may not be claimed live in `core` and are unit-tested there — a
+ * script cannot be unit-tested, and "invent no score" is exactly the rule that needs a test. This
+ * function only decides where the two files go.
+ *
+ * JSON for a machine and Markdown for a person, from one structure, because two generators drift:
+ * the published page would say one thing and the artifact another, and nobody would know which was
+ * the measurement.
+ */
+async function writeReport(dir, input) {
+  const { buildReport, markdownReport } = await import(new URL("../dist/eval-report.mjs", import.meta.url));
+  const report = buildReport(input);
+  await mkdir(dir, { recursive: true });
+  const jsonFile = join(dir, "report.json");
+  const mdFile = join(dir, "report.md");
+  await writeFile(jsonFile, JSON.stringify(report, null, 2) + "\n");
+  await writeFile(mdFile, markdownReport(report));
+  return [jsonFile, mdFile];
 }
 
 main().catch((err) => {

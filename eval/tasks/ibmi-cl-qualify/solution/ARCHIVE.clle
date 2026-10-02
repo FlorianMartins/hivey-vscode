@@ -1,0 +1,17 @@
+             PGM        PARM(&LIB)
+
+/* The library is a parameter with a default, not a name repeated in every command: one place to */
+/* change, and nothing that resolves against whatever library list the job was submitted with.  */
+             DCL        VAR(&LIB) TYPE(*CHAR) LEN(10) VALUE('DEVCFC')
+             DCL        VAR(&COUNT) TYPE(*DEC) LEN(7 0)
+
+/* Clear the staging file and refill it from the live one. */
+             CLRPFM     FILE(&LIB/ARCSTG)
+             CPYF       FROMFILE(&LIB/ORDHDR) TOFILE(&LIB/ARCSTG) MBROPT(*ADD)
+
+/* Drop last month's extract. */
+             DLTF       FILE(&LIB/ARCOLD)
+
+             SNDPGMMSG  MSG('Archive staged')
+
+             ENDPGM

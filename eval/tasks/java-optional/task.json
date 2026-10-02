@@ -1,0 +1,7 @@
+{
+  "title": "A lookup that returns null and a caller that does not check",
+  "kind": "refactor",
+  "prompt": "CustomerRepository.find returns null when nothing is found, and Billing calls it without checking. Change find to return Optional<Customer> and make Billing handle the empty case. No method is to return null.",
+  "check": "codeonly CustomerRepository.java | grep -q 'Optional<Customer>' && ! codeonly CustomerRepository.java | grep -qE 'return +null *;' && codeonly Billing.java | grep -qE '(orElse|isPresent|ifPresent|orElseThrow|map\\()' && ! codeonly Billing.java | grep -qE '!= *null'",
+  "timeoutMs": 180000
+}

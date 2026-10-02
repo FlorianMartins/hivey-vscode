@@ -2,7 +2,7 @@
 
 Honnête plutôt que flatteur : ce qui marche, ce qui manque, ce qui n'est pas vérifié.
 
-Ce document décrit l'état à la version **0.67.0**. Les chiffres qu'il annonce — version, tests, tâches d'évaluation — sont
+Ce document décrit l'état à la version **0.68.0**. Les chiffres qu'il annonce — version, tests, tâches d'évaluation — sont
 vérifiés par `npm run check:numbers`, que la CI exécute : ils ne peuvent plus vieillir en silence.
 Il était resté figé à `0.3.0` pendant trente-cinq
 versions, ce qui est sa propre leçon : une feuille de route périmée dit « projet abandonné » à
@@ -24,7 +24,7 @@ externe non exécuté ici est « non vérifié ».
 | 0.3 Fermer `QSH` dans la garde IBM i | fait | **testé** (les quatre cas du prompt, plus le shell enveloppé et le faux positif `QSHELLDOC`) ; retombe sans le correctif. Non vérifié sur une vraie partition |
 | 0.4 Suite de tests sous Node 22 | fait | **non vérifié ici** — seul Node 18 est installé sur cette machine ; la matrice de CI (18, 20, 22 + Windows) l'établira. Invariants gardés par deux tests |
 | 0.5 Des chiffres qui ne peuvent plus vieillir | fait | **testé** — le contrôleur refuse un chiffre faux et le répare (prouvé dans les deux sens) ; son câblage en CI est gardé par un test |
-| 0.6 Mesurer la qualité sur de vrais modèles | à faire | — |
+| 0.6 Mesurer la qualité sur de vrais modèles | fait (harnais) | **testé** — rapport JSON+Markdown prouvé de bout en bout contre un faux serveur de modèle ; les règles « n'invente aucun chiffre » tenues par 9 tests dans `core` ; banc porté à 40 tâches, 40/40 échouent sur la fixture intacte **et** passent sur leur solution (deux portes de CI). ⚠️ **non mesuré** : aucun modèle réel joignable d'ici — les chiffres de qualité restent à produire |
 
 
 ## Comment lire les affirmations ci-dessous
@@ -37,6 +37,25 @@ Trois niveaux, jamais mélangés :
   nommés.
 
 ## Fait
+
+### Mesurer la qualité, sans pouvoir se mentir (0.68.0)
+
+- **Un rapport d'évaluation par tâche et par modèle** (testé) : durée, étapes, jetons, coût, et
+  comment le tour s'est arrêté. Les chiffres viennent du tour lui-même, pas d'une estimation —
+  le client terminal les écrit, dans un fichier placé hors de la copie de travail pour que la mesure
+  ne fasse pas partie de ce qui est mesuré.
+- **Le rapport ne peut pas inventer un chiffre** (testé) : un modèle local est *non tarifé* et
+  jamais gratuit, un total incomplet est marqué comme un plancher, et une campagne sans modèle dit
+  « not measured » sans aucun tableau. Un test exige qu'un rapport vide ne contienne pas `0 %`.
+- **40 tâches, honnêtes dans les deux sens** (testé) : chacune échoue sur la fixture intacte et
+  passe sur sa solution de référence. La seconde porte a trouvé quatre contrôles que *rien* ne
+  pouvait satisfaire, dont un vieux de plusieurs semaines.
+- **Un contrôle structurel regarde le code et pas la prose** (testé) : `eval/bin/codeonly`, sur le
+  PATH des contrôles et dans le dépôt plutôt que dans la fixture — un outil que l'agent peut
+  modifier n'est pas un contrôle.
+- ⚠️ **Non mesuré** : aucun modèle n'a été évalué. Il faut une machine qui en héberge un, ou une
+  clé ; le harnais et les portes sont prêts et éprouvés contre un faux serveur.
+
 
 ### Les modifications atteignent le fichier (0.67.0)
 
@@ -101,7 +120,7 @@ Trois niveaux, jamais mélangés :
 ### Avant 0.39.0
 
 - Noyau indépendant de l'éditeur : anonymisation, fournisseurs, routeur, budget, complétion, session,
-  carte du dépôt, boucle d'agent. **733 tests unitaires** plus **41 tests d'intégration dans un vrai
+  carte du dépôt, boucle d'agent. **741 tests unitaires** plus **41 tests d'intégration dans un vrai
   VS Code**.
 - Barre latérale : conversation, historique, modèles, permissions, configuration ; modes
   discussion / plan / agent ; budget de raisonnement ; contexte explicite.

@@ -1,0 +1,7 @@
+{
+  "title": "A switch that silently forgets a case",
+  "kind": "feature",
+  "prompt": "A fourth kind of event was added to the union in events.ts and nothing told us that describe() does not handle it. Handle it, and make the compiler refuse the next addition that is forgotten, with an exhaustiveness check on `never` rather than a default branch.",
+  "check": "codeonly events.ts | grep -qE ': *never\\b' && codeonly events.ts | grep -q 'case \"refunded\"' && codeonly events.ts | grep -q 'case \"settled\"' && codeonly events.ts | grep -q 'case \"issued\"' && codeonly events.ts | grep -q 'case \"cancelled\"' && ! codeonly events.ts | grep -qE '^\\s*default:'",
+  "timeoutMs": 180000
+}

@@ -1,0 +1,7 @@
+{
+  "title": "A parser typed as any, with casts holding it together",
+  "kind": "refactor",
+  "prompt": "settings.ts takes `any` and holds itself together with casts, so nothing is checked. Give it real types and narrow what comes in with a type guard instead of asserting it. No `any` and no `as` casts are to remain, and the behaviour must not change.",
+  "check": "! codeonly settings.ts | grep -qE '(: *any\\b|<any>|as +any\\b)' && ! codeonly settings.ts | grep -qE ' as +[A-Z][A-Za-z]*' && codeonly settings.ts | grep -qE '\\bis +[A-Z][A-Za-z]*' && grep -q 'export function readSettings' settings.ts && codeonly settings.ts | grep -q 'typeof'",
+  "timeoutMs": 180000
+}

@@ -1,0 +1,7 @@
+{
+  "title": "A sort that reorders the caller's array",
+  "kind": "bug",
+  "prompt": "ranking.ts sorts the array it was given, so the caller's own order is destroyed and the bug appears somewhere else entirely. Make the parameter readonly and return a new array, without changing what the function returns.",
+  "check": "codeonly ranking.ts | grep -qE '\\breadonly\\b' && ! codeonly ranking.ts | grep -qE '(rows|input|items)\\.(sort|reverse|push|splice)\\(' && grep -q 'export function ranked' ranking.ts",
+  "timeoutMs": 180000
+}

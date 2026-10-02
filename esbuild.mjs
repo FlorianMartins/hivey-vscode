@@ -85,6 +85,20 @@ const targets = integration
         platform: "browser",
         format: "iife",
       },
+      {
+        // The evaluation report's arithmetic, for `scripts/evaluate.mjs`.
+        //
+        // A plain `.mjs` script cannot import TypeScript, and the rules it needs — what a report
+        // may claim and what it must leave blank — are exactly the rules that have to be unit
+        // tested. So they live in `src/core/eval/report.ts` with the rest of the core, and the
+        // script imports this bundle. Nothing in the extension or the client imports it, so it
+        // costs the shipped product nothing.
+        ...common,
+        entryPoints: ["src/core/eval/report.ts"],
+        outfile: "dist/eval-report.mjs",
+        platform: "node",
+        format: "esm",
+      },
     ];
 
 for (const t of targets) {

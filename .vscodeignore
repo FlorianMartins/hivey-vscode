@@ -21,3 +21,7 @@ esbuild.mjs
 .gitignore
 .gitleaks.toml
 **/*.ts
+# The evaluation report's arithmetic, bundled for `scripts/evaluate.mjs` alone. Nothing the
+# extension or the terminal client runs imports it, so shipping it would be dead weight in the
+# download — the same mistake as the stale bundle this file's header describes, one order smaller.
+dist/eval-report.mjs

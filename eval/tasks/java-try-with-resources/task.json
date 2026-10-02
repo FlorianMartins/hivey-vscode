@@ -1,0 +1,7 @@
+{
+  "title": "A reader that stays open when the parse throws",
+  "kind": "bug",
+  "prompt": "LedgerReader closes its reader in a finally block that can itself throw, and the close is skipped when the constructor of the stream fails. Rewrite it with try-with-resources so the handle is released on every path, and keep the method's signature.",
+  "check": "codeonly LedgerReader.java | grep -qE 'try *\\(' && ! codeonly LedgerReader.java | grep -qE 'finally' && ! codeonly LedgerReader.java | grep -qE '\\.close\\(\\)' && grep -q 'public List<String> lines' LedgerReader.java",
+  "timeoutMs": 180000
+}

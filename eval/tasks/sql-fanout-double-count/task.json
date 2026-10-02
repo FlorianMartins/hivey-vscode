@@ -1,0 +1,8 @@
+{
+  "title": "Invoice totals doubled by a second join",
+  "kind": "bug",
+  "prompt": "totals.sql reports the paid amount for each invoice, and the figures are too high for any invoice with more than one line. Fix totals.sql so the output matches expected.txt. Keep the same columns, in the same order, sorted by invoice.",
+  "setup": "sqlite3 shop.db < schema.sql",
+  "check": "sqlite3 shop.db < totals.sql | diff -u expected.txt -",
+  "timeoutMs": 180000
+}

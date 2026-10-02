@@ -1,0 +1,7 @@
+{
+  "title": "A CL program that trusts the library list",
+  "kind": "ibmi",
+  "prompt": "ARCHIVE.clle names every object without a library, so what it clears and deletes depends on whichever library list the job happens to have — and in production that list starts with production. Qualify every object reference with the library DEVCFC, and take the library from a parameter with DEVCFC as its default rather than hard-coding it in each command.",
+  "check": "! codeonly ARCHIVE.clle | grep -qiE '(OBJ|FILE|TOFILE|FROMFILE)\\( *[A-Z0-9#$@]+ *\\)' && codeonly ARCHIVE.clle | grep -qiE 'PGM *PARM\\(' && codeonly ARCHIVE.clle | grep -qiE 'DCL +VAR\\(&LIB' && [ $(codeonly ARCHIVE.clle | grep -ciE '&LIB/') -ge 3 ]",
+  "timeoutMs": 180000
+}

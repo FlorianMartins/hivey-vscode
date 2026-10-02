@@ -1,0 +1,10 @@
+     A                                      DSPSIZ(24 80 *DS3)
+     A          R ORDHDRFMT
+     A                                      CA03(03 'Exit')
+     A                                  1  2'Order enquiry'
+     A                                      DSPATR(HI)
+     A                                  3  2'Order'
+     A            ORDNBR         7S 0O  3  9
+     A                                  5  2'Date'
+     A            ORDDAT          8A  O  5  9
+     A                                 23  2'F3=Exit'

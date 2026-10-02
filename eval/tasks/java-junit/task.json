@@ -1,0 +1,7 @@
+{
+  "title": "An interest calculation with no tests at all",
+  "kind": "test",
+  "prompt": "Write JUnit 5 tests for Interest.java in a new file InterestTest.java: the ordinary case, the boundaries (zero principal, zero days), and the two inputs it refuses. Use @DisplayName to say what each test asserts, and assertThrows for the refusals.",
+  "check": "test -f InterestTest.java && codeonly InterestTest.java | grep -q 'import org.junit.jupiter.api.Test' && [ $(codeonly InterestTest.java | grep -c '@Test') -ge 4 ] && codeonly InterestTest.java | grep -q '@DisplayName' && codeonly InterestTest.java | grep -q 'assertThrows' && codeonly InterestTest.java | grep -q 'Interest'",
+  "timeoutMs": 180000
+}

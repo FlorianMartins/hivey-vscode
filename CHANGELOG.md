@@ -2,6 +2,65 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.68.0 — 2026-10-02
+
+### Ajouté
+
+- **Chantier 0.6 — un rapport d'évaluation qui ne peut pas inventer un chiffre.**
+  `npm run eval -- --report <dossier>` écrit `report.json` et `report.md` : par tâche et par
+  modèle, réussite, durée, nombre d'étapes, jetons entrants et sortants, coût, et comment le tour
+  s'est arrêté (réponse, plus d'étapes, tronqué). Réussi ou échoué était la moitié la moins
+  intéressante : un modèle qui résout neuf tâches en quarante secondes chacune et un modèle qui en
+  résout neuf en neuf minutes et douze étapes ne sont pas le même produit.
+
+  Les chiffres viennent du tour lui-même : avec `HIVEY_CODE_RUN_REPORT=<fichier>`, le client
+  terminal ajoute une ligne de JSON par tour. Le harnais pointe ce fichier **hors de la copie de
+  travail** — un fichier que l'agent voit est un fichier qu'il peut modifier, et la mesure ne doit
+  pas faire partie de ce qui est mesuré.
+
+  Et il refuse de combler un trou : un modèle local est **non tarifé**, jamais gratuit ; un total
+  qui n'a pas pu tarifer toutes les exécutions est marqué comme un plancher ; une campagne sans
+  modèle joignable dit « not measured » sans aucun tableau, plutôt qu'une page de zéros. Ces règles
+  sont dans `src/core/eval/report.ts` et tenues par neuf tests, dont un qui exige qu'un rapport
+  vide ne contienne pas la chaîne `0 %`. Voir
+  [ADR-0015](docs/adr/0015-une-evaluation-qui-ne-peut-pas-inventer-un-chiffre.md).
+
+- **Le banc passe de 15 à 40 tâches.** TypeScript, Python, Java, SQL, RPG fixe et libre, CL, DDS,
+  Db2 for i, et la finance : arrondi demi-loin-de-zéro, décimal exact, IBAN mod-97, échéancier dont
+  les mensualités doivent totaliser le capital au centime, sous-unités monétaires ISO 4217 (le yen
+  n'a pas de centimes, le dinar tunisien en a trois). Les tâches Python, SQL et JavaScript sont
+  **exécutées** ; les tâches Java, TypeScript et IBM i sont **structurelles** — il n'y a ici ni JDK,
+  ni compilateur TypeScript, ni partition — et le mot est écrit dans `eval/README.md` plutôt que
+  sous-entendu.
+
+### Corrigé
+
+- **Un contrôle d'évaluation pouvait être impossible à satisfaire, et rien ne le disait.**
+  `--verify-tasks` attrapait une tâche qui passe avant que le modèle y touche. L'erreur inverse est
+  pire parce qu'elle est invisible : un contrôle qui ne peut **jamais** réussir note tous les
+  modèles à 0 % et ressemble exactement à une tâche difficile — il devient une preuve contre les
+  modèles au lieu d'une preuve contre lui-même. Chaque tâche livre désormais un `solution/`, et
+  `npm run eval:solutions` exige que le contrôle passe au vert dessus. Les deux portes tournent sans
+  modèle, donc les deux sont en CI.
+
+  Il a trouvé **quatre contrôles insatisfaisables** à son premier passage, dont un présent depuis
+  des semaines, et la cause était la même à chaque fois : un contrôle structurel est un grep, et un
+  grep lit aussi les commentaires. Une réponse correcte qui s'explique — « remplacé le bloc
+  `finally` par un try-with-resources » — était refusée pour avoir cité ce qu'elle venait de
+  supprimer. `ibmi-sql-db2` refusait toute réponse mentionnant `pg_` dans un commentaire. La
+  première victime a été la solution de référence. D'où `eval/bin/codeonly`, qui imprime un fichier
+  sans ses commentaires ; il est sur le `PATH` de chaque contrôle et vit dans le dépôt, pas dans la
+  fixture, parce qu'un outil que l'agent peut modifier n'est pas un contrôle.
+
+### Précisé
+
+- Le workflow nocturne écrit le rapport dans le **résumé de l'exécution** et plus seulement dans un
+  artefact : c'est tout l'intérêt de produire du Markdown, la comparaison entre deux nuits doit être
+  lisible sans rien décompresser.
+- **Non mesuré, et assumé** : aucun modèle n'a encore été évalué. Le harnais est prouvé de bout en
+  bout contre un faux serveur de modèle ; les chiffres de qualité des modèles restent à produire sur
+  une machine qui en héberge un.
+
 ## 0.67.0 — 2026-10-02
 
 ### Corrigé
