@@ -18,7 +18,7 @@ externe non exécuté ici est « non vérifié ».
 | Chantier | État | Vérification |
 |---|---|---|
 | 0.1 Marqueurs dans les arguments d'outils | fait | **testé** (unitaire, retombe sans le correctif) ; intégration impossible ici — la porte de sortie est sautée en loopback, donc aucun coffre peuplé ; invariant gardé par un test qui lit le source |
-| 0.2 Marqueur coupé entre deux fragments | à faire | — |
+| 0.2 Marqueur coupé entre deux fragments | fait | **testé** (toutes les positions de coupure, fin de flux, arrêt ; retombe sans le correctif) ; câblage gardé par un test qui lit le source |
 | 0.3 Fermer `QSH` dans la garde IBM i | à faire | — |
 | 0.4 Suite de tests sous Node 22 | à faire | — |
 | 0.5 Des chiffres qui ne peuvent plus vieillir | à faire | — |

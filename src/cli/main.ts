@@ -17,7 +17,7 @@ import { join, dirname } from "node:path";
 import { stdin, stdout } from "node:process";
 import { runTurn } from "../core/agent/loop.js";
 import { makeProvider, PROVIDER_IDS, type ProviderId } from "../core/providers/index.js";
-import { isLocalEndpoint, redactMessages, Vault } from "../core/redaction/index.js";
+import { isLocalEndpoint, redactMessages, Vault, streamingRestorer } from "../core/redaction/index.js";
 import type { RedactionLevel } from "../core/redaction/types.js";
 import { Budget, type Spend, type SpendStore } from "../core/router/budget.js";
 import { costOf, makeLookup } from "../core/router/pricing.js";
@@ -325,6 +325,9 @@ async function main(): Promise<void> {
     );
 
     let printed = false;
+    // One restorer for the whole stream. A terminal cannot repaint what it has already written, so
+    // a marker shown in halves stays in halves. See `streamingRestorer`.
+    const live = streamingRestorer((text) => vault.restore(text));
     try {
       const result = await runTurn({
         provider,
@@ -335,7 +338,9 @@ async function main(): Promise<void> {
         maxTokens: 4096,
         onDelta: (d) => {
           if (d.text) {
-            stdout.write(vault.restore(d.text));
+            // Through the same restorer as the panel: a marker split across two packets is two
+            // halves that match nothing, and a terminal cannot repaint what it has already written.
+            stdout.write(live.push(d.text));
             printed = true;
           }
         },
@@ -351,6 +356,12 @@ async function main(): Promise<void> {
         afterResponse: (t) => vault.restore(t),
         restoreArgs: (t) => vault.restore(t),
       });
+      // Whatever was still held when the stream ended, including when it ended mid-marker.
+      const rest = live.flush();
+      if (rest) {
+        stdout.write(rest);
+        printed = true;
+      }
       if (printed) stdout.write("\n");
 
       const answer = session.add({ role: "assistant", text: result.text, model: cfg.model });

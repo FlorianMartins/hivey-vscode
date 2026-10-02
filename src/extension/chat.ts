@@ -65,7 +65,7 @@ import { discoverLocal, rankModels, suggestPull } from "../core/providers/discov
 import { endpointSettingKey, REMOTE_VENDORS, vendor, type ProviderId } from "../core/providers/vendors.js";
 import { request } from "../core/util/http.js";
 import { estimateTokens } from "../core/util/tokens.js";
-import { isLocalEndpoint, Vault } from "../core/redaction/index.js";
+import { isLocalEndpoint, streamingRestorer, Vault } from "../core/redaction/index.js";
 import type {
   Mode,
   Reasoning,
@@ -3063,6 +3063,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       }
 
       let streamed = "";
+      // The summary streams too, so it needs the same holding as an answer does: a marker cut by a
+      // packet boundary is two halves that match nothing. Found by the guard in the redaction tests
+      // rather than by looking, which is the point of writing it as a rule over the source.
+      const live = streamingRestorer((text) => vault.restore(text));
       const result = await runTurn({
         provider,
         model,
@@ -3074,11 +3078,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         onDelta: (d) => {
           if (!d.text || ctl.signal.aborted) return;
           streamed += d.text;
-          this.post({ type: "delta", text: vault.restore(d.text) });
+          const shown = live.push(d.text);
+          if (shown) this.post({ type: "delta", text: shown });
         },
         afterResponse: (text) => vault.restore(text),
         restoreArgs: (text) => vault.restore(text),
       });
+
+      const rest = live.flush();
+      if (rest && !ctl.signal.aborted) this.post({ type: "delta", text: rest });
 
       const summary = (result.text || streamed).trim();
       if (!summary) {
@@ -3562,6 +3570,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       this.streamingEntryId = answer.id;
       let streamed = "";
       let thought = "";
+      // A marker arrives split across packets — `⟨EMA` then `IL_1⟩` — and neither half matches the
+      // pattern, so restoring chunk by chunk showed the placeholder raw and then left it raw: text
+      // already on screen is never revisited. One restorer per stream, flushed when the turn ends.
+      // See `streamingRestorer`.
+      const liveText = streamingRestorer((text) => vault.restore(text));
+      const liveThought = streamingRestorer((text) => vault.restore(text));
 
       // One attempt, wrapped so it can be repeated against a different endpoint. See the catch below.
       const attempt = (
@@ -3590,12 +3604,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             // question, and the words the model had already said came back only later, if at all.
             answer.text = vault.restore(streamed);
             // Placeholders are resolved as they stream, so the user never reads their own data
-            // through a marker.
-            this.post({ type: "delta", text: vault.restore(d.text) });
+            // through a marker — including one the packet boundary cut in two.
+            const shown = liveText.push(d.text);
+            if (shown) this.post({ type: "delta", text: shown });
           }
           if (d.reasoning) {
             thought += d.reasoning;
-            this.post({ type: "reasoning", text: vault.restore(d.reasoning) });
+            const shownThought = liveThought.push(d.reasoning);
+            if (shownThought) this.post({ type: "reasoning", text: shownThought });
           }
         },
         onToolResult: ({ call, result }) => {
@@ -3657,6 +3673,17 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         const untouched = !streamed && !steps.length;
         if (!untouched || ctl.signal.aborted || !isRetryable(err) || !chain.length) throw err;
         result = await this.runFallback(chain, settings, { provider: providerId, model, why: "" }, attempt, ctl);
+      }
+
+      // Whatever the restorers were still holding. Not lost, and not shown raw: a stream that ends
+      // mid-marker — a model that stops talking, a turn the user stops — still owes the reader the
+      // characters it was waiting on.
+      for (const [restorer, type] of [
+        [liveText, "delta"],
+        [liveThought, "reasoning"],
+      ] as const) {
+        const rest = restorer.flush();
+        if (rest && !ctl.signal.aborted) this.post({ type, text: rest });
       }
 
       // Thought until there was nothing left to answer with.

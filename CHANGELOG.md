@@ -2,6 +2,29 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.63.0 — 2026-10-02
+
+### Corrigé
+
+- **Chantier 0.2 — un marqueur coupé entre deux fragments s'affichait brut.** `vault.restore()` était
+  appliqué fragment par fragment, et un modèle n'envoie pas des mots : il envoie ce qui tient dans
+  un paquet. Un marqueur arrivait donc coupé — `⟨EMA`, puis `IL_1⟩` — et aucune des deux moitiés ne
+  correspond au motif. Le lecteur voyait le marqueur apparaître brut, puis **rester** brut, parce
+  qu'un texte déjà affiché n'est jamais repris.
+
+  `streamingRestorer` (`core/redaction/`) examine la fin de chaque fragment : un crochet ouvrant
+  sans fermant, assez proche de la fin pour pouvoir encore devenir un marqueur, est **retenu** et
+  recollé au fragment suivant. Tout ce qui précède part immédiatement — une réponse vivante qui
+  attend est pire qu'une réponse qui attend un paquet. Deux refus assumés : il ne retient **jamais
+  indéfiniment** (la prose peut contenir `⟨` ; au-delà de 32 caractères le texte part tel quel), et
+  il ne **perd rien** (`flush` rend ce qui était retenu à la fin du flux, y compris quand
+  l'utilisateur arrête le tour). Il sert à la réponse, à la réflexion, au résumé et au client
+  terminal.
+
+  ⚠️ Vérifié en retirant le correctif : trois tests retombent. ⚠️ Le garde-fou écrit sur le source
+  a trouvé **un troisième chemin de streaming** que je n'avais pas vu — celui du résumé — ce qui est
+  exactement ce pour quoi une règle vaut mieux qu'une relecture.
+
 ## 0.62.0 — 2026-10-01
 
 ### Corrigé

@@ -141,3 +141,61 @@ export function restoreDeep<T>(value: T, restore: (text: string) => string): T {
   }
   return value;
 }
+
+/**
+ * The longest a placeholder can be.
+ *
+ * `⟨` + a label + `_` + a counter + `⟩`. The labels are a closed set, the longest being `SECRET`,
+ * and the counter is however many values one conversation hid. Thirty-two characters is far more
+ * than any of that and is the amount of text that may be held back waiting for a closing bracket —
+ * which is the only thing this bound is for. Too small and a marker is released in halves; too
+ * large and prose containing `⟨` stalls on screen for longer than it should.
+ */
+const MAX_PLACEHOLDER = 32;
+
+export interface StreamingRestorer {
+  /** The part of this chunk that is safe to show, with its markers restored. */
+  push(chunk: string): string;
+  /** Whatever was held back, at the end of the stream or when the user stops the turn. */
+  flush(): string;
+}
+
+/**
+ * Restore markers in text that arrives in pieces.
+ *
+ * `vault.restore()` was applied chunk by chunk, and a model does not send words — it sends whatever
+ * fits in a packet. A marker therefore arrives split, `⟨EMA` then `IL_1⟩`, and neither half matches
+ * the pattern. The reader watched a placeholder appear raw and then watched it STAY raw, because
+ * text already on screen is never revisited.
+ *
+ * So the end of a chunk is examined: an opening bracket with no closing one after it, close enough
+ * to the end to still be a marker, is held back and joined to the next chunk. Everything before it
+ * is released immediately, because a live answer that waits is worse than one that waits a packet.
+ *
+ * Two things it deliberately does not do. It does not hold for ever: prose can contain `⟨`, and
+ * past `MAX_PLACEHOLDER` characters the text is released as it is. And it does not lose what it
+ * held: `flush` gives it back when the stream ends, which is also what happens when the user stops
+ * the turn mid-marker.
+ */
+export function streamingRestorer(restore: (text: string) => string): StreamingRestorer {
+  let held = "";
+  return {
+    push(chunk: string): string {
+      const buffer = held + chunk;
+      const open = buffer.lastIndexOf("⟨");
+      // Held only when the opening bracket has no closing one after it AND is recent enough that
+      // what follows could still become a marker.
+      const partial = open >= 0 && !buffer.includes("⟩", open) && buffer.length - open <= MAX_PLACEHOLDER;
+      const cut = partial ? open : buffer.length;
+      held = buffer.slice(cut);
+      return restore(buffer.slice(0, cut));
+    },
+    flush(): string {
+      const rest = held;
+      held = "";
+      // Restored anyway: what is left is not a complete marker, so this changes nothing — and if
+      // the bound above ever lets a whole one through, it is put back rather than shown raw.
+      return restore(rest);
+    },
+  };
+}
