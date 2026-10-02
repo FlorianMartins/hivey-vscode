@@ -2,7 +2,7 @@
 
 Honnête plutôt que flatteur : ce qui marche, ce qui manque, ce qui n'est pas vérifié.
 
-Ce document décrit l'état à la version **0.69.0**. Les chiffres qu'il annonce — version, tests, tâches d'évaluation — sont
+Ce document décrit l'état à la version **0.70.0**. Les chiffres qu'il annonce — version, tests, tâches d'évaluation — sont
 vérifiés par `npm run check:numbers`, que la CI exécute : ils ne peuvent plus vieillir en silence.
 Il était resté figé à `0.3.0` pendant trente-cinq
 versions, ce qui est sa propre leçon : une feuille de route périmée dit « projet abandonné » à
@@ -31,7 +31,7 @@ externe non exécuté ici est « non vérifié ».
 | Chantier | État | Vérification |
 |---|---|---|
 | 1.1 Boucle compiler, lire, corriger | fait | **testé** — 37 tests : table des commandes, analyseur sur RPG III / ILE fixe / ILE libre / SQLRPGLE / CL / DDS, piège du sommaire (retombe sans la règle), noms refusés plutôt qu'échappés, les trois sources et leurs chemins d'échec, le journal lu pour le bon travail, verdict dans `verifyTurn` (retombe sans le câblage). ⚠️ **non vérifié** : fixtures **construites** d'après les dispositions documentées, pas enregistrées sur une partition ; aucune exécution réelle possible ici |
-| 1.2 Tests unitaires RPG exécutés | à faire | — |
+| 1.2 Tests unitaires RPG exécutés | fait | **testé** — 17 tests : présence demandée au catalogue, RPGUnit absent → l'outil le dit et ne simule rien, catalogue illisible traité comme un **troisième cas**, nom de procédure ≠ nom d'objet, analyseur sur fixtures (sortie non reconnue comptée comme non lue, jamais convertie en succès), verdict dans `verifyTurn` séparé de celui de la compilation (retombe sans le câblage), `/rpgtest` finit sur l'exécution. ⚠️ **non vérifié** : le texte imprimé par `RUCALLTST` n'est pas connu de première main — la conception est faite pour que l'ignorer soit sans danger ; aucune exécution réelle possible ici |
 | 1.3 Analyse d'impact | à faire | — |
 | 1.4 Performance Db2 for i | à faire | — |
 | 1.5 Messages et documentation de la maison | à faire | — |
@@ -49,6 +49,18 @@ Trois niveaux, jamais mélangés :
   nommés.
 
 ## Fait
+
+### Les tests de la maison, exécutés (0.70.0)
+
+- **`ibmi_test` lance RPGUnit et son échec est un verdict** (testé ; **non vérifié** sur une
+  partition). Un programme qui compile et rate ses tests n'est pas fini, et les deux verdicts sont
+  séparés : la compilation réussie ne couvre pas l'échec des tests.
+- **L'outil refuse d'être rassurant** (testé) : RPGUnit absent → il le dit et n'exécute rien ;
+  catalogue illisible → un troisième cas, pas « pas installé » ; sortie non reconnue → comptée comme
+  non lue et jamais rendue par « aucun test n'a échoué ».
+- **`/rpgtest`** écrit les cas, les compile et les **exécute** — et `/compile` n'invente plus sa
+  commande.
+
 
 ### Compiler est un verdict (0.69.0)
 
@@ -148,7 +160,7 @@ Trois niveaux, jamais mélangés :
 ### Avant 0.39.0
 
 - Noyau indépendant de l'éditeur : anonymisation, fournisseurs, routeur, budget, complétion, session,
-  carte du dépôt, boucle d'agent. **778 tests unitaires** plus **41 tests d'intégration dans un vrai
+  carte du dépôt, boucle d'agent. **795 tests unitaires** plus **41 tests d'intégration dans un vrai
   VS Code**.
 - Barre latérale : conversation, historique, modèles, permissions, configuration ; modes
   discussion / plan / agent ; budget de raisonnement ; contexte explicite.

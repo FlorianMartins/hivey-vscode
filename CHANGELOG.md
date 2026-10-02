@@ -2,6 +2,51 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.70.0 — 2026-10-02
+
+### Ajouté
+
+- **Chantier 1.2 — les tests RPG de la maison sont exécutés, et leur résultat compte.**
+  `ibmi_test` lance RPGUnit (`RUCALLTST`) contre un programme de test compilé et rend les cas passés
+  et les cas en échec. Le compilateur répond « est-ce un programme ? » ; ceci répond à la question
+  qu'une banque pose vraiment : « fait-il encore ce qu'il faisait ? » — en exécutant les tests que
+  la maison a déjà, pas en inventant un cadriciel.
+
+  Comme la compilation, un échec est un **verdict sur le tour** : un programme qui compile et rate
+  ses tests n'est pas fini. Les deux verdicts sont séparés — la réussite de la compilation ne couvre
+  pas l'échec des tests.
+
+  Nouvelle compétence **`/rpgtest`** : lire ce que le membre promet, écrire les cas, les compiler
+  avec `ibmi_compile`, puis les **exécuter**. L'instruction qui compte est la dernière : un modèle à
+  qui l'on demande d'écrire des tests écrit des tests et crie victoire, et sur cette plate-forme une
+  source de test qui n'a jamais été compilée n'est pas un test, c'est un fichier texte dans
+  QRPGLESRC.
+
+### Corrigé
+
+- **`/compile` n'invente plus sa commande.** La compétence disait au modèle de construire un `CRT…`
+  à la main avec `ibmi_command` — c'est précisément ainsi qu'une bibliothèque cible ou un jeu
+  d'options finit par être inventé. Elle utilise maintenant `ibmi_compile`.
+
+### Précisé
+
+- **L'outil refuse d'être rassurant.** Si RPGUnit n'est pas installé, il le dit et n'exécute rien :
+  « aucun test en échec » sur une partition sans cadriciel de test est la phrase la plus coûteuse
+  que cet outil pourrait produire. Et « je n'ai pas pu interroger le catalogue » est un **troisième
+  cas**, distinct de « pas installé » : un catalogue illisible n'est pas une partition sans RPGUnit.
+- La présence est demandée au **catalogue d'objets** et non en lançant la commande pour voir : un
+  `RUCALLTST` qui n'existe pas échoue d'une façon qu'aucun code de retour ne distingue d'un test en
+  échec.
+- ⚠️ **Non vérifié, et dit clairement** : ce qui est connu de première main, c'est le contrat de
+  `RUCALLTST` — il prend le programme de test et se termine en erreur quand un test échoue. Le
+  **texte** qu'il imprime ne l'est pas. La conception est donc faite pour que l'ignorer soit sans
+  danger : le verdict est le code de retour et jamais les compteurs lus, une ligne n'est lue comme
+  un résultat que si elle en est clairement un, l'analyseur **dit** combien de lignes il n'a pas su
+  lire, et la sortie brute voyage toujours avec le résultat. « Je n'ai reconnu aucun test » n'est
+  jamais rendu par « aucun test n'a échoué ».
+- ⚠️ Un nom de **procédure** n'est pas un nom d'objet : la règle des dix caractères refusait
+  `testRoundsHalfUp`, qui est un nom de procédure RPG parfaitement ordinaire. Trouvé par un test.
+
 ## 0.69.0 — 2026-10-02
 
 ### Ajouté

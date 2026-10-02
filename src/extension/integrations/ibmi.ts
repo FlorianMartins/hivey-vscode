@@ -27,6 +27,16 @@ import {
   formatReport,
   runCompile,
 } from "../../core/ibmi/compile.js";
+import {
+  NOT_INSTALLED,
+  formatTestRun,
+  parseTestOutput,
+  presenceSql,
+  readPresence,
+  testCommand,
+  type RpgUnitPresence,
+  type TestRun,
+} from "../../core/ibmi/rpgunit.js";
 import { extractCalledPrograms, extractCopyDirectives } from "../../core/ibmi/symbols.js";
 
 const EXTENSION_ID = "halcyontechltd.code-for-ibmi";
@@ -927,5 +937,88 @@ export function buildIbmiTools(writable: string[] = []): Tool[] {
     },
   };
 
-  return [sql, command, compile, readMember, programContext, whereIsMember, listMembers, listObjects, libraryList];
+
+  /**
+   * Run the shop's own RPG unit tests, and report the verdict.
+   *
+   * The compiler answers "is this a program?". This answers the question a bank actually asks:
+   * "does it still do what it did?" — and it does so by running the tests the shop already has,
+   * rather than by inventing a framework.
+   *
+   * The one thing it will not do is be reassuring. If RPGUnit is not installed it says so and
+   * stops; "no tests failed" on a partition with no test framework is the most expensive sentence
+   * this tool could produce.
+   */
+  const runTests: Tool = {
+    schema: {
+      name: "ibmi_test",
+      description:
+        "Run RPGUnit tests on the partition (RUCALLTST) against a compiled test program, and return " +
+        "which cases passed and which failed. Use it after ibmi_compile to check a change against the " +
+        "shop's own tests. If RPGUnit is not installed it says so and runs nothing.",
+      parameters: {
+        type: "object",
+        properties: {
+          library: { type: "string", description: "The library holding the compiled test program." },
+          program: { type: "string", description: "The test *PGM." },
+          testCase: { type: "string", description: "One test procedure instead of all of them." },
+        },
+        required: ["library", "program"],
+      },
+    },
+    // Running a test runs somebody's code on the partition. It is asked for, like a command is.
+    approval: (args) => t("run the tests in {0}/{1}", String(args["library"] ?? ""), String(args["program"] ?? "")),
+    async run(args, ctx): Promise<ToolResult> {
+      const conn = connection();
+      const content = conn.getContent();
+
+      // Asked of the catalogue, not by running the command: a RUCALLTST that does not exist fails
+      // in a way nothing reading an exit status can tell apart from a failing test.
+      let presence: RpgUnitPresence = { installed: false };
+      try {
+        presence = readPresence(await content.runSQL(presenceSql()), cell);
+      } catch {
+        // A catalogue we cannot read is not a partition without RPGUnit, and must not be reported
+        // as one. Said as its own case below.
+        return {
+          content:
+            "I could not ask the object catalogue whether RPGUnit is installed " +
+            "(QSYS2.OBJECT_STATISTICS did not answer), so I do not know, and I am not going to run " +
+            "RUCALLTST to find out — a command that does not exist fails in a way I cannot tell " +
+            "apart from a failing test.",
+          isError: true,
+        };
+      }
+      if (!presence.installed) return { content: NOT_INSTALLED, isError: true };
+
+      const built = testCommand({
+        library: String(args["library"] ?? ""),
+        program: String(args["program"] ?? ""),
+        ...(args["testCase"] ? { testCase: String(args["testCase"]) } : {}),
+        detail: true,
+      });
+      if ("refused" in built) return { content: built.refused, isError: true };
+
+      const result = await conn.runCommand({ command: built.command, environment: "ile" });
+      const output = [result.stdout, result.stderr].filter((x) => x?.trim()).join("\n");
+      const parsed = parseTestOutput(output);
+      const run: TestRun = {
+        command: built.command,
+        ok: result.code === 0,
+        cases: parsed.cases,
+        ...(parsed.reported ? { reported: parsed.reported } : {}),
+        unread: parsed.unread,
+        output,
+      };
+      const failed = run.cases.filter((c) => c.status !== "passed").length;
+      ctx.report(
+        run.ok
+          ? t("tests passed in {0}", String(args["program"] ?? ""))
+          : t("{0} test(s) failed in {1}", failed || "?", String(args["program"] ?? "")),
+      );
+      return { content: headToTokens(formatTestRun(run), MAX_TOKENS), isError: !run.ok };
+    },
+  };
+
+  return [sql, command, compile, runTests, readMember, programContext, whereIsMember, listMembers, listObjects, libraryList];
 }

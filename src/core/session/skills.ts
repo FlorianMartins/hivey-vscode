@@ -234,16 +234,39 @@ export const BUILTIN_SKILLS: BuiltinSkill[] = [
     // built with. All of that is READABLE, and reading it is cheaper than guessing.
     prompt: t(
       "Compile this member and fix what the compiler reports.\n\n" +
-        "1. Work out the command from the member itself rather than assuming: the source type decides it " +
-        "(RPGLE → CRTBNDRPG, SQLRPGLE → CRTSQLRPGI, CLLE → CRTBNDCL, DSPF/PRTF/PF → CRTDSPF/CRTPRTF/CRTPF), " +
-        "and a `//` or `*` compile directive at the top of the member overrides all of it.\n" +
-        "2. Before inventing options, look at how the existing object was built — DSPOBJD or the " +
-        "compile directive — and reuse them. Target the library the source came from unless told otherwise.\n" +
-        "3. Run it with ibmi_command. A non-zero return code is the answer, not a failure: the message ids " +
-        "it printed are what to read.\n" +
+        "1. Use ibmi_compile. It picks the command from the member's type and reads the errors out of the " +
+        "compile listing and the joblog for you — identifier, severity, line, text. Do not build a CRT… " +
+        "command by hand with ibmi_command: that is how a target library or a set of options gets invented.\n" +
+        "2. Target the library the source came from unless you were told otherwise, and say which library " +
+        "you are creating the object in before you do it.\n" +
+        "3. A failed compile means NO OBJECT EXISTS. It is not a partial result and there is nothing to " +
+        "inspect: the message ids are the whole of what you have.\n" +
         "4. For every message, quote the id (RNF…, SQL…, CPD…), say which line it is about and why, and give " +
         "the corrected source. Do not change anything the compiler did not complain about.\n" +
-        "5. Recompile until it is clean, and say what was changed and what was left alone.",
+        "5. Recompile until it is clean, and say what was changed and what was left alone. If the tool " +
+        "reports that it could not read the listing, say so rather than concluding there were no errors.",
+    ),
+    attach: true,
+  },
+  {
+    group: "rpg",
+    name: "/rpgtest",
+    hint: t("write RPGUnit tests, compile them and run them"),
+    // The instruction that matters is the last one. A model asked to "write tests" writes tests and
+    // declares victory, and on this platform a test source that was never compiled is not a test —
+    // it is a text file in QRPGLESRC. So the skill ends on the run, and the run has a verdict.
+    prompt: t(
+      "Write RPGUnit tests for this, then compile and run them.\n\n" +
+        "1. Read the member first and work out what it actually promises: the boundaries, the error paths, " +
+        "and the behaviour somebody would notice if it changed. Test those, not the happy path three times.\n" +
+        "2. Write a test program as a member in QRPGLESRC, `**FREE`, one exported procedure per case named " +
+        "`test…`, using the RPGUnit service program: assert with assert()/aEqual()/iEqual(), and set up and " +
+        "tear down in setUpSuite/tearDownSuite rather than in each case.\n" +
+        "3. Compile the test program with ibmi_compile, into a test library — never into production.\n" +
+        "4. Run it with ibmi_test. If RPGUnit is not on the partition the tool says so; report that and stop, " +
+        "do not claim the tests pass.\n" +
+        "5. A failing test is the point of this exercise. Say which case failed and what it expected, then fix " +
+        "the CODE if the test is right, or the test if it was wrong — and say which of the two you decided.",
     ),
     attach: true,
   },
