@@ -20,7 +20,7 @@ externe non exécuté ici est « non vérifié ».
 | 0.1 Marqueurs dans les arguments d'outils | fait | **testé** (unitaire, retombe sans le correctif) ; intégration impossible ici — la porte de sortie est sautée en loopback, donc aucun coffre peuplé ; invariant gardé par un test qui lit le source |
 | 0.2 Marqueur coupé entre deux fragments | fait | **testé** (toutes les positions de coupure, fin de flux, arrêt ; retombe sans le correctif) ; câblage gardé par un test qui lit le source |
 | 0.3 Fermer `QSH` dans la garde IBM i | fait | **testé** (les quatre cas du prompt, plus le shell enveloppé et le faux positif `QSHELLDOC`) ; retombe sans le correctif. Non vérifié sur une vraie partition |
-| 0.4 Suite de tests sous Node 22 | à faire | — |
+| 0.4 Suite de tests sous Node 22 | fait | **non vérifié ici** — seul Node 18 est installé sur cette machine ; la matrice de CI (18, 20, 22 + Windows) l'établira. Invariants gardés par deux tests |
 | 0.5 Des chiffres qui ne peuvent plus vieillir | à faire | — |
 | 0.6 Mesurer la qualité sur de vrais modèles | à faire | — |
 

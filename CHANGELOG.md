@@ -2,6 +2,33 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.65.0 — 2026-10-02
+
+### Corrigé
+
+- **Chantier 0.4 — la suite de tests dépendait de la version de Node qui la lançait.**
+  `node --test dist-tests/` avait l'air d'être l'appel évident et ne l'est pas : ce qu'un argument
+  positionnel **signifie** pour le lanceur a changé entre les versions — un répertoire sous Node 18
+  et 20, un chemin ou un motif sous Node 22, où l'ensemble correspondant n'est pas le même. Et un
+  motif littéral n'est pas une réponse non plus : Node 18 ne sait pas les développer, et npm exécute
+  ses scripts par `cmd.exe` sous Windows, qui ne les développe pas davantage — le motif arriverait
+  donc à Node sous forme de texte précisément là où il ne peut pas être lu.
+
+  `scripts/run-tests.mjs` énumère les fichiers et les passe **explicitement**. Une liste de chemins
+  a toujours voulu dire la même chose, dans toutes les versions et sur toutes les plateformes. Le
+  lanceur employé est `process.execPath` et non `node` : celui qui exécute le script, pas celui qui
+  se trouve en tête du `PATH`.
+
+- **`engines` annonçait Node 18 ou plus et la CI n'exécutait que Node 20** : deux des trois
+  promesses n'étaient jamais éprouvées. Nouveau travail `unit` en matrice — 18, 20 et 22 sur Linux,
+  plus un passage Windows sous 22, puisque la fragilité de l'ancien appel était justement une
+  histoire de `cmd.exe`. Deux tests gardent l'invariant : l'appel ne reçoit ni répertoire ni motif,
+  et la version la plus basse annoncée par `engines` figure dans la matrice.
+
+  ⚠️ **Non vérifié ici** : seul Node 18 est installé sur cette machine, donc je n'ai pas pu
+  reproduire l'échec sous Node 22 ni le constater corrigé. C'est la matrice de CI qui l'établira au
+  prochain passage, et c'est précisément pour cela qu'elle est ajoutée.
+
 ## 0.64.0 — 2026-10-02
 
 ### Corrigé

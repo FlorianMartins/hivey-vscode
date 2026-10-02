@@ -18,6 +18,33 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # The unit tests on every Node this project claims to support.
+  #
+  # `engines` says 18 or later and the build job pins 20, so 18 and 22 were claimed and never run.
+  # The call itself was the reason: `node --test dist-tests/` means different things to different
+  # releases of the runner. It is enumerated explicitly now (scripts/run-tests.mjs), and this matrix
+  # is what proves the claim rather than repeating it.
+  unit:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ["18", "20", "22"]
+        os: [ubuntu-latest]
+        # One Windows run, because the reason the old call was fragile is a Windows one: npm runs
+        # scripts through cmd.exe, which does not expand a glob.
+        include:
+          - node: "22"
+            os: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm test
+
   build:
     runs-on: ubuntu-latest
     permissions:

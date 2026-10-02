@@ -2,7 +2,7 @@
   "name": "hivey-code",
   "displayName": "Hivey Code",
   "description": "%extension.description%",
-  "version": "0.64.0",
+  "version": "0.65.0",
   "publisher": "hivey",
   "license": "Apache-2.0",
   "repository": {
@@ -1029,7 +1029,7 @@
     "build": "node esbuild.mjs",
     "watch": "node esbuild.mjs --watch",
     "typecheck": "tsc --noEmit",
-    "test": "node esbuild.mjs && node esbuild.mjs --tests && node --test dist-tests/",
+    "test": "node esbuild.mjs && node esbuild.mjs --tests && node scripts/run-tests.mjs",
     "package": "npx --yes @vscode/vsce@3.9.2 package --no-dependencies -o hivey-code.vsix",
     "models": "node scripts/update-models.mjs",
     "models:check": "node scripts/update-models.mjs --check",
