@@ -2,7 +2,7 @@
 
 Honnête plutôt que flatteur : ce qui marche, ce qui manque, ce qui n'est pas vérifié.
 
-Ce document décrit l'état à la version **0.66.0**. Les chiffres qu'il annonce — version, tests, tâches d'évaluation — sont
+Ce document décrit l'état à la version **0.67.0**. Les chiffres qu'il annonce — version, tests, tâches d'évaluation — sont
 vérifiés par `npm run check:numbers`, que la CI exécute : ils ne peuvent plus vieillir en silence.
 Il était resté figé à `0.3.0` pendant trente-cinq
 versions, ce qui est sa propre leçon : une feuille de route périmée dit « projet abandonné » à
@@ -37,6 +37,25 @@ Trois niveaux, jamais mélangés :
   nommés.
 
 ## Fait
+
+### Les modifications atteignent le fichier (0.67.0)
+
+- **Un chemin absolu n'est plus pris pour un chemin dehors** (testé dans un vrai éditeur ; retombe
+  sans le correctif). Le résolveur refusait tout chemin absolu avec « leaves the workspace » —
+  l'écriture même que l'extension donne au modèle pour un fichier qui n'est dans aucun dossier
+  ouvert (`relative()` renvoie alors `uri.fsPath`), et celle des diagnostics, de la sortie du
+  terminal et des piles d'appel. L'extension dictait un chemin, puis refusait le sien : le mode
+  agent décrivait les modifications au lieu de les faire, et d'autant plus sûrement que le travail
+  portait sur des membres IBM i ou des fichiers distants. L'appartenance est maintenant décidée en
+  résolvant puis en vérifiant où le chemin a atterri ; les bords (barre oblique finale, lettre de
+  lecteur, dossier voisin au nom préfixe) sont tenus par neuf tests unitaires dans `core`, hors de
+  `vscode`. Voir [ADR-0014](adr/0014-un-chemin-absolu-n-est-pas-un-chemin-dehors.md).
+- **Un tour d'agent qui affirme sur le contenu d'un fichier** (testé). C'était le trou par lequel le
+  défaut ci-dessus est passé : les quarante tests d'intégration affirmaient tous sur ce qui avait
+  été *envoyé* ou sur ce que le panneau *dit*. Le quarante et unième noue les deux moitiés de la
+  contradiction — il vérifie d'abord le nom que l'extension donne au fichier, puis fait rendre ce
+  même nom par le modèle.
+
 
 ### La boucle de rétroaction (0.39.0)
 
@@ -82,7 +101,7 @@ Trois niveaux, jamais mélangés :
 ### Avant 0.39.0
 
 - Noyau indépendant de l'éditeur : anonymisation, fournisseurs, routeur, budget, complétion, session,
-  carte du dépôt, boucle d'agent. **724 tests unitaires** plus **40 tests d'intégration dans un vrai
+  carte du dépôt, boucle d'agent. **733 tests unitaires** plus **41 tests d'intégration dans un vrai
   VS Code**.
 - Barre latérale : conversation, historique, modèles, permissions, configuration ; modes
   discussion / plan / agent ; budget de raisonnement ; contexte explicite.

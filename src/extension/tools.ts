@@ -25,6 +25,16 @@ import { arcadInstalled, buildArcadTools, type ArcadDeps } from "./integrations/
 import { buildKnowledgeTools } from "./knowledge.js";
 import type { McpManager } from "./integrations/mcp.js";
 import { runCommandInTerminal } from "./terminal.js";
+import { isAbsolutePath, tidyPath, underRoot } from "../core/fs/within.js";
+
+/**
+ * Whether two paths differing only in case are the same file.
+ *
+ * Windows only. macOS folds by default and can be configured not to, and a case difference in a
+ * path a model produced is far more likely to be an invention than a real file — so there the
+ * stricter answer is also the more useful one.
+ */
+const FOLD_CASE = process.platform === "win32";
 
 const MAX_READ_TOKENS = 6000;
 const MAX_MATCHES = 60;
@@ -53,17 +63,63 @@ function root(): vscode.Uri {
  *                   is matched against them.
  */
 function resolve(path: string, settings: Settings): vscode.Uri {
-  const clean = path.replace(/^\.\//, "");
-  // A tool call is model output, and model output can be steered by a file it just read. Escaping
-  // the workspace is refused here rather than trusted to the model's good manners.
-  if (clean.startsWith("/") || clean.includes("..")) {
+  const folders = vscode.workspace.workspaceFolders ?? [];
+
+  // An absolute path is not a path outside the workspace, and the rule that treated the two as one
+  // thing is what made agent mode stop changing files. `/home/me/proj/src/a.ts` IS `src/a.ts` when
+  // that folder is open, and it is the spelling the editor itself puts in diagnostics, terminal
+  // output and stack traces — so a model that read one and named it back was told its own correct
+  // answer "leaves the workspace", once per attempted edit. Containment is decided by resolving
+  // the path and looking at where it landed; see `underRoot`.
+  if (isAbsolutePath(path)) {
+    const placed = underRoot(
+      path,
+      folders.map((f) => f.uri.path),
+      FOLD_CASE,
+    );
+    if (placed) {
+      // Checked on the part under the root, not on what the model typed: the privacy list is
+      // written in workspace-relative globs, and `**/.env*` matches `.env` and not `/home/me/.env`.
+      if (EgressGate.isBlocked(placed.relative, settings.privacy.blockedGlobs)) {
+        throw new Error(`Refused: “${path}” is excluded by the privacy policy.`);
+      }
+      const folder = folders.find((f) => f.uri.path === placed.root)!;
+      return placed.relative ? vscode.Uri.joinPath(folder.uri, placed.relative) : folder.uri;
+    }
+    // No folder open, or outside all of them: an open tab is still somewhere the user chose to
+    // work, and naming it by its full path is the obvious thing to do.
+    const exact = openFileUris().find((uri) => tidyPath(uri.path) === tidyPath(path));
+    if (exact) {
+      // The same list as every other branch. A tab is a place the user chose, not an exemption:
+      // `~/.ssh/id_rsa` left open in the editor would otherwise be readable just by naming it in
+      // full. The leading slash is dropped because the list is written workspace-relative, and
+      // `**/.env*` needs a segment to begin matching against.
+      if (EgressGate.isBlocked(tidyPath(path).replace(/^\/+/, ""), settings.privacy.blockedGlobs)) {
+        throw new Error(`Refused: “${path}” is excluded by the privacy policy.`);
+      }
+      return exact;
+    }
+    throw new Error(
+      folders.length
+        ? `Refused: “${path}” is outside the folder(s) open in the editor.`
+        : `Refused: “${path}” is not one of the open files, and no folder is open.`,
+    );
+  }
+
+  // A relative path. A tool call is model output, and model output can be steered by a file it just
+  // read, so climbing out of the workspace is refused here rather than trusted to the model's good
+  // manners — and `..` is REFUSED rather than resolved, which is the promise `docs/THREAT-MODEL.md`
+  // makes and the stronger of the two available rules. Resolving it would also be correct, since
+  // containment is checked afterwards either way; it would buy nothing but `src/sub/../a.ts`, and
+  // it would mean a guarantee stated in prose no longer matched the code literally.
+  const clean = tidyPath(path).replace(/^\.\//, "");
+  if (!clean || clean.includes("..")) {
     throw new Error(`Refused: “${path}” leaves the workspace.`);
   }
   if (EgressGate.isBlocked(clean, settings.privacy.blockedGlobs)) {
     throw new Error(`Refused: “${path}” is excluded by the privacy policy.`);
   }
 
-  const folders = vscode.workspace.workspaceFolders ?? [];
   if (folders.length > 1) {
     const named = folders.find((f) => clean === f.name || clean.startsWith(`${f.name}/`));
     if (named) {

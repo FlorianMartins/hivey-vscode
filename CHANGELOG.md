@@ -2,6 +2,42 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.67.0 — 2026-10-02
+
+### Corrigé
+
+- **Le mode agent ne modifiait plus rien : l'extension dictait un chemin au modèle, puis refusait
+  le sien.** Le résolveur de chemins refusait tout chemin **absolu** avec « leaves the workspace »,
+  en confondant « absolu » et « hors du projet » — alors que `/home/moi/projet/src/a.ts` et
+  `src/a.ts` sont le même fichier quand ce dossier est ouvert. Or c'est exactement l'écriture que
+  l'extension donne elle-même au modèle : un fichier qui n'appartient à aucun dossier ouvert n'a
+  pas de nom relatif à donner, et le contexte le nomme donc par son chemin complet (`relative()`
+  renvoie `uri.fsPath`). Le modèle rendait ce chemin, l'outil le refusait, et le tour se terminait
+  par une description de la modification au lieu de la modification. La même écriture arrive par
+  les diagnostics de l'éditeur, la sortie du terminal et les piles d'appel, qui sont tous absolus.
+
+  D'où une panne qui paraissait intermittente : un fichier **dans** le dossier ouvert passait par
+  un chemin relatif et fonctionnait ; un membre source IBM i, un fichier distant, un fichier glissé
+  dans l'éditeur ou un fichier d'un second dossier ne passait jamais. Dès que le travail porte sur
+  des membres, plus rien n'est modifiable.
+
+  L'appartenance est désormais décidée en résolvant le chemin puis en regardant où il a atterri
+  (`src/core/fs/within.ts`, sans `vscode`, parce qu'une telle règle se trompe aux bords : barre
+  oblique finale, lettre de lecteur, dossier voisin dont le nom commence par celui de la racine).
+  Un chemin absolu est accepté s'il tombe dans un dossier ouvert, ou s'il **est** l'un des fichiers
+  ouverts ; refusé sinon, avec une phrase qui dit lequel des deux cas s'applique. Un chemin relatif
+  ne change pas : un `..` est refusé, jamais interprété. La politique de confidentialité est
+  maintenant appliquée à la partie sous la racine, car `**/.env*` ne correspond pas à
+  `/home/moi/.env`. Voir [ADR-0014](docs/adr/0014-un-chemin-absolu-n-est-pas-un-chemin-dehors.md).
+
+  Le défaut existait depuis la première version et aucun test ne l'avait vu : les quarante tests
+  d'intégration affirment **tous** sur ce qui a été envoyé ou sur ce que le panneau dit, aucun sur
+  le contenu d'un fichier. Le quarante et unième fait modifier un fichier par un vrai tour dans un
+  vrai éditeur, et noue les deux moitiés de la contradiction — il affirme d'abord que `relative()`
+  donne bien ce chemin-là, puis fait rendre ce même chemin par le modèle, de sorte qu'aucun des
+  deux côtés ne peut plus dériver de l'autre. Vérifié en retirant le correctif : le test redevient
+  rouge sur le message d'origine.
+
 ## 0.66.0 — 2026-10-02
 
 ### Corrigé

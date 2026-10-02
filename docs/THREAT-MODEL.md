@@ -82,6 +82,10 @@ C'est un problème de vigilance humaine, pas d'exécution.
 
 - tout chemin est résolu et **refusé s'il sort de l'espace de travail** ou s'il correspond à un glob
   interdit — un `..` dans un argument produit par le modèle est rejeté, jamais interprété ;
+- « absolu » et « dehors » sont deux choses : un chemin absolu est accepté s'il tombe dans un dossier
+  ouvert, ou s'il est exactement un fichier ouvert, et refusé sinon ([ADR-0014](adr/0014-un-chemin-absolu-n-est-pas-un-chemin-dehors.md)).
+  L'appartenance est décidée sur les chaînes : **résidu assumé**, un lien symbolique placé dans le
+  projet et pointant dehors reste un chemin « dedans » ;
 - toute écriture passe par `approval()` puis par un **diff** (vue de comparaison dans l'éditeur,
   diff imprimé dans le terminal) ;
 - dans l'éditeur, les modifications sont des `WorkspaceEdit` : elles sont dans la pile d'annulation

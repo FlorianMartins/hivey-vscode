@@ -2,7 +2,7 @@
   "name": "hivey-code",
   "displayName": "Hivey Code",
   "description": "%extension.description%",
-  "version": "0.66.0",
+  "version": "0.67.0",
   "publisher": "hivey",
   "license": "Apache-2.0",
   "repository": {
@@ -891,13 +891,19 @@
         "properties": {
           "hiveyCode.ibmi.writableLibraries": {
             "type": "array",
-            "items": { "type": "string" },
+            "items": {
+              "type": "string"
+            },
             "default": [],
             "markdownDescription": "%config.ibmi.writableLibraries%"
           },
           "hiveyCode.ibmi.integration": {
             "type": "string",
-            "enum": ["auto", "on", "off"],
+            "enum": [
+              "auto",
+              "on",
+              "off"
+            ],
             "enumDescriptions": [
               "%config.ibmi.integration.auto%",
               "%config.ibmi.integration.on%",
@@ -948,7 +954,9 @@
           },
           "hiveyCode.knowledge.folders": {
             "type": "array",
-            "items": { "type": "string" },
+            "items": {
+              "type": "string"
+            },
             "default": [],
             "markdownDescription": "%config.knowledge.folders%"
           },

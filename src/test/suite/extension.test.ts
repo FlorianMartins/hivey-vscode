@@ -8,6 +8,7 @@ import * as fs from "node:fs/promises";
 // keeps passing after a rename has broken the product.
 import { SECTION, readSettings, providerFor, restoreMisplacedGatewayAddress, Keys } from "../../extension/config.js";
 import { buildTools } from "../../extension/tools.js";
+import { relative } from "../../extension/workspace.js";
 import { buildKnowledgeTools, knowledgeAmbient, knowledgeStore } from "../../extension/knowledge.js";
 import { listModels, openFileUris } from "../../extension/models.js";
 import { DefinitionStore } from "../../extension/definitions.js";
@@ -1657,6 +1658,98 @@ suite("Hivey Code", () => {
       await config.update("endpoints.deepseek", before.endpoint, vscode.ConfigurationTarget.Global);
       await config.update("privacy.confirmSend", before.confirmSend, vscode.ConfigurationTarget.Global);
       stub.close();
+    }
+  });
+
+  /**
+   * Agent mode changes a file the model named the way the editor shows it.
+   *
+   * The one thing the product is for, and until now the one thing no test looked at: forty
+   * integration tests drive turns, approve commands, escalate, route and photograph, and every one
+   * of them asserts on what was SENT or on what the panel says. "Agent mode no longer makes
+   * modifications" could not be contradicted by any of them.
+   *
+   * An ABSOLUTE path, deliberately. That is the spelling a model uses after reading a diagnostic,
+   * a stack trace or terminal output — all of which the editor writes absolutely — and the
+   * resolver refused every one of them with "leaves the workspace", a sentence that reads as the
+   * agent having lost the project. The containment arithmetic itself is checked at its edges in
+   * `tests/paths.test.ts`; what this proves is that a real turn in a real editor reaches the file
+   * instead of a refusal.
+   */
+  test("agent mode edits a file the model named by its full path", async () => {
+    const ext = vscode.extensions.getExtension(ID)!;
+    await ext.activate();
+
+    const dir = await fs.mkdtemp(join(tmpdir(), "hivey-write-"));
+    const target = join(dir, "note.txt");
+    await fs.writeFile(target, "before\n", "utf8");
+    // Opened, because this harness deliberately opens no folder: the tabs are the workspace here,
+    // which is also an ordinary way to work on a file from a remote or an IBM i partition.
+    const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(target));
+    await vscode.window.showTextDocument(doc);
+
+    // The two halves of the contradiction, tied together so that neither can drift from the other:
+    // this is the spelling the extension ITSELF gives the model for this file, and the next lines
+    // are the model handing it straight back. A file outside every open folder has no relative name
+    // to be given, so what the context says is `uri.fsPath` — and the resolver refused it. The
+    // extension dictated a path and then refused its own.
+    assert.equal(relative(doc.uri), target, "the context names this file some other way now");
+
+    const stub = await scriptedStub([
+      { tool: { name: "edit_file", args: { path: relative(doc.uri), old: "before", new: "after" } } },
+      { text: "Done." },
+    ]);
+
+    const config = vscode.workspace.getConfiguration(SECTION);
+    const before = {
+      provider: config.get("chat.provider"),
+      model: config.get("chat.model"),
+      local: config.get("endpoints.local"),
+      confirm: config.get("privacy.confirmSend"),
+      approve: config.get("permissions.autoApprove"),
+    };
+    await config.update("chat.provider", "local", vscode.ConfigurationTarget.Global);
+    await config.update("chat.model", "stub-model", vscode.ConfigurationTarget.Global);
+    await config.update("endpoints.local", `http://127.0.0.1:${stub.port}/v1`, vscode.ConfigurationTarget.Global);
+    await config.update("privacy.confirmSend", "never", vscode.ConfigurationTarget.Global);
+    await config.update("permissions.autoApprove", "all", vscode.ConfigurationTarget.Global);
+
+    // The diff-then-notification is the last gate before the edit is applied, and nothing clicks in
+    // a test run. Answering it here does not weaken the assertion: what is under test is everything
+    // from the tool call to the text in the document, and the click is the user's part of that.
+    const realInfo = vscode.window.showInformationMessage;
+    const reviewed: string[] = [];
+    (vscode.window as unknown as { showInformationMessage: unknown }).showInformationMessage = (
+      message: string,
+      ...rest: unknown[]
+    ) => {
+      reviewed.push(message);
+      const choices = rest.filter((r) => typeof r === "string") as string[];
+      return Promise.resolve(choices.find((c) => /Apply|Appliquer/.test(c)));
+    };
+
+    try {
+      await vscode.commands.executeCommand("hiveyCode.setMode", "agent");
+      void vscode.commands.executeCommand("hiveyCode.askWith", "rename before to after");
+      for (let i = 0; i < 200 && !doc.getText().includes("after"); i++) await delay(50);
+      await vscode.commands.executeCommand("hiveyCode.stopAnswer");
+
+      const back = (JSON.parse(stub.bodies()[1] ?? "{}").messages ?? []).filter(
+        (m: { role: string }) => m.role === "tool",
+      );
+      const said = JSON.stringify(back);
+      assert.equal(/leaves the workspace/.test(said), false, `the resolver refused its own path: ${said}`);
+      assert.ok(reviewed.length, `the change was never put up for review; the tool said ${said}`);
+      assert.equal(doc.getText(), "after\n", `agent mode did not change the file; the tool said ${said}`);
+    } finally {
+      (vscode.window as unknown as { showInformationMessage: unknown }).showInformationMessage = realInfo;
+      await config.update("chat.provider", before.provider, vscode.ConfigurationTarget.Global);
+      await config.update("chat.model", before.model, vscode.ConfigurationTarget.Global);
+      await config.update("endpoints.local", before.local, vscode.ConfigurationTarget.Global);
+      await config.update("privacy.confirmSend", before.confirm, vscode.ConfigurationTarget.Global);
+      await config.update("permissions.autoApprove", before.approve, vscode.ConfigurationTarget.Global);
+      stub.close();
+      await fs.rm(dir, { recursive: true, force: true });
     }
   });
 });
