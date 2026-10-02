@@ -2,7 +2,9 @@
 
 Honnête plutôt que flatteur : ce qui marche, ce qui manque, ce qui n'est pas vérifié.
 
-Ce document décrit l'état à la version **0.39.0**. Il était resté figé à `0.3.0` pendant trente-cinq
+Ce document décrit l'état à la version **0.66.0**. Les chiffres qu'il annonce — version, tests, tâches d'évaluation — sont
+vérifiés par `npm run check:numbers`, que la CI exécute : ils ne peuvent plus vieillir en silence.
+Il était resté figé à `0.3.0` pendant trente-cinq
 versions, ce qui est sa propre leçon : une feuille de route périmée dit « projet abandonné » à
 quelqu'un qui l'ouvre, et elle le dit avant que la moindre ligne de code soit lue.
 
@@ -21,7 +23,7 @@ externe non exécuté ici est « non vérifié ».
 | 0.2 Marqueur coupé entre deux fragments | fait | **testé** (toutes les positions de coupure, fin de flux, arrêt ; retombe sans le correctif) ; câblage gardé par un test qui lit le source |
 | 0.3 Fermer `QSH` dans la garde IBM i | fait | **testé** (les quatre cas du prompt, plus le shell enveloppé et le faux positif `QSHELLDOC`) ; retombe sans le correctif. Non vérifié sur une vraie partition |
 | 0.4 Suite de tests sous Node 22 | fait | **non vérifié ici** — seul Node 18 est installé sur cette machine ; la matrice de CI (18, 20, 22 + Windows) l'établira. Invariants gardés par deux tests |
-| 0.5 Des chiffres qui ne peuvent plus vieillir | à faire | — |
+| 0.5 Des chiffres qui ne peuvent plus vieillir | fait | **testé** — le contrôleur refuse un chiffre faux et le répare (prouvé dans les deux sens) ; son câblage en CI est gardé par un test |
 | 0.6 Mesurer la qualité sur de vrais modèles | à faire | — |
 
 
@@ -80,7 +82,7 @@ Trois niveaux, jamais mélangés :
 ### Avant 0.39.0
 
 - Noyau indépendant de l'éditeur : anonymisation, fournisseurs, routeur, budget, complétion, session,
-  carte du dépôt, boucle d'agent. **562 tests unitaires** plus **27 tests d'intégration dans un vrai
+  carte du dépôt, boucle d'agent. **724 tests unitaires** plus **40 tests d'intégration dans un vrai
   VS Code**.
 - Barre latérale : conversation, historique, modèles, permissions, configuration ; modes
   discussion / plan / agent ; budget de raisonnement ; contexte explicite.

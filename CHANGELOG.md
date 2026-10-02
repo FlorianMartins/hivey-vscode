@@ -2,6 +2,34 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.66.0 — 2026-10-02
+
+### Corrigé
+
+- **Chantier 0.5 — les chiffres annoncés par la documentation ne pouvaient que vieillir.**
+  `README.md` annonçait 562 tests unitaires et la version 0.39.0 alors que le dépôt était bien
+  au-delà ; `README.fr.md` en était resté à 284 tests et à `0.11.1`. Personne n'a menti : un chiffre
+  écrit en prose n'a aucune raison de suivre ce qu'il décrit, et une valeur qu'il faut penser à
+  mettre à jour sera fausse à la version suivante.
+
+  `scripts/check-numbers.mjs` compare neuf affirmations à la réalité du dépôt — version, tests
+  unitaires, tests d'intégration, tâches d'évaluation — et la CI l'exécute. `--fix` les réécrit.
+
+  ⚠️ Ce qui compte comme vérité est **volontairement bon marché à calculer** : un test est un
+  `test(` en tête de ligne dans un fichier de tests, ce que `node:test` rapporte, et une tâche est
+  un répertoire sous `eval/tasks`. Lancer la suite pour compter en ferait une barrière lente que
+  personne ne mettrait dans la CI. Les deux comptes ont été validés contre la réalité : 724 et 40,
+  exactement ce que les deux suites annoncent.
+
+  ⚠️ Les endroits vérifiés sont **listés** et non devinés : une expression assez large pour trouver
+  toutes les tournures serait assez large pour réécrire un nombre qui n'était pas une affirmation.
+  Ajouter une affirmation, c'est l'ajouter à cette liste — c'est le moment où quelqu'un décide que
+  c'en est une.
+
+  ⚠️ Friction assumée : chaque test ajouté périme le chiffre, donc `npm run check:numbers -- --fix`
+  fait désormais partie de la préparation d'un commit. Le contrôle l'a d'ailleurs prouvé sur
+  lui-même, en signalant le test que je venais d'écrire pour lui.
+
 ## 0.65.0 — 2026-10-02
 
 ### Corrigé

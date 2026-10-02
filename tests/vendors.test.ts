@@ -152,3 +152,11 @@ test("every Node the manifest claims to support is actually run by CI", () => {
   assert.ok(matrix.includes(lowest), `engines says node >= ${lowest} and CI never runs it: ${matrix.join(", ")}`);
   assert.ok(matrix.length >= 2, "a single version in the matrix proves nothing about a range");
 });
+
+test("the numbers the documentation claims are checked by CI", () => {
+  // The checker is the guard; this is the guard that the guard is wired. A script nobody runs is a
+  // script that goes stale alongside the thing it was meant to keep honest.
+  const manifest = JSON.parse(readFileSync("package.json", "utf8")) as { scripts: Record<string, string> };
+  assert.match(manifest.scripts["check:numbers"] ?? "", /check-numbers\.mjs/);
+  assert.match(readFileSync(".github/workflows/ci.yml", "utf8"), /npm run check:numbers/);
+});

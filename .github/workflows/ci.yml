@@ -74,6 +74,12 @@ jobs:
       - name: Secrets — scanned with the extension's own detectors
         run: node scripts/scan-secrets.mjs
 
+      # A number written in prose has no reason to follow the thing it describes. The README
+      # announced 562 unit tests and version 0.39.0 while the repository was at 0.61.0 with 699,
+      # and the French one still said 284 and 0.11.1. Nobody lied; nobody could have noticed.
+      - name: Documentation — the numbers it claims
+        run: npm run check:numbers
+
       # Not the evaluation itself, which needs a model. This is the gate that makes the evaluation
       # worth running at all: every task's check must FAIL on its untouched fixture, or the task
       # scores every model 100 % and measures nothing. It needs no GPU, so it runs on every commit.
