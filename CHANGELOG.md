@@ -2,6 +2,53 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.72.0 — 2026-10-02
+
+### Ajouté
+
+- **Chantier 1.4 — pourquoi cette requête est lente, d'après ce que la base sait déjà.**
+  `ibmi_index_advice` lit ce que l'optimiseur de Db2 for i a **souhaité** avoir pendant que de vraies
+  requêtes tournaient (`QSYS2.SYSIXADV`), avec la taille et le nombre d'index de la table
+  (`QSYS2.SYSTABLESTAT`). C'est la différence entre « pose un index sur CUSTNO, ça aide en général »
+  et « l'optimiseur a demandé cette clé exacte 4 812 fois, sur 2,1 millions de lignes, et a construit
+  un index temporaire pour elle ». La compétence `/sql` l'appelle **avant** de proposer un index, et
+  n'en propose pas sans lui.
+
+  ⚠️ Et le rapport ne recommande rien : le conseiller est une **liste de souhaits, pas une
+  conception**. Lu comme une liste de tâches il donne une table à quatorze index où chaque insertion
+  paie les quatorze. Chaque réponse porte donc ce que le conseiller ne veut pas dire — une clé
+  demandée deux fois est du bruit, l'ordre des colonnes EST l'index, un conseiller vide ne veut pas
+  dire que les index sont bons — et rappelle que créer l'index est une **modification**, bornée comme
+  les autres.
+
+- **Chantier 1.5 — ce que veut dire un identifiant, et ce que la maison en fait.**
+  `ibmi_message` rend le texte IBM de premier et de second niveau depuis le fichier de messages
+  (`QSYS2.MESSAGE_FILE_DATA`) **et** les notes de la documentation interne qui citent cet
+  identifiant. Le texte d'IBM dit ce qui s'est passé ; il ne dit pas quoi faire, parce que quoi faire
+  est une décision que cette maison a prise et écrite quelque part.
+
+  ⚠️ Les deux moitiés sont **étiquetées**, et c'est tout l'intérêt : IBM d'abord, comme fait ; les
+  notes ensuite, comme celles de l'organisation et « possiblement périmées », avec la consigne de dire
+  sur laquelle on s'appuie. Un modèle qui ne les distingue pas présente une procédure de 2011 avec
+  l'autorité d'un manuel.
+
+### Précisé
+
+- Les deux outils ne font que lire, donc ils sont disponibles en **mode Plan** — c'est là que les
+  questions « pourquoi est-ce lent » et « que veut dire cette erreur » se posent le plus.
+- Créer un index reste une **écriture** : `isReadOnlySql` ne laisse passer que `select`/`with`/
+  `values`, donc un `CREATE INDEX` passe par la garde comme n'importe quelle autre modification. Un
+  test l'exige explicitement.
+- ⚠️ **Un chiffre absent reste absent.** `Number("")` vaut 0 et 0 est fini, donc une colonne que le
+  catalogue n'a pas renvoyée devenait « cette table a zéro ligne » — une mesure que personne n'a
+  faite. Trouvé par un test. Même règle que le rapport d'évaluation, appliquée au catalogue.
+- La décision structurante commune à 1.3, 1.4 et 1.5 est écrite dans
+  [ADR-0017](docs/adr/0017-un-resultat-porte-son-autorite.md) : un résultat porte sa méthode, ce que
+  cette méthode ne peut pas voir, et ce qui n'a pas pu être lu — dans le résultat lui-même, parce que
+  c'est ce que le modèle recopie.
+- ⚠️ **Non vérifié** : aucun de ces outils n'a tourné contre une partition. D'où la lecture des
+  colonnes par `cell()` sous plusieurs orthographes partout.
+
 ## 0.71.0 — 2026-10-02
 
 ### Ajouté

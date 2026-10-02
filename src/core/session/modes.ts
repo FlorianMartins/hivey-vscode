@@ -52,6 +52,11 @@ const READ_ONLY = new Set([
   // `core/ibmi/guard.ts`). Plan mode is also where this question is asked most: "who uses this"
   // belongs to deciding whether to change something, not to changing it.
   "ibmi_impact",
+  // The optimizer's own index wish list and the table statistics. Reading them is a SELECT; the
+  // index it suggests is a change, and that goes through `ibmi_sql` where the gate sees it.
+  "ibmi_index_advice",
+  // What a message identifier means, and what the house documentation says about it. Two reads.
+  "ibmi_message",
 ]);
 
 export function toolsForMode(all: Tool[], mode: Mode): Tool[] {

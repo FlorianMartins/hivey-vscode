@@ -213,7 +213,28 @@ export const BUILTIN_SKILLS: BuiltinSkill[] = [
   // column positions produces a member that looks right, compiles into something else, and fails
   // in a spool file.
   { group: "rpg", name: "/tofree", hint: t("convert fixed-format RPG to fully free"), prompt: t("Convert this member to fully free-form RPGLE. Start with **FREE, use dcl-f/dcl-s/dcl-ds/dcl-proc, keep every comment, and change no behavior. Point out anything with no free-form equivalent instead of inventing one."), attach: true },
-  { group: "db2i", name: "/sql", hint: t("write it as Db2 for i SQL"), prompt: t("Write this as Db2 for i SQL. Qualify the objects, use FETCH FIRST rather than LIMIT, and say which library list the unqualified names would resolve against."), attach: true },
+  {
+    group: "db2i",
+    name: "/sql",
+    hint: t("write it as Db2 for i SQL"),
+    // The addition that matters is step 3. A model asked to make a query faster proposes an index,
+    // and the proposal is a guess dressed as expertise — while the database is sitting on a record
+    // of the indexes its own optimizer wished for, with counts.
+    prompt: t(
+      "Write this as Db2 for i SQL, and justify it from what the database knows.\n\n" +
+        "1. Qualify the objects, use FETCH FIRST rather than LIMIT, and say which library you assumed.\n" +
+        "2. Prefer the SQL the platform has: VALUES, OLAP specifications, CTEs, and the QSYS2 and " +
+        "SYSTOOLS services over anything hand-rolled.\n" +
+        "3. If this is about speed, call ibmi_index_advice FIRST. Do not propose an index without it: " +
+        "the optimizer's own wish list, with how often it asked and the size of the table, is the " +
+        "difference between a justified index and a guess. Quote the counts you are relying on.\n" +
+        "4. Read what that tool says it does NOT mean before you act on it: a key asked for twice is " +
+        "noise, the column order IS the index, and an empty advisor does not mean the indexes are right.\n" +
+        "5. Creating the index is a change, bounded by the writable-libraries list. Say what it costs on " +
+        "every insert, and say what you would measure to know whether it worked.",
+    ),
+    attach: true,
+  },
   { group: "dds", name: "/dds", hint: t("explain this DDS"), prompt: t("Explain this DDS member: the record formats, the key fields, the keywords that change behavior, and anything that would surprise someone reading it for the first time."), attach: true },
   { group: "dds", name: "/dspf", hint: t("review this display file"), prompt: t("Review this DSPF: the record formats and their overlay order, indicators and what each one drives, CFxx/CAxx keys and where they are handled, subfile control and whether the size is right, and the DDS keywords that will surprise the next reader."), attach: true },
   { group: "dds", name: "/prtf", hint: t("review this printer file"), prompt: t("Review this PRTF: page size and orientation against the form, the record formats and their line positions, overflow handling, and the editing that will change the printed value. Say what breaks if the form changes."), attach: true },

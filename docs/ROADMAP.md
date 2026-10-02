@@ -2,7 +2,7 @@
 
 Honnête plutôt que flatteur : ce qui marche, ce qui manque, ce qui n'est pas vérifié.
 
-Ce document décrit l'état à la version **0.71.0**. Les chiffres qu'il annonce — version, tests, tâches d'évaluation — sont
+Ce document décrit l'état à la version **0.72.0**. Les chiffres qu'il annonce — version, tests, tâches d'évaluation — sont
 vérifiés par `npm run check:numbers`, que la CI exécute : ils ne peuvent plus vieillir en silence.
 Il était resté figé à `0.3.0` pendant trente-cinq
 versions, ce qui est sa propre leçon : une feuille de route périmée dit « projet abandonné » à
@@ -33,8 +33,8 @@ externe non exécuté ici est « non vérifié ».
 | 1.1 Boucle compiler, lire, corriger | fait | **testé** — 37 tests : table des commandes, analyseur sur RPG III / ILE fixe / ILE libre / SQLRPGLE / CL / DDS, piège du sommaire (retombe sans la règle), noms refusés plutôt qu'échappés, les trois sources et leurs chemins d'échec, le journal lu pour le bon travail, verdict dans `verifyTurn` (retombe sans le câblage). ⚠️ **non vérifié** : fixtures **construites** d'après les dispositions documentées, pas enregistrées sur une partition ; aucune exécution réelle possible ici |
 | 1.2 Tests unitaires RPG exécutés | fait | **testé** — 17 tests : présence demandée au catalogue, RPGUnit absent → l'outil le dit et ne simule rien, catalogue illisible traité comme un **troisième cas**, nom de procédure ≠ nom d'objet, analyseur sur fixtures (sortie non reconnue comptée comme non lue, jamais convertie en succès), verdict dans `verifyTurn` séparé de celui de la compilation (retombe sans le câblage), `/rpgtest` finit sur l'exécution. ⚠️ **non vérifié** : le texte imprimé par `RUCALLTST` n'est pas connu de première main — la conception est faite pour que l'ignorer soit sans danger ; aucune exécution réelle possible ici |
 | 1.3 Analyse d'impact | fait | **testé** — 23 tests : sortie dans QTEMP acceptée par la garde production verrouillée, QTEMP ne blanchit pas les autres bibliothèques de la commande, membre de sortie remplacé et non complété, lecture bornée, lignes DSPPGMREF lues sous plusieurs orthographes, référence sans bibliothèque conservée, méthode en première ligne, zéro jamais rendu par « rien ne l'utilise », présence en liste blanche du mode Plan, l'outil fait passer sa propre commande par la garde (tout retombe sans les correctifs). ⚠️ **non vérifié** : aucune exécution réelle ; **et les références croisées ARCAD ne sont pas appelées** — catalogue REST non publié, la réponse nomme la porte au lieu d'inventer un chemin |
-| 1.4 Performance Db2 for i | à faire | — |
-| 1.5 Messages et documentation de la maison | à faire | — |
+| 1.4 Performance Db2 for i | fait | **testé** — 16 tests : requêtes et échappement des quotes, lecture des lignes sous plusieurs orthographes, index temporaire reconnu comme le signal le plus fort, **un chiffre absent reste absent** (trouvé par un test), taille avant conseil, « aucun conseil » jamais rendu par « les index sont bons », les 5 mises en garde présentes dans chaque réponse, `CREATE INDEX` soumis à la garde, `/sql` n'ose plus proposer un index sans l'outil. ⚠️ **non vérifié** : aucune exécution réelle |
+| 1.5 Messages et documentation de la maison | fait | **testé** — 16 tests : fichier de messages par préfixe, préfixe inconnu cherché partout, second niveau conservé, identifiants cités extraits des notes, note citante rendue avec la ligne suivante, **les deux autorités étiquetées et dans l'ordre**, silence de la doc dit explicitement, lacune ≠ absence. ⚠️ **non vérifié** : aucune exécution réelle |
 | 1.6 Au moins 40 compétences IBM i | à faire | — |
 | 1.7 Livraison par ARCAD | à faire | — |
 
@@ -49,6 +49,17 @@ Trois niveaux, jamais mélangés :
   nommés.
 
 ## Fait
+
+### Ce que la base sait déjà, et ce que ça ne veut pas dire (0.72.0)
+
+- **`ibmi_index_advice` lit la liste de souhaits de l'optimiseur** (testé ; **non vérifié** sur une
+  partition) et ne recommande rien : chaque réponse porte ce que le conseiller ne veut pas dire.
+  `/sql` ne propose plus d'index sans l'avoir consulté.
+- **`ibmi_message` joint le texte IBM et la note maison, étiquetés** (testé) — parce qu'une
+  procédure interne de 2011 ne doit pas être présentée avec l'autorité d'un manuel.
+- **Un chiffre absent reste absent** (testé) : une colonne que le catalogue n'a pas renvoyée ne
+  devient pas zéro.
+
 
 ### Qui utilise ceci (0.71.0)
 
@@ -172,7 +183,7 @@ Trois niveaux, jamais mélangés :
 ### Avant 0.39.0
 
 - Noyau indépendant de l'éditeur : anonymisation, fournisseurs, routeur, budget, complétion, session,
-  carte du dépôt, boucle d'agent. **818 tests unitaires** plus **41 tests d'intégration dans un vrai
+  carte du dépôt, boucle d'agent. **850 tests unitaires** plus **41 tests d'intégration dans un vrai
   VS Code**.
 - Barre latérale : conversation, historique, modèles, permissions, configuration ; modes
   discussion / plan / agent ; budget de raisonnement ; contexte explicite.

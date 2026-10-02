@@ -47,6 +47,27 @@ import {
   type Reference,
 } from "../../core/ibmi/impact.js";
 import { arcadInstalled } from "./arcad.js";
+import {
+  formatAdvice,
+  indexAdviceSql,
+  readAdvice,
+  readStats,
+  tableStatsSql,
+  type IndexAdvice,
+  type TableStats,
+} from "../../core/ibmi/db2advice.js";
+import {
+  formatMessage,
+  messageFiles,
+  messageSql,
+  notesCiting,
+  readMessage,
+  validMessageId,
+  type CitingNote,
+  type IbmMessage,
+} from "../../core/ibmi/messages.js";
+import { knowledgeStore } from "../knowledge.js";
+import { readSettings } from "../config.js";
 import { extractCalledPrograms, extractCopyDirectives } from "../../core/ibmi/symbols.js";
 
 const EXTENSION_ID = "halcyontechltd.code-for-ibmi";
@@ -1190,5 +1211,129 @@ export function buildIbmiTools(writable: string[] = []): Tool[] {
     },
   };
 
-  return [sql, command, compile, runTests, impact, readMember, programContext, whereIsMember, listMembers, listObjects, libraryList];
+
+  /**
+   * What Db2 for i already knows about a table.
+   *
+   * Db2 for i keeps something no other platform hands you this directly: a record of the indexes
+   * its own optimizer wished existed while real queries ran. That turns "add an index on CUSTNO,
+   * that usually helps" into "the optimizer asked for this exact key 4 812 times, over 2.1 million
+   * rows, and built a temporary index for it".
+   *
+   * It reads, so it is free and it is in plan mode. Acting on what it says is not: creating an
+   * index is a CHANGE, it goes through `ibmi_sql`, and the gate sees it like any other.
+   */
+  const db2Advice: Tool = {
+    parallel: () => true,
+    schema: {
+      name: "ibmi_index_advice",
+      description:
+        "What Db2 for i's own optimizer wished it had: the indexes it asked for on a table " +
+        "(QSYS2.SYSIXADV) with how often it asked, plus the table's size and index count " +
+        "(QSYS2.SYSTABLESTAT). Read this BEFORE proposing an index or explaining why a query is slow. " +
+        "It is a wish list, not a design, and the answer says what it does not mean.",
+      parameters: {
+        type: "object",
+        properties: {
+          schema: { type: "string", description: "The library (SQL schema)." },
+          table: { type: "string", description: "The table. Omit to see the whole schema's advice." },
+        },
+        required: ["schema"],
+      },
+    },
+    approval: () => false,
+    async run(args, ctx): Promise<ToolResult> {
+      const content = connection().getContent();
+      const schema = String(args["schema"] ?? "").trim();
+      const table = String(args["table"] ?? "").trim();
+      if (!schema) return { content: "No schema given.", isError: true };
+
+      const gaps: string[] = [];
+      let advice: IndexAdvice[] = [];
+      try {
+        advice = readAdvice(await content.runSQL(indexAdviceSql(schema, table || undefined)), cell);
+      } catch (err) {
+        gaps.push(`the index advisor (${(err as Error).message.split("\n")[0]?.slice(0, 120)})`);
+      }
+
+      let stats: TableStats | undefined;
+      if (table) {
+        try {
+          stats = readStats(await content.runSQL(tableStatsSql(schema, table)), cell);
+        } catch (err) {
+          gaps.push(`the table statistics (${(err as Error).message.split("\n")[0]?.slice(0, 120)})`);
+        }
+      }
+
+      ctx.report(t("{0} index suggestion(s) from the optimizer", advice.length));
+      return {
+        content: headToTokens(formatAdvice({ schema: schema.toUpperCase(), ...(table ? { table: table.toUpperCase() } : {}) }, advice, stats, gaps), MAX_TOKENS),
+      };
+    },
+  };
+
+
+  /**
+   * What an identifier means, and what this shop does about it.
+   *
+   * IBM's text says what happened. It does not say what to DO, because what to do is a decision
+   * this company made years ago and wrote down somewhere — the recovery procedure, the batch to
+   * re-run, the person to call. That part lives in the internal documentation this extension can
+   * already read, so an identifier resolves to both, labelled, because "IBM says this" and "your
+   * documentation says this" carry very different authority when the second one is from 2011.
+   */
+  const message: Tool = {
+    parallel: () => true,
+    schema: {
+      name: "ibmi_message",
+      description:
+        "What an IBM i message identifier means (CPF, CPD, MCH, RNF, SQL…): IBM's own first- and " +
+        "second-level text from the message file, AND the internal documentation notes that mention " +
+        "it. Use it whenever a message id appears in a joblog, a compile listing or an error.",
+      parameters: {
+        type: "object",
+        properties: { id: { type: "string", description: "A message identifier, for example CPF4131." } },
+        required: ["id"],
+      },
+    },
+    approval: () => false,
+    async run(args, ctx): Promise<ToolResult> {
+      const id = String(args["id"] ?? "").trim().toUpperCase();
+      if (!validMessageId(id)) {
+        return {
+          content: `“${args["id"]}” is not a message identifier. They are three letters and four digits, like CPF4131.`,
+          isError: true,
+        };
+      }
+
+      const gaps: string[] = [];
+      let found: IbmMessage | undefined;
+      const content = connection().getContent();
+      for (const file of messageFiles(id)) {
+        if (found) break;
+        try {
+          found = readMessage(await content.runSQL(messageSql(file, id)), file, cell);
+        } catch (err) {
+          gaps.push(`${file.library}/${file.name} (${(err as Error).message.split("\n")[0]?.slice(0, 100)})`);
+        }
+      }
+
+      // The house half. Read from the knowledge base the user configured, which may be none — and
+      // then the answer simply says the documentation does not mention it.
+      let house: CitingNote[] = [];
+      const store = knowledgeStore(readSettings());
+      if (store) {
+        try {
+          house = notesCiting(await store.list(), id);
+        } catch (err) {
+          gaps.push(`the knowledge base (${(err as Error).message.split("\n")[0]?.slice(0, 100)})`);
+        }
+      }
+
+      ctx.report(t("{0}: {1} house note(s)", id, house.length));
+      return { content: headToTokens(formatMessage(id, found, house, gaps), MAX_TOKENS) };
+    },
+  };
+
+  return [sql, command, compile, runTests, impact, db2Advice, message, readMember, programContext, whereIsMember, listMembers, listObjects, libraryList];
 }
