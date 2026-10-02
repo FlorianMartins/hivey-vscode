@@ -270,6 +270,28 @@ export const BUILTIN_SKILLS: BuiltinSkill[] = [
     ),
     attach: true,
   },
+  {
+    group: "db2i",
+    name: "/impact",
+    hint: t("who uses this file, program or field"),
+    // Before, and the word is load-bearing. Changing a field length on this platform is a
+    // five-minute edit and a four-hour search, and the search is the part that gets skipped — so
+    // the skill exists to make it the first step rather than the post-mortem.
+    prompt: t(
+      "Who uses this, and what breaks if I change it? Answer BEFORE proposing any change.\n\n" +
+        "1. Call ibmi_impact on the object. At object level that reads the programs' own reference lists, " +
+        "which is a fact; say which libraries were looked in, because the answer is only as wide as its search.\n" +
+        "2. If the change touches a field — a length, a type, a name — call ibmi_impact again with the field. " +
+        "That one is a SEARCH of the source members, not an inventory: report it as evidence and repeat what " +
+        "the tool says it cannot see.\n" +
+        "3. Look for the logical files over the physical one, and for the display and printer files that show " +
+        "the field: a DDS change propagates through objects nobody edits.\n" +
+        "4. Then, and only then, say what you would change, what has to be recompiled, and in what order.\n" +
+        "5. If the tool reports that it was cut short, or that a library could not be read, say so. " +
+        "Do not conclude that nothing else uses it.",
+    ),
+    attach: true,
+  },
   { group: "rpg", name: "/rpgdoc", hint: t("document this member"), prompt: t("Document this member the way an RPG shop reads: a header saying what it is for and what calls it, a note per procedure, and the files it uses with what it does to each. Keep the column layout untouched if the member is fixed-format."), attach: true },
   { group: "db2i", name: "/journal", hint: t("review the journalling"), prompt: t("Review journalling here: which files are journalled and which are not, what the journal receivers cost and when they are detached, and what a recovery would actually be able to replay. Say what is lost if the system ends abnormally now."), },
   {

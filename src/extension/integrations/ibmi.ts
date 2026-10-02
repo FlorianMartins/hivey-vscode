@@ -37,11 +37,32 @@ import {
   type RpgUnitPresence,
   type TestRun,
 } from "../../core/ibmi/rpgunit.js";
+import {
+  PROGRAM_REFERENCE_LIMITS,
+  fieldMethod,
+  formatImpact,
+  programRefsCommand,
+  programRefsQuery,
+  referencesTo,
+  type Reference,
+} from "../../core/ibmi/impact.js";
+import { arcadInstalled } from "./arcad.js";
 import { extractCalledPrograms, extractCopyDirectives } from "../../core/ibmi/symbols.js";
 
 const EXTENSION_ID = "halcyontechltd.code-for-ibmi";
 const MAX_ROWS = 200;
 const MAX_TOKENS = 6000;
+/**
+ * How far a field search goes before it stops and says it stopped.
+ *
+ * A field search downloads source members one at a time, and a library can hold thousands. The
+ * bound is what keeps the answer honest rather than slow: an answer that was cut short says so,
+ * and "nothing else uses it" is never implied by a search that gave up.
+ */
+const MAX_MEMBERS_SEARCHED = 300;
+const MAX_REFERENCE_ROWS = 5000;
+/** The source files a field is plausibly written in. Not every member of the library. */
+const SOURCE_FILES = ["QRPGLESRC", "QRPGSRC", "QCLSRC", "QCLLESRC", "QDDSSRC", "QSQLSRC", "QCBLLESRC"];
 
 /** Only the handful of methods used here; the real interface is an order of magnitude larger. */
 interface IBMiContent {
@@ -1020,5 +1041,154 @@ export function buildIbmiTools(writable: string[] = []): Tool[] {
     },
   };
 
-  return [sql, command, compile, runTests, readMember, programContext, whereIsMember, listMembers, listObjects, libraryList];
+
+  /**
+   * Who uses this?
+   *
+   * The question asked before every change to a file here, and the one the member in front of you
+   * cannot answer: a physical file is used by programs nobody remembers writing, through logicals
+   * whose names say nothing, from a library that is not on the current list.
+   *
+   * It READS, and it is in plan mode's allow-list — which is only defensible because the one thing
+   * it writes is an output file in QTEMP, a library that is created per job and destroyed with it.
+   * The gate knows that explicitly (`SCRATCH_LIBRARY` in `core/ibmi/guard.ts`), and this tool puts
+   * its own command through the gate before running it: if `programRefsCommand` is ever changed to
+   * write somewhere else, the gate stops it rather than this comment being wrong.
+   */
+  const impact: Tool = {
+    schema: {
+      name: "ibmi_impact",
+      description:
+        "Who uses this file, program or field. At object level it reads the objects' own reference " +
+        "lists (DSPPGMREF), which is a fact; at field level it searches the source members it can read, " +
+        "which is evidence. The answer states which method it used and what that method cannot see. " +
+        "Run it BEFORE changing a physical file.",
+      parameters: {
+        type: "object",
+        properties: {
+          object: { type: "string", description: "LIB/NAME, or NAME to search the library list." },
+          field: { type: "string", description: "A field name, for a field-level search of the sources." },
+          libraries: {
+            type: "string",
+            description: "Comma-separated libraries to look in. Defaults to the job's library list.",
+          },
+        },
+        required: ["object"],
+      },
+    },
+    approval: () => false,
+    async run(args, ctx): Promise<ToolResult> {
+      const conn = connection();
+      const content = conn.getContent();
+      const asked = String(args["object"] ?? "").trim().toUpperCase();
+      if (!asked) return { content: "No object name given.", isError: true };
+      const [maybeLibrary, maybeName] = asked.includes("/") ? asked.split("/") : ["", asked];
+      const name = (maybeName ?? "").trim();
+      const field = String(args["field"] ?? "").trim().toUpperCase();
+
+      const scope = String(args["libraries"] ?? "")
+        .split(/[,\s]+/)
+        .map((l) => l.trim().toUpperCase())
+        .filter(Boolean);
+      const searched = scope.length
+        ? scope
+        : [...new Set([maybeLibrary, conn.getConfig().currentLibrary ?? "", ...(conn.getConfig().libraryList ?? [])].map((l) => (l ?? "").toUpperCase()).filter(Boolean))];
+      if (!searched.length) {
+        return { content: "No library to look in: name one, or set a library list in Code for IBM i.", isError: true };
+      }
+
+      // ── Field level: a search of the sources, and it says so ─────────────────────────────────
+      if (field) {
+        const { method, limits, better } = fieldMethod(arcadInstalled());
+        const references: Reference[] = [];
+        let truncated = false;
+        let read = 0;
+        for (const library of searched) {
+          for (const sourceFile of SOURCE_FILES) {
+            if (read >= MAX_MEMBERS_SEARCHED) {
+              truncated = true;
+              break;
+            }
+            let members: Array<{ library: string; file: string; name: string; extension: string }> = [];
+            try {
+              members = await content.getMemberList({ library, sourceFile });
+            } catch {
+              continue; // a source file that is not there is not an error, it is a library without one
+            }
+            for (const member of members) {
+              if (read >= MAX_MEMBERS_SEARCHED) {
+                truncated = true;
+                break;
+              }
+              if (ctx.signal?.aborted) return { content: "Stopped.", isError: true };
+              read++;
+              try {
+                const text = await content.downloadMemberContent(member.library, member.file, member.name);
+                const line = text.split("\n").find((l) => l.toUpperCase().includes(field));
+                if (line) {
+                  references.push({
+                    library: member.library.toUpperCase(),
+                    name: member.name.toUpperCase(),
+                    type: member.extension.toUpperCase(),
+                    usage: line.trim().slice(0, 120),
+                  });
+                }
+              } catch {
+                /* a member we cannot read is a member we cannot search; counted in `read` */
+              }
+            }
+          }
+        }
+        ctx.report(t("searched {0} member(s) for {1}", read, field));
+        return {
+          content: headToTokens(
+            formatImpact({
+              subject: { library: maybeLibrary || searched[0]!, name, field },
+              method,
+              references,
+              truncated,
+              searched,
+              limits,
+              ...(better ? { better } : {}),
+            }),
+            MAX_TOKENS,
+          ),
+        };
+      }
+
+      // ── Object level: the reference lists, which are a fact ──────────────────────────────────
+      const references: Reference[] = [];
+      let truncated = false;
+      const covered: string[] = [];
+      for (const library of searched) {
+        const command = programRefsCommand(library);
+        // Its own command, through the gate. The point is not suspicion of this code but of the
+        // next edit to it: `OUTFILE` pointing anywhere but QTEMP must fail here, loudly.
+        const refused = refuseChange(command, true, { writable });
+        if (refused) return refusal(refused, writable);
+        const ran = await conn.runCommand({ command, environment: "ile" });
+        if (ran.code !== 0) continue; // a library with no programs produces CPF9801 and no outfile
+        const rows = await content.runSQL(programRefsQuery(MAX_REFERENCE_ROWS));
+        if (rows.length >= MAX_REFERENCE_ROWS) truncated = true;
+        references.push(...referencesTo(rows, { library: maybeLibrary || library, name }, cell));
+        covered.push(library);
+      }
+      ctx.report(t("{0} user(s) of {1}", references.length, name));
+      return {
+        content: headToTokens(
+          formatImpact({
+            subject: { library: maybeLibrary || covered[0] || searched[0]!, name },
+            method: "program-references",
+            references,
+            truncated,
+            searched: covered.length ? covered : searched,
+            limits: PROGRAM_REFERENCE_LIMITS,
+          }),
+          MAX_TOKENS,
+        ),
+      };
+    },
+  };
+
+  return [sql, command, compile, runTests, impact, readMember, programContext, whereIsMember, listMembers, listObjects, libraryList];
 }

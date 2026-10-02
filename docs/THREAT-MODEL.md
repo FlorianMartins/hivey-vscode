@@ -94,6 +94,18 @@ C'est un problème de vigilance humaine, pas d'exécution.
   hasard ;
 - l'absence de rappel d'approbation vaut refus (`runTurn` : le silence n'est pas un consentement).
 
+**QTEMP est la seule bibliothèque qu'un outil en lecture peut écrire**, et la garde le sait
+explicitement (`SCRATCH_LIBRARY`, `src/core/ibmi/guard.ts`). La raison n'est pas une convention mais
+une propriété de la bibliothèque : elle est créée par travail, détruite avec lui, invisible des
+autres travaux, et rien de la production ne s'atteint par elle. Demander « quels programmes
+utilisent ce fichier » passe par `DSPPGMREF` vers un **fichier de sortie**, donc un outil qui ne fait
+que lire doit malgré tout écrire quelque part. L'exemption vit dans la garde et non dans chaque
+outil : un outil qui s'accorde une exemption est un outil qui peut se tromper, et le suivant recopie
+l'exemption sans recopier la raison. Elle ne vaut que pour la bibliothèque nommée QTEMP — une
+commande qui écrit dans QTEMP *et* dans CUSTMAST reste une commande qui écrit dans CUSTMAST — et
+`ibmi_impact` fait passer **sa propre commande** par la garde avant de la lancer, pour qu'un
+`OUTFILE` déplacé ailleurs échoue bruyamment au lieu de reposer sur un commentaire resté vrai.
+
 **Compiler** (`src/core/ibmi/compile.ts`) crée un objet, donc c'est une écriture et elle est bornée
 par la même liste — avec deux précisions qui lui sont propres :
 

@@ -2,7 +2,7 @@
 
 Honnête plutôt que flatteur : ce qui marche, ce qui manque, ce qui n'est pas vérifié.
 
-Ce document décrit l'état à la version **0.70.0**. Les chiffres qu'il annonce — version, tests, tâches d'évaluation — sont
+Ce document décrit l'état à la version **0.71.0**. Les chiffres qu'il annonce — version, tests, tâches d'évaluation — sont
 vérifiés par `npm run check:numbers`, que la CI exécute : ils ne peuvent plus vieillir en silence.
 Il était resté figé à `0.3.0` pendant trente-cinq
 versions, ce qui est sa propre leçon : une feuille de route périmée dit « projet abandonné » à
@@ -32,7 +32,7 @@ externe non exécuté ici est « non vérifié ».
 |---|---|---|
 | 1.1 Boucle compiler, lire, corriger | fait | **testé** — 37 tests : table des commandes, analyseur sur RPG III / ILE fixe / ILE libre / SQLRPGLE / CL / DDS, piège du sommaire (retombe sans la règle), noms refusés plutôt qu'échappés, les trois sources et leurs chemins d'échec, le journal lu pour le bon travail, verdict dans `verifyTurn` (retombe sans le câblage). ⚠️ **non vérifié** : fixtures **construites** d'après les dispositions documentées, pas enregistrées sur une partition ; aucune exécution réelle possible ici |
 | 1.2 Tests unitaires RPG exécutés | fait | **testé** — 17 tests : présence demandée au catalogue, RPGUnit absent → l'outil le dit et ne simule rien, catalogue illisible traité comme un **troisième cas**, nom de procédure ≠ nom d'objet, analyseur sur fixtures (sortie non reconnue comptée comme non lue, jamais convertie en succès), verdict dans `verifyTurn` séparé de celui de la compilation (retombe sans le câblage), `/rpgtest` finit sur l'exécution. ⚠️ **non vérifié** : le texte imprimé par `RUCALLTST` n'est pas connu de première main — la conception est faite pour que l'ignorer soit sans danger ; aucune exécution réelle possible ici |
-| 1.3 Analyse d'impact | à faire | — |
+| 1.3 Analyse d'impact | fait | **testé** — 23 tests : sortie dans QTEMP acceptée par la garde production verrouillée, QTEMP ne blanchit pas les autres bibliothèques de la commande, membre de sortie remplacé et non complété, lecture bornée, lignes DSPPGMREF lues sous plusieurs orthographes, référence sans bibliothèque conservée, méthode en première ligne, zéro jamais rendu par « rien ne l'utilise », présence en liste blanche du mode Plan, l'outil fait passer sa propre commande par la garde (tout retombe sans les correctifs). ⚠️ **non vérifié** : aucune exécution réelle ; **et les références croisées ARCAD ne sont pas appelées** — catalogue REST non publié, la réponse nomme la porte au lieu d'inventer un chemin |
 | 1.4 Performance Db2 for i | à faire | — |
 | 1.5 Messages et documentation de la maison | à faire | — |
 | 1.6 Au moins 40 compétences IBM i | à faire | — |
@@ -49,6 +49,18 @@ Trois niveaux, jamais mélangés :
   nommés.
 
 ## Fait
+
+### Qui utilise ceci (0.71.0)
+
+- **`ibmi_impact` répond au niveau objet et au niveau champ** (testé ; **non vérifié** sur une
+  partition), et les deux réponses ne valent pas la même chose : l'une est un fait enregistré par le
+  compilateur, l'autre une recherche dans les sources lisibles. La méthode est en première ligne et
+  les limites sont écrites, parce que ce résultat finit dans une demande de modification.
+- **`QTEMP` est la seule bibliothèque qu'un outil en lecture peut écrire, et la garde le sait**
+  (testé, retombe sans la règle) — et l'outil fait passer sa propre commande par la garde.
+- **Trouver zéro n'est jamais « rien ne l'utilise »** (testé).
+- **`/impact`** pose la question avant de proposer un changement.
+
 
 ### Les tests de la maison, exécutés (0.70.0)
 
@@ -160,7 +172,7 @@ Trois niveaux, jamais mélangés :
 ### Avant 0.39.0
 
 - Noyau indépendant de l'éditeur : anonymisation, fournisseurs, routeur, budget, complétion, session,
-  carte du dépôt, boucle d'agent. **795 tests unitaires** plus **41 tests d'intégration dans un vrai
+  carte du dépôt, boucle d'agent. **818 tests unitaires** plus **41 tests d'intégration dans un vrai
   VS Code**.
 - Barre latérale : conversation, historique, modèles, permissions, configuration ; modes
   discussion / plan / agent ; budget de raisonnement ; contexte explicite.

@@ -2,6 +2,48 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.71.0 — 2026-10-02
+
+### Ajouté
+
+- **Chantier 1.3 — qui utilise ceci ?** `ibmi_impact` répond à la question posée avant chaque
+  modification d'un fichier sur cette plate-forme, et que le membre sous les yeux ne peut pas
+  trancher : un fichier physique est utilisé par des programmes dont personne ne se souvient, à
+  travers des logiques dont les noms ne disent rien, depuis une bibliothèque qui n'est pas dans la
+  liste courante. Changer la longueur d'un champ est une édition de cinq minutes et une recherche de
+  quatre heures.
+
+  **Deux niveaux, et ce ne sont pas deux réponses de même valeur** — c'est toute la conception :
+  au niveau objet, `DSPPGMREF` lit la liste de références que le compilateur a enregistrée, et c'est
+  un **fait** ; au niveau champ, c'est une **recherche** dans les sources qu'on peut lire, qui
+  manque tout programme dont la source a disparu, toute référence construite à l'exécution et tout
+  champ renommé par un mot-clé PREFIX. Chaque réponse porte donc sa **méthode en première ligne** et
+  ses **limites** en toutes lettres : ce résultat finit collé dans une demande de modification, et
+  la différence entre « le compilateur a enregistré ceci » et « j'ai cherché dans ce que je pouvais
+  lire » est la différence entre un fait et une piste.
+
+  Nouvelle compétence **`/impact`**, qui l'appelle *avant* de proposer quoi que ce soit.
+
+### Précisé
+
+- **`QTEMP` est la seule bibliothèque qu'un outil en lecture peut écrire, et la garde le sait
+  explicitement** (`SCRATCH_LIBRARY`). Demander « quels programmes utilisent ce fichier » passe par
+  un fichier de sortie, donc un outil qui ne fait que lire doit malgré tout écrire quelque part. La
+  raison n'est pas une convention mais une propriété : QTEMP est créée par travail, détruite avec
+  lui, invisible des autres travaux. L'exemption vit dans la garde et non dans chaque outil — un
+  outil qui s'accorde une exemption peut se tromper, et le suivant recopie l'exemption sans recopier
+  la raison. Elle ne blanchit pas les autres bibliothèques nommées dans la même commande, et
+  `ibmi_impact` fait passer **sa propre commande** par la garde avant de la lancer.
+- **Trouver zéro n'est jamais rendu par « rien ne l'utilise ».** Au niveau objet c'est « aucun
+  programme de ces bibliothèques n'enregistre de référence — c'est un fait sur ces bibliothèques,
+  pas sur le système » ; au niveau champ, c'est une preuve faible, et c'est dit.
+- ⚠️ **ARCAD : la feuille de route demandait ses références croisées, et je ne les appelle pas.**
+  Elias les a réellement, et le catalogue d'endpoints REST d'ARCAD n'est pas publié — inventer un
+  chemin produirait une intégration qui casse chez le client d'une façon indébogable, ce qui est
+  déjà la position écrite en tête de `integrations/arcad.ts`. La forme honnête : la réponse dit que
+  ARCAD est installé, qu'il sait mieux, et nomme la porte (`arcad_rest` avec un chemin fourni par
+  l'administrateur ARCAD) au lieu de prétendre à une réponse d'un produit qu'on devine.
+
 ## 0.70.0 — 2026-10-02
 
 ### Ajouté

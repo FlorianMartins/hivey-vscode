@@ -62,6 +62,22 @@ export interface LibraryPolicy {
 }
 
 /**
+ * The one library a reading tool may write.
+ *
+ * Asking "which programs use this file" on IBM i means `DSPPGMREF` to an OUTPUT FILE, and an output
+ * file is a file: a tool that only reads still has to write somewhere. QTEMP is the right and only
+ * answer, for reasons that are properties of the library rather than a convention — it is created
+ * per job, it is destroyed when the job ends, no other job can see it, and nothing in production
+ * can be reached through it.
+ *
+ * It lives HERE, in the gate, rather than in each tool. A tool that grants itself an exemption is a
+ * tool that can be wrong about it, and the next one copies the exemption without copying the
+ * reason. It is also only an exemption for the library named QTEMP: a command that writes to QTEMP
+ * and to CUSTMAST is still a command that writes to CUSTMAST.
+ */
+export const SCRATCH_LIBRARY = "QTEMP";
+
+/**
  * Commands that carry what they will do inside a string.
  *
  * A shell line, or a CL command handed to `QCMDEXC` as text: the target is in the string, the
@@ -100,6 +116,9 @@ export function refuseChange(text: string, changes: boolean, policy: LibraryPoli
   // Nothing named at all: it resolves against the library list, and that is not knowable here.
   if (!named.length) return { reason: "unqualified" };
 
-  const outside = named.filter((l) => !allowed.includes(l));
+  // QTEMP is allowed without being listed — see `SCRATCH_LIBRARY`. Filtered out of the names rather
+  // than added to the allow-list, so that a policy printed back to the user still shows the
+  // libraries THEY configured and not one this code added behind them.
+  const outside = named.filter((l) => l !== SCRATCH_LIBRARY && !allowed.includes(l));
   return outside.length ? { reason: "outside", libraries: outside } : undefined;
 }

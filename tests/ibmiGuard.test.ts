@@ -132,3 +132,45 @@ test("nothing is refused as opaque while the gate is off", () => {
 test("reading is still never restricted, shell or not", () => {
   assert.equal(refuseChange("QSH CMD('ls')", false, policy), undefined);
 });
+
+// ── QTEMP ────────────────────────────────────────────────────────────────────────────────────────
+//
+// A read-only tool on IBM i still has to WRITE somewhere: the classic way to ask "which programs
+// use this file" is `DSPPGMREF` to an output file, and an output file is a file. So the gate has to
+// know about the one library where that is harmless — and it has to know it EXPLICITLY, because the
+// alternative is each tool deciding for itself, and a tool that grants itself an exemption is a
+// tool that can be wrong about it.
+//
+// QTEMP is the right and only answer: it is created per job, it is destroyed when the job ends, no
+// other job can see it, and nothing in production can be reached through it.
+
+test("QTEMP is writable whatever the policy says, because it cannot outlive the job", () => {
+  const policy = { writable: ["TSTCFC", "DEVCFC"] };
+  assert.equal(refuseChange("DSPPGMREF PGM(PRODCFC/*ALL) OUTPUT(*OUTFILE) OUTFILE(QTEMP/HVYPGMREF)", true, policy), undefined);
+  assert.equal(refuseChange("CRTPF FILE(QTEMP/WORK) RCDLEN(80)", true, policy), undefined);
+  assert.equal(refuseChange("DLTF FILE(QTEMP/HVYPGMREF)", true, policy), undefined);
+  // Lower case too: a library name is a library name.
+  assert.equal(refuseChange("DLTF FILE(qtemp/hvypgmref)", true, policy), undefined);
+});
+
+test("QTEMP does not launder the other libraries named in the same command", () => {
+  // The failure mode worth guarding: `CPYF FROMFILE(QTEMP/X) TOFILE(PRODCFC/CUSTMAST)` writes to
+  // production and mentions QTEMP, and "every name counts" has to keep meaning every name.
+  const policy = { writable: ["TSTCFC"] };
+  const refused = refuseChange("CPYF FROMFILE(QTEMP/WORK) TOFILE(PRODCFC/CUSTMAST) MBROPT(*REPLACE)", true, policy);
+  assert.equal(refused?.reason, "outside");
+  assert.deepEqual(refused?.reason === "outside" ? refused.libraries : [], ["PRODCFC"]);
+});
+
+test("an unqualified command is still refused, QTEMP or not", () => {
+  // `DSPPGMREF ... OUTFILE(HVYPGMREF)` resolves against the library list. The exemption is for the
+  // library named QTEMP, not for the hope that the job's list happens to start with it.
+  const refused = refuseChange("DSPPGMREF PGM(PRODCFC/*ALL) OUTPUT(*OUTFILE) OUTFILE(HVYPGMREF)", true, { writable: ["TSTCFC"] });
+  assert.equal(refused?.reason, "unqualified");
+});
+
+test("the exemption is off with the gate, like everything else", () => {
+  // An empty list means the gate does nothing at all, and that has to stay true: a reader of this
+  // code must not have to wonder whether QTEMP introduced a second regime.
+  assert.equal(refuseChange("CPYF FROMFILE(QTEMP/WORK) TOFILE(PRODCFC/CUSTMAST)", true, { writable: [] }), undefined);
+});

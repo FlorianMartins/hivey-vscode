@@ -46,6 +46,12 @@ const READ_ONLY = new Set([
   "ibmi_members",
   "ibmi_objects",
   "ibmi_library_list",
+  // Impact analysis reads. It is here despite writing an output file, because the only library it
+  // writes is QTEMP — created per job, destroyed with it, invisible to every other job — and the
+  // gate knows that explicitly rather than the tool claiming it (`SCRATCH_LIBRARY`,
+  // `core/ibmi/guard.ts`). Plan mode is also where this question is asked most: "who uses this"
+  // belongs to deciding whether to change something, not to changing it.
+  "ibmi_impact",
 ]);
 
 export function toolsForMode(all: Tool[], mode: Mode): Tool[] {
