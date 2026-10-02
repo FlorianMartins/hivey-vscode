@@ -1,0 +1,7 @@
+{
+  "title": "A monolith that four programs copy from",
+  "kind": "ibmi",
+  "prompt": "The VAT and rounding rules in PRICING.rpgle are copied into three other programs. Turn this into an ILE service program: make the procedures exported with a prototype copybook PRICING_H.rpgleinc, add a binder source member PRICING.bnd with an explicit signature and the exported names, and keep NOMAIN so it has no program entry point.",
+  "check": "test -f PRICING.bnd && test -f PRICING_H.rpgleinc && codeonly PRICING.rpgle | grep -qi 'nomain' && [ $(codeonly PRICING.rpgle | grep -ci 'dcl-proc') -ge 2 ] && codeonly PRICING.rpgle | grep -qi 'export' && codeonly PRICING_H.rpgleinc | grep -qi 'dcl-pr' && grep -qi 'STRPGMEXP' PRICING.bnd && grep -qiE 'EXPORT +SYMBOL' PRICING.bnd",
+  "timeoutMs": 180000
+}

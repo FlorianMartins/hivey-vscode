@@ -1,0 +1,7 @@
+{
+  "title": "A printer file with no headings and no page break",
+  "kind": "ibmi",
+  "prompt": "CUSPRT.prtf prints detail lines and nothing else: no column headings, no page number, and no page break. Add a heading record format that prints the title, the date, the page number and the column headings, with SKIP and SPACE stated rather than implied, and a total record format for the end. Keep the DDS in fixed format.",
+  "check": "grep -qE '^     A' CUSPRT.prtf && [ $(codeonly CUSPRT.prtf | grep -cE '^     A +R +[A-Z]') -ge 3 ] && codeonly CUSPRT.prtf | grep -qiE 'PAGNBR' && codeonly CUSPRT.prtf | grep -qiE '(SKIPB|SKIPA)' && codeonly CUSPRT.prtf | grep -qiE 'SPACEA' && codeonly CUSPRT.prtf | grep -qiE \"'Customer'\" && codeonly CUSPRT.prtf | grep -qiE 'DATE'",
+  "timeoutMs": 180000
+}

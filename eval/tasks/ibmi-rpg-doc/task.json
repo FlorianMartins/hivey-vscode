@@ -1,0 +1,7 @@
+{
+  "title": "A member with no header and no note anywhere",
+  "kind": "ibmi",
+  "prompt": "STKADJ.rpgle has no documentation at all. Add a header saying what it is for, what calls it and which files it uses with what it does to each, and a short note above each procedure saying what it promises. Do not change a line of code and do not reformat it.",
+  "check": "codeonly STKADJ.rpgle | grep -qi 'dcl-proc adjustStock' && codeonly STKADJ.rpgle | grep -qi 'dcl-proc stockOf' && [ $(grep -c '^ *//' STKADJ.rpgle) -ge 8 ] && grep -qiE '^ *//.*(STKMAST|file)' STKADJ.rpgle && awk '/dcl-proc adjustStock/{if (prev ~ /^ *\\/\\//) ok=1} {prev=$0} END{exit !ok}' STKADJ.rpgle && awk '/dcl-proc stockOf/{if (prev ~ /^ *\\/\\//) ok=1} {prev=$0} END{exit !ok}' STKADJ.rpgle",
+  "timeoutMs": 180000
+}

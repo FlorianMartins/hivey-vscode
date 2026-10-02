@@ -1,0 +1,8 @@
+     A          R CUSREC                    TEXT('Customer master')
+     A            CUSNO         10A         TEXT('Customer number')
+     A            CUSNAM        30A         TEXT('Customer name')
+     A            BRANCH         3A         TEXT('Branch code')
+     A            STATUS         1A         TEXT('A=active, C=closed')
+     A            CUSBAL        11P 2       TEXT('Balance')
+     A          K CUSNO
+     A                                      UNIQUE

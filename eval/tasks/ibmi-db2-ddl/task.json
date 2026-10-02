@@ -1,0 +1,7 @@
+{
+  "title": "A DDS physical file, as an SQL table",
+  "kind": "ibmi",
+  "prompt": "Write custmast.sql: the SQL DDL equivalent of the DDS in CUSTMAST.pf, as a CREATE TABLE in schema DEVCFC. Carry over the column names, types and lengths, the text descriptions, the NOT NULL where DDS implies it, and the unique key as a primary key. Say nothing about the DDS file itself — just the DDL.",
+  "check": "test -f custmast.sql && codeonly custmast.sql | grep -qiE 'create +table +DEVCFC\\.CUSTMAST' && codeonly custmast.sql | grep -qiE 'CUSNO +(char|numeric|dec)' && codeonly custmast.sql | grep -qiE 'CUSBAL +(numeric|decimal|dec)\\( *11 *, *2 *\\)' && codeonly custmast.sql | grep -qiE 'primary +key' && codeonly custmast.sql | grep -qiE 'not +null' && codeonly custmast.sql | grep -qi 'IS '",
+  "timeoutMs": 180000
+}

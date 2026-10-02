@@ -1,0 +1,7 @@
+{
+  "title": "Numbered indicators nobody can read",
+  "kind": "ibmi",
+  "prompt": "ORDVAL.rpgle drives its logic with *IN50, *IN51 and *IN60, so the code cannot be read without a key nobody wrote down. Replace them with named indicator variables that say what they mean, and keep the behaviour identical. Leave the display-file indicators that DDS owns alone — only the program's own flags are yours to rename.",
+  "check": "! codeonly ORDVAL.rpgle | grep -qiE '\\*IN(50|51|60)\\b' && codeonly ORDVAL.rpgle | grep -qiE 'dcl-s +[a-z][a-z0-9]* +ind' && [ $(codeonly ORDVAL.rpgle | grep -ciE 'dcl-s +[a-z][a-z0-9]* +ind') -ge 3 ] && codeonly ORDVAL.rpgle | grep -qiE '\\*IN03\\b'",
+  "timeoutMs": 180000
+}

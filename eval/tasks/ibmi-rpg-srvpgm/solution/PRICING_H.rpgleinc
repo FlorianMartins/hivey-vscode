@@ -1,0 +1,9 @@
+// What PRICING exports. Included by the service program itself and by every caller, so the two
+// cannot disagree about a parameter.
+dcl-pr CalcVat packed(11:2);
+  net packed(11:2) const;
+end-pr;
+
+dcl-pr CalcGross packed(11:2);
+  net packed(11:2) const;
+end-pr;

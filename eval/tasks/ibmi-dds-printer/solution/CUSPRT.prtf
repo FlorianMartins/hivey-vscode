@@ -1,0 +1,21 @@
+     A                                      REF(CUSTMAST)
+     A          R HEADING                    SKIPB(1)
+     A                                      SPACEA(2)
+     A                                  1  2'Customer balances'
+     A                                      DSPATR(HI)
+     A                                  1 50'Date'
+     A            PRTDAT          8A       1 56
+     A                                  1 70'Page'
+     A                                  1 76PAGNBR
+     A                                      EDTCDE(Z)
+     A                                  3  2'Number'
+     A                                  3 15'Customer'
+     A                                  3 50'Balance'
+     A          R DETAIL                     SPACEA(1)
+     A            CUSNO         10A     2  2
+     A            CUSNAM        30A     2 15
+     A            CUSBAL        11P 2   2 50EDTCDE(J)
+     A          R TOTALS                     SPACEB(2)
+     A                                      SPACEA(1)
+     A                                  1 15'Total'
+     A            GRDTOT        13P 2   1 50EDTCDE(J)

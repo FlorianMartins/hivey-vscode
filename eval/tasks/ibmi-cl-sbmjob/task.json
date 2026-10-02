@@ -1,0 +1,7 @@
+{
+  "title": "A submitted job that inherits whatever the caller had",
+  "kind": "ibmi",
+  "prompt": "NIGHTLY.clle submits the batch with a bare SBMJOB, so the job runs under whatever job description, library list and output queue the caller happened to have — and nobody can tell afterwards which job it was. Give it an explicit job name, an explicit JOBD qualified by its library, and an explicit initial library list, and monitor the submission itself so a failure to submit is not silent.",
+  "check": "codeonly NIGHTLY.clle | grep -qiE 'SBMJOB' && codeonly NIGHTLY.clle | grep -qiE 'JOB\\(' && codeonly NIGHTLY.clle | grep -qiE 'JOBD\\( *[&A-Z0-9#$@]+/[A-Z0-9#$@]+ *\\)' && codeonly NIGHTLY.clle | grep -qiE 'INLLIBL\\(' && codeonly NIGHTLY.clle | grep -qiE 'MONMSG' && codeonly NIGHTLY.clle | grep -qiE 'CMD\\( *CALL +PGM\\( *[&A-Z0-9#$@]+/'",
+  "timeoutMs": 180000
+}

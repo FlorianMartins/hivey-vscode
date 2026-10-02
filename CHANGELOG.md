@@ -2,6 +2,47 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.73.0 — 2026-10-02
+
+### Ajouté
+
+- **Chantier 1.6 — quarante compétences IBM i, et chacune adossée à une tâche qui échoue d'abord.**
+  21 nouvelles compétences complètent les quatre familles : **14 RPG** (indicateurs nommés,
+  `MOVE`/`MOVEL` vers des affectations explicites, sortie du cycle, `/COPY` et prototypes, monolithe
+  vers programme de service, contrôle de validation, pointeurs et stockage basé), **7 DDS** (fichier
+  logique, clés et sélection, DDS vers DDL SQL, sous-fichier), **11 Db2 for i** (index sur preuves,
+  isolation, déclencheurs, performance d'une requête, gestion des nulls) et **8 CL** (`SBMJOB`
+  explicite, sortir de la liste de bibliothèques, messages exploitables, surveillance du message qui
+  peut arriver, contrôle des paramètres avant d'agir).
+
+  ⚠️ Et le critère qui coûte : **une compétence est une poignée de lignes de texte**, donc quarante
+  compétences jamais éprouvées sont quarante lignes dans un tableau comparatif. Chaque compétence
+  IBM i **déclare donc la tâche d'évaluation qui l'éprouve** (`evalTask`), et trois tests lisent
+  cette déclaration : au moins quarante compétences et au moins cinq par famille, la tâche nommée
+  **existe sur le disque**, et c'est bien une tâche IBM i — ce qui empêche la triche évidente
+  d'adosser `/tofree` à une tâche JavaScript. Les deux portes du banc font le reste : la tâche doit
+  échouer sur la fixture intacte et réussir sur sa solution.
+  Voir [ADR-0018](docs/adr/0018-une-competence-nomme-la-tache-qui-l-eprouve.md).
+
+- **Le banc passe de 40 à 51 tâches**, dont 21 IBM i : indicateurs numérotés, `MOVE`/`MOVEL`,
+  `/COPY` et prototypes, programme de service avec source de reliure et signature, documentation
+  d'un membre, tests RPGUnit écrits, accès par enregistrement vers curseur SQL, fichier logique avec
+  clé et sélection, DDS vers `CREATE TABLE` avec `LABEL ON`, `SBMJOB` explicite et surveillé,
+  fichier imprimante avec en-têtes et saut de page. 51/51 échouent avant et passent sur leur
+  solution.
+
+### Précisé
+
+- ⚠️ **Deux compétences ne peuvent pas être éprouvées par le banc**, et elles le **déclarent**
+  (`evalGap`) : `/impact` et `/whouses` répondent depuis une partition vivante, et une fixture qui en
+  tiendrait lieu deviendrait la chose testée. Les deux autres réponses possibles étaient mauvaises —
+  les adosser à une tâche voisine mais sans rapport rend le critère décoratif, les laisser
+  silencieusement sans rien le rend faux sans que personne le sache. Un test exige que ces lacunes
+  restent au plus quatre et qu'elles disent ce qui manque.
+- ⚠️ **Non vérifié** : aucune de ces compétences n'a été exécutée contre un modèle réel. On sait que
+  les tâches sont honnêtes ; on ne sait pas encore que les compétences les résolvent — c'est
+  exactement ce que le chantier 0.6 a livré le moyen de mesurer.
+
 ## 0.72.0 — 2026-10-02
 
 ### Ajouté

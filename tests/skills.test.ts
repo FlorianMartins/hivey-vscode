@@ -14,6 +14,8 @@ import {
   skillInvocation,
   toggleSkill,
 } from "../src/core/session/skills.js";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 
 test("a skill nobody has switched off is on", () => {
   assert.equal(isSkillEnabled("/tests", []), true);
@@ -187,4 +189,63 @@ test("nothing is offered by a family nobody selected", () => {
   const names = enabledSkills({ groups: ["general"], disabled: [] }).map((s) => s.name);
   assert.ok(!names.some((n) => ["/a11y", "/junit", "/borrow", "/dspf"].includes(n)));
   assert.ok(names.length >= 8 && names.length <= 15, `general should be a handful, got ${names.length}`);
+});
+
+// ── The IBM i families, and the task behind each skill ───────────────────────────────────────────
+//
+// The roadmap's requirement for phase 1 is forty IBM i skills, each backed by an evaluation task
+// whose check fails before the work is done. A requirement like that survives exactly as long as
+// somebody remembers it, so it is read off the skills themselves: a new IBM i skill with no task
+// named — and no reason given for having none — fails here.
+
+const IBMI_GROUPS = new Set(["rpg", "dds", "db2i", "cl"]);
+const ibmiSkills = BUILTIN_SKILLS.filter((s) => IBMI_GROUPS.has(s.group));
+
+test("there are at least forty IBM i skills", () => {
+  assert.ok(ibmiSkills.length >= 40, `only ${ibmiSkills.length}: ${ibmiSkills.map((s) => s.name).join(" ")}`);
+  // And spread across the four families rather than forty variations of one.
+  for (const group of IBMI_GROUPS) {
+    const count = ibmiSkills.filter((s) => s.group === group).length;
+    assert.ok(count >= 5, `the ${group} family has only ${count}`);
+  }
+});
+
+test("every IBM i skill names the evaluation task that exercises it, or says why it cannot", () => {
+  const unbacked = ibmiSkills.filter((s) => !s.evalTask && !s.evalGap);
+  assert.deepEqual(unbacked.map((s) => s.name), [], "these are backed by nothing and explain nothing");
+});
+
+test("every task a skill names exists on disk", () => {
+  // The failure this catches is a renamed directory: the skill still points somewhere, and nothing
+  // else in the repository would notice.
+  const missing: string[] = [];
+  for (const skill of ibmiSkills) {
+    if (!skill.evalTask) continue;
+    if (!existsSync(join("eval", "tasks", skill.evalTask, "task.json"))) missing.push(`${skill.name} → ${skill.evalTask}`);
+  }
+  assert.deepEqual(missing, [], "these skills point at a task that is not there");
+});
+
+test("the declared gaps are few, and each says what is missing", () => {
+  // A gap is honest; a drawer full of gaps is the requirement quietly abandoned.
+  const gaps = ibmiSkills.filter((s) => s.evalGap);
+  assert.ok(gaps.length <= 4, `${gaps.length} skills are unbacked: ${gaps.map((s) => s.name).join(" ")}`);
+  for (const skill of gaps) {
+    assert.match(skill.evalGap ?? "", /partition/, `${skill.name}'s gap does not say what is missing`);
+    assert.equal(skill.evalTask, undefined, `${skill.name} claims both a task and a gap`);
+  }
+});
+
+test("the tasks behind the IBM i skills really are IBM i tasks", () => {
+  // The cheat this prevents: backing /tofree with a JavaScript task because the mapping only
+  // checks that a directory exists.
+  const wrong: string[] = [];
+  for (const skill of ibmiSkills) {
+    if (!skill.evalTask) continue;
+    const meta = JSON.parse(readFileSync(join("eval", "tasks", skill.evalTask, "task.json"), "utf8")) as { kind: string };
+    // `ibmi` is the kind for the platform's own work; a test-writing or bug task is allowed when the
+    // fixture is IBM i source, which the directory name carries.
+    if (meta.kind !== "ibmi" && !skill.evalTask.startsWith("ibmi-")) wrong.push(`${skill.name} → ${skill.evalTask} (${meta.kind})`);
+  }
+  assert.deepEqual(wrong, [], "these skills are backed by a task about something else");
 });

@@ -1,0 +1,7 @@
+{
+  "title": "A called program with no prototype",
+  "kind": "ibmi",
+  "prompt": "ORDPOST.rpgle calls CUSTCHK with a bare CALL and PARM-style variables, so nothing checks the parameters and a change to CUSTCHK breaks this silently at run time. Write a prototype for it in a copybook member CUSTCHK_H.rpgleinc, bring it in with /COPY, and call it through the prototype with CALLP. Keep the same parameters.",
+  "check": "test -f CUSTCHK_H.rpgleinc && codeonly CUSTCHK_H.rpgleinc | grep -qi 'dcl-pr' && codeonly CUSTCHK_H.rpgleinc | grep -qi 'extpgm' && codeonly ORDPOST.rpgle | grep -qiE '/(copy|include)' && codeonly ORDPOST.rpgle | grep -qi 'callp' && ! codeonly ORDPOST.rpgle | grep -qiE '^ *call +'",
+  "timeoutMs": 180000
+}

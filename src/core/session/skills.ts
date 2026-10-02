@@ -28,6 +28,31 @@ export interface BuiltinSkill {
   /** True when the active file (or selection) should ride along with it. */
   attach?: boolean;
   /**
+   * The evaluation task that exercises this skill, by directory name under `eval/tasks`.
+   *
+   * Declared on the skill rather than kept in a list somewhere, because a list somewhere is a list
+   * that rots: the roadmap's requirement is that every IBM i skill be backed by a task whose check
+   * FAILS before the work is done, and the only way that requirement survives the next skill
+   * somebody adds is if a test can read it off the skill itself. `tests/skills.test.ts` checks that
+   * every skill in the IBM i families names one and that the directory exists; `eval:verify` and
+   * `eval:solutions` already check that the task itself is honest in both directions.
+   *
+   * One task may back several skills, which is honest where they are the same subject seen from two
+   * sides — `/tofree` and `/cycle` are both about getting out of the fixed-format program — and is
+   * not an excuse to point five unrelated skills at one convenient task.
+   */
+  evalTask?: string;
+  /**
+   * Why no evaluation task backs this skill, when none can.
+   *
+   * Two of the IBM i skills cannot be exercised by the bench at all: their answer comes from a live
+   * partition — `DSPPGMREF` over a real library — and a fixture cannot stand in for it without the
+   * fixture becoming the thing being tested. The honest construction is not to point them at a
+   * convenient unrelated task, and not to leave them silently unbacked either, but to say so HERE,
+   * where it is countable and reviewable. The test requires one of `evalTask` or `evalGap`.
+   */
+  evalGap?: string;
+  /**
    * A feature this skill depends on. Offered only when that feature is on.
    *
    * Not the same thing as a group: a group is a language somebody chose not to work in today, and
@@ -130,6 +155,327 @@ export const BUILTIN_SKILLS: BuiltinSkill[] = [
   { group: "general", name: "/errors", hint: t("handle the failures"), prompt: t("Find every failure this code does not handle: what can throw, what can return nothing, what can time out. Propose handling that leaves the caller able to act, not a swallowed exception."), attach: true },
   { group: "security", name: "/security", hint: t("security review"), prompt: t("Review this for security: injection through anything that reaches a query, a shell or a template; authorization checked at the boundary rather than in the caller; secrets in code or logs; unsafe deserialisation. Rank by exploitability and say what an attacker would need."), attach: true },
 
+
+  // ── IBM i, the families the roadmap asks to complete ─────────────────────────────────────────
+  {
+    group: "rpg",
+    name: "/indicators",
+    hint: t("numbered indicators to named ones"),
+    evalTask: "ibmi-rpg-indicators",
+    prompt: t(
+      "Replace the numbered indicators in this member with named indicator variables.\n" +
+        "\n" +
+        "1. Leave alone every indicator DDS owns: a display file's function keys and its error indicators are the screen's, not the program's. Say which ones you left and why.\n" +
+        "2. For each of the program's own flags, give it a name that says what it MEANS rather than what it does — badQuantity, not errorFlag2.\n" +
+        "3. Change no behaviour. An indicator that is both set and tested in two places is one variable, not two.\n" +
+        "4. Where an indicator was standing in for a condition that can simply be re-evaluated, say so: the best fix is often no flag at all.\n"
+    ),
+    attach: true,
+  },
+  {
+    group: "rpg",
+    name: "/movefree",
+    hint: t("MOVE and MOVEL to explicit assignments"),
+    evalTask: "ibmi-rpg-move",
+    prompt: t(
+      "Replace every MOVE and MOVEL here with an explicit free-form assignment.\n" +
+        "\n" +
+        "1. Say which way each one aligned before you change it: MOVE takes from the right, MOVEL from the left. Getting that backwards is silent and it corrupts data.\n" +
+        "2. Use %SUBST for a left-aligned truncation, EVALR for a right-aligned one, and %CHAR or %DEC where a type was being changed as a side effect.\n" +
+        "3. A MOVE between different types was doing two things at once. Write both.\n" +
+        "4. Change no behaviour, and point out any case where the original was relying on MOVE not clearing the rest of the target.\n"
+    ),
+    attach: true,
+  },
+  {
+    group: "rpg",
+    name: "/cycle",
+    hint: t("get out of the RPG cycle"),
+    evalTask: "ibmi-rpg-freeform",
+    prompt: t(
+      "Replace the RPG cycle in this program with an explicit loop.\n" +
+        "\n" +
+        "1. Say what the cycle was doing for it: the primary file read, the level breaks, the total time output, the automatic LR. Each one has to be written out by hand now.\n" +
+        "2. Write the read loop explicitly, with %EOF, and the level-break comparisons as ordinary IF statements on saved key values.\n" +
+        "3. Keep the output exactly as it was, totals and all. A level break that fires one record early is the classic way this goes wrong.\n" +
+        "4. Set *INLR yourself, and say so: without the cycle nothing does it for you.\n"
+    ),
+    attach: true,
+  },
+  {
+    group: "rpg",
+    name: "/copyproto",
+    hint: t("/COPY and prototypes instead of bare CALL"),
+    evalTask: "ibmi-rpg-copy-proto",
+    prompt: t(
+      "Give the called programs here real prototypes.\n" +
+        "\n" +
+        "1. For each bare CALL, write a prototype with EXTPGM in a copybook member, and bring it in with /COPY. One copybook per called program, named after it.\n" +
+        "2. Call it with CALLP through the prototype. The point is the compile error: a change to the called program's parameters now breaks every caller at compile time instead of at run time, in production.\n" +
+        "3. Mark as CONST every parameter the callee does not change — that is documentation the compiler enforces, and it lets a caller pass an expression.\n" +
+        "4. Say what you could not prototype: a program called by a name held in a variable cannot be, and that is worth reporting rather than working around.\n"
+    ),
+    attach: true,
+  },
+  {
+    group: "rpg",
+    name: "/srvpgm",
+    hint: t("monolith to modules and a service program"),
+    evalTask: "ibmi-rpg-srvpgm",
+    prompt: t(
+      "Turn this into an ILE service program.\n" +
+        "\n" +
+        "1. Decide what belongs in it: the rules more than one program needs. A procedure used once belongs where it is used.\n" +
+        "2. Make it NOMAIN — a service program has no entry point, because nothing calls \"the pricing program\", callers call a procedure in it.\n" +
+        "3. Export the procedures, and put their prototypes in a copybook included by the service program itself AND by every caller, so the two cannot disagree.\n" +
+        "4. Write the binder source with an explicit SIGNATURE and the exports in a fixed order, and say why the order matters: adding at the end stays compatible, reordering breaks every bound caller.\n" +
+        "5. Say which activation group it should run in and what that means for open files and for commitment control.\n"
+    ),
+    attach: true,
+  },
+  {
+    group: "rpg",
+    name: "/validate",
+    hint: t("input validation that says what is wrong"),
+    evalTask: "ibmi-rpg-indicators",
+    prompt: t(
+      "Review the input validation here.\n" +
+        "\n" +
+        "1. For each field, say what is actually checked and what is not: a length, a range, a date that exists, a code that is in a table, a mandatory field that is only blank-checked.\n" +
+        "2. Validate ALL of it before refusing, not at the first error: a screen that reports one problem at a time is a screen somebody submits six times.\n" +
+        "3. Name each failure in a message the user can act on, and keep the field in error identifiable so the display file can light it.\n" +
+        "4. Say which checks belong in the database instead — a referential constraint or a check constraint is enforced for every program, including the ones nobody has written yet.\n"
+    ),
+    attach: true,
+  },
+  {
+    group: "rpg",
+    name: "/pointers",
+    hint: t("review pointers and based storage"),
+    evalTask: "ibmi-rpg-srvpgm",
+    prompt: t(
+      "Review the pointers and based storage here.\n" +
+        "\n" +
+        "1. For each pointer, state the invariant that makes it sound: what it points at, who allocated it, who frees it, and what happens on an error path in between.\n" +
+        "2. Find the leaks: an ALLOC with no DEALLOC on every path, including the one through a MONITOR handler.\n" +
+        "3. Find the arithmetic nobody can check: a based structure whose length is computed from a field, and a %SIZE that stopped matching when somebody changed the structure.\n" +
+        "4. Where the same thing can be done with a varying field, a data structure or a procedure parameter, say so. Treat a pointer with no written invariant as a defect.\n"
+    ),
+    attach: true,
+  },
+  {
+    group: "dds",
+    name: "/lf",
+    hint: t("design the logical file"),
+    evalTask: "ibmi-dds-logical",
+    prompt: t(
+      "Design or review this logical file.\n" +
+        "\n" +
+        "1. Say what it is FOR: an access path, a subset, a projection, or a join. A logical that does all four is one nobody can reason about.\n" +
+        "2. Key it on the columns the access actually needs, in the order the access needs them — the key order IS the access path.\n" +
+        "3. Use S and O specifications for a subset, and say what happens to a record that stops matching: it leaves the view, which is a surprise to any program holding a position in it.\n" +
+        "4. Project only the fields the readers use, and say what each one costs: every logical is maintained on every write to the physical.\n"
+    ),
+    attach: true,
+  },
+  {
+    group: "dds",
+    name: "/ddskeys",
+    hint: t("keys, select and omit"),
+    evalTask: "ibmi-dds-logical",
+    prompt: t(
+      "Review the keys and the select/omit here.\n" +
+        "\n" +
+        "1. Say what order the key gives, including the keywords that change it: DESCEND, ABSVAL, ZONE, UNIQUE, and what a duplicate key does to a write.\n" +
+        "2. For each S and O line, say whether the order matters — they are evaluated in sequence and the first match wins, so an O before an S changes the answer.\n" +
+        "3. Watch for a select on a field that is not in the key: the access path is built anyway and every read pays for the filtering.\n" +
+        "4. Say which of these would be clearer as an SQL index and view, and what that would change about how programs open it.\n"
+    ),
+    attach: true,
+  },
+  {
+    group: "dds",
+    name: "/ddsmodern",
+    hint: t("DDS to SQL DDL"),
+    evalTask: "ibmi-db2-ddl",
+    prompt: t(
+      "Write the SQL DDL equivalent of this DDS.\n" +
+        "\n" +
+        "1. Carry over the names, the types and the lengths exactly. A packed field is DECIMAL, a zoned one is NUMERIC, and the two are not interchangeable on disk.\n" +
+        "2. Carry over the TEXT and COLHDG as LABEL ON: they are what every query tool shows, and losing them is the most visible part of a conversion nobody reviews.\n" +
+        "3. DDS has no nullable field unless ALWNULL says so, so state NOT NULL rather than inheriting SQL's opposite default — and say what default value each column then needs.\n" +
+        "4. A unique DDS key becomes a primary key. Say what happens to the programs that relied on duplicate keys being allowed.\n" +
+        "5. Say what is LOST: the record format name, the field reference file, and anything the physical file's DDS did that DDL has no word for.\n"
+    ),
+    attach: true,
+  },
+  {
+    group: "dds",
+    name: "/subfile",
+    hint: t("review the subfile"),
+    evalTask: "ibmi-dds-field",
+    prompt: t(
+      "Review this subfile.\n" +
+        "\n" +
+        "1. Say which kind it is and why: load-all, single-page or expanding. A load-all over a file nobody bounded is a program that reads a million records to show twelve.\n" +
+        "2. Check the control record's keywords against the behaviour: SFLDSP, SFLDSPCTL, SFLCLR, SFLEND and the order they must be set in. A missing SFLCLR shows yesterday's rows.\n" +
+        "3. Check the relative record number arithmetic, which is where this always breaks: the page size, the top record, and what happens on the last partial page.\n" +
+        "4. Say how an error on one line is shown, and whether the user can still see the data while reading the message.\n"
+    ),
+    attach: true,
+  },
+  {
+    group: "db2i",
+    name: "/indexes",
+    hint: t("which indexes this table needs"),
+    evalTask: "ibmi-db2-catalog",
+    prompt: t(
+      "Work out which indexes this table needs, from evidence.\n" +
+        "\n" +
+        "1. Call ibmi_index_advice first. Without it this is a guess, and an index is a guess that costs disk and slows every write.\n" +
+        "2. Separate the keys asked for thousands of times from the ones asked for twice: the second kind is somebody's ad-hoc query, not a workload.\n" +
+        "3. Say what each proposed index would serve — which predicate, which ordering, which join — and in which order its columns must be, because the order IS the index.\n" +
+        "4. Look at what already exists before adding: an index whose leading columns match an existing one is usually the existing one with a longer key.\n" +
+        "5. Say what you would measure afterwards to know it worked.\n"
+    ),
+    attach: true,
+  },
+  {
+    group: "db2i",
+    name: "/isolation",
+    hint: t("the isolation level in force"),
+    evalTask: "ibmi-db2-commit",
+    prompt: t(
+      "What isolation is this running under, and what does that allow?\n" +
+        "\n" +
+        "1. Say where the level comes from: the COMMIT parameter on the compile, a SET TRANSACTION, the connection, or the default — and that they do not all agree.\n" +
+        "2. For the level in force, name what it permits concretely: a dirty read, a value that changes between two reads of the same row, a row that appears in the second half of a report.\n" +
+        "3. Say which rows are locked, for how long, and what another job waiting on them will see — a timeout, or a wait that outlasts the user's patience.\n" +
+        "4. Where native I/O and SQL touch the same file in one program, say what that does to the locks. It is the most common cause of a hang that nobody can reproduce.\n"
+    ),
+    attach: true,
+  },
+  {
+    group: "db2i",
+    name: "/triggers",
+    hint: t("review the triggers on this table"),
+    evalTask: "ibmi-db2-ddl",
+    prompt: t(
+      "Review the triggers on this table.\n" +
+        "\n" +
+        "1. List them with what fires them and when: before or after, insert, update or delete, row or statement. A before-trigger that writes elsewhere is a transaction nobody declared.\n" +
+        "2. Say what happens on a failure inside one: whether the originating write is rolled back, and whether the caller is told anything it can act on.\n" +
+        "3. Look for the loop — a trigger whose write fires the trigger — and for the ordering nobody controls when two triggers fire on the same event.\n" +
+        "4. Say which of these belongs in a trigger at all: logic in a trigger runs for every program, including the data fix somebody runs by hand at midnight, which is sometimes exactly right and sometimes a disaster.\n"
+    ),
+    attach: true,
+  },
+  {
+    group: "db2i",
+    name: "/sqlperf",
+    hint: t("why this query is slow"),
+    evalTask: "ibmi-db2-catalog",
+    prompt: t(
+      "Why is this query slow, and what would make it fast?\n" +
+        "\n" +
+        "1. Call ibmi_index_advice on the tables involved before saying anything: the optimizer has already recorded what it wished it had.\n" +
+        "2. Read the predicates for what an index can actually use: a function on the left of a comparison, a LIKE with a leading wildcard, an implicit cast between a CHAR column and a numeric host variable — each of those costs the index.\n" +
+        "3. Look at the joins for the one that fans out, and at the ORDER BY and GROUP BY for a sort that an index could have given for free.\n" +
+        "4. Say what you expect to change and by how much, and what you would measure. A rewrite with no number attached is a preference.\n"
+    ),
+    attach: true,
+  },
+  {
+    group: "cl",
+    name: "/clsbmjob",
+    hint: t("submit a job that can be found afterwards"),
+    evalTask: "ibmi-cl-sbmjob",
+    prompt: t(
+      "Review this submitted job.\n" +
+        "\n" +
+        "1. A bare SBMJOB inherits the caller's job description, library list and output queue by accident. Make all three explicit, and qualify the JOBD by its library.\n" +
+        "2. Give the job a NAME somebody can find in the output queue two days later. A screen full of QPADEV jobs is an audit nobody can perform.\n" +
+        "3. Monitor the submission itself: a missing JOBD, no authority or a held job queue fails at SBMJOB, and the caller currently reports success.\n" +
+        "4. Say what the job queue's single-threading means for this, and what happens if it is submitted twice.\n"
+    ),
+    attach: true,
+  },
+  {
+    group: "cl",
+    name: "/cllib",
+    hint: t("stop depending on the library list"),
+    evalTask: "ibmi-cl-qualify",
+    prompt: t(
+      "Make this program stop depending on the job's library list.\n" +
+        "\n" +
+        "1. Qualify every object reference with a library. An unqualified name resolves against a list this program does not control, and in production that list starts with production.\n" +
+        "2. Take the library from a parameter with a sensible default rather than hard-coding it in each command: one place to change, and a test run becomes possible.\n" +
+        "3. Where the list genuinely has to change, do it explicitly and restore it — and say what happens if the program ends between the two.\n" +
+        "4. Say which references you could NOT qualify and why: a command that builds its own target at run time cannot be, and that is a finding rather than a failure.\n"
+    ),
+    attach: true,
+  },
+  {
+    group: "cl",
+    name: "/clmsgf",
+    hint: t("send a message somebody can act on"),
+    evalTask: "ibmi-cl-monmsg",
+    prompt: t(
+      "Review the messages this program sends.\n" +
+        "\n" +
+        "1. Say what each SNDPGMMSG actually does: an informational message in a batch joblog nobody reads, or an escape message that stops the caller. Those are different programs.\n" +
+        "2. Put the text in a message file with substitution variables rather than in the source: translatable, findable by id, and changeable without a recompile.\n" +
+        "3. Make a failure escape. A program that detects an error, sends *INFO and ends with status 0 is a program whose caller believes it worked.\n" +
+        "4. Say what the operator is supposed to DO with each message. A message that names a problem and not an action is a message that gets ignored.\n"
+    ),
+    attach: true,
+  },
+  {
+    group: "cl",
+    name: "/clmonitor",
+    hint: t("monitor the message that can happen"),
+    evalTask: "ibmi-cl-monmsg",
+    prompt: t(
+      "Review the error handling in this CL program.\n" +
+        "\n" +
+        "1. For each command that can fail, name the message it would send and monitor THAT one. A program-level MONMSG MSGID(CPF0000) swallows an authority failure and a damaged object along with the file-not-found you were expecting.\n" +
+        "2. Say what the handler should do: tolerate (the file was not there, which is fine the first time), recover, or escape. Tolerating by accident is the bug this skill exists for.\n" +
+        "3. Make the program's own failure visible to its caller, with a message the caller can monitor.\n" +
+        "4. Say what state is left behind on each error path — a cleared file, a half-copied member, a lock still held.\n"
+    ),
+    attach: true,
+  },
+  {
+    group: "cl",
+    name: "/clvalidate",
+    hint: t("check the parameters before acting"),
+    evalTask: "ibmi-cl-qualify",
+    prompt: t(
+      "Make this program check its parameters before it does anything.\n" +
+        "\n" +
+        "1. For each parameter, say what an invalid value would DO: a blank library that resolves to the list, a name that does not exist, a date nobody validated that ends up in a file name.\n" +
+        "2. Check existence where it matters — CHKOBJ before you clear something — and refuse with an escape message naming the parameter rather than failing in the middle.\n" +
+        "3. Do all the checking before the first change. A program that validates the second parameter after clearing the file described by the first is a program that destroys data on a typo.\n" +
+        "4. Say which checks the command definition (CMD) should carry instead: a VALUES list or a RANGE is enforced before the program ever starts.\n"
+    ),
+    attach: true,
+  },
+  {
+    group: "db2i",
+    name: "/nulls",
+    hint: t("null handling, which DDS never had"),
+    evalTask: "ibmi-db2-ddl",
+    prompt: t(
+      "Review how this handles nulls.\n" +
+        "\n" +
+        "1. Say which columns are actually null-capable. DDS has none unless ALWNULL says so, SQL has them by default, and a table created both ways in its lifetime has both.\n" +
+        "2. In RPG, every read of a null-capable column needs its null indicator checked BEFORE the value is used: the value in a null column is not a value, and using it silently gives you zero or blanks.\n" +
+        "3. Watch the comparisons: a predicate on a null column is UNKNOWN rather than false, so NOT IN returns nothing and an aggregate skips rows nobody told you about.\n" +
+        "4. Say for each column whether null means anything different from zero or blank in this business. If it does not, the column should not be null-capable.\n"
+    ),
+    attach: true,
+  },
+
   // ── Web ─────────────────────────────────────────────────────────────────────────────────────
   { group: "frontend", name: "/a11y", hint: t("accessibility audit"), prompt: t("Audit this against WCAG 2.2 AA: the accessible name of every control, keyboard reachability and focus order, contrast, ARIA used where a native element would do, and what a screen reader announces. Cite the criterion for each finding and separate what is certain from what needs a browser."), attach: true },
   { group: "frontend", name: "/semantic", hint: t("the right HTML elements"), prompt: t("Rewrite this markup with the elements that carry its meaning: landmarks, headings in order, lists for lists, buttons for actions and links for navigation. Say what each change gives a screen reader that the original did not."), attach: true },
@@ -212,10 +558,11 @@ export const BUILTIN_SKILLS: BuiltinSkill[] = [
   // The largest family, and the reason the dialect rules in core exist: a model that guesses at
   // column positions produces a member that looks right, compiles into something else, and fails
   // in a spool file.
-  { group: "rpg", name: "/tofree", hint: t("convert fixed-format RPG to fully free"), prompt: t("Convert this member to fully free-form RPGLE. Start with **FREE, use dcl-f/dcl-s/dcl-ds/dcl-proc, keep every comment, and change no behavior. Point out anything with no free-form equivalent instead of inventing one."), attach: true },
+  { group: "rpg", name: "/tofree", evalTask: "ibmi-rpg-freeform", hint: t("convert fixed-format RPG to fully free"), prompt: t("Convert this member to fully free-form RPGLE. Start with **FREE, use dcl-f/dcl-s/dcl-ds/dcl-proc, keep every comment, and change no behavior. Point out anything with no free-form equivalent instead of inventing one."), attach: true },
   {
     group: "db2i",
     name: "/sql",
+    evalTask: "ibmi-db2-catalog",
     hint: t("write it as Db2 for i SQL"),
     // The addition that matters is step 3. A model asked to make a query faster proposes an index,
     // and the proposal is a guess dressed as expertise — while the database is sitting on a record
@@ -235,17 +582,18 @@ export const BUILTIN_SKILLS: BuiltinSkill[] = [
     ),
     attach: true,
   },
-  { group: "dds", name: "/dds", hint: t("explain this DDS"), prompt: t("Explain this DDS member: the record formats, the key fields, the keywords that change behavior, and anything that would surprise someone reading it for the first time."), attach: true },
-  { group: "dds", name: "/dspf", hint: t("review this display file"), prompt: t("Review this DSPF: the record formats and their overlay order, indicators and what each one drives, CFxx/CAxx keys and where they are handled, subfile control and whether the size is right, and the DDS keywords that will surprise the next reader."), attach: true },
-  { group: "dds", name: "/prtf", hint: t("review this printer file"), prompt: t("Review this PRTF: page size and orientation against the form, the record formats and their line positions, overflow handling, and the editing that will change the printed value. Say what breaks if the form changes."), attach: true },
-  { group: "cl", name: "/clparm", hint: t("review the command definition"), prompt: t("Review this command definition: parameter types and lengths against what the program expects, defaults that hide a required choice, prompt text that says what the value is for, and validity checking done in the CMD rather than in the program."), attach: true },
-  { group: "cl", name: "/clerr", hint: t("review the message handling"), prompt: t("Review the message handling here: MONMSG with no message id, escape messages resent so the caller sees them, diagnostic messages left in the job log without an escape, and the message file the program depends on. Say what the caller learns when this fails."), attach: true },
-  { group: "cl", name: "/cl", hint: t("review this CL"), prompt: t("Review this CL program: MONMSG placed where it can hide a real failure, unqualified object references and what the library list would resolve them to, overrides never deleted, and the return code the caller sees."), attach: true },
-  { group: "rpg", name: "/embedsql", hint: t("review the embedded SQL"), prompt: t("Review this embedded SQL in RPG: SQLCODE and SQLSTATE checked after every statement, host variables sized to their columns, cursors closed on every path, literals that should be parameter markers, and the isolation level in force."), attach: true },
-  { group: "rpg", name: "/ile", hint: t("review the ILE structure"), prompt: t("Review this as ILE: what belongs in a service program rather than in the program, the procedures that should be exported and their prototypes, the activation group and what it means for open files and commitment, and the binding directory this needs."), attach: true },
+  { group: "dds", name: "/dds", evalTask: "ibmi-dds-field", hint: t("explain this DDS"), prompt: t("Explain this DDS member: the record formats, the key fields, the keywords that change behavior, and anything that would surprise someone reading it for the first time."), attach: true },
+  { group: "dds", name: "/dspf", evalTask: "ibmi-dds-field", hint: t("review this display file"), prompt: t("Review this DSPF: the record formats and their overlay order, indicators and what each one drives, CFxx/CAxx keys and where they are handled, subfile control and whether the size is right, and the DDS keywords that will surprise the next reader."), attach: true },
+  { group: "dds", name: "/prtf", evalTask: "ibmi-dds-printer", hint: t("review this printer file"), prompt: t("Review this PRTF: page size and orientation against the form, the record formats and their line positions, overflow handling, and the editing that will change the printed value. Say what breaks if the form changes."), attach: true },
+  { group: "cl", name: "/clparm", evalTask: "ibmi-cl-qualify", hint: t("review the command definition"), prompt: t("Review this command definition: parameter types and lengths against what the program expects, defaults that hide a required choice, prompt text that says what the value is for, and validity checking done in the CMD rather than in the program."), attach: true },
+  { group: "cl", name: "/clerr", evalTask: "ibmi-cl-monmsg", hint: t("review the message handling"), prompt: t("Review the message handling here: MONMSG with no message id, escape messages resent so the caller sees them, diagnostic messages left in the job log without an escape, and the message file the program depends on. Say what the caller learns when this fails."), attach: true },
+  { group: "cl", name: "/cl", evalTask: "ibmi-cl-qualify", hint: t("review this CL"), prompt: t("Review this CL program: MONMSG placed where it can hide a real failure, unqualified object references and what the library list would resolve them to, overrides never deleted, and the return code the caller sees."), attach: true },
+  { group: "rpg", name: "/embedsql", evalTask: "ibmi-db2-commit", hint: t("review the embedded SQL"), prompt: t("Review this embedded SQL in RPG: SQLCODE and SQLSTATE checked after every statement, host variables sized to their columns, cursors closed on every path, literals that should be parameter markers, and the isolation level in force."), attach: true },
+  { group: "rpg", name: "/ile", evalTask: "ibmi-rpg-procedure", hint: t("review the ILE structure"), prompt: t("Review this as ILE: what belongs in a service program rather than in the program, the procedures that should be exported and their prototypes, the activation group and what it means for open files and commitment, and the binding directory this needs."), attach: true },
   {
     group: "rpg",
     name: "/compile",
+    evalTask: "ibmi-rpg-fixed-lr",
     hint: t("compile it and fix what the compiler says"),
     // The plumbing for this already existed — `ibmi_command` runs CL, and its description names
     // CRTBNDRPG — and it was still not usable, because a model asked to "compile this" invents a
@@ -272,6 +620,7 @@ export const BUILTIN_SKILLS: BuiltinSkill[] = [
   {
     group: "rpg",
     name: "/rpgtest",
+    evalTask: "ibmi-rpg-unittest",
     hint: t("write RPGUnit tests, compile them and run them"),
     // The instruction that matters is the last one. A model asked to "write tests" writes tests and
     // declares victory, and on this platform a test source that was never compiled is not a test —
@@ -294,6 +643,7 @@ export const BUILTIN_SKILLS: BuiltinSkill[] = [
   {
     group: "db2i",
     name: "/impact",
+    evalGap: "needs a live partition: the answer comes from DSPPGMREF over a real library, and a fixture standing in for it would be the thing under test",
     hint: t("who uses this file, program or field"),
     // Before, and the word is load-bearing. Changing a field length on this platform is a
     // five-minute edit and a four-hour search, and the search is the part that gets skipped — so
@@ -313,11 +663,12 @@ export const BUILTIN_SKILLS: BuiltinSkill[] = [
     ),
     attach: true,
   },
-  { group: "rpg", name: "/rpgdoc", hint: t("document this member"), prompt: t("Document this member the way an RPG shop reads: a header saying what it is for and what calls it, a note per procedure, and the files it uses with what it does to each. Keep the column layout untouched if the member is fixed-format."), attach: true },
-  { group: "db2i", name: "/journal", hint: t("review the journalling"), prompt: t("Review journalling here: which files are journalled and which are not, what the journal receivers cost and when they are detached, and what a recovery would actually be able to replay. Say what is lost if the system ends abnormally now."), },
+  { group: "rpg", name: "/rpgdoc", evalTask: "ibmi-rpg-doc", hint: t("document this member"), prompt: t("Document this member the way an RPG shop reads: a header saying what it is for and what calls it, a note per procedure, and the files it uses with what it does to each. Keep the column layout untouched if the member is fixed-format."), attach: true },
+  { group: "db2i", name: "/journal", evalTask: "ibmi-db2-commit", hint: t("review the journalling"), prompt: t("Review journalling here: which files are journalled and which are not, what the journal receivers cost and when they are detached, and what a recovery would actually be able to replay. Say what is lost if the system ends abnormally now."), },
   {
     group: "db2i",
     name: "/whouses",
+    evalGap: "needs a live partition: the answer comes from DSPPGMREF over a real library, and a fixture standing in for it would be the thing under test",
     hint: t("find what uses an object"),
     prompt: t(
       "Find everything on this system that uses the object I name — programs that call it, files it " +
@@ -338,9 +689,9 @@ export const BUILTIN_SKILLS: BuiltinSkill[] = [
         "for each answer. A caller you inferred from a naming convention is not a caller.",
     ),
   },
-  { group: "db2i", name: "/qsys2", hint: t("use the catalogue instead"), prompt: t("Replace this with a QSYS2 or SYSTOOLS service where one exists — object lists, job information, journal entries, IFS objects — rather than a command whose output has to be parsed. Give the query and say what it returns that the command did not."), attach: true },
-  { group: "db2i", name: "/commitctl", hint: t("review the commitment control"), prompt: t("Review the commitment control here: what is under commit and what is not, where COMMIT and ROLLBACK are issued, what happens on an unhandled error, and whether the activation group scope matches the unit of work.") },
-  { group: "rpg", name: "/dbmodern", hint: t("modernise the data access"), prompt: t("Propose the SQL replacement for these native I/O operations (CHAIN, SETLL, READE): the query, whether a cursor or a single fetch is right, and what changes about record locking and about the record format the program expects. Say where native I/O should stay."), attach: true },
+  { group: "db2i", name: "/qsys2", evalTask: "ibmi-sql-db2", hint: t("use the catalogue instead"), prompt: t("Replace this with a QSYS2 or SYSTOOLS service where one exists — object lists, job information, journal entries, IFS objects — rather than a command whose output has to be parsed. Give the query and say what it returns that the command did not."), attach: true },
+  { group: "db2i", name: "/commitctl", evalTask: "ibmi-db2-commit", hint: t("review the commitment control"), prompt: t("Review the commitment control here: what is under commit and what is not, where COMMIT and ROLLBACK are issued, what happens on an unhandled error, and whether the activation group scope matches the unit of work.") },
+  { group: "rpg", name: "/dbmodern", evalTask: "ibmi-rpg-sql-cursor", hint: t("modernise the data access"), prompt: t("Propose the SQL replacement for these native I/O operations (CHAIN, SETLL, READE): the query, whether a cursor or a single fetch is right, and what changes about record locking and about the record format the program expects. Say where native I/O should stay."), attach: true },
 ];
 
 /**

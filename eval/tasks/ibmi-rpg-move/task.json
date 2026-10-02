@@ -1,0 +1,7 @@
+{
+  "title": "MOVE and MOVEL, where nobody remembers which way they align",
+  "kind": "ibmi",
+  "prompt": "CUSFMT.rpgle still uses MOVE and MOVEL in its /free section. Replace them with explicit free-form assignments — %SUBST, EVALR, %CHAR, %DEC as appropriate — so the alignment is written down instead of implied by the operation. Keep the behaviour identical: MOVE aligns right, MOVEL aligns left.",
+  "check": "! codeonly CUSFMT.rpgle | grep -qiE '\\b(move|movel)\\b' && codeonly CUSFMT.rpgle | grep -qiE '(evalr|%subst|%char|%dec)' && codeonly CUSFMT.rpgle | grep -qi 'shortName' && codeonly CUSFMT.rpgle | grep -qi 'rightCode'",
+  "timeoutMs": 180000
+}

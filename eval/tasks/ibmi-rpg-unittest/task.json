@@ -1,0 +1,7 @@
+{
+  "title": "A pricing procedure with no tests",
+  "kind": "test",
+  "prompt": "VATCALC.rpgle has no tests. Write an RPGUnit test program in a new member VATCALC_T.rpgle: **FREE, one exported procedure per case named test…, covering the ordinary case, the half-cent rounding in both directions, and zero. Use the RPGUnit assertion procedures and set up nothing you do not need.",
+  "check": "test -f VATCALC_T.rpgle && codeonly VATCALC_T.rpgle | grep -qiE '^\\*\\*free' && [ $(codeonly VATCALC_T.rpgle | grep -ciE 'dcl-proc +test[a-z0-9_]* +export') -ge 4 ] && codeonly VATCALC_T.rpgle | grep -qiE '(assert|aequal|iequal)' && codeonly VATCALC_T.rpgle | grep -qi 'calcVat' && codeonly VATCALC_T.rpgle | grep -qiE '(-0\\.|negative|credit)'",
+  "timeoutMs": 180000
+}

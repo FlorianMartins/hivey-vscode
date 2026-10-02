@@ -1,0 +1,8 @@
+     A          R CUSREC                    PFILE(CUSTMAST)
+     A            CUSNO
+     A            CUSNAM
+     A            BRANCH
+     A            STATUS
+     A          K BRANCH
+     A          K CUSNAM
+     A          S STATUS                    COMP(EQ 'A')

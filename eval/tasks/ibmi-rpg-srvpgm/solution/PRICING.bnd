@@ -1,0 +1,10 @@
+/* Binder source for PRICING.                                                                  */
+/*                                                                                             */
+/* An explicit signature, and the exports listed in a fixed order. This is what lets a caller   */
+/* bound last year keep working: adding a procedure at the END of the list leaves the signature */
+/* compatible, while reordering or removing one breaks it loudly at bind time instead of        */
+/* quietly at run time.                                                                        */
+STRPGMEXP PGMLVL(*CURRENT) SIGNATURE('PRICING_V1')
+  EXPORT SYMBOL('CALCVAT')
+  EXPORT SYMBOL('CALCGROSS')
+ENDPGMEXP
