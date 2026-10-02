@@ -90,8 +90,26 @@ C'est un problème de vigilance humaine, pas d'exécution.
   hasard ;
 - l'absence de rappel d'approbation vaut refus (`runTurn` : le silence n'est pas un consentement).
 
+**Sur IBM i** (`src/core/ibmi/guard.ts`), `hiveyCode.ibmi.writableLibraries` ajoute une barrière
+dans le code, du même genre que l'outillage du mode Plan :
+
+- toute commande CL ou instruction SQL qui **modifie** doit nommer sa bibliothèque, et chacune doit
+  figurer dans la liste ; la lecture n'est jamais restreinte ;
+- un verbe CL que l'extension ne reconnaît pas comme lecteur **compte comme écrivain** : se tromper
+  dans ce sens coûte un refus que l'utilisateur lève, se tromper dans l'autre coûte un fichier de
+  production ;
+- une commande **non qualifiée** est refusée : elle se résoudrait sur la liste de bibliothèques du
+  travail, qui n'est pas connaissable ici ;
+- une commande qui porte ce qu'elle va faire **dans une chaîne** — `QSH`, `STRQSH`, du CL passé à
+  `QCMDEXC` ou `QCAPCMD` — est refusée d'emblée, **même lorsqu'elle semble nommer une bibliothèque
+  autorisée**. `QSH` figurait parmi les verbes de lecture : `QSH CMD('rm -r /QSYS.LIB/PROD.LIB')`
+  passait donc la barrière sans être regardé.
+
 **Résidu, assumé.** Un utilisateur qui approuve sans lire approuve quand même. Le nombre d'étapes
-d'un tour est plafonné (12) pour qu'une boucle ne demande pas trente fois d'affilée.
+d'un tour est plafonné (12) pour qu'une boucle ne demande pas trente fois d'affilée. Sur IBM i, la
+barrière n'empêche pas une commande autorisée de détruire quelque chose **dans** une bibliothèque
+autorisée : elle borne le périmètre, pas le geste. Et elle est **vide par défaut** — une
+installation qui ne la configure pas n'a pas de périmètre.
 
 ---
 

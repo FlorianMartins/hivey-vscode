@@ -2,6 +2,32 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.64.0 — 2026-10-02
+
+### Corrigé
+
+- ⚠️⚠️ **Chantier 0.3 — `QSH` était classé parmi les verbes de lecture.** Un shell n'est pas un
+  lecteur : `QSH CMD('rm -r /QSYS.LIB/PROD.LIB')` était donc considéré comme un regard et passait
+  sans être examiné la barrière qui existe pour tenir l'agent hors de la production. `STRSQL` y
+  figurait aussi.
+
+  Les deux quittent la liste des lecteurs, et une catégorie de refus est ajoutée : **opaque**. Une
+  commande qui porte ce qu'elle va faire dans une chaîne — `QSH`, `STRQSH`, du CL passé à `QCMDEXC`
+  ou `QCAPCMD` — est refusée d'emblée dès que la liste est renseignée, **même lorsqu'elle semble
+  nommer une bibliothèque autorisée** : ce qu'elle touche se construit à l'exécution, et sembler
+  viser `DEVCFC` n'est pas viser `DEVCFC`. La détection porte sur tout le texte et non sur le verbe,
+  donc un shell enveloppé dans une soumission — `SBMJOB CMD(QSH CMD('…'))` — reste un shell ; et les
+  frontières de mot évitent qu'un membre nommé `QSHELLDOC` soit pris pour un interpréteur.
+
+  ⚠️ Vérifié : `SBMJOB CMD(DLTF FILE(PROD/X))` était **déjà** correctement refusé, le paramètre `CMD`
+  étant lu comme le reste. ⚠️ Vérifié en retirant le correctif : trois tests retombent.
+
+### Précisé
+
+- `docs/THREAT-MODEL.md` §4 décrit maintenant la barrière IBM i, ses trois rigueurs et son résidu :
+  elle borne le **périmètre**, pas le geste — une commande autorisée peut détruire quelque chose
+  dans une bibliothèque autorisée — et elle est **vide par défaut**.
+
 ## 0.63.0 — 2026-10-02
 
 ### Corrigé

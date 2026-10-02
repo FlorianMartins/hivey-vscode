@@ -520,13 +520,23 @@ export async function ibmiDiagnose(library: string): Promise<string> {
  */
 function refusal(where: Refusal, writable: string[]): ToolResult {
   const list = writable.join(", ");
-  return {
-    isError: true,
-    content:
-      where.reason === "unqualified"
-        ? `Refused: this changes something and does not say which library. It would resolve against the job's library list, which cannot be checked from here. Name the library — LIBRARY/OBJECT — and it will run if the library is one of: ${list}.`
-        : `Refused: ${where.libraries.join(", ")} ${where.libraries.length > 1 ? "are" : "is"} not in hiveyCode.ibmi.writableLibraries, which allows: ${list}. Reading is unrestricted; this would have changed something.`,
-  };
+  switch (where.reason) {
+    case "unqualified":
+      return {
+        isError: true,
+        content: `Refused: this changes something and does not say which library. It would resolve against the job's library list, which cannot be checked from here. Name the library — LIBRARY/OBJECT — and it will run if the library is one of: ${list}.`,
+      };
+    case "opaque":
+      return {
+        isError: true,
+        content: `Refused: this carries what it will do inside a string — a shell line, or a command handed to QCMDEXC — so what it touches cannot be checked. Run the CL command directly, naming its library, and it will go through if the library is one of: ${list}.`,
+      };
+    default:
+      return {
+        isError: true,
+        content: `Refused: ${where.libraries.join(", ")} ${where.libraries.length > 1 ? "are" : "is"} not in hiveyCode.ibmi.writableLibraries, which allows: ${list}. Reading is unrestricted; this would have changed something.`,
+      };
+  }
 }
 
 export function buildIbmiTools(writable: string[] = []): Tool[] {

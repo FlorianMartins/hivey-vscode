@@ -27,8 +27,13 @@
  * Deliberately short. Every verb absent from this list is treated as making a change, so adding to
  * it is a decision to let the agent run that family of commands against whatever is allowed —
  * which is why `WRK` is not here: a WRK screen is a menu onto commands that change things.
+ *
+ * `QSH` and `STRSQL` were here and should never have been. A shell is not a reader: `QSH CMD('rm -r
+ * /QSYS.LIB/PROD.LIB')` was classified as looking and walked straight past the gate that exists to
+ * keep the agent out of production. They are handled below instead, as commands whose target cannot
+ * be read at all.
  */
-const READING_VERBS = ["DSP", "RTV", "PRT", "CHK", "QSH", "STRSQL"];
+const READING_VERBS = ["DSP", "RTV", "PRT", "CHK"];
 
 /** Up to ten characters, starting with a letter or one of the three national characters. */
 const NAME = "[A-Z#$@][A-Z0-9#$@_.]{0,9}";
@@ -56,7 +61,26 @@ export interface LibraryPolicy {
   writable: string[];
 }
 
-export type Refusal = { reason: "outside"; libraries: string[] } | { reason: "unqualified" };
+/**
+ * Commands that carry what they will do inside a string.
+ *
+ * A shell line, or a CL command handed to `QCMDEXC` as text: the target is in the string, the
+ * string is built at run time, and whatever this gate reads in it the partition may read something
+ * else. There is no version of these that can be checked, so when the gate is on they are refused
+ * outright — including one that appears to name an allowed library, because appearing to is not the
+ * same as doing so.
+ *
+ * Matched anywhere in the text rather than at the verb, so a shell wrapped in a submission —
+ * `SBMJOB CMD(QSH CMD('…'))` — is still a shell. Word boundaries on both sides: `QSHELLDOC` is a
+ * member name, not an interpreter.
+ */
+const OPAQUE = /(?<![A-Z0-9])(?:QSH|STRQSH|QCMDEXC|QCAPCMD|SYSTEM)(?![A-Z0-9])/;
+
+export type Refusal =
+  | { reason: "outside"; libraries: string[] }
+  | { reason: "unqualified" }
+  /** The command says what it does in a string this cannot read. See `OPAQUE`. */
+  | { reason: "opaque" };
 
 /**
  * Why this must not run, or `undefined` if it may.
@@ -67,6 +91,10 @@ export type Refusal = { reason: "outside"; libraries: string[] } | { reason: "un
 export function refuseChange(text: string, changes: boolean, policy: LibraryPolicy): Refusal | undefined {
   const allowed = policy.writable.map((l) => l.trim().toUpperCase()).filter(Boolean);
   if (!allowed.length || !changes) return undefined;
+
+  // Before anything is read out of it: a command that carries its target in a string cannot be
+  // checked by reading the string, and a library name appearing in one proves nothing.
+  if (OPAQUE.test(text.toUpperCase())) return { reason: "opaque" };
 
   const named = librariesNamed(text);
   // Nothing named at all: it resolves against the library list, and that is not knowable here.

@@ -70,3 +70,65 @@ test("library names are found in both the CL and the SQL spelling", () => {
 test("a national character is a legal first letter of a library name", () => {
   assert.deepEqual(librariesNamed("DLTOBJ OBJ(#LIB/X)"), ["#LIB"]);
 });
+
+// ── A shell is not a reader ─────────────────────────────────────────────────────────────────────
+//
+// `READING_VERBS` held QSH and STRSQL. `QSH CMD('rm -r /QSYS.LIB/PROD.LIB')` was therefore a READ,
+// and walked straight past the gate that exists to keep the agent out of production. The same is
+// true of anything that runs a command it was handed as a string: the target is inside the string,
+// and the gate cannot see it.
+
+test("a shell command is refused, whatever it appears to touch", () => {
+  // Refused as OPAQUE rather than as "outside": the point is not that this one names PROD, it is
+  // that nothing here can tell what a shell line will do. A version naming DEVCFC is refused too.
+  for (const command of [
+    "QSH CMD('rm -r /QSYS.LIB/PROD.LIB')",
+    "QSH CMD('rm -r /QSYS.LIB/DEVCFC.LIB/X')",
+    "STRQSH",
+    "STRQSH PARM('ls')",
+  ]) {
+    const refused = refuseChange(command, true, policy);
+    assert.equal(refused?.reason, "opaque", `${command} was not refused`);
+  }
+});
+
+test("a command submitted to batch is read through its CMD parameter", () => {
+  assert.deepEqual(refuseChange("SBMJOB CMD(DLTF FILE(PROD/X))", true, policy), {
+    reason: "outside",
+    libraries: ["PROD"],
+  });
+  // And the same submission into an allowed library goes through.
+  assert.equal(refuseChange("SBMJOB CMD(DLTF FILE(DEVCFC/X))", true, policy), undefined);
+});
+
+test("a shell wrapped in a submission is still a shell", () => {
+  assert.equal(refuseChange("SBMJOB CMD(QSH CMD('rm -r /QSYS.LIB/PROD.LIB'))", true, policy)?.reason, "opaque");
+});
+
+test("SQL that runs a CL command is refused", () => {
+  // QCMDEXC takes the command as a string. Whatever the gate reads in that string, the partition
+  // reads something else the moment it is built at run time.
+  assert.equal(refuseChange("CALL QSYS2.QCMDEXC('DLTF PROD/X')", true, policy)?.reason, "opaque");
+  assert.equal(refuseChange("CALL QSYS2.QCMDEXC('DLTF DEVCFC/X')", true, policy)?.reason, "opaque");
+});
+
+test("QSH is no longer a reader, and neither is STRSQL", () => {
+  assert.equal(clOnlyReads("QSH CMD('ls')"), false);
+  assert.equal(clOnlyReads("STRSQL"), false);
+  // The real readers are untouched.
+  assert.equal(clOnlyReads("DSPFD FILE(X/Y)"), true);
+  assert.equal(clOnlyReads("RTVOBJD OBJ(X/Y)"), true);
+});
+
+test("a member whose name merely starts with QSH is not a shell", () => {
+  // `\bQSH\b` and not a prefix match: QSHELLDOC is a name, not an interpreter.
+  assert.equal(refuseChange("CRTBNDRPG PGM(DEVCFC/QSHELLDOC) SRCFILE(DEVCFC/QRPGLESRC)", true, policy), undefined);
+});
+
+test("nothing is refused as opaque while the gate is off", () => {
+  assert.equal(refuseChange("QSH CMD('rm -rf /')", true, { writable: [] }), undefined);
+});
+
+test("reading is still never restricted, shell or not", () => {
+  assert.equal(refuseChange("QSH CMD('ls')", false, policy), undefined);
+});
