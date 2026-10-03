@@ -37,6 +37,16 @@ export interface TableInput {
   endpoint?: string;
   /** The models behind the figures, named so a reader can reproduce them. */
   models?: string[];
+  /**
+   * What is known to be wrong with these figures.
+   *
+   * ⚠️ The table could not say this, and it needed to. Three of the task prompts were corrupted for
+   * months by shell interpolation — `` `any` `` reached the model as nothing at all — so every score
+   * published from that set has a known defect, and the only ways to express it were to erase the
+   * numbers (hiding a real measurement) or to leave them bare (presenting a known-flawed figure as
+   * clean). Neither is honest. A caveat printed above the table is.
+   */
+  caveats?: string[];
   /** How many tasks the set holds, which is printed even when nothing ran. */
   taskCount: number;
   rows: Measured[];
@@ -160,6 +170,12 @@ export function qualityTable(input: TableInput): string {
     "",
   ];
 
+  if (input.caveats?.length) {
+    lines.push("> **Read these figures with the following in mind.**", ">");
+    for (const caveat of input.caveats) lines.push(`> - ${caveat}`);
+    lines.push("");
+  }
+
   if (!input.rows.length) {
     lines.push(
       "## Nothing here has been measured",
@@ -193,7 +209,7 @@ export function qualityTable(input: TableInput): string {
       `Taken ${input.at ?? "(no date recorded)"}${input.endpoint ? ` against \`${input.endpoint}\`` : ""}` +
         `${input.models?.length ? ` with \`${input.models.join("`, `")}\`` : ""}.`,
       "",
-      "| configuration | passed | quality | never acted | claimed done | time | cost |",
+      "| configuration | passed | quality | never acted | claimed done | model time | cost |",
       "| --- | --- | --- | --- | --- | --- | --- |",
       ...CONFIGURATIONS.map((spec) => {
         const found = measured.get(spec.configuration);
@@ -218,6 +234,11 @@ export function qualityTable(input: TableInput): string {
       "cleanly and the check failed anyway. It is the number that decides whether a tool can be left",
       "alone: a model that fails loudly costs you a turn, one that fails while claiming success costs",
       "the trust that makes it usable.",
+      "",
+      "**model time** is the sum of the task durations, **not** how long the run took. The harness runs",
+      "several tasks at once, so the wall clock is a fraction of this — about a sixth at the default",
+      "concurrency. The column was called *time* and read as a duration, which is why it now says what",
+      "it is: a figure whose name invites the wrong reading is a figure that will be misread.",
       "",
       "**not priced** is not free. A local endpoint bills nothing and costs electricity and time; the",
       "time is in the table and the price is absent rather than written as $0.00.",

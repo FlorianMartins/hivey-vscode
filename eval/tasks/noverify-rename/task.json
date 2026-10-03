@@ -1,0 +1,7 @@
+{
+  "title": "Rename an exported function",
+  "kind": "noverify",
+  "prompt": "Rename the exported function `slugify` in slug.js to `toSlug`. Nothing about its behaviour changes.",
+  "check": "node -e \"import('./slug.js').then(m => { if (!m.toSlug) { console.error('toSlug is not exported'); process.exit(1) } if (m.slugify) { console.error('slugify is still exported'); process.exit(1) } })\" && node index.js | grep -qx 'hello-world' && node --test",
+  "timeoutMs": 180000
+}

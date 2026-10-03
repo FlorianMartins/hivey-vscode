@@ -2,7 +2,7 @@
 
 Honnête plutôt que flatteur : ce qui marche, ce qui manque, ce qui n'est pas vérifié.
 
-Ce document décrit l'état à la version **0.94.0**. Les chiffres qu'il annonce — version, tests, tâches d'évaluation — sont
+Ce document décrit l'état à la version **0.95.0**. Les chiffres qu'il annonce — version, tests, tâches d'évaluation — sont
 vérifiés par `npm run check:numbers`, que la CI exécute : ils ne peuvent plus vieillir en silence.
 Il était resté figé à `0.3.0` pendant trente-cinq
 versions, ce qui est sa propre leçon : une feuille de route périmée dit « projet abandonné » à
@@ -42,6 +42,9 @@ externe non exécuté ici est « non vérifié ».
 | 4.4 Vérifier pendant le tour | fait | **testé** — 11 tests : un changement non vérifié déclenche un rappel **en forme de preuve**, un tour qui n'a rien changé n'en déclenche pas, un contrôle **lancé** (même échoué) suffit à se taire, une modification refusée n'est pas un changement, liste de fichiers bornée et dédupliquée ; et côté boucle : **un seul rappel** (prouvé en retirant le garde), il coûte une étape, la réponse prématurée est jetée, et sans `selfCheck` le tour finit exactement comme avant. + `edit_file`/`write_file` rapportent les **erreurs** de l'éditeur (jamais les avertissements, **rien** quand il n'y en a pas, attente bornée). ADR-0032. ⚠️ Effet sur `claimedDone` **pas encore mesuré** |
 | 4.5 Capacité de raisonner | fait | **testé** — 4 tests, les 3 premiers retombent si on rétablit l'ancienne expression : le catalogue reconnaît une génération le jour de sa sortie, **chaque modèle `deep` d'un préréglage payant doit pouvoir raisonner**, le repli **ne contient aucun chiffre** (lu dans son source), et la capacité est générée depuis `supported_parameters`. ⚠️ Défaut réel : la regex nommait `gpt-5`, le marché est à `gpt-6` → le contrôle de réflexion était **caché sur le modèle le plus fort du produit**. ADR-0033. Le reste du chantier (choisir le niveau) n'existait pas : traduction déjà juste, capacité binaire |
 | 4.6 DeepSeek v4.1 | **mesuré — abandonné** | **44/56** contre une plage de **47–50** pour le préréglage, et **11 échecs annoncés comme réussites** contre 5–7. Sous toute la plage observée, donc la direction tient malgré le bruit. Décision écrite **avant** la mesure. ⚠️ **33× moins cher** (0,0024 $/tâche contre 0,0766 $) — écrit aussi, parce que ça ne va pas dans le sens de la décision. ADR-0034 |
+| 4.4 — éprouvé | **mesuré — justifié** | 6 tâches « sans vérification » ajoutées (banc 56 → **62**). Sur `qwen3.7-flash` : **0/6 sans le rappel, 4/6 avec**, déclenché exactement 4 fois, chaîne causale visible tâche par tâche. Sur `gpt-6.1-sol-pro` : **jamais déclenché** — il vérifie de lui-même. ⇒ filet pour les **modèles bon marché**, pas pour le banc. ADR-0035 |
+| ⚠️ Consignes corrompues | **corrigé** | Les consignes passaient par `sh -c` : les accents graves étaient **exécutés**. `` `any` `` disparaissait, `` `open` `` était remplacé par l'aide de `xdg-open`. **3 tâches des 56 d'origine** touchées, donc tous les chiffres publiés les incluaient. Passage en **argv** |
+| ⚠️ Refus du fournisseur | **corrigé** | Un `402` d'OpenRouter (crédit retenu par les requêtes en vol) a frappé **54 tâches sur 62** et le harnais a compté **8/62** — il aurait publié **13 %** comme une qualité. Enregistré comme refus ; un jeu qui en contient n'énonce aucun taux. + concurrence **adaptative** et réserves (`--note`) portées par le tableau |
 | 4.4 — verdict | **non éprouvé** | Le rappel s'est déclenché **0 fois sur 56**, et c'est expliqué par la mesure : **51 tâches ont changé quelque chose, et dans les 51 un contrôle a tourné** → 0 occasion sur 51. Les tâches du banc demandent un résultat vérifiable, donc le modèle contrôle de lui-même ; la population visée (« change ça » sans demander de preuve) n'y est pas. Mécanisme **gardé**, état écrit |
 | Bruit du banc | **mesuré** | ⚠️⚠️ **48, 47 et 50** sur trois séries du **même** préréglage, mêmes tâches, même build → **une différence de moins de 3 tâches n'est pas un résultat**. Le tableau le publie lui-même quand on lui donne plusieurs séries. Rapporté, jamais moyenné |
 | Banc en parallèle | fait | 56 tâches de ~90 min à **~7 min** (6 à la fois). Le seul obstacle était `process.env["HIVEY_CODE_MODEL"]`, un global ; chaque tâche a aussi son propre `HOME`, donc une mesure qui ne lit plus la configuration personnelle de son opérateur |
@@ -340,7 +343,7 @@ Trois niveaux, jamais mélangés :
 ### Avant 0.39.0
 
 - Noyau indépendant de l'éditeur : anonymisation, fournisseurs, routeur, budget, complétion, session,
-  carte du dépôt, boucle d'agent. **1168 tests unitaires** plus **43 tests d'intégration dans un vrai
+  carte du dépôt, boucle d'agent. **1176 tests unitaires** plus **43 tests d'intégration dans un vrai
   VS Code**.
 - Barre latérale : conversation, historique, modèles, permissions, configuration ; modes
   discussion / plan / agent ; budget de raisonnement ; contexte explicite.

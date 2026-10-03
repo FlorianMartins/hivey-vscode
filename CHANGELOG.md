@@ -2,6 +2,76 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.95.0 — 2026-10-03
+
+### Corrigé
+
+- **⚠️⚠️ Les consignes du banc passaient par un shell, et trois d'entre elles étaient corrompues depuis
+  des mois.** Elles étaient interpolées avec `JSON.stringify`, qui produit des guillemets **doubles**
+  — et dans des guillemets doubles, `sh` exécute toujours les accents graves. Chaque identifiant écrit
+  entre accents graves était donc **exécuté comme une commande** : `` `any` `` disparaissait, et
+  `` `open` `` était **remplacé par la sortie d'aide de `xdg-open`**, ce que le modèle a signalé
+  lui-même en demandant de quel statut on parlait. « No `any` and no `as` casts are to remain »
+  arrivait au modèle comme « No and no casts are to remain » — une phrase privée de son sujet. La
+  consigne passe maintenant en **argv**, sans shell. Et le fond dépasse la citation : une consigne est
+  du contenu de dépôt qui atteignait `sh -c` ; que ce soit le nôtre était de la chance.
+
+- **⚠️⚠️ Un refus du fournisseur n'était pas enregistré comme un refus.** La règle « un refus n'est pas
+  un échec » existait pour le plafond de dépense **local** et avait un trou de la taille exacte de ce
+  pour quoi elle a été construite. OpenRouter a répondu `HTTP 402 — cette requête dépasserait vos
+  crédits disponibles compte tenu de vos requêtes en vol` à **54 tâches sur 62**, et le harnais a
+  compté **8 réussites sur 62**. Il aurait publié **13 %** comme la qualité de cette configuration :
+  pas un chiffre faux, **un chiffre qui ne parle de rien**. Un 402 ou un 429 est désormais un refus,
+  et un jeu qui en contient **n'énonce aucun taux**.
+
+- ⚠️ **La colonne `time` du tableau se lisait comme une durée** alors qu'elle est la **somme** des
+  durées de tâches : avec six en parallèle, l'horloge murale en est le sixième. J'ai annoncé « 62 min »
+  et « 65 min » comme des temps d'attente ; c'étaient des sommes. Renommée **`model time`**, et le
+  document dit ce qu'elle est. Un chiffre dont le nom invite à la mauvaise lecture sera mal lu.
+
+### Ajouté
+
+- **Six tâches dont la consigne ne demande pas de vérifier** (`kind: "noverify"`), pour éprouver le
+  chantier 4.4. La propriété définissante est une propriété des **consignes** — aucune ne contient
+  « test », « vérifie », « lance », « compile » — et un test de garde la protège : un seul « assure-toi
+  que les tests passent » ajouté en rangeant sortirait silencieusement une tâche de la famille.
+
+  ⚠️ Et le point qu'il ne fallait pas rater : une tâche dont l'édition naïve est déjà correcte
+  déclencherait le rappel **sans rien changer**. Chaque fixture porte donc un second endroit que le
+  changement doit atteindre — un autre appelant, une constante dupliquée, un `switch` exhaustif, une
+  liste blanche fermée, un `insert` positionnel — et les quatre pièges mécanisables sont éprouvés un
+  par un. ⚠️ La porte d'honnêteté m'a corrigé au passage : deux de mes six contrôles **passaient sur
+  la fixture intacte**, parce qu'ils vérifiaient le comportement, qui ne change pas quand on renomme
+  une fonction.
+
+- **Le harnais découvre la concurrence que le compte autorise** au lieu qu'on la lui dise. Un
+  fournisseur retient du crédit pour chaque requête en vol ; sur un modèle à un million de jetons la
+  réserve est grosse, et aucun nombre fixe n'est juste pour tous les comptes. À chaque refus il divise
+  sa concurrence par deux, remet la tâche en file, et ne descend jamais sous un.
+
+- **Le tableau peut porter ses propres réserves** (`--note`). Il ne pouvait pas dire « ces chiffres ont
+  un défaut connu », et les deux seules issues étaient d'effacer une mesure réelle ou de présenter une
+  mesure défectueuse comme propre. Ni l'une ni l'autre n'est honnête ; une réserve imprimée **au-dessus**
+  du tableau l'est — une réserve placée après le chiffre est une réserve que personne ne lit.
+
+### Mesuré
+
+- **Le chantier 4.4 est justifié, et le chiffre est net.** Sur `qwen3.7-flash`, la famille passe de
+  **0/6 sans le rappel à 4/6 avec**, le rappel partant exactement **4 fois sur 6** ; la chaîne causale
+  est observable tâche par tâche. Le 0/6 n'est pas un artefact : le modèle a édité sur les six, est
+  sorti proprement sur les six, et n'a vérifié qu'une fois — le mode d'échec « annoncé fini » à l'état
+  pur. Sur `gpt-6.1-sol-pro` il ne se déclenche **jamais** : sans qu'on le lui demande, ce modèle
+  vérifie de lui-même. **4.4 n'est donc pas un filet pour le banc, c'est un filet pour les modèles bon
+  marché** — la population même que ce produit cherche à rendre utilisable. Voir
+  [ADR-0035](docs/adr/0035-les-taches-qui-ne-demandent-pas-de-verifier.md).
+
+### Non fait
+
+- **La série de remplacement sur les 62 tâches n'a pas pu tourner.** OpenRouter refuse les requêtes de
+  cette taille faute de marge sous la limite mensuelle de la clé — 28,47 $ restants, une requête
+  minimale passe, un tour d'agent non. Le tableau porte donc ses chiffres **avec leurs réserves**,
+  dont celle-ci.
+
 ## 0.94.0 — 2026-10-03
 
 ### Corrigé

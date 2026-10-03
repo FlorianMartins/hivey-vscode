@@ -14,7 +14,7 @@ mesurer mais de s'assurer que la mesure veut dire quelque chose.
 ## Ce qu'est un banc d'évaluation
 
 Un **banc d'évaluation** (*benchmark*) est un jeu de tâches avec une réponse vérifiable
-automatiquement. Celui de ce projet contient **56 tâches** : des petits dépôts cassés, une consigne,
+automatiquement. Celui de ce projet contient **62 tâches** : des petits dépôts cassés, une consigne,
 et un **contrôle** — une commande qui réussit si le travail est fait et échoue sinon.
 
 Par exemple : un petit programme qui compte des lignes, la consigne « ajoute une option `--json` », et

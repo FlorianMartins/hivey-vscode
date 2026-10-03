@@ -24,6 +24,7 @@ import { MUTATING_TOOLS, selfCheckMessage, VERIFIER_TOOLS } from "../core/router
 import { callSignature, safeArgs } from "../core/agent/callSignature.js";
 import { catalogueWindow } from "../core/router/window.js";
 import { contextBudget, repoMapBudget } from "../core/context/budget.js";
+import { isProviderRefusal, refusalKind } from "../core/providers/refusal.js";
 import { BUILTIN_AGENTS, parseDefinition, type AgentDefinition } from "../core/agent/definitions.js";
 import { BUILTIN_SKILLS, builtinSkillsForModel } from "../core/session/skills.js";
 import { skillsPrompt } from "../core/agent/definitions.js";
@@ -542,7 +543,12 @@ async function main(): Promise<void> {
       }
       writeRunRecord(result, Date.now() - startedAt, cfg.model, !isLocal && cost.known ? cost.usd : undefined, unfinished.left.length);
     } catch (err) {
-      console.log(C.red(`\n${(err as Error).message}`));
+      const message = (err as Error).message;
+      console.log(C.red(`\n${message}`));
+      // A provider that would not serve the request is not a model that got it wrong. Recorded, so a
+      // measurement cannot report it as a failure — the rule already existed for the local spending
+      // guard and had a hole exactly the size of what it was built for. See `isProviderRefusal`.
+      if (isProviderRefusal(message)) writeRefusal(`provider:${refusalKind(message) ?? "unknown"}`);
     } finally {
       process.off("SIGINT", onSigint);
     }

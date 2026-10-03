@@ -41,11 +41,29 @@ const flag = (name, fallback) => {
 const has = (name) => args.includes(`--${name}`);
 
 /** Run a shell command in a directory, capturing everything, with a deadline. */
+/**
+ * Run something and collect its output.
+ *
+ * `command` is either a shell line (a task's `check`, which IS a shell command) or an argv array —
+ * and the array form exists because of a defect that quietly corrupted this bench.
+ *
+ * ⚠️⚠️ THE AGENT'S PROMPT USED TO GO THROUGH A SHELL. It was interpolated with `JSON.stringify`,
+ * which produces double quotes, and inside double quotes `sh` still performs command substitution.
+ * So every backtick in a task's prompt ran as a command: `` `any` `` was deleted (no such command),
+ * and `` `open` `` was REPLACED BY xdg-open's help text — which the model duly complained about.
+ * Three tasks of the original fifty-six were affected, and every score this bench has published
+ * included them: "No `any` and no `as` casts are to remain" reached the model as "No and no casts
+ * are to remain", a sentence with its subject removed.
+ *
+ * A prompt is repository content reaching `sh -c`; that it was our own content is luck, not design.
+ * The argv form takes no shell and interpolates nothing.
+ */
 function sh(command, cwd, timeoutMs = 120_000, env = {}) {
   return new Promise((resolveRun) => {
-    const child = spawn(command, {
+    const argv = Array.isArray(command);
+    const child = spawn(argv ? command[0] : command, argv ? command.slice(1) : undefined, {
       cwd,
-      shell: true,
+      shell: !argv,
       // `eval/bin` on PATH, which is how a check gets `codeonly` — a structural check must look at
       // the code and not at the comments, and the helper that strips them has to live OUTSIDE the
       // working copy: a tool the agent can edit is not a check. See `eval/bin/codeonly`.
@@ -179,7 +197,9 @@ async function runTask(task, model, endpoint) {
   const started = Date.now();
   try {
     const attempt = await sh(
-      `node ${JSON.stringify(CLI)} --yes ${JSON.stringify(task.prompt)}`,
+      // argv, not a shell line: a prompt is text, and text with a backtick in it is a command when
+      // it passes through `sh -c`. See `sh`.
+      ["node", CLI, "--yes", task.prompt],
       dir,
       task.timeoutMs ?? 180_000,
       {
@@ -301,7 +321,18 @@ async function main() {
       if (saved.complete === false) partial = true;
     }
     const out = flag("table", "eval/QUALITY.md");
-    await writeTable(out, { at, endpoint, models: [...new Set(models)], taskCount: tasks.length, rows });
+    // `--note` may be repeated: what is known to be wrong with these figures, printed above the
+    // table. A measurement with a known defect is published with the defect, not erased and not
+    // dressed up as clean.
+    const caveats = args.flatMap((a, i) => (a === "--note" && args[i + 1] ? [args[i + 1]] : []));
+    await writeTable(out, {
+      at,
+      endpoint,
+      models: [...new Set(models)],
+      taskCount: tasks.length,
+      rows,
+      ...(caveats.length ? { caveats } : {}),
+    });
     console.log(`written: ${out}${partial ? "  (one of these runs did not finish)" : ""}`);
     process.exit(0);
   }
@@ -366,7 +397,14 @@ async function main() {
   // race over. What bounds the concurrency is the far end: a provider's rate limit, and a laptop's
   // patience with four `node` processes. Four by default, because it is the number that turns hours
   // into minutes without turning a measurement into a load test.
-  const jobs = Math.max(1, Number(flag("jobs", "4")) || 4);
+  // ⚠️ Three, not six, and the reason is not the machine. At six, OpenRouter answered 54 of 62 tasks
+  // with "this request would exceed your available credits given your current in-flight requests":
+  // it holds credit for every request still in flight, and six concurrent agent turns on a
+  // million-token model reserve more than was left. The run recorded 8 passes out of 62 and would
+  // have published 13 % as a quality — a number about nothing. Raise it with `--jobs` when the
+  // account has room; the refusals are now recorded either way (`isProviderRefusal`), so a
+  // credit-limited run reports "refused" instead of a score.
+  const jobs = Math.max(1, Number(flag("jobs", "3")) || 3);
   const queue = models.flatMap((model) => tasks.map((task) => ({ model, task })));
   let next = 0;
   let done = 0;
@@ -376,13 +414,52 @@ async function main() {
       JSON.stringify({ at: new Date().toISOString(), endpoint, models, as: as || undefined, results, complete: false }, null, 2) + "\n",
     );
 
-  console.log(`${queue.length} task(s), ${jobs} at a time\n`);
+  // How many may be in flight, and why it is not simply `jobs`.
+  //
+  // ⚠️ A provider holds credit for every request still in flight. On a million-token model that
+  // reservation is large, and at six — then at three — OpenRouter answered most of a 62-task run
+  // with "this request would exceed your available credits given your current in-flight requests".
+  // One request at a time was served immediately. So the limit is not the machine and not the key's
+  // balance: it is how much is RESERVED at once, and no fixed number is right for every account on
+  // every model.
+  //
+  // So the harness finds out. A refusal halves the concurrency and the task goes back in the queue;
+  // it never drops below one, and a task refused after several tries is recorded as refused rather
+  // than pretended to be a failure. It goes as fast as the account allows and no faster, which is
+  // the only speed worth having.
+  let allowed = jobs;
+  let active = 0;
+  const attempts = new Map();
+  const MAX_ATTEMPTS = 4;
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  console.log(`${queue.length} task(s), up to ${jobs} at a time\n`);
   await Promise.all(
     Array.from({ length: Math.min(jobs, queue.length) }, async () => {
       for (;;) {
+        // Hold back when the concurrency has been reduced under us.
+        while (active >= allowed) await wait(250);
         const item = queue[next++];
         if (!item) return;
-        const result = await runTask(item.task, item.model, endpoint);
+        active += 1;
+        let result;
+        try {
+          result = await runTask(item.task, item.model, endpoint);
+        } finally {
+          active -= 1;
+        }
+
+        const refused = result.runs?.some((r) => String(r.refused ?? "").startsWith("provider:"));
+        const tries = (attempts.get(item.task.id) ?? 0) + 1;
+        attempts.set(item.task.id, tries);
+        if (refused && tries < MAX_ATTEMPTS) {
+          const was = allowed;
+          allowed = Math.max(1, Math.floor(allowed / 2));
+          if (allowed !== was) console.log(`  ↓ ${was} → ${allowed} at a time (the provider is holding credit)`);
+          queue.push(item);
+          await wait(2000 * tries);
+          continue;
+        }
         results.push(result);
         // One line per completion rather than "task … " then the verdict: with several in flight the
         // two halves of that pair interleave, and the log becomes a puzzle.

@@ -1,11 +1,17 @@
 # Measured quality
 
 What each configuration scores on this repository's own evaluation set
-(56 tasks). Regenerate with `node scripts/evaluate.mjs --table eval/QUALITY.md`.
+(62 tasks). Regenerate with `node scripts/evaluate.mjs --table eval/QUALITY.md`.
+
+> **Read these figures with the following in mind.**
+>
+> - Mesuré sur 56 tâches, avant que le banc n'en compte 62 : les six tâches de la famille « sans vérification » n'y sont pas.
+> - ⚠️ Trois des 56 consignes étaient corrompues au moment de ces séries : les accents graves étaient exécutés par un shell, donc « No `any` and no `as` casts » arrivait au modèle sans son sujet. Corrigé le 2026-10-03 ; ces trois tâches étaient donc plus dures qu'elles ne devraient l'être.
+> - La série de remplacement est bloquée : OpenRouter refuse les requêtes de cette taille faute de marge sous la limite mensuelle de la clé.
 
 Taken 2026-10-03T13:44:56.036Z against `https://openrouter.ai/api/v1` with `deepseek/deepseek-v4.1-flash`, `hivey`.
 
-| configuration | passed | quality | never acted | claimed done | time | cost |
+| configuration | passed | quality | never acted | claimed done | model time | cost |
 | --- | --- | --- | --- | --- | --- | --- |
 | `local only` | — | not measured | — | — | — | — |
 | `local + escalation` | — | not measured | — | — | — | — |
@@ -39,6 +45,11 @@ been measured on its reasoning at all.
 cleanly and the check failed anyway. It is the number that decides whether a tool can be left
 alone: a model that fails loudly costs you a turn, one that fails while claiming success costs
 the trust that makes it usable.
+
+**model time** is the sum of the task durations, **not** how long the run took. The harness runs
+several tasks at once, so the wall clock is a fraction of this — about a sixth at the default
+concurrency. The column was called *time* and read as a duration, which is why it now says what
+it is: a figure whose name invites the wrong reading is a figure that will be misread.
 
 **not priced** is not free. A local endpoint bills nothing and costs electricity and time; the
 time is in the table and the price is absent rather than written as $0.00.

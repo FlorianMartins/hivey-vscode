@@ -304,3 +304,18 @@ test("the table reports what the same configuration scored twice", () => {
   const single = qualityTable({ taskCount: 56, at: "x", rows: [rows[0]!] });
   assert.ok(!/scored twice/.test(single));
 });
+
+test("the table can say what is wrong with its own figures", () => {
+  // It could not, and it needed to. Three task prompts were corrupted for months by shell
+  // interpolation, so every score from that set has a known defect — and the only choices were to
+  // erase a real measurement or to present a flawed one as clean. Neither is honest.
+  const rows = [{ configuration: "hivey", totals: { ...emptyTotals(56), passed: 50, passRate: 50 / 56 } }];
+  const md = qualityTable({ taskCount: 56, at: "x", rows, caveats: ["three prompts were corrupted"] });
+  assert.match(md, /Read these figures with the following in mind/);
+  assert.match(md, /- three prompts were corrupted/);
+  // The caveat comes BEFORE the table: a reservation printed after the number is a reservation
+  // nobody reads.
+  assert.ok(md.indexOf("three prompts were corrupted") < md.indexOf("| configuration |"));
+  // And no block at all when there is nothing to warn about.
+  assert.ok(!/Read these figures/.test(qualityTable({ taskCount: 56, at: "x", rows })));
+});

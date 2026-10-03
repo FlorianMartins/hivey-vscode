@@ -1,0 +1,7 @@
+{
+  "title": "Put the currency first",
+  "kind": "noverify",
+  "prompt": "In billing.py, `charge` takes the amount then the currency. Make it take the currency first instead.",
+  "check": "python3 -c \"import billing, inspect; p=list(inspect.signature(billing.charge).parameters); assert p[0]=='currency', p; assert billing.charge('EUR', 4.5)=='4.50 EUR'\" && python3 verify.py",
+  "timeoutMs": 180000
+}
