@@ -2,6 +2,46 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.83.0 — 2026-10-03
+
+### Ajouté
+
+- **Chantier 3.3 — un second modèle relit le diff avant les dangereux.** La carte d'approbation
+  montre déjà le diff, et le résidu écrit dans le modèle de menace est que **celui qui approuve sans
+  lire approuve quand même**. Or les changements où cela coûte le plus sont les **petits** : une ligne
+  ajoutée à une liste de globs interdits, un réglage qui désactive un contrôle, une permission élargie
+  d'un mot. Trois lignes, qui ressemblent à ce qui était demandé, et qui retirent une garantie.
+
+  Un second modèle lit donc la demande et le diff, et répond à **une seule question** : est-ce que ce
+  diff fait quelque chose que la demande n'a pas demandé ? Pas « revois ce code » — c'est le travail
+  du premier modèle, qui a plus de contexte. Ses objections apparaissent sur la carte, avec le nom du
+  modèle qui les a faites.
+
+  Trois déclencheurs : un **réglage gardé** (la liste est celle des choses que ce produit traite comme
+  des garanties ailleurs), un **fichier qui configure le comportement de tout le reste**, ou un diff
+  **trop gros pour avoir été lu**.
+
+  ⚠️ **Local uniquement, pris au mot** : si le second lecteur serait un modèle facturé, il n'est pas
+  appelé et la carte le dit. Un second avis qui doublerait discrètement le prix de l'édition d'un
+  fichier de réglages est une fonctionnalité qu'on désactive, et un qui le facturerait sans le dire
+  serait pire.
+
+  ⚠️ **Consultatif par défaut** : les objections vont sur la carte et l'humain décide. Elles ne
+  bloquent que si la politique de l'organisation l'exige — ce qui est une restriction, donc dans ce
+  qu'une politique peut faire. Un second modèle qui pourrait mettre son veto serait un modèle dont
+  les propres erreurs arrêtent le travail, et rien ici n'a mesuré sa fréquence d'erreur.
+
+### Précisé
+
+- **Une réponse illisible est signalée comme illisible, jamais comme « aucune objection »** : tout
+  l'intérêt est de mettre quelque chose sur la carte, et un échec d'analyse rendant une liste vide y
+  mettrait un rien rassurant. Un second lecteur injoignable est dit aussi — « personne n'a vérifié
+  ceci à part vous ».
+- Un tableau vide **est** la réponse attendue la plupart du temps, et le prompt le dit : « le dire est
+  plus utile que de trouver quelque chose à dire ».
+- La politique n'a **aucune valeur qui désactive** le second lecteur : une politique peut durcir un
+  contrôle, pas le retirer.
+
 ## 0.82.0 — 2026-10-03
 
 ### Ajouté

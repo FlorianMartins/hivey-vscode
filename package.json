@@ -2,7 +2,7 @@
   "name": "hivey-code",
   "displayName": "Hivey Code",
   "description": "%extension.description%",
-  "version": "0.82.0",
+  "version": "0.83.0",
   "publisher": "hivey",
   "license": "Apache-2.0",
   "repository": {
@@ -1048,6 +1048,11 @@
             "type": "string",
             "default": "2g",
             "markdownDescription": "%config.background.memory%"
+          },
+          "hiveyCode.secondOpinion.enabled": {
+            "type": "boolean",
+            "default": true,
+            "markdownDescription": "%config.secondOpinion.enabled%"
           }
         }
       },

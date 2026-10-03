@@ -53,6 +53,14 @@ import { capture, describeRestore, trimCheckpoints } from "../core/session/check
 import type { Plan } from "../core/agent/plan.js";
 import { promptForMode, toolsForMode } from "../core/session/modes.js";
 import { Hooks } from "./hooks.js";
+import { policyState } from "./policy.js";
+import {
+  DEFAULT_TRIGGERS,
+  describeOpinion,
+  needsSecondOpinion,
+  parseObjections,
+  secondOpinionPrompt,
+} from "../core/review/second.js";
 import type { Corpus } from "./corpus.js";
 import type { LearnedRouting } from "./learned.js";
 import type { Episode } from "../core/corpus/corpus.js";
@@ -4334,16 +4342,93 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       t("{0} — proposed by Hivey Code", relative(uri)),
       { preview: true },
     );
+    // A second reader, before the dangerous ones. See `core/review/second.ts`: the changes where
+    // approving without reading costs the most are the SMALL ones, so this fires on what the diff
+    // DOES rather than on its size alone.
+    const second = await this.secondOpinion(relative(uri), original ?? "", next);
+
     const answer = await vscode.window.showInformationMessage(
-      t("Apply the change to {0}?", relative(uri)),
-      { modal: false },
-      t("Apply"),
-      t("Refuse"),
+      [t("Apply the change to {0}?", relative(uri)), ...second.lines].join("\n"),
+      { modal: second.blocking },
+      ...(second.blocking ? [t("Refuse")] : [t("Apply"), t("Refuse")]),
     );
     previewContents.delete(preview.toString());
     const apply = answer === t("Apply");
     if (apply) this.snapshot(uri, original);
     return apply;
+  }
+
+  /**
+   * What a second model says about this diff, when the diff is one of the dangerous ones.
+   *
+   * ⚠️ LOCAL BY DEFAULT, taken literally: if the second reader would be a model that bills, it is not
+   * called at all and the card says so. A second opinion that quietly doubled the price of editing a
+   * settings file would be a feature people turn off, and one that charged for it without saying so
+   * would be worse than that.
+   */
+  private async secondOpinion(
+    path: string,
+    before: string,
+    after: string,
+  ): Promise<{ lines: string[]; blocking: boolean }> {
+    const settings = readSettings();
+    if (!vscode.workspace.getConfiguration(SECTION).get<boolean>("secondOpinion.enabled", true)) {
+      return { lines: [], blocking: false };
+    }
+    const diff = unifiedDiff(path, before, after, { maxChars: 20_000 });
+    const trigger = needsSecondOpinion({ paths: [path], diff }, DEFAULT_TRIGGERS, matchGlob);
+    if (!trigger.needed) return { lines: [], blocking: false };
+
+    const state = policyState();
+    const blocking = state.kind !== "none" && state.policy.secondOpinion === "blocking";
+
+    // The local endpoint's own model, or nothing. `endpointFor` throws for a provider with no address,
+    // which is the ordinary case for somebody who only uses a paid one.
+    let localUrl = "";
+    try {
+      localUrl = endpointFor(settings, "local");
+    } catch {
+      localUrl = "";
+    }
+    if (!localUrl || !isLocalEndpoint(localUrl)) {
+      return {
+        lines: [
+          t(
+            "This change is worth a second look ({0}), and no local model is configured to give one — a paid one is not called for this.",
+            trigger.why,
+          ),
+        ],
+        blocking: false,
+      };
+    }
+
+    const model = settings.completion.model || settings.chat.model;
+    try {
+      const provider = await providerFor(settings, this.keys, "local");
+      const result = await runTurn({
+        provider,
+        model,
+        messages: [{ role: "user", content: secondOpinionPrompt(this.lastRequest(), diff) }],
+        maxTokens: 1024,
+      });
+      const opinion = parseObjections(result.text);
+      return {
+        lines: [t("Worth a second look: {0}.", trigger.why), ...describeOpinion(opinion, model, blocking)],
+        // Blocking only when the organisation asks AND there is something to resolve.
+        blocking: blocking && opinion.objections.length > 0,
+      };
+    } catch (err) {
+      this.log.appendLine(`[second] ${(err as Error).message}`);
+      return {
+        lines: [t("A second reader could not be reached ({0}), so nobody has checked this but you.", (err as Error).message.split("\n")[0] ?? "")],
+        blocking: false,
+      };
+    }
+  }
+
+  /** The question this turn is answering, for the second reader. */
+  private lastRequest(): string {
+    return [...this.session.entries].reverse().find((e) => e.role === "user")?.text ?? "";
   }
 }
 

@@ -76,6 +76,14 @@ export interface ManagedPolicy {
   mcp?: Array<{ name: string; fingerprint: string }>;
   /** Hook commands allowed, by fingerprint. An empty array forbids hooks entirely. */
   hooks?: string[];
+  /**
+   * Whether a second reader's objections merely appear on the approval card or must be resolved.
+   *
+   * `"blocking"` RESTRICTS — it refuses a change the user would otherwise have been able to apply —
+   * so it is within what a policy may do. There is deliberately no value that turns the second
+   * reader OFF: a policy may not remove a check.
+   */
+  secondOpinion?: "advisory" | "blocking";
   /** Features switched off outright: `completion`, `knowledge`, `mcp`, `hooks`, `background`. */
   disabled?: string[];
 }

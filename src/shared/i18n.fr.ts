@@ -459,6 +459,11 @@ export const FR: Record<string, string> = {
   "Hivey Code is in its safest mode: {0}": "Hivey Code est dans son mode le plus sûr : {0}",
   "The policy is read from {0}.": "La politique est lue depuis {0}.",
   "Where is the policy?": "Où est la politique ?",
+  "Worth a second look: {0}.": "Mérite un second regard : {0}.",
+  "This change is worth a second look ({0}), and no local model is configured to give one — a paid one is not called for this.":
+    "Ce changement mérite un second regard ({0}), et aucun modèle local n'est configuré pour le donner — un modèle facturé n'est pas appelé pour cela.",
+  "A second reader could not be reached ({0}), so nobody has checked this but you.":
+    "Un second lecteur n'a pas pu être joint ({0}), donc personne n'a vérifié ceci à part vous.",
   "Chose {0}: {1}": "Choisi {0} : {1}",
   "Trying {0}: {1}": "Essai de {0} : {1}",
   "Nothing has been measured in this repository yet.": "Rien n'a encore été mesuré dans ce dépôt.",

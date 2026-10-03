@@ -155,5 +155,6 @@
   "config.routing.minAttempts": "Combien d'essais un modèle doit avoir avant d'avoir un historique. Une réussite n'est pas un taux, et « pas d'historique » n'est pas « mauvais » — en dessous, votre ordre configuré gagne.",
   "config.routing.explore": "La part de tours qui essaient délibérément un modèle sans historique. Assez pour remarquer qu'un modèle s'est amélioré après une mise à jour ; assez peu pour que quelqu'un qui ne regarde jamais ceci ne le paie pas. L'exploration ne remesure jamais un modèle qui a déjà un historique.",
   "command.routingShow.title": "Ce qui a été appris dans ce dépôt",
-  "command.routingForget.title": "Oublier ce qui a été appris dans ce dépôt"
+  "command.routingForget.title": "Oublier ce qui a été appris dans ce dépôt",
+  "config.secondOpinion.enabled": "Avant d'appliquer un changement qui touche l'un des réglages dont les autres règles dépendent, un fichier qui configure le comportement de tout le reste, ou un diff trop gros pour avoir été lu, un **second modèle** relit la demande et le diff et dit ce que la demande n'avait pas demandé. Ses objections apparaissent sur la carte d'approbation. **Local uniquement** : si le second lecteur serait un modèle facturé, il n'est pas appelé et la carte le dit. Les objections sont consultatives, sauf si la politique de votre organisation exige qu'elles soient résolues."
 }

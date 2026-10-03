@@ -155,5 +155,6 @@
   "config.routing.minAttempts": "How many attempts a model needs before it has a record at all. One success is not a rate, and “no record” is not “bad” — below this, your configured order wins.",
   "config.routing.explore": "The share of turns that deliberately try a model with no record yet. Enough to notice that a model got better after an upgrade; small enough that somebody who never looks at this does not pay for it. Exploration never re-measures a model that already has a record.",
   "command.routingShow.title": "What has been learned in this repository",
-  "command.routingForget.title": "Forget what was learned in this repository"
+  "command.routingForget.title": "Forget what was learned in this repository",
+  "config.secondOpinion.enabled": "Before applying a change that touches one of the settings the other rules depend on, a file that configures how everything else behaves, or a diff too big to have been read, a **second model** reads the request and the diff and says what the request did not ask for. Its objections appear on the approval card. **Local only**: if the second reader would be a model that bills, it is not called and the card says so. Objections are advisory unless your organisation's policy requires them to be resolved."
 }
