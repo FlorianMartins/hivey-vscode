@@ -1,0 +1,7 @@
+{
+  "title": "A market that opens an hour late twice a year",
+  "kind": "bug",
+  "prompt": "market.py decides whether a venue is open by comparing UTC hours against a fixed window, so it is an hour wrong for half the year and open on Sundays. Fix it using the venue's own time zone and its session, with the holidays passed in. The tests say what is expected. Use only the standard library — zoneinfo is in it.",
+  "check": "python3 -m unittest discover -q",
+  "timeoutMs": 180000
+}

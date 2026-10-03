@@ -1,0 +1,7 @@
+{
+  "title": "A settlement date that lands on Christmas",
+  "kind": "bug",
+  "prompt": "settlement.js adds two days to the trade date and calls it T+2, so it settles on Saturdays and on public holidays. Fix it: skip weekends and skip the holidays the CALLER supplies. Do not hard-code a holiday list — a calendar built into the code is wrong in another country and wrong next year. The tests say what is expected.",
+  "check": "node --test",
+  "timeoutMs": 180000
+}

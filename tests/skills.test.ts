@@ -14,7 +14,7 @@ import {
   skillInvocation,
   toggleSkill,
 } from "../src/core/session/skills.js";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 test("a skill nobody has switched off is on", () => {
@@ -199,7 +199,16 @@ test("nothing is offered by a family nobody selected", () => {
 // named — and no reason given for having none — fails here.
 
 const IBMI_GROUPS = new Set(["rpg", "dds", "db2i", "cl"]);
+/**
+ * The families whose skills must each be backed by an evaluation task.
+ *
+ * IBM i because the roadmap's phase 1 asked for it, and finance because phase 3 asked for the same
+ * thing in the same words — and the reason is the same in both: a skill is a few lines of text, so a
+ * family nobody can measure is a family nobody should count.
+ */
+const BACKED_GROUPS = new Set([...IBMI_GROUPS, "finance"]);
 const ibmiSkills = BUILTIN_SKILLS.filter((s) => IBMI_GROUPS.has(s.group));
+const backedSkills = BUILTIN_SKILLS.filter((s) => BACKED_GROUPS.has(s.group));
 
 test("there are at least forty IBM i skills", () => {
   assert.ok(ibmiSkills.length >= 40, `only ${ibmiSkills.length}: ${ibmiSkills.map((s) => s.name).join(" ")}`);
@@ -210,8 +219,8 @@ test("there are at least forty IBM i skills", () => {
   }
 });
 
-test("every IBM i skill names the evaluation task that exercises it, or says why it cannot", () => {
-  const unbacked = ibmiSkills.filter((s) => !s.evalTask && !s.evalGap);
+test("every IBM i and finance skill names the evaluation task that exercises it, or says why it cannot", () => {
+  const unbacked = backedSkills.filter((s) => !s.evalTask && !s.evalGap);
   assert.deepEqual(unbacked.map((s) => s.name), [], "these are backed by nothing and explain nothing");
 });
 
@@ -219,7 +228,7 @@ test("every task a skill names exists on disk", () => {
   // The failure this catches is a renamed directory: the skill still points somewhere, and nothing
   // else in the repository would notice.
   const missing: string[] = [];
-  for (const skill of ibmiSkills) {
+  for (const skill of backedSkills) {
     if (!skill.evalTask) continue;
     if (!existsSync(join("eval", "tasks", skill.evalTask, "task.json"))) missing.push(`${skill.name} → ${skill.evalTask}`);
   }
@@ -248,4 +257,33 @@ test("the tasks behind the IBM i skills really are IBM i tasks", () => {
     if (meta.kind !== "ibmi" && !skill.evalTask.startsWith("ibmi-")) wrong.push(`${skill.name} → ${skill.evalTask} (${meta.kind})`);
   }
   assert.deepEqual(wrong, [], "these skills are backed by a task about something else");
+});
+
+test("the finance family exists, is complete, and every skill in it is backed", () => {
+  const finance = BUILTIN_SKILLS.filter((s) => s.group === "finance");
+  assert.ok(finance.length >= 8, `only ${finance.length}: ${finance.map((s) => s.name).join(" ")}`);
+  // The subjects the roadmap names, each present.
+  const names = finance.map((s) => s.name).join(" ");
+  for (const subject of ["/rounding", "/decimal", "/packed", "/settlement", "/markethours", "/identifiers", "/fixmsg"]) {
+    assert.ok(names.includes(subject), `${subject} is missing from the finance family`);
+  }
+  // And every one of them names a task that exists — no gaps here: all of this is testable in
+  // ordinary code, unlike an IBM i partition.
+  for (const skill of finance) {
+    assert.ok(skill.evalTask, `${skill.name} is backed by nothing`);
+    assert.equal(skill.evalGap, undefined, `${skill.name} claims a gap, and finance has no excuse for one`);
+    assert.ok(existsSync(join("eval", "tasks", skill.evalTask!, "task.json")), `${skill.name} → ${skill.evalTask}`);
+  }
+  // The roadmap asks for JavaScript, Python, Java and RPG where relevant: the tasks behind this
+  // family span at least three languages.
+  const kinds = new Set(
+    finance.map((s) => {
+      const files = readdirSync(join("eval", "tasks", s.evalTask!, "files"));
+      if (files.some((f) => f.endsWith(".py"))) return "python";
+      if (files.some((f) => f.endsWith(".rpgle"))) return "rpg";
+      if (files.some((f) => f.endsWith(".js"))) return "javascript";
+      return "other";
+    }),
+  );
+  assert.ok(kinds.size >= 3, `the finance tasks span only ${[...kinds].join(", ")}`);
 });

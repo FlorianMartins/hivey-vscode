@@ -73,6 +73,7 @@ export interface BuiltinSkill {
 
 export type SkillGroup =
   | "general"
+  | "finance"
   | "frontend"
   | "javascript"
   | "python"
@@ -119,6 +120,11 @@ export const SKILL_GROUPS: Array<{ id: SkillGroup; label: string; hint: string }
   { id: "devops", label: t("Build & deploy"), hint: t("Docker, CI, shell, configuration") },
   { id: "design", label: t("Design & UX"), hint: t("Layout, states, wording, motion") },
   { id: "security", label: t("Security"), hint: t("Threats, authorization, secrets, dependencies") },
+  {
+    id: "finance",
+    label: t("Finance"),
+    hint: t("Rounding, decimal, settlement, market hours, ISIN/LEI/BIC, FIX"),
+  },
   { id: "rpg", label: t("RPG & ILE"), hint: t("Free-form conversion, procedures, embedded SQL") },
   { id: "dds", label: t("DDS, display & printer files"), hint: t("PF, LF, DSPF, PRTF") },
   { id: "db2i", label: t("Db2 for i"), hint: t("SQL, commitment control, catalogue, journalling") },
@@ -511,6 +517,121 @@ export const BUILTIN_SKILLS: BuiltinSkill[] = [
         "2. In RPG, every read of a null-capable column needs its null indicator checked BEFORE the value is used: the value in a null column is not a value, and using it silently gives you zero or blanks.\n" +
         "3. Watch the comparisons: a predicate on a null column is UNKNOWN rather than false, so NOT IN returns nothing and an aggregate skips rows nobody told you about.\n" +
         "4. Say for each column whether null means anything different from zero or blank in this business. If it does not, the column should not be null-capable.\n"
+    ),
+    attach: true,
+  },
+
+
+  // ── Finance ─────────────────────────────────────────────────────────────────────────────────
+  {
+    group: "finance",
+    name: t("/rounding"),
+    hint: t("round money the way an invoice does"),
+    evalTask: "js-money-rounding",
+    prompt: t(
+      "Review how this rounds money.\n" +
+        "1. Say which rule is in force and which one the business needs: half away from zero (what an invoice does), half to even (what a float library does by default), or truncation. They differ on exactly one input and that input is a half cent.\n" +
+        "2. Check the NEGATIVE case. `Math.round`, Python's `round` and Java's `BigDecimal.ROUND_HALF_UP` do not agree about -0.5, and a credit note that refunds a cent less than the invoice charged is a reconciliation difference nobody can find.\n" +
+        "3. Round ONCE, at the end. Rounding each line and summing gives a total that differs from rounding the sum, and both are defensible — but only one of them is what the ledger says.\n" +
+        "4. Say what the rounding does to the invariant: if a set of parts must total the whole, the residue has to go somewhere, and 'somewhere' is a decision rather than an accident.\n"
+    ),
+    attach: true,
+  },
+  {
+    group: "finance",
+    name: t("/decimal"),
+    hint: t("money without a float, anywhere"),
+    evalTask: "py-decimal-money",
+    prompt: t(
+      "Find every place a monetary value touches a binary floating-point type here, and remove it.\n" +
+        "1. A float cannot hold 0.10. Everything that follows from that — a total that is 0.30000000000000004, a comparison that fails, a cent that appears from nowhere — is not a bug to be patched, it is the type being wrong.\n" +
+        "2. Use the exact type the language has: Decimal in Python, BigDecimal in Java, a packed field in RPG, an integer number of minor units in JavaScript. Say which you chose and what its precision is.\n" +
+        "3. Watch the BOUNDARIES, which is where this survives a rewrite: a JSON number is a double, a float column in the database is a double, and a value that was exact until it was serialised is a value that is no longer exact.\n" +
+        "4. Say what the precision must be rather than taking a default: two decimals for most currencies, three for a dinar, none for a yen, and more than two for a rate.\n"
+    ),
+    attach: true,
+  },
+  {
+    group: "finance",
+    name: t("/packed"),
+    hint: t("packed and zoned decimal, sized on purpose"),
+    evalTask: "ibmi-rpg-packed",
+    prompt: t(
+      "Review the packed and zoned fields here.\n" +
+        "1. State the precision of every monetary value and WHY it is that: the ledger's currency to the cent, a rate to six decimals, a quantity with none.\n" +
+        "2. Size the intermediates. A product of an 11-digit amount and a 9-digit rate does not fit in 11 digits, and RPG truncates it without saying so — which is a wrong number that balances.\n" +
+        "3. Zoned where a file format demands it, packed everywhere else, and say which the field on disk actually is: reading a zoned field as packed gives a number nobody recognises.\n" +
+        "4. Never a float for money. And where a conversion can fail — a rate of zero, a value too large — handle it with a MONITOR group rather than letting it end the program in the job log.\n"
+    ),
+    attach: true,
+  },
+  {
+    group: "finance",
+    name: t("/settlement"),
+    hint: t("settlement dates, T+1 and T+2"),
+    evalTask: "fin-settlement",
+    prompt: t(
+      "Work out the settlement dates here.\n" +
+        "1. Skip weekends AND the holidays — and the holidays must be a PARAMETER. A calendar built into the code is wrong in another country and wrong next year, and the person who finds out is a counterparty.\n" +
+        "2. Say which calendar applies: the venue's, the currency's, or both. A cross-border trade settles when both sides are open, which is not the same as either.\n" +
+        "3. T+0 still has to land on a business day. Nothing settles on a Sunday, so a same-day convention moves forward rather than staying put.\n" +
+        "4. Say what happens at a month end and across a year end, and whether the convention is 'following', 'modified following' or 'preceding' — they differ only on the day that matters.\n"
+    ),
+    attach: true,
+  },
+  {
+    group: "finance",
+    name: t("/markethours"),
+    hint: t("time zones and market sessions"),
+    evalTask: "fin-market-hours",
+    prompt: t(
+      "Review how this decides whether a venue is open.\n" +
+        "1. Use the venue's OWN time zone and its session in local time. A window written in UTC is right for half the year: the exchange does not move its bell when the clocks change, so the UTC offset of the open is not a constant.\n" +
+        "2. Name the time zone rather than an offset. `Europe/Paris` knows when the clocks change; `+01:00` does not, and the day it is wrong is a day somebody traded.\n" +
+        "3. Watch the two transitions: an hour that happens twice and an hour that does not exist. A timestamp in either is ambiguous, and 'it compiled' is not an answer about which one you meant.\n" +
+        "4. Holidays and half-days come from the caller, and an auction or a pre-open is part of the session or it is not — say which.\n"
+    ),
+    attach: true,
+  },
+  {
+    group: "finance",
+    name: t("/identifiers"),
+    hint: t("validate ISIN, LEI and BIC properly"),
+    evalTask: "fin-identifiers",
+    prompt: t(
+      "Validate these identifiers properly rather than by their length.\n" +
+        "1. ISIN: twelve characters, a two-letter country code, and a Luhn check digit over the letters converted to digits — each letter becoming its position in the alphabet plus nine BEFORE the digits are concatenated. Converting afterwards gives a different number and a check that always fails.\n" +
+        "2. LEI: twenty characters, ISO 17442, which is ISO 7064 MOD 97-10 — the whole string as digits, modulo 97, must be 1.\n" +
+        "3. BIC: the shape is part of what makes it one — four letters, two letters for the country, two alphanumerics, and an optional three-character branch. Eight characters of the wrong shape is not a BIC.\n" +
+        "4. Never throw on bad input: these are validated on whatever a form submitted, and a validator that throws has to be wrapped by every caller, which is the same check written again in the wrong place.\n"
+    ),
+    attach: true,
+  },
+  {
+    group: "finance",
+    name: t("/fixmsg"),
+    hint: t("FIX messages a counterparty accepts"),
+    evalTask: "fin-fix-message",
+    prompt: t(
+      "Review this FIX message.\n" +
+        "1. BodyLength (tag 9) counts the bytes from the SOH that ends tag 9 to the start of tag 10 — not the whole message, and not the body plus the header.\n" +
+        "2. CheckSum (tag 10) covers EVERYTHING before it, including `8=` and `9=`, modulo 256, as three digits ZERO-PADDED. A two-digit checksum is right ninety-nine times in a hundred, which is worse than being always wrong.\n" +
+        "3. Check the field order where the specification fixes it: 8, 9 and 35 first, 10 last. A counterparty rejects on order before it reads the order.\n" +
+        "4. Say which FIX version this is and which fields are required for this message type in it — a field that became required in 4.4 is a rejection on a venue that upgraded.\n"
+    ),
+    attach: true,
+  },
+  {
+    group: "finance",
+    name: t("/amortise"),
+    hint: t("schedules whose parts total the whole"),
+    evalTask: "fin-amortisation",
+    prompt: t(
+      "Review this schedule.\n" +
+        "1. The instalments must total the principal EXACTLY. Rounding each one and multiplying back gives a schedule that differs from the loan by a few cents, and that difference is a reconciliation item somebody chases for an afternoon.\n" +
+        "2. Say where the residue goes: spread one minor unit at a time over the first instalments, or all of it on the last. Both are defensible; only one matches the contract.\n" +
+        "3. Work in minor units, as integers. Every version of this defect begins with a division in floating point.\n" +
+        "4. Say what happens at the boundaries: one instalment, zero instalments, a principal smaller than the number of instalments.\n"
     ),
     attach: true,
   },

@@ -1,0 +1,7 @@
+{
+  "title": "Money through a zoned field and a float",
+  "kind": "ibmi",
+  "prompt": "AMTCVT.rpgle moves money through a float and a zoned field with the wrong precision, so the cents drift and a value too large is truncated silently. Fix it: keep every monetary value packed with the precision the field needs, size the intermediate so a product cannot overflow, and handle the conversion failure with a MONITOR group instead of letting it end the program. Say in a comment what the precision of each value is and why.",
+  "check": "! codeonly AMTCVT.rpgle | grep -qiE 'float|\\bfloat8\\b|\\bfloat4\\b' && [ $(codeonly AMTCVT.rpgle | grep -ciE 'packed\\(') -ge 3 ] && ! codeonly AMTCVT.rpgle | grep -qiE 'zoned\\( *11 *: *0 *\\)' && codeonly AMTCVT.rpgle | grep -qi 'monitor;' && codeonly AMTCVT.rpgle | grep -qi 'on-error' && codeonly AMTCVT.rpgle | grep -qiE 'packed\\( *1[5-9] *:' && grep -qE '^ *//' AMTCVT.rpgle",
+  "timeoutMs": 180000
+}

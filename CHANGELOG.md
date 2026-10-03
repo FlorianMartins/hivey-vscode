@@ -2,6 +2,39 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.84.0 — 2026-10-03
+
+### Ajouté
+
+- **Chantier 3.4 — une famille de compétences `finance`.** Huit compétences, activables comme les
+  autres par `skills.groups` : **`/rounding`** (demi-loin-de-zéro contre demi-au-pair, et le cas
+  négatif que `Math.round`, le `round` de Python et `BigDecimal.ROUND_HALF_UP` tranchent
+  différemment), **`/decimal`** (de l'argent sans flottant, y compris aux frontières — un nombre JSON
+  est un double), **`/packed`** (décimal packé et zoné, intermédiaires dimensionnés pour qu'un produit
+  ne déborde pas en silence), **`/settlement`** (T+1, T+2, et les jours fériés en **paramètre** —
+  jamais un calendrier dans le code), **`/markethours`** (le fuseau de la place et sa séance en heure
+  locale : une fenêtre écrite en UTC est juste la moitié de l'année), **`/identifiers`** (ISIN par
+  Luhn, LEI par ISO 17442 / ISO 7064 MOD 97-10, BIC par sa forme), **`/fixmsg`** (BodyLength et
+  CheckSum, et une somme de contrôle à deux chiffres est juste 99 fois sur 100, ce qui est pire que
+  d'avoir toujours tort) et **`/amortise`** (des échéanciers dont les parts font le tout).
+
+- **Cinq tâches d'évaluation de plus**, qui portent cette famille : identifiants ISIN/LEI/BIC
+  (Python), dates de règlement avec jours fériés fournis (JavaScript), heures de marché à travers un
+  changement d'heure (Python, `zoneinfo`), message FIX avec sa longueur et sa somme de contrôle
+  (JavaScript) et décimal packé/zoné avec débordement et MONITOR (RPG). Le banc passe à **56 tâches**,
+  56/56 honnêtes dans les deux sens.
+
+### Précisé
+
+- **Chaque compétence `finance` déclare la tâche qui l'éprouve**, et le test qui l'exigeait pour les
+  familles IBM i l'exige maintenant pour celle-ci — avec une différence assumée : **aucune lacune n'y
+  est admise**. Une partition IBM i est une excuse ; de l'arithmétique décimale n'en est pas une.
+- Un test vérifie aussi que les tâches derrière cette famille **couvrent au moins trois langages**,
+  parce que la feuille de route demandait JavaScript, Python, Java et RPG là où c'est pertinent.
+- ⚠️ `/fix` existait déjà dans la famille générale : la compétence FIX s'appelle **`/fixmsg`**. Trouvé
+  par le test qui exige que les noms soient uniques — ce que l'utilisateur tape ne peut pas désigner
+  deux choses.
+
 ## 0.83.0 — 2026-10-03
 
 ### Ajouté
