@@ -5,6 +5,8 @@ import * as vscode from "vscode";
 import { showKnowledge } from "./knowledge.js";
 import { announcePolicy, policySource, reloadPolicy } from "./policy.js";
 import { SiemShipper } from "./siem.js";
+import { sovereigntyReport } from "./sovereignty.js";
+import type { ReportRow } from "../core/audit/sovereignty.js";
 import { setLanguage, t } from "../shared/i18n.js";
 import { Budget } from "../core/router/budget.js";
 import { contextBudget } from "../core/context/budget.js";
@@ -171,6 +173,9 @@ export function activate(context: vscode.ExtensionContext): void {
 
     vscode.commands.registerCommand("hiveyCode.showKnowledge", () => showKnowledge()),
     vscode.commands.registerCommand("hiveyCode.siemStatus", () => siem.report()),
+    vscode.commands.registerCommand("hiveyCode.sovereigntyReport", () =>
+      sovereigntyReport(gate.ledger() as unknown as ReportRow[], context.secrets),
+    ),
     // Reloading is a deliberate act rather than a file watcher: a policy being written half a file
     // at a time would otherwise be read mid-write and refused, putting the machine into safe mode
     // because an administrator was in the middle of a deployment.

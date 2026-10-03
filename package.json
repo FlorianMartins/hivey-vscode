@@ -2,7 +2,7 @@
   "name": "hivey-code",
   "displayName": "Hivey Code",
   "description": "%extension.description%",
-  "version": "0.76.0",
+  "version": "0.77.0",
   "publisher": "hivey",
   "license": "Apache-2.0",
   "repository": {
@@ -341,6 +341,11 @@
       {
         "command": "hiveyCode.siemStatus",
         "title": "%command.siemStatus.title%",
+        "category": "Hivey Code"
+      },
+      {
+        "command": "hiveyCode.sovereigntyReport",
+        "title": "%command.sovereigntyReport.title%",
         "category": "Hivey Code"
       }
     ],
@@ -892,6 +897,11 @@
             "type": "number",
             "default": 30,
             "markdownDescription": "%config.siem.flushSeconds%"
+          },
+          "hiveyCode.audit.timestampUrl": {
+            "type": "string",
+            "default": "",
+            "markdownDescription": "%config.audit.timestampUrl%"
           }
         }
       },

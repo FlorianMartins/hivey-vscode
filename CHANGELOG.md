@@ -2,6 +2,52 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.77.0 — 2026-10-03
+
+### Ajouté
+
+- **Chantier 2.3 — une preuve de souveraineté, et le résidu n°9 du modèle de menace est fermé.**
+  `Hivey Code : Produire une preuve de souveraineté` écrit un dossier qu'on remet à un auditeur :
+  nombre de requêtes, destinations avec le volume sorti vers chacune, catégories anonymisées,
+  images envoyées, et **le verdict de la chaîne** en haut du document.
+
+  **L'horodatage porte sur la TÊTE de la chaîne**, auprès d'une autorité RFC 3161 que
+  l'organisation configure — **une seule empreinte sort**. C'est ce qui ferme le résidu n°9 : une
+  chaîne locale rendait visible la modification d'une ligne, et rien ne la liait à une racine de
+  confiance extérieure, donc réécrire tout le registre depuis le début était indétectable.
+  Réécrire produit une tête différente, qu'aucune autorité n'a jamais vue.
+
+  ⚠️⚠️ **Le rapport dit ce qu'il ne prouve pas**, et c'est la décision centrale : un document qui
+  ressemble à une preuve sans en être une est pire que pas de document, parce que c'est celui qui
+  sera cité. Les limites sont **dans le rapport** et un test les exige — il est signé par *cette*
+  machine (donc la signature établit qu'il n'a pas changé depuis l'émission, pas que le registre
+  était vrai), le volume est compté en **jetons** parce que c'est ce que le registre enregistre, et
+  rien ici ne voit la requête d'un autre outil.
+
+  ⚠️ **L'extension n'affirme pas vérifier ce qu'elle ne vérifie pas** : elle obtient et conserve le
+  jeton verbatim, elle ne valide pas la signature de l'autorité. Le faire demanderait une
+  implémentation CMS complète et le magasin de confiance de l'organisation ; le dossier livré
+  contient la commande `openssl ts -verify` à exécuter par celui qui audite, avec *sa* racine.
+  Voir [ADR-0021](docs/adr/0021-une-preuve-qui-dit-ce-qu-elle-ne-prouve-pas.md).
+
+### Précisé
+
+- Le DER de la requête d'horodatage est écrit à la main et **vérifié contre une implémentation que
+  personne ici n'a écrite** : le test la fait relire par `openssl ts -query` et `openssl asn1parse`,
+  et **échoue** si `openssl` manque. Deux pièges attrapés par là : une longueur DER doit être la plus
+  courte représentation, et un INTEGER est **signé** — donc un nonce aléatoire sur deux a besoin d'un
+  zéro de tête, sans quoi l'autorité lit un nombre négatif.
+- La chaîne est vérifiée sur **tout le registre** et non sur la fenêtre demandée : un rapport qui
+  vérifierait les liens d'une semaine manquerait une modification faite la semaine précédente, qui
+  est la semaine où quelqu'un modifierait.
+- **La troncature est tolérée, la lacune de numérotation ne l'est pas.** Supprimer une ligne du
+  milieu et rechaîner laisse tous les liens valides : c'est la numérotation qui trahit.
+- Un rapport est produit **même si l'autorité est en panne**, avec la raison : le document signé vaut
+  d'être eu sans horodatage.
+- La clé de signature est générée à la première utilisation et vit dans le **trousseau du système** —
+  jamais dans un réglage, qui est une clé dans une capture d'écran, une sauvegarde et un ticket de
+  support.
+
 ## 0.76.0 — 2026-10-03
 
 ### Ajouté

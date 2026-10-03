@@ -135,5 +135,7 @@
   "config.siem.headers": "Extra headers for the OTLP collector — an API key, a tenant.",
   "config.siem.userId": "Who this machine's activity belongs to, as your organisation names people. **Empty by default and never filled in automatically**: an identifier you chose is a pseudonym you can resolve and an auditor cannot, while an e-mail address taken from a git configuration is personal data nobody consented to shipping. Empty means the field is simply absent.",
   "config.siem.flushSeconds": "How often the queue is flushed. The queue is on disk, so an outage costs a delay and never a row.",
-  "command.siemStatus.title": "Where the audit stream is"
+  "command.siemStatus.title": "Where the audit stream is",
+  "config.audit.timestampUrl": "An RFC 3161 timestamping authority, configured by your organisation. When set, the sovereignty report asks it to timestamp the **head of the audit chain** — one hash and nothing else leaves. That is what ties a local chain to a clock outside this machine: rewriting the ledger from the beginning produces a different head, and no authority ever saw it. This extension obtains and keeps the token; it does **not** verify it, because verifying needs your own trust anchor — `openssl ts -verify -in head.tsr -queryfile head.tsq -CAfile your-tsa-ca.pem`.",
+  "command.sovereigntyReport.title": "Produce a sovereignty report"
 }

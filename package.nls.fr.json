@@ -135,5 +135,7 @@
   "config.siem.headers": "En-têtes supplémentaires pour le collecteur OTLP — une clé d'API, un locataire.",
   "config.siem.userId": "À qui appartient l'activité de cette machine, tel que votre organisation nomme les personnes. **Vide par défaut et jamais rempli automatiquement** : un identifiant que vous avez choisi est un pseudonyme que vous pouvez résoudre et qu'un auditeur ne peut pas, alors qu'une adresse e-mail prise dans une configuration git est une donnée personnelle que personne n'a consenti à envoyer. Vide signifie que le champ est simplement absent.",
   "config.siem.flushSeconds": "Fréquence de vidage de la file. La file est sur disque, donc une coupure coûte un délai et jamais une ligne.",
-  "command.siemStatus.title": "Où en est le flux d'audit"
+  "command.siemStatus.title": "Où en est le flux d'audit",
+  "config.audit.timestampUrl": "Une autorité d'horodatage RFC 3161, configurée par votre organisation. Quand elle est renseignée, la preuve de souveraineté lui demande d'horodater la **tête de la chaîne d'audit** — une seule empreinte sort, et rien d'autre. C'est ce qui relie une chaîne locale à une horloge extérieure à cette machine : réécrire le registre depuis le début produit une tête différente, qu'aucune autorité n'a jamais vue. L'extension obtient et conserve le jeton ; elle ne le **vérifie pas**, parce que vérifier exige votre propre racine de confiance — `openssl ts -verify -in head.tsr -queryfile head.tsq -CAfile votre-ca-tsa.pem`.",
+  "command.sovereigntyReport.title": "Produire une preuve de souveraineté"
 }

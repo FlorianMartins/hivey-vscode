@@ -263,11 +263,29 @@ lien si l'on rechaîne — mais laisse un trou dans la numérotation, et c'est j
 que quelqu'un voudrait faire. `Hivey Code : Vérifier…` répond, et `Hivey Code : Exporter…` met une
 copie hors de portée (JSONL ou syslog RFC 5424, empreintes comprises).
 
-**Résidu, assumé.** Une chaîne locale ne protège pas contre quelqu'un qui réécrit **tout** le journal
-depuis le début : rien ne le lie à une racine de confiance extérieure. L'export vers un collecteur
-distant est ce qui ferme ce trou, et il dépend de l'exploitant. La troncature (le journal est
-plafonné à 500 entrées) est tolérée par la vérification, sans quoi le contrôle deviendrait inutile
-dès que le plafond est atteint.
+**Parade, depuis la 0.77.0 — le résidu est fermé.** Deux choses atteignent l'extérieur de la
+machine, et la preuve de souveraineté (`Hivey Code : Produire une preuve de souveraineté`) les
+emploie toutes les deux :
+
+- **l'horodatage RFC 3161 de la TÊTE de la chaîne**, auprès d'une autorité que l'organisation
+  configure (`hiveyCode.audit.timestampUrl`). **Une seule empreinte sort**, et elle répond à une
+  seule question : « cette empreinte existait à cet instant ». C'est exactement la question qu'un
+  journal réécrit ne peut pas satisfaire — réécrire depuis le début produit une tête différente,
+  qu'aucune autorité n'a jamais vue. ⚠️ L'extension **obtient et conserve** le jeton ; elle ne le
+  **vérifie pas** : vérifier exige la racine de confiance de l'organisation, et c'est tout l'intérêt.
+  Le dossier livré contient la commande `openssl ts -verify` à exécuter ;
+- **l'envoi vers le collecteur** (§ Envoi du registre, `docs/PRIVACY.md`), qui met une copie hors de
+  portée au moment où la ligne est écrite.
+
+Le rapport est signé par la machine, et il **dit lui-même** ce que cela ne prouve pas : une
+signature locale établit que le rapport n'a pas changé depuis son émission, pas que le registre dont
+il est tiré était vrai. Rien produit sur la machine auditée ne peut l'établir.
+
+**Résidu restant, assumé.** Sans autorité d'horodatage configurée **et** sans collecteur, la chaîne
+reste purement locale et la réécriture complète reste indétectable — le rapport le dit en toutes
+lettres plutôt que de laisser le lecteur le supposer. La troncature (le journal est plafonné à 500
+entrées) est tolérée par la vérification, sans quoi le contrôle deviendrait inutile dès que le
+plafond est atteint.
 
 ---
 
