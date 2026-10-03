@@ -23,6 +23,24 @@
 
 /** What one turn of the agent did. Produced by the terminal client, one line of JSON per turn. */
 export interface RunRecord {
+  /**
+   * Set when the turn never happened: the budget refused it, or another guard did.
+   *
+   * ⚠️ The reason this field exists is that a refusal and a failure were the same thing in the
+   * results. Eleven tasks into a measurement the daily cap was reached, and the next forty-two were
+   * refused before they started — and read as forty-two model failures. A score computed over those
+   * is not a score. See `refused` in `Totals`: a report that holds any of these refuses to state a
+   * pass rate at all.
+   */
+  refused?: string;
+  /**
+   * Steps of its own plan the turn left outstanding, when it kept a plan.
+   *
+   * Absent when there was no plan, which is not the same as zero: most turns never need one, and a
+   * harness that read "0 outstanding" for a turn that never planned would be counting discipline
+   * nobody exercised.
+   */
+  planLeft?: number;
   model: string;
   /** Tool-calling rounds. A task solved in one step was understood; eleven is a model groping. */
   steps: number;
@@ -74,6 +92,25 @@ export interface Totals {
   usd?: number;
   /** How many runs could not be priced. A total with this above zero is a floor, not a figure. */
   unpriced: number;
+  /**
+   * Tasks the agent finished cleanly and that the check then failed.
+   *
+   * The number 4.1 of the roadmap promised, and the one that matters most to somebody using this:
+   * the gap between "the model says it is done" and "the check passes". A model that fails loudly
+   * costs a turn; a model that fails while claiming success costs the trust that makes the tool
+   * usable at all.
+   */
+  claimedDone: number;
+  /** Turns that ended with steps of their own plan outstanding. */
+  planLeft: number;
+  /**
+   * Tasks that never ran because a guard refused them.
+   *
+   * Above zero, `passRate` is ABSENT — not lowered. A refused task says nothing about the model, and
+   * averaging it in as a failure produces a figure that looks like a measurement and is not one.
+   */
+  refused: number;
+
   /** Runs that ran out of steps, and runs cut off mid-sentence. Both are quality signals. */
   outOfSteps: number;
   truncated: number;
@@ -94,7 +131,19 @@ export interface Totals {
 
 /** Nothing measured, stated as such. The one shape that must never be confused with a bad score. */
 export function emptyTotals(tasks = 0): Totals {
-  return { tasks, passed: 0, seconds: 0, unpriced: 0, outOfSteps: 0, truncated: 0, escalations: 0, neverActed: 0 };
+  return {
+    tasks,
+    passed: 0,
+    seconds: 0,
+    unpriced: 0,
+    outOfSteps: 0,
+    truncated: 0,
+    escalations: 0,
+    neverActed: 0,
+    claimedDone: 0,
+    planLeft: 0,
+    refused: 0,
+  };
 }
 
 /**
@@ -107,12 +156,19 @@ export function totalsFor(outcomes: TaskOutcome[]): Totals {
   const out = emptyTotals(outcomes.length);
   if (!outcomes.length) return out;
   out.passed = outcomes.filter((o) => o.passed).length;
-  out.passRate = out.passed / outcomes.length;
+  out.refused = outcomes.filter((o) => o.runs.some((r) => r.refused)).length;
+  // A pass rate over a set that includes refused tasks is not a pass rate. Absent rather than
+  // lowered, for the same reason nothing else here is ever zero when it is unknown.
+  if (!out.refused) out.passRate = out.passed / outcomes.length;
   out.seconds = round1(outcomes.reduce((n, o) => n + o.seconds, 0));
 
   // Counted over TASKS, not runs, and before the early return: a task whose client reported nothing
   // took no step either, and "the model never acted" is exactly as true then.
   out.neverActed = outcomes.filter((o) => o.runs.reduce((n, r) => n + r.steps, 0) === 0).length;
+  // Exited cleanly and failed anyway: the agent believed it was finished. Counted over tasks, like
+  // `neverActed`, and before the early return — a task whose client reported nothing still exited.
+  out.claimedDone = outcomes.filter((o) => !o.passed && o.agentExit === 0).length;
+  out.planLeft = outcomes.filter((o) => o.runs.some((r) => (r.planLeft ?? 0) > 0)).length;
 
   const runs = outcomes.flatMap((o) => o.runs);
   if (!runs.length) return out;

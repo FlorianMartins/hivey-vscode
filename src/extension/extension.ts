@@ -291,6 +291,24 @@ export function activate(context: vscode.ExtensionContext): void {
       await vscode.window.showTextDocument(doc);
     }),
 
+    // What, literally, was just sent.
+    //
+    // The egress log answers "what has left over time" and holds no content, by design. This answers
+    // the other question — the one somebody asks once before trusting the thing, and again the first
+    // time an answer is strange. It is the pseudonymized form, because that is the form that left,
+    // and it is held in memory for the session only: nothing is written anywhere by this command.
+    vscode.commands.registerCommand("hiveyCode.auditLastPrompt", async () => {
+      const report = chat.auditLastPrompt();
+      if (!report) {
+        void vscode.window.showInformationMessage(
+          t("Nothing has been sent yet in this session, so there is nothing to audit."),
+        );
+        return;
+      }
+      const doc = await vscode.workspace.openTextDocument({ language: "markdown", content: report });
+      await vscode.window.showTextDocument(doc);
+    }),
+
     vscode.commands.registerCommand("hiveyCode.pinLastAnswer", async () => {
       await chat.reveal();
       return chat.togglePinLastAnswer();

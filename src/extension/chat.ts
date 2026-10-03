@@ -41,6 +41,7 @@ import { compactBrief, digestEntries, sessionAsContext, shouldSuggestCompact } f
 import {
   ALWAYS_ON,
   BUILTIN_SKILLS,
+  builtinSkillsForModel,
   detectGroups,
   isSkillEnabled,
   normalizeGroups,
@@ -98,7 +99,8 @@ import type {
   UiApproval,
 } from "../shared/protocol.js";
 import { SECTION, endpointFor, providerFor, readSettings, routerConfig, type Keys, type Settings, writeTarget } from "./config.js";
-import { EgressGate, safeHost } from "./egress.js";
+import { EgressGate, safeHost, summarize } from "./egress.js";
+import { renderPromptAudit, type PromptAudit } from "../core/audit/prompt.js";
 import { contextWindow, labelFor, listModels, openFiles, openFileUris, ownModelIds, supportsReasoning } from "./models.js";
 import { servedSetChanged } from "../core/models/watch.js";
 import { billsTheUser } from "../core/router/billing.js";
@@ -572,6 +574,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       remote: isHivey(s.chat.model) || !isLocalEndpoint(baseUrl),
       billed: isHivey(s.chat.model) || billsTheUser(s.chat.provider),
       contextTokens,
+      ...(this.contextParts().length ? { contextParts: this.contextParts() } : {}),
       sentTokens: this.session.plannedTokens(budgetTokens),
       contextBudget: budgetTokens,
       contextBudgetAuto: !(typeof s.context.maxTokens === "number" && s.context.maxTokens > 0),
@@ -1553,6 +1556,57 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    * The sub-agent sees only the task it was given. That is the point of one: it starts on a clean
    * context, so a long conversation does not have to be re-read to answer a small question.
    */
+  /**
+   * What the context is made of, for the bar.
+   *
+   * Only what is knowable WITHOUT assembling a request. The conversation and the attachments are in
+   * hand; the instructions and the repository map are not — they are built during a turn, and
+   * rebuilding them on every state post would spend real work to redraw a bar. So their sizes are
+   * remembered from the last turn, and **left out entirely before the first one**: a bar that showed
+   * "instructions" before anything had been assembled would be showing a number nobody measured.
+   *
+   * The arithmetic and the rules — the floor under which parts merge, free space never negative, no
+   * share invented when the window is unknown — are in `core/context/breakdown.ts` with their tests.
+   */
+  private contextParts(): Array<{ label: string; tokens: number }> {
+    const parts: Array<{ label: string; tokens: number }> = [];
+    if (this.lastPromptTokens) parts.push({ label: t("instructions"), tokens: this.lastPromptTokens });
+    if (this.lastAmbientTokens) parts.push({ label: t("repository map"), tokens: this.lastAmbientTokens });
+
+    let conversation = 0;
+    for (const entry of this.session.entries) {
+      if (!entry.included || entry.error) continue;
+      conversation += estimateTokens(entry.text);
+      for (const item of entry.context ?? []) {
+        parts.push({ label: item.label, tokens: item.image ? IMAGE_TOKENS : estimateTokens(item.body) });
+      }
+    }
+    if (conversation > 0) parts.push({ label: t("the conversation"), tokens: conversation });
+    return parts;
+  }
+
+  /**
+   * The last request, for the audit. In memory, never on disk, cleared with the session.
+   *
+   * Not in the ledger: that file keeps metadata and only metadata, by design. See
+   * `core/audit/prompt.ts` for the three rules this holds to.
+   */
+  private lastAudit: PromptAudit | undefined;
+
+  /**
+   * The last request, rendered — or nothing, when none has been sent in this session.
+   *
+   * Returns the text rather than opening a document: the panel does not own the editor, and a method
+   * that renders is one a test can call.
+   */
+  auditLastPrompt(): string | undefined {
+    return this.lastAudit ? renderPromptAudit(this.lastAudit) : undefined;
+  }
+
+  /** Measured during a turn, because that is the only moment they are assembled. */
+  private lastPromptTokens: number | undefined;
+  private lastAmbientTokens: number | undefined;
+
   private async runSubAgent(
     run: SubAgentRun,
     env: {
@@ -3411,6 +3465,27 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     // Not in chat mode. A skill is instructions the user wrote, but it is still a file read from
     // the repository, and chat mode's promise is that it does not read the repository. A promise
     // with an exception in it is not one.
+      // The built-in skills, offered to the model the way the repository's own are: names and one
+    // line each in the prompt, instructions on demand. They were reachable only by a user who knew
+    // the slash command to type — so forty IBM i skills and eight finance ones, every one of them
+    // backed by an evaluation task, were conditional on knowing a magic word.
+    //
+    // Filtered by what the user has actually switched on, which is also what bounds the cost: the
+    // whole catalogue is eighty-five, a typical setup enables a fraction of it, and a skill that
+    // is off must not be described either — the model would announce something the user cannot
+    // invoke.
+      const offeredBuiltins = builtinSkillsForModel(
+      BUILTIN_SKILLS.filter(
+        (sk) =>
+          settings.skills.groups.includes(sk.group) && isSkillEnabled(sk.name, settings.skills.disabled),
+      ),
+    );
+    const modelSkills = [
+      ...definitions.skills.filter((sk) => isSkillEnabled(skillInvocation(sk.name), settings.skills.disabled)),
+      // The repository's own first: a team that wrote a skill with the same name as a built-in one
+      // meant theirs, and `use_skill` resolves on the first match.
+      ...offeredBuiltins.filter((b) => !definitions.skills.some((sk) => skillInvocation(sk.name) === b.name)),
+    ];
     if (mode !== "chat") {
       tools.push(
         ...buildDefinitionTools(
@@ -3424,7 +3499,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             ...definitions,
             // A switched-off skill or sub-agent is not described to the model either. Filtering it
             // out of the picker alone would leave the model announcing a delegation it cannot make.
-            skills: definitions.skills.filter((sk) => isSkillEnabled(skillInvocation(sk.name), settings.skills.disabled)),
+            skills: modelSkills,
             agents: definitions.agents.filter((a) => !settings.agents.disabled.includes(a.name)),
           },
         ),
@@ -3451,15 +3526,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         skills:
           mode === "chat"
             ? ""
-            : skillsPrompt(
-                // A switched-off skill is not described to the model either. Filtering it out of the
-                // `/` list alone would leave the model announcing a skill the user cannot invoke.
-                definitions.skills.filter((sk) => isSkillEnabled(skillInvocation(sk.name), settings.skills.disabled)),
-              ),
+            : skillsPrompt(modelSkills),
     });
     const ambientText = ambient
       ? `${ambient.text}\n\n(${ambient.files} files mapped, ${ambient.omitted} omitted)`
       : undefined;
+    // Remembered for the context bar, which is drawn outside a turn and cannot assemble these.
+    this.lastPromptTokens = estimateTokens(systemPrompt);
+    this.lastAmbientTokens = ambientText ? estimateTokens(ambientText) : undefined;
     const built = this.session.build({
       systemPrompt,
       ambient: ambientText,
@@ -3619,6 +3693,27 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         this.post({ type: "turnEnd" });
         return;
       }
+
+      // Held for the audit, in memory, for this session only.
+      //
+      // The ledger records that a request happened and never what it contained — a log of what you
+      // were trying to keep private is not a privacy feature, and that rule is unchanged. This
+      // answers a different question, asked at a different moment: "what, literally, did you just
+      // send?" It is the pseudonymized form, because that is the form that left; showing the
+      // original would say the client's name went out when a marker went out.
+      this.lastAudit = {
+        at: Date.now(),
+        model,
+        host: safeHost(baseUrl),
+        isLocal,
+        messages: prepared.messages.map((m) => ({
+          role: m.role,
+          content: m.content,
+          ...(m.images?.length ? { images: m.images.length } : {}),
+        })),
+        tools: tools.map((tool) => tool.schema.name),
+        redactions: summarize(prepared.findings),
+      };
 
       // The spending guard ASKS. It used to refuse, and that is the defect that made the extension
       // look dead.
@@ -3882,7 +3977,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       // is `verifyTurn`'s, which is the same evidence the escalation spends money on — so a turn that
       // nothing verified counts as neither a success nor a failure and is simply not recorded.
       {
-        const verdict = verifyTurn(steps);
+        const verdict = verifyTurn(steps, this.plan);
         const verified = steps.some((x) => VERIFIED_TOOLS.has(x.tool));
         if (verified && !ctl.signal.aborted) {
           void this.learnedRouting?.observe(model, steps.map((x) => x.tool), verdict.kind === "none");
@@ -3893,7 +3988,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       // GREEN after the remote model — an episode whose final diff does not work is not a training
       // example, it is two wrong answers. `handover` is true on the escalated turn itself, which is
       // the turn whose verdict decides.
-      if (handover && this.pendingEpisode && !ctl.signal.aborted && verifyTurn(steps).kind === "none") {
+      if (handover && this.pendingEpisode && !ctl.signal.aborted && verifyTurn(steps, this.plan).kind === "none") {
         const episode = this.pendingEpisode;
         this.pendingEpisode = undefined;
         void this.corpus?.record({
@@ -4194,7 +4289,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     usedProvider: ProviderId,
   ): Promise<void> {
     if (settings.escalation.policy === "never") return;
-    const verdict = verifyTurn(steps);
+    const verdict = verifyTurn(steps, this.plan);
     if (verdict.kind === "none") return;
 
     const target = escalationTarget(routerConfig(settings), { provider: usedProvider, model: usedModel });

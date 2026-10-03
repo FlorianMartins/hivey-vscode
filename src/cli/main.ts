@@ -18,10 +18,13 @@ import { stdin, stdout } from "node:process";
 import { runTurn, type TurnResult } from "../core/agent/loop.js";
 import { makeProvider, PROVIDER_IDS, type ProviderId } from "../core/providers/index.js";
 import { hiveyModel, isHivey } from "../core/router/hivey.js";
+import { planSummary, planVerdict, type Plan } from "../core/agent/plan.js";
+import { BUILTIN_SKILLS, builtinSkillsForModel } from "../core/session/skills.js";
+import { skillsPrompt } from "../core/agent/definitions.js";
 import { isLocalEndpoint, redactMessages, Vault, streamingRestorer } from "../core/redaction/index.js";
 import type { RedactionLevel } from "../core/redaction/types.js";
 import type { RunRecord } from "../core/eval/report.js";
-import { Budget, type Spend, type SpendStore } from "../core/router/budget.js";
+import { Budget, SHIPPED_LIMITS, type Spend, type SpendStore } from "../core/router/budget.js";
 import { costOf, makeLookup } from "../core/router/pricing.js";
 import { GENERATED_PRICES } from "../core/router/catalog.generated.js";
 import { Session } from "../core/session/session.js";
@@ -39,7 +42,9 @@ interface CliConfig {
   redaction: RedactionLevel;
   customTerms: string[];
   blockedGlobs: string[];
-  budget: { perRequestUsd: number; dailyUsd: number };
+  budget: { perRequestUsd: number; dailyUsd: number; perRequestTokens: number };
+  /** Which built-in skill families the model may reach. See `SKILL_GROUPS`. */
+  skillGroups?: string[];
   contextTokens: number;
   /** Which mode the client starts in — the same three the sidebar offers. */
   mode: Mode;
@@ -66,7 +71,10 @@ const DEFAULTS: CliConfig = {
   redaction: "strict",
   customTerms: [],
   blockedGlobs: ["**/.env*", "**/*.pem", "**/*.key", "**/id_rsa*", "**/secrets/**", "**/.aws/**", "**/.ssh/**"],
-  budget: { perRequestUsd: 0.25, dailyUsd: 2 },
+  // From the one place that holds them, not retyped here. See `SHIPPED_LIMITS`: this file had
+  // `0.25` and `2` while the editor shipped `2` and `20`, so the terminal refused what the panel
+  // allowed — the same defect this project had already fixed in the panel and not in this half.
+  budget: { ...SHIPPED_LIMITS },
   contextTokens: 8000,
   mode: "agent",
 };
@@ -148,6 +156,13 @@ async function main(): Promise<void> {
 
   const store = new FileSpendStore(join(homedir(), ".hiveycode", "spend.json"));
   store.load();
+    // The built-in skills the configuration switched on, in the shape the model is offered. The
+  // terminal has no settings UI, so the groups come from `.hiveycode.json` and default to the
+  // general family — enough to be useful, bounded enough not to spend the context on a catalogue.
+  const cliSkills = builtinSkillsForModel(
+    BUILTIN_SKILLS.filter((sk) => (cfg.skillGroups ?? ["general"]).includes(sk.group)),
+  );
+
   const budget = new Budget(store, cfg.budget);
   const prices = makeLookup(GENERATED_PRICES);
   const session = new Session();
@@ -298,7 +313,10 @@ async function main(): Promise<void> {
     // Chat mode answers from what it is given: no repository map, no tools, no surprises.
     const ambient = mode === "chat" ? undefined : await repoMap(cwd, Math.floor(cfg.contextTokens * 0.35));
     const built = session.build({
-      systemPrompt: promptForMode(mode),
+      // The same skills the panel offers, by the same mechanism: names and one line each here,
+      // instructions on demand through `use_skill`. The terminal had none at all — which also meant
+      // the evaluation harness, which drives this client, could not measure whether a skill helps.
+      systemPrompt: promptForMode(mode) + skillsPrompt(cliSkills),
       ambient,
       maxTokens: cfg.contextTokens,
       nonce: randomNonce(),
@@ -328,14 +346,35 @@ async function main(): Promise<void> {
       const verdict = budget.check(estimate, built.estimatedTokens);
       if (!verdict.ok) {
         console.log(C.red(t("budget: {0}", verdict.message)));
+        // Recorded, not just printed. The evaluation harness drives this client, and a task refused
+        // before it started is NOT a task the model got wrong — but in the results the two were
+        // indistinguishable, and forty-two refusals once became forty-two apparent model failures in
+        // a measurement. A refusal has to be able to say it was a refusal.
+        writeRefusal(verdict.reason);
         process.off("SIGINT", onSigint);
         return;
       }
     }
 
+    // The plan this turn kept, if it kept one. Read at the end of the turn: a turn that finishes
+    // with steps of its own plan outstanding has declared itself done against its own list.
+    let turnPlan: Plan | undefined;
+
     // The mode decides the tool set in code: plan mode simply has no tool that writes.
     const tools = toolsForMode(
-      buildCliTools({ cwd, blockedGlobs: cfg.blockedGlobs, showDiff: (path, before, after) => printDiff(path, before, after) }),
+      buildCliTools({
+        cwd,
+        blockedGlobs: cfg.blockedGlobs,
+        showDiff: (path, before, after) => printDiff(path, before, after),
+        // Printed, so the terminal shows what the panel shows — and kept, because the verdict at the
+        // end of the turn reads it: a turn that ends with its own steps outstanding is a turn that
+        // declared itself finished against its own list.
+        onPlan: (plan) => {
+          turnPlan = plan;
+          const { done, total, current } = planSummary(plan);
+          console.log(C.dim(`  ${t("plan")} ${done}/${total}${current ? ` · ${current.title}` : ""}`));
+        },
+      }),
       mode,
     );
 
@@ -396,7 +435,12 @@ async function main(): Promise<void> {
         );
       }
       if (result.stoppedBecause === "max-steps") console.log(C.amber(t("  (stopped at the maximum number of steps)")));
-      writeRunRecord(result, Date.now() - startedAt, cfg.model, !isLocal && cost.known ? cost.usd : undefined);
+      // The verdict the panel reaches, reached here too — and said out loud. A turn that ends with
+      // its own steps outstanding has declared itself finished against its own list, and the person
+      // reading the terminal is the one who should know that first.
+      const unfinished = planVerdict(turnPlan);
+      if (unfinished.unfinished) console.log(C.amber(`  ${t("unfinished: {0}", unfinished.why)}`));
+      writeRunRecord(result, Date.now() - startedAt, cfg.model, !isLocal && cost.known ? cost.usd : undefined, unfinished.left.length);
     } catch (err) {
       console.log(C.red(`\n${(err as Error).message}`));
     } finally {
@@ -476,7 +520,30 @@ function randomNonce(): string {
  * all of them. A failure to write is swallowed: an evaluation hook must never be able to break the
  * turn it is measuring.
  */
-function writeRunRecord(result: TurnResult, ms: number, model: string, usd: number | undefined): void {
+/**
+ * A turn that never happened, and why.
+ *
+ * Written to the same report the harness reads, so a run that was refused can be told apart from a
+ * run that failed. See the call site: the distinction is the difference between a measurement and a
+ * misleading one.
+ */
+function writeRefusal(reason: string): void {
+  const path = process.env["HIVEY_CODE_RUN_REPORT"];
+  if (!path) return;
+  try {
+    require("node:fs").appendFileSync(path, `${JSON.stringify({ refused: reason })}\n`, "utf8");
+  } catch {
+    /* measuring must never break the thing being measured */
+  }
+}
+
+function writeRunRecord(
+  result: TurnResult,
+  ms: number,
+  model: string,
+  usd: number | undefined,
+  planLeft?: number,
+): void {
   const path = process.env["HIVEY_CODE_RUN_REPORT"];
   if (!path) return;
   const tools: Record<string, number> = {};
@@ -491,6 +558,9 @@ function writeRunRecord(result: TurnResult, ms: number, model: string, usd: numb
     truncated: result.truncated,
     tools,
     ms,
+    // Absent when the turn kept no plan: most turns do not need one, and recording 0 would count
+    // discipline nobody exercised.
+    ...(planLeft === undefined || !result.trace.some((x) => x.call.name === "update_plan") ? {} : { planLeft }),
   };
   try {
     require("node:fs").appendFileSync(path, `${JSON.stringify(record)}\n`, "utf8");

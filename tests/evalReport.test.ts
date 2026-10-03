@@ -218,3 +218,50 @@ test("a task where the model never acted is counted as such", () => {
   assert.equal(totalsFor([acted]).neverActed, 0, "zero means it acted every time, which is a result");
   assert.equal(emptyTotals(0).neverActed, 0);
 });
+
+test("a failure the agent reported as a success is counted separately", () => {
+  // The figure chantier 4.1 promised, and the one that decides whether a tool can be left alone: a
+  // model that fails loudly costs you a turn, one that fails while claiming success costs the trust
+  // that makes it usable. Counted over TASKS, and `agentExit === 0` is the claim.
+  const t = totalsFor([
+    outcome({ passed: true, agentExit: 0 }),
+    outcome({ passed: false, agentExit: 0 }), // finished cleanly, check failed anyway
+    outcome({ passed: false, agentExit: 1 }), // failed and said so
+  ]);
+  assert.equal(t.claimedDone, 1);
+  assert.equal(emptyTotals(0).claimedDone, 0);
+});
+
+test("a turn that kept a plan and left steps in it is counted", () => {
+  const t = totalsFor([
+    outcome({ runs: [run({ planLeft: 2 })] }),
+    outcome({ runs: [run({ planLeft: 0 })] }),
+    outcome({ runs: [run()] }), // no plan at all — absent, which is not zero
+  ]);
+  assert.equal(t.planLeft, 1);
+});
+
+test("a refused task does not become a failure", () => {
+  // The defect this exists for: eleven tasks into a real measurement the daily budget cap was
+  // reached, and the next forty-two were refused before they started. In the results they were
+  // indistinguishable from forty-two model failures, and a pass rate computed over them would have
+  // been published. A refused task says nothing about the model.
+  const t = totalsFor([
+    outcome({ passed: true }),
+    outcome({ passed: false, runs: [{ ...run(), refused: "daily" }] }),
+  ]);
+  assert.equal(t.refused, 1);
+  assert.equal(t.passRate, undefined, "a set with a refused task cannot state a rate");
+  assert.equal(t.passed, 1, "what did pass is still counted");
+  // And with nothing refused the rate comes back.
+  assert.equal(totalsFor([outcome({ passed: true })]).passRate, 1);
+});
+
+test("the table says how many were refused instead of printing a rate", () => {
+  const rows = rowsFromOutcomes([
+    outcome({ passed: false, runs: [{ ...run(), refused: "daily" }] }),
+  ], "remote only");
+  const md = qualityTable({ taskCount: 1, at: "2026-10-03", rows });
+  assert.match(md, /1 refused — no rate/);
+  assert.ok(!/\| 0 % \|/.test(md), "a refusal must never be rendered as a score");
+});

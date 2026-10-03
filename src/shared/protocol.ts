@@ -261,6 +261,17 @@ export interface UiState {
   billed: boolean;
   contextTokens: number;
   /**
+   * What the context is made of, biggest first — the bar's data.
+   *
+   * The ring has shown a percentage for a long time, and "84 %" answers the wrong half: the half
+   * somebody can act on is "84 % of WHAT". An attribution already existed and lived only on the
+   * consent card, a screen that appears for a remote provider once per session.
+   *
+   * Approximate by construction: it measures the sources rather than the assembled messages. See
+   * `core/context/breakdown.ts`.
+   */
+  contextParts?: Array<{ label: string; tokens: number }>;
+  /**
    * Of that, how much actually goes with the next question.
    *
    * Equal to `contextTokens` until the conversation outgrows its budget, and then smaller — because

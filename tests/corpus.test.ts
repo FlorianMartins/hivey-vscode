@@ -184,7 +184,13 @@ test("it is off by default, and the policy can only forbid it", () => {
 test("an episode is kept only when the verification went GREEN after the remote model", () => {
   // An episode whose final diff does not work is not a training example, it is two wrong answers.
   const chat = readFileSync(join("src", "extension", "chat.ts"), "utf8");
-  assert.match(chat, /if \(handover && this\.pendingEpisode && !ctl\.signal\.aborted && verifyTurn\(steps\)\.kind === "none"\)/);
+  // The guarantee: an episode is kept only when the verdict is clean. The verdict now also reads the
+  // turn's own plan (`verifyTurn(steps, this.plan)`), so a turn that left its own steps outstanding
+  // is no longer a training example either — which is a tightening of this rule, not a loosening.
+  assert.match(
+    chat,
+    /if \(handover && this\.pendingEpisode && !ctl\.signal\.aborted && verifyTurn\(steps, this\.plan\)\.kind === "none"\)/,
+  );
   // And it is held for exactly one turn: carrying it further would attach a diff nobody can
   // attribute to the question that produced it.
   assert.match(chat, /\} else if \(handover\) \{[\s\S]{0,200}this\.pendingEpisode = undefined;/);

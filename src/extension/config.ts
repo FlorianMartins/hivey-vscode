@@ -7,6 +7,7 @@
 //   • the endpoint decides what is local, not the setting name. Someone who points the "local"
 //     provider at a public URL gets redaction and consent like any other remote provider.
 
+import { SHIPPED_LIMITS } from "../core/router/budget.js";
 import * as vscode from "vscode";
 import { allowedEndpoint, applyPolicy, featureDisabled } from "../core/policy/policy.js";
 import { policyState } from "./policy.js";
@@ -270,9 +271,11 @@ function readSettingsRaw(scope?: vscode.Uri): Settings {
       customTerms: c.get<string[]>("privacy.customTerms", []),
     },
     budget: {
-      perRequestUsd: c.get<number>("budget.perRequestUsd", 2),
-      perRequestTokens: c.get<number>("budget.perRequestTokens", 200_000),
-      dailyUsd: c.get<number>("budget.dailyUsd", 20),
+      // The fallbacks come from the one place that holds the shipped limits, so the panel and the
+      // terminal cannot drift apart again — see `SHIPPED_LIMITS`.
+      perRequestUsd: c.get<number>("budget.perRequestUsd", SHIPPED_LIMITS.perRequestUsd),
+      perRequestTokens: c.get<number>("budget.perRequestTokens", SHIPPED_LIMITS.perRequestTokens),
+      dailyUsd: c.get<number>("budget.dailyUsd", SHIPPED_LIMITS.dailyUsd),
     },
     context: {
       // Deliberately NOT `c.get(..., default)`. A default returned as a value cannot be told apart

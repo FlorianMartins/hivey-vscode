@@ -77,6 +77,9 @@ export function rowsFromOutcomes(outcomes: TaskOutcome[], label?: string): Measu
 }
 
 function quality(totals: Totals): string {
+  // A refused task says nothing about the model, so a set containing any cannot state a rate. It
+  // says how many were refused instead — which tells the reader what to fix to get a number.
+  if (totals.refused) return `${totals.refused} refused — no rate`;
   if (totals.passRate === undefined) return "not measured";
   return `${Math.round(totals.passRate * 100)} %`;
 }
@@ -92,10 +95,14 @@ function row(configuration: string, totals: Totals): string {
   // failed because it never attempted an edit is a different thing from one that attempted and was
   // wrong, and only one of those is improved by a better model.
   const idle = totals.tasks ? `${totals.neverActed}/${totals.tasks}` : "—";
-  return `| \`${configuration}\` | ${totals.passed}/${totals.tasks} | ${quality(totals)} | ${idle} | ${totals.seconds.toFixed(0)} s | ${cost(totals)} |`;
+  // "Claimed done" is the honesty gap: finished cleanly, and the check failed anyway. A model that
+  // fails loudly costs a turn; one that fails while reporting success costs the trust that makes
+  // the tool usable.
+  const claimed = totals.tasks ? `${totals.claimedDone}/${totals.tasks}` : "—";
+  return `| \`${configuration}\` | ${totals.passed}/${totals.tasks} | ${quality(totals)} | ${idle} | ${claimed} | ${totals.seconds.toFixed(0)} s | ${cost(totals)} |`;
 }
 
-const NOT_MEASURED = (configuration: string) => `| \`${configuration}\` | — | not measured | — | — | — |`;
+const NOT_MEASURED = (configuration: string) => `| \`${configuration}\` | — | not measured | — | — | — | — |`;
 
 /** The table, as the file that gets committed. */
 export function qualityTable(input: TableInput): string {
@@ -141,8 +148,8 @@ export function qualityTable(input: TableInput): string {
       `Taken ${input.at ?? "(no date recorded)"}${input.endpoint ? ` against \`${input.endpoint}\`` : ""}` +
         `${input.models?.length ? ` with \`${input.models.join("`, `")}\`` : ""}.`,
       "",
-      "| configuration | passed | quality | never acted | time | cost |",
-      "| --- | --- | --- | --- | --- | --- |",
+      "| configuration | passed | quality | never acted | claimed done | time | cost |",
+      "| --- | --- | --- | --- | --- | --- | --- |",
       ...CONFIGURATIONS.map((spec) => {
         const found = measured.get(spec.configuration);
         return found ? row(spec.configuration, found.totals) : NOT_MEASURED(spec.configuration);
@@ -160,6 +167,11 @@ export function qualityTable(input: TableInput): string {
       "it never tried, and those are different problems: one is answered by a better model, the other",
       "by the client and the prompt. A configuration with a low score and a high *never acted* has not",
       "been measured on its reasoning at all.",
+      "",
+      "**claimed done** is how many of those failures the agent reported as a success — it exited",
+      "cleanly and the check failed anyway. It is the number that decides whether a tool can be left",
+      "alone: a model that fails loudly costs you a turn, one that fails while claiming success costs",
+      "the trust that makes it usable.",
       "",
       "**not priced** is not free. A local endpoint bills nothing and costs electricity and time; the",
       "time is in the table and the price is absent rather than written as $0.00.",

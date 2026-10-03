@@ -2,6 +2,117 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.90.0 — 2026-10-03
+
+### Corrigé
+
+- **⚠️⚠️ Le client terminal refusait ce que le panneau autorisait, d'un facteur dix** — et c'est le
+  défaut que ce projet avait **déjà corrigé une fois**. Le journal le raconte pour le panneau : un
+  plafond quotidien de 2 $ refusait la huitième question de la journée, *silencieusement*, « donc ce
+  que l'utilisateur voyait était une extension qui avait cessé de fonctionner sans raison ». Le
+  panneau est passé à 20 $. **Le terminal a gardé `0.25` et `2` codés en dur dans ses propres
+  valeurs par défaut.** C'est exactement ce contre quoi l'en-tête de `src/cli/env.ts` met en garde :
+  *« les deux moitiés en désaccord en silence »*. Les limites livrées vivent maintenant à **un seul
+  endroit** (`SHIPPED_LIMITS`), un test vérifie que `package.json` dit la même chose, et un test lit
+  le source du terminal pour refuser qu'il les retape.
+
+- **⚠️⚠️⚠️ Et dans le relevé du banc, un refus était indiscernable d'un échec.** C'est ainsi que le
+  défaut a été trouvé : onze tâches ont réussi, puis **les quarante-deux suivantes ont échoué sans
+  produire un seul tour**, parce que le plafond quotidien était atteint. Un taux de réussite calculé
+  là-dessus aurait été publié comme une mesure — l'erreur même que toute la phase 3 existe pour
+  empêcher. Le client **enregistre** désormais le refus, le rapport le compte, et **un jeu qui
+  contient un seul refus n'énonce aucun taux** : la colonne affiche « *n* refused — no rate » au lieu
+  d'un pourcentage. Absent plutôt que faux, comme partout ailleurs ici.
+
+- ⚠️ **Les identifiants de préréglage du tableau étaient faux depuis une semaine** : `hivey/balanced`
+  et `hivey/pro` n'existent nulle part dans le produit (ce sont `hivey` et `hivey/smart`). Un tableau
+  qui nomme des configurations que personne ne peut choisir est un tableau qu'on ne peut pas
+  reproduire.
+
+### Ajouté
+
+- **Chantier 4.1 — un plan inachevé est une preuve.** `verifyTurn(steps, plan)` lit maintenant le plan
+  du tour, **en dernier** : un contrôle qui échoue est une preuve concrète sur le code, un plan
+  inachevé est le récit que le modèle fait de lui-même, donc il ne parle que si rien de plus dur n'a
+  parlé. Un tour qui se termine en laissant des étapes de son **propre** plan ouvertes s'est déclaré
+  fini contre sa propre liste, et c'est la forme de preuve sur laquelle l'escalade dépense de l'argent.
+  Prudence symétrique : **l'absence de plan n'est pas un échec**, et une étape `skipped` compte comme
+  réglée. Voir [ADR-0028](docs/adr/0028-un-plan-inacheve-est-une-preuve.md).
+
+- **Le client terminal a l'outil de plan.** Il ne l'avait pas, pour une raison écrite dans le code —
+  *« un outil que rien n'affiche dépense des jetons pour rien »* — vraie tant que le plan n'était
+  qu'un affichage, fausse dès qu'il devient une preuve. Et surtout : le banc pilote ce client, donc il
+  ne pouvait **rien** mesurer du plan, ce qui rendait inapplicable la règle « on mesure avant et
+  après » de toute la phase.
+
+- **Deux chiffres de plus dans le rapport et le tableau.** **`claimed done`** : le tour est sorti
+  proprement et le contrôle a échoué quand même — c'est l'écart entre « le modèle dit que c'est fini »
+  et « le contrôle passe », que le chantier 4.1 promettait de mesurer, et c'est le chiffre qui décide
+  si on peut laisser l'outil travailler seul. Un modèle qui échoue bruyamment coûte un tour ; un
+  modèle qui échoue en annonçant une réussite coûte la confiance. Et **`planLeft`**, absent quand il
+  n'y a pas eu de plan — compter 0 pour un tour qui n'a jamais planifié serait compter une discipline
+  que personne n'a exercée.
+
+- **Chantier 4.2 — les compétences intégrées deviennent atteignables par le modèle.** Les
+  quatre-vingt-cinq compétences — quarante pour IBM i, huit pour la finance, chacune adossée à une
+  tâche d'évaluation qui échoue avant qu'on l'applique — étaient réservées à un utilisateur **qui
+  connaissait la commande à taper**. Qui ne sait pas que `/packed` existe n'en bénéficiait jamais :
+  tout un axe de l'expertise du produit dépendait d'un mot magique. Elles passent désormais par le
+  mécanisme qui existait déjà (`skillsPrompt` + `use_skill`) : **le nom et une ligne dans le prompt,
+  les instructions seulement si le modèle les demande**. Filtrées par ce que l'utilisateur a activé —
+  ce qui borne le coût et évite d'annoncer une compétence qu'il ne peut pas invoquer ; une compétence
+  qui est une *action* sur la conversation (`/compact`) est exclue, faute d'instructions à lire ; et
+  une compétence du dépôt qui porte le même nom gagne, parce que l'équipe qui a écrit la sienne
+  voulait la sienne. Voir [ADR-0029](docs/adr/0029-les-competences-etaient-invisibles-au-modele.md).
+
+- **Le terminal a les compétences, comme il a maintenant le plan.** Il n'en avait aucune — ni celles
+  du dépôt, ni les intégrées — donc le banc, qui pilote ce client, ne pouvait pas mesurer si une
+  compétence sert. Troisième fois dans cette phase que la moitié terminal était la moitié oubliée.
+
+- **Une barre de contexte, qui dit de quoi les 84 % sont faits.** L'anneau affiche un pourcentage
+  depuis longtemps, et « 84 % » répond à la mauvaise moitié de la question : celle sur laquelle on
+  peut agir est **84 % de QUOI** — détacher ce fichier, réduire cette sélection, résumer la
+  conversation, relever le budget. Une attribution existait déjà et ne vivait que sur la carte de
+  consentement, un écran qui n'apparaît que pour un fournisseur distant, une fois par session. La
+  barre est dans le menu de l'anneau — *« l'endroit où l'on regarde après avoir lu 84 % est le
+  84 % »* — avec une légende, l'espace libre, et les couleurs prises **à la palette de graphiques de
+  l'éditeur** et non choisies ici. Règles tenues par des tests : les tranches sous 2 % sont **fondues
+  en une seule** (une barre de vingt éclats d'un tiers de pourcent est une texture, pas une
+  information), l'espace libre **n'est jamais négatif** (au-delà du budget la barre le *dit*), et une
+  fenêtre inconnue **n'invente aucune part** — on montre le compte seul. Et elle annonce qu'elle est
+  approximative : elle mesure les **sources** et non les messages assemblés, parce qu'une ventilation
+  qui devrait être exacte devrait être maintenue au pas de l'assemblage, et serait abandonnée à la
+  première divergence.
+
+- **Un audit de prompt : exactement ce qui est parti.** `Hivey Code : Auditer le dernier prompt`
+  ouvre un document en lecture seule avec la **dernière requête telle qu'elle a été envoyée** —
+  chaque message, son rôle, sa taille, et les outils offerts. Le registre des sorties répond à « qu'est-ce
+  qui est parti dans le temps » et **ne contient aucun contenu, par conception** ; cette commande
+  répond à l'autre question, celle qu'on pose une fois avant de faire confiance à l'outil, et de
+  nouveau la première fois qu'une réponse est étrange. Trois règles : c'est **la forme
+  pseudonymisée**, parce que c'est elle qui est partie (montrer l'original dirait que le nom du
+  client est sorti alors qu'un marqueur est sorti) ; **rien n'est conservé** — en mémoire, pour la
+  session, et un test lit le source pour refuser que ce module puisse écrire où que ce soit ; et
+  **chaque message porte sa taille**, parce que « pourquoi cette requête fait 40 000 jetons » se
+  répond par la liste et pas par le total. ⚠️ La clôture du bloc de code s'adapte à son contenu : un
+  prompt qui contient trois accents graves aurait fermé le bloc au milieu de ce que l'audit était
+  ouvert pour montrer.
+
+### Précisé
+
+- ⚠️⚠️ **Les deux premières rédactions de la phase 4 étaient fausses, et c'est un défaut de méthode.**
+  4.1 affirmait que « la boucle est sans mémoire de son propre plan » : `src/core/agent/plan.ts`
+  existait, avec l'analyse, la règle « une seule étape en cours », le résumé et l'affichage — et j'ai
+  commencé par **écraser ce fichier** avant de m'en apercevoir. 4.2 affirmait que 85 compétences
+  encombraient le prompt : elles n'y étaient pas du tout, et celles du dépôt utilisaient déjà la
+  divulgation progressive, avec le raisonnement écrit dans le code.
+
+  Les six chantiers de la phase avaient été rédigés d'affilée **depuis ce que je croyais savoir du
+  produit**, pas depuis le code. Ce qui a évité le pire n'est pas de la prudence : c'est que le dépôt
+  force à vérifier — la compilation a refusé un import inexistant, un test qui lit le source a refusé
+  une affirmation fausse. La **rédaction** d'une feuille de route n'a pas de contrôle de ce genre.
+  Conséquence inscrite : **4.3 à 4.6 sont à re-dériver du code avant d'être engagés.**
+
 ## 0.89.0 — 2026-10-03
 
 ### Corrigé

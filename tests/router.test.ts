@@ -3,7 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { route, classifyComplexity } from "../src/core/router/route.js";
-import { Budget, MemorySpendStore } from "../src/core/router/budget.js";
+import { SHIPPED_LIMITS, Budget, MemorySpendStore } from "../src/core/router/budget.js";
 import { costOf, estimateCost, makeLookup } from "../src/core/router/pricing.js";
 import { GENERATED_PRICES } from "../src/core/router/catalog.generated.js";
 import { readFileSync } from "node:fs";
@@ -281,4 +281,18 @@ test("an ordinary question is still ordinary in both languages", () => {
   ]) {
     assert.notEqual(classifyComplexity(ordinary, 100, 32_000).level, "hard", ordinary);
   }
+});
+
+test("the terminal and the panel ship the same caps", () => {
+  // They did not, and the consequence was the defect this project had already fixed once: the
+  // CHANGELOG records a $2 daily cap refusing the eighth question of the day in the panel, silently.
+  // The panel was raised to $20 and the terminal client kept `0.25` and `2` hard-coded in its own
+  // defaults — so the same product refused in the terminal what it allowed in the panel. Found by
+  // the evaluation harness, which drives the terminal.
+  assert.equal(SHIPPED_LIMITS.perRequestUsd, shippedDefault("hiveyCode.budget.perRequestUsd"));
+  assert.equal(SHIPPED_LIMITS.dailyUsd, shippedDefault("hiveyCode.budget.dailyUsd"));
+  assert.equal(SHIPPED_LIMITS.perRequestTokens, shippedDefault("hiveyCode.budget.perRequestTokens"));
+  // And the terminal must take them from there rather than retyping them.
+  const main = readFileSync("src/cli/main.ts", "utf8");
+  assert.match(main, /budget: \{ \.\.\.SHIPPED_LIMITS \}/);
 });

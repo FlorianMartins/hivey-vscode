@@ -17,6 +17,7 @@ import type { Mode, Reasoning, ToExtension, UiApproval, UiEntry, UiSkill, UiStat
 import { applySuggestion, suggestionsFor, type Suggestion } from "../core/session/mentions.js";
 import { BUILTIN_SKILLS, type BuiltinSkill } from "../core/session/skills.js";
 import { planComplete, planSummary, type Plan } from "../core/agent/plan.js";
+import { contextBreakdown, OTHER } from "../core/context/breakdown.js";
 import { providerIsReady, whatIsMissing, type ProviderState } from "../core/providers/ready.js";
 
 const MODES: Array<{ id: Mode; label: string; hint: string }> = [
@@ -1208,6 +1209,10 @@ function contextRing(state: UiState, deps: ChatDeps): HTMLElement {
   wrap.addEventListener("click", () =>
     menu(wrap, (close) => {
       const panel = el("div", "menu-list");
+      // The bar first, because it answers the question the ring raises. "84 %" is not actionable;
+      // "84 %, of which 61 % is the repository map" is — you detach it, or you raise the budget.
+      panel.append(...contextBarSection(state));
+      panel.append(separator());
       panel.append(...contextBudgetSection(state, deps, close));
       // Summarizing lives here, under the number it moves.
       //
@@ -1539,6 +1544,71 @@ function modelButton(state: UiState, deps: ChatDeps): HTMLElement {
  * room left for the answer" after the other had stopped capping it. Two renderings of one setting
  * drift, and the one nobody is looking at is the one that drifts.
  */
+/**
+ * The context bar: what the window is actually holding.
+ *
+ * A stacked bar and a legend, in the menu rather than in the toolbar. The toolbar was the obvious
+ * place and it is the wrong one: a capture showed what 22 px of it cost last time something was
+ * added there — the model name, the one label in that row carrying something nobody can guess, went
+ * from "qwen2.5-co…" to "qwen2…". The ring is already in the toolbar, already about exactly this,
+ * and one click from here.
+ *
+ * Approximate, and it says so: it measures the sources rather than the assembled messages, so the
+ * parts do not sum exactly to what a provider counts. Naming the big one correctly is the point.
+ */
+function contextBarSection(state: UiState): HTMLElement[] {
+  const parts = state.contextParts ?? [];
+  if (!parts.length) {
+    // Before the first turn there is nothing measured, and an empty bar would be a drawing of a
+    // number nobody took.
+    return [menuTitle(t("Context")), el("div", "menu-note", t("Nothing has been assembled yet."))];
+  }
+  const breakdown = contextBreakdown(parts, state.contextBudget);
+  const out: HTMLElement[] = [
+    menuTitle(
+      breakdown.budget > 0
+        ? t("Context — {0} of {1}", formatTokens(breakdown.used), formatTokens(breakdown.budget))
+        : t("Context — {0}, window unknown", formatTokens(breakdown.used)),
+    ),
+  ];
+
+  const bar = el("div", `context-bar${breakdown.over ? " over" : ""}`);
+  const shown = breakdown.budget > 0 ? breakdown.segments : [];
+  for (const [index, segment] of shown.entries()) {
+    const slice = el("span", `context-slice s${index % 5}`);
+    // Clamped for drawing only: the figure in the legend stays true even when it exceeds the window.
+    slice.style.width = `${Math.min(100, segment.share * 100).toFixed(2)}%`;
+    slice.title = `${segment.label} — ${formatTokens(segment.tokens)}`;
+    bar.append(slice);
+  }
+  if (breakdown.freeShare > 0) {
+    const free = el("span", "context-slice free");
+    free.style.width = `${(breakdown.freeShare * 100).toFixed(2)}%`;
+    free.title = t("free — {0}", formatTokens(breakdown.free));
+    bar.append(free);
+  }
+  if (shown.length) out.push(bar);
+
+  for (const [index, segment] of breakdown.segments.entries()) {
+    const row = el("div", "context-legend");
+    const dot = el("span", `context-dot s${index % 5}`);
+    const label = el("span", "context-legend-label");
+    label.textContent = segment.label === OTHER ? t("everything else") : segment.label;
+    const size = el("span", "context-legend-size");
+    size.textContent =
+      breakdown.budget > 0
+        ? `${formatTokens(segment.tokens)} · ${Math.round(segment.share * 100)}%`
+        : formatTokens(segment.tokens);
+    row.append(dot, label, size);
+    out.push(row);
+  }
+  if (breakdown.over) out.push(el("div", "menu-note", t("Over the budget — the oldest exchanges are being left out.")));
+  // Said once, here, rather than in every tooltip: the figures measure the sources, not the
+  // assembled request, so they will not add up to the last count a provider reported.
+  out.push(el("div", "menu-note", t("Measured from the sources, so these are close rather than exact.")));
+  return out;
+}
+
 function contextBudgetSection(state: UiState, deps: ChatDeps, close: () => void): HTMLElement[] {
   const out: HTMLElement[] = [
     menuTitle(

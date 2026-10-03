@@ -963,3 +963,38 @@ export function detectGroups(languageIds: string[]): SkillGroup[] {
 export function skillInvocation(name: string): string {
   return name.startsWith("/") ? name : `/${name}`;
 }
+
+/**
+ * The built-in skills, in the shape the model is offered.
+ *
+ * ⚠️ They were invisible to the model. All of them — forty for IBM i, eight for finance, each one
+ * backed by an evaluation task that fails before it is applied — were reachable **only by a user
+ * typing the right slash command**. Somebody who does not know that `/packed` exists never benefits
+ * from it, which makes a whole axis of this product's expertise conditional on knowing a magic word.
+ *
+ * They reach the model through the mechanism the repository's own skills already use (see
+ * `skillsPrompt` and `use_skill`): the NAME and one line in the prompt, the instructions only when
+ * the model asks for them. Nothing new is invented — one more source feeds an existing path, which
+ * is also why the token cost is bounded by what the user has switched on rather than by the whole
+ * catalogue of eighty-five.
+ *
+ * A skill whose job is an ACTION on the conversation (`/compact`) is left out: there are no
+ * instructions to read, and offering it would let the model announce something it cannot do.
+ */
+export function builtinSkillsForModel(skills: BuiltinSkill[]): Array<{
+  kind: "skill";
+  name: string;
+  description: string;
+  body: string;
+  source: string;
+}> {
+  return skills
+    .filter((sk) => typeof sk.prompt === "string" && sk.prompt.trim().length > 0)
+    .map((sk) => ({
+      kind: "skill" as const,
+      name: sk.name,
+      description: sk.hint,
+      body: sk.prompt as string,
+      source: "built in",
+    }));
+}

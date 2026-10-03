@@ -436,36 +436,105 @@ seule preuve disponible est le banc d'évaluation, et il est maintenant en état
 `eval/QUALITY.md`). **Chaque chantier de cette phase se mesure avant et après, sur les 56 tâches, et
 un chantier qui n'améliore pas le chiffre est annulé plutôt que gardé.**
 
-### 4.1 Un état de plan que le modèle tient
+### 4.1 Le plan devient une preuve, et devient mesurable
 
-Ce qui distingue le plus un agent qui aboutit d'un agent qui tourne en rond n'est pas la taille du
-modèle, c'est qu'il garde une **liste de ce qui reste à faire** et qu'il la met à jour. Aujourd'hui la
-boucle est sans mémoire de son propre plan : douze étapes, chacune décidée depuis la trace.
+⚠️ **Correction de la première rédaction de ce chantier** : elle disait que « la boucle est sans
+mémoire de son propre plan ». C'est faux. `src/core/agent/plan.ts` existe, avec `parsePlan`,
+`planSummary`, `planComplete`, la règle « une seule étape en cours », et l'affichage dans le panneau.
+Je l'avais écrit sans vérifier — et j'ai commencé par écraser ce fichier avant de m'en apercevoir.
 
-À livrer : un état de tâches explicite, écrit et relu par le modèle à chaque étape, visible dans le
-panneau. Mesurer : le taux de réussite, et surtout le nombre de tours qui finissent **sans avoir
-vérifié**.
+Ce qui manque est ailleurs, et le fichier le dit lui-même : *« le plan n'est pas une technique de
+prompt et il n'est pas pour le bénéfice du modèle ; c'est un affichage de progression »*. D'où deux
+lacunes réelles :
 
-### 4.2 Les compétences chargées à la demande
+**a) Un plan inachevé n'est pas une preuve.** Un tour qui se termine en laissant des étapes de son
+**propre** plan ouvertes est un tour qui s'est déclaré fini contre sa propre liste. C'est exactement
+la forme de preuve sur laquelle `router/outcome.ts` escalade (ADR-0009), et c'est la moitié qui
+change le résultat plutôt que l'apparence. Prudence symétrique à `verifyTurn` : **l'absence de plan
+n'est pas un échec** — beaucoup de bons tours n'en ont pas besoin, et traiter leur absence comme une
+faute escalade chaque réponse courte, qui est précisément l'erreur de l'ancien routage par
+mots-clés.
 
-Il y a environ 85 compétences. Les décrire toutes dans le prompt coûte des jetons à chaque tour et
-dilue l'attention du modèle. Ce que fait un agent moderne : n'envoyer que les **noms** et charger le
-contenu quand la compétence est choisie — exactement la discipline déjà appliquée à la base de
-connaissance (chapitre 7 du cours : seuls les titres voyagent).
+**b) Le client terminal n'a pas l'outil de plan**, donc le banc — qui pilote ce client — ne peut rien
+mesurer à ce sujet. C'est bloquant pour toute la phase : la règle « on mesure avant et après » est
+inapplicable à une fonctionnalité que le harnais ne peut pas exercer.
 
-À livrer : une compétence est un nom plus une description d'une ligne dans le prompt ; son contenu
-arrive par un appel d'outil. Mesurer : les jetons du préfixe, et le taux de réussite (il doit **ne pas**
-baisser).
+Mesurer : le taux de réussite, et surtout **l'écart entre « le modèle dit que c'est fini » et « le
+contrôle passe »** — le seul chiffre qui compte pour quelqu'un qui s'en sert.
 
-### 4.3 Des sous-agents qui travaillent vraiment en parallèle
+**Reste de ce chantier, trouvé en route et non fait** : le client terminal fixe son budget de contexte
+à **8 000 jetons en dur**, alors que le panneau suit la fenêtre du modèle réellement choisi — et le
+`CHANGELOG` dit que ce nombre fixe **était** le défaut. Même histoire que les plafonds de dépense,
+dans la même moitié oubliée.
 
-`.hiveycode/agents/` existe : un prompt, une liste d'outils intersectée, un modèle, un contexte
-vierge. Ce qui manque est ce qui les rend utiles : **plusieurs à la fois**, et une synthèse de leurs
-retours par l'agent principal. Une recherche qui lirait trente fichiers coûte trente lectures dans le
-contexte principal ; déléguée, elle coûte une réponse.
+### 4.2 Les compétences deviennent atteignables par le modèle
 
-À livrer : lancer plusieurs sous-agents, attendre, synthétiser. Mesurer : les jetons du contexte
-principal sur les tâches qui demandent de l'exploration, et le temps.
+⚠️ **Deuxième rédaction fausse de cette phase.** Elle disait : « il y a environ 85 compétences, les
+décrire toutes dans le prompt coûte des jetons et dilue l'attention ». Vérification faite : les
+compétences **intégrées n'entrent jamais dans le prompt** (ce sont les commandes `/` que
+l'utilisateur tape), et celles du dépôt utilisaient **déjà** la divulgation progressive, avec le
+raisonnement écrit dans `skillsPrompt`.
+
+Le vrai manque est l'inverse : **les 85 compétences intégrées étaient inatteignables par le modèle**.
+Quarante pour IBM i, huit pour la finance, chacune adossée à une tâche d'évaluation — et toutes
+conditionnées au fait que l'utilisateur **connaisse la commande à taper**. Qui ne sait pas que
+`/packed` existe n'en bénéficie jamais.
+
+Fait : elles passent par le mécanisme existant (`skillsPrompt` + `use_skill`), filtrées par ce que
+l'utilisateur a activé — ce qui borne le coût — en excluant celles qui sont une action sur la
+conversation, et en laissant gagner une compétence du dépôt qui porte le même nom. Le terminal les
+reçoit aussi, sans quoi le banc ne peut rien mesurer. Voir
+[ADR-0029](adr/0029-les-competences-etaient-invisibles-au-modele.md).
+
+⚠️⚠️ **Et un constat de méthode qui vaut pour la suite de cette phase.** Les six chantiers ont été
+écrits d'affilée depuis ce que je croyais savoir du produit, pas depuis le code : deux des deux
+premiers portaient sur des problèmes déjà résolus. **Les chantiers 4.3 à 4.6 ci-dessous sont à
+re-dériver du code avant d'être engagés** — leur rédaction est une intention, pas un constat.
+
+### 4.3 La délégation est transitive, et le terminal n'en a pas
+
+⚠️ **Troisième rédaction fausse de cette phase, re-dérivée du code sur demande.** Elle disait : « ce
+qui manque est ce qui les rend utiles : **plusieurs à la fois**, et une synthèse de leurs retours ».
+Les deux existent.
+
+Ce qui existe déjà, vérifié :
+
+- **Le parallélisme est implémenté.** `loop.ts` fusionne les appels **voisins** que l'outil déclare
+  sûrs et les lance en `Promise.all` ; les approbations sont résolues **avant**, une par une, parce
+  que deux dialogues simultanés ne sont pas une interface ; et ne fusionner que des voisins préserve
+  l'ordre que le modèle a demandé. L'outil de dispatch se déclare parallélisable **uniquement pour un
+  agent en lecture seule** — deux agents qui écrivent en même temps sont une course que personne ne
+  reconstitue depuis une trace.
+- **La synthèse est le mécanisme même** : la conclusion du sous-agent revient comme résultat d'outil,
+  et le modèle principal continue avec elle. Il n'y a pas d'étape à ajouter.
+- **Les outils d'un sous-agent sont une intersection, jamais une union** : un fichier de définition
+  arrivé avec un dépôt cloné ne peut pas s'accorder un outil que le mode n'offre pas.
+- **Quatre sous-agents intégrés** existent déjà : `explorer`, `reviewer`, `tester`, `dba`.
+
+Les trois vraies lacunes :
+
+**a) ⚠️⚠️ La délégation est transitive et non bornée.** `toolsForAgent` rend **tous** les outils
+disponibles quand une définition n'a pas de ligne `tools:` — et parmi eux `run_agent`. Donc un
+sous-agent défini sans restriction peut dispatcher des sous-agents, qui peuvent en dispatcher à leur
+tour. La largeur est bornée par le plafond d'étapes de chaque niveau ; **la profondeur ne l'est par
+rien**. Aucune garde n'existe nulle part, et aucun test ne l'interdit. La règle à poser est simple et
+sans ambiguïté : **un sous-agent est une feuille**. C'est déjà ce que la description de l'outil
+promet — « il travaille seul et ne rend que sa conclusion » — et aucun des quatre agents intégrés ne
+veut déléguer.
+
+**b) Le client terminal n'a aucun sous-agent.** `buildDefinitionTools` est côté extension seulement.
+Quatrième fois dans cette phase que la moitié terminal est la moitié oubliée (après l'outil de plan,
+les plafonds de dépense et les compétences) — et, comme à chaque fois, cela veut dire que le banc ne
+peut rien mesurer de la délégation.
+
+**c) Une ligne d'étape ne nomme jamais le sous-agent dispatché.** `callSignature` déclare
+`run_agent: ["agent", "task"]` alors que le schéma de l'outil utilise `name`. L'argument `agent`
+n'existe donc jamais, on retombe sur `task`, et la trace montre la tâche sans dire **quel** agent l'a
+reçue. C'est exactement le défaut que ce fichier existe pour empêcher : *« quelqu'un qui relit ce
+qu'un agent a fait à son dépôt a besoin de l'appel »*.
+
+Mesurer : le taux de réussite, les jetons du contexte **principal** sur les tâches qui demandent de
+l'exploration, et le temps.
 
 ### 4.4 La vérification pendant, pas seulement après
 

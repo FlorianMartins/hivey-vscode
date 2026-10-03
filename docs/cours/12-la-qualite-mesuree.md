@@ -65,6 +65,12 @@ C'est pour ça que le tableau a une colonne **« never acted »** (jamais agi). 
 si un modèle s'est trompé ou s'il n'a jamais essayé, et ce sont deux problèmes différents : le
 premier se règle avec un meilleur modèle, le second avec le client et le prompt.
 
+Et une colonne **« claimed done »** (annoncé fini), qui est peut-être le chiffre le plus utile de
+tous : combien de ces échecs le modèle a présentés comme une réussite. Il a terminé proprement, et le
+contrôle a échoué quand même. C'est ce chiffre qui décide si on peut laisser l'outil travailler seul :
+un modèle qui échoue bruyamment vous coûte un tour, un modèle qui échoue **en annonçant une
+réussite** coûte la confiance qui rend l'outil utilisable.
+
 **Le même banc, sur un modèle distant moderne, a renversé le résultat** : la grande majorité des
 tâches réussies, aucune tâche sans action, pour environ un dollar et une vingtaine de minutes. Le
 contraste n'est pas un détail : il dit qu'un petit modèle local, aujourd'hui, ne suffit pas pour du
@@ -84,6 +90,22 @@ réponse et ne modifiait rien.
 Autrement dit : **le mode agent ne fonctionnait pas du tout dans la configuration par défaut du
 produit**, et aucun test du comportement de l'extension ne pouvait le voir. Il a fallu essayer pour de
 vrai, sur un vrai modèle, pour le découvrir.
+
+## Un refus n'est pas un échec
+
+Un épisode qui mérite d'être raconté, parce qu'il montre à quel point une mesure est fragile.
+
+Lors d'une mesure, les onze premières tâches ont réussi, puis **les quarante-deux suivantes ont
+échoué sans produire le moindre tour**. Ni le modèle ni la tâche n'étaient en cause : le **plafond de
+dépense quotidien** était atteint, et chaque tâche suivante était refusée *avant de commencer*.
+
+Dans le relevé, ces quarante-deux refus étaient **indiscernables de quarante-deux erreurs du
+modèle**. Un taux de réussite calculé là-dessus aurait été publié comme une mesure.
+
+Donc : un refus est désormais **enregistré comme un refus**, et un jeu qui en contient ne serait-ce
+qu'un seul **n'énonce aucun taux** — la colonne affiche « 3 refused — no rate » au lieu d'un
+pourcentage. Absent plutôt que faux. C'est la même règle que partout ailleurs ici, et c'est elle qui
+rend le tableau digne de confiance : il préfère ne rien dire que dire quelque chose d'invérifiable.
 
 ## Les règles que ce projet s'impose sur les chiffres
 

@@ -1306,4 +1306,22 @@ export const FR: Record<string, string> = {
     "(lu dans le message du modèle, pas dans un appel d'outil)",
   "Size ceiling raised to {0} tokens.": "Plafond de taille relevé à {0} jetons.",
   "{0} → {1}": "{0} → {1}",
+  "unfinished: {0}": "inachevé : {0}",
+  "plan": "plan",
+  "Nothing has been assembled yet.":
+    "Rien n'a encore été assemblé.",
+  "Context — {0} of {1}":
+    "Contexte — {0} sur {1}",
+  "Context — {0}, window unknown":
+    "Contexte — {0}, fenêtre inconnue",
+  "free — {0}":
+    "libre — {0}",
+  "everything else":
+    "tout le reste",
+  "Over the budget — the oldest exchanges are being left out.":
+    "Au-delà du budget — les échanges les plus anciens ne sont plus envoyés.",
+  "Measured from the sources, so these are close rather than exact.":
+    "Mesuré depuis les sources : ces chiffres sont proches, pas exacts.",
+  "Nothing has been sent yet in this session, so there is nothing to audit.":
+    "Rien n'a encore été envoyé dans cette session : il n'y a rien à auditer.",
 };

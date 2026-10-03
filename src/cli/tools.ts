@@ -14,12 +14,24 @@ import { headToTokens } from "../core/util/tokens.js";
 import { isBlockedPath } from "../core/util/glob.js";
 import { t } from "../shared/i18n.js";
 
+import { parsePlan, planSummary, PLAN_TOOL_DESCRIPTION, type Plan } from "../core/agent/plan.js";
+
 export interface CliToolOptions {
   cwd: string;
   blockedGlobs: string[];
   /** Prints a diff and asks. The loop's approver handles yes/no; this one shows what changes. */
   showDiff: (path: string, before: string, after: string) => void;
   maxOutputChars?: number;
+  /**
+   * Where the agent's plan goes when it updates one.
+   *
+   * The panel had this tool from the start and the terminal did not, on the reasoning that "a tool
+   * whose output nothing displays spends tokens for nothing". That was true while a plan was only a
+   * progress display. It stopped being true when an unfinished plan became **evidence** the
+   * escalation reads (`planVerdict`) — and it also meant the evaluation harness, which drives this
+   * client, could not measure anything about plans at all.
+   */
+  onPlan?: (plan: Plan) => void;
 }
 
 const SKIP_DIRS = new Set([".git", "node_modules", "dist", "build", "out", "target", ".venv", "__pycache__", ".next"]);
@@ -54,6 +66,45 @@ async function walk(dir: string, root: string, out: string[], limit: number): Pr
 
 export function buildCliTools(opts: CliToolOptions): Tool[] {
   const maxOut = opts.maxOutputChars ?? 8000;
+
+  const updatePlan: Tool = {
+    schema: {
+      name: "update_plan",
+      description: PLAN_TOOL_DESCRIPTION,
+      parameters: {
+        type: "object",
+        properties: {
+          steps: {
+            type: "array",
+            description: "The whole plan, every time — not just what changed.",
+            items: {
+              type: "object",
+              properties: {
+                title: { type: "string", description: "Short and imperative, in the user's language." },
+                state: { type: "string", enum: ["pending", "running", "done", "skipped"] },
+              },
+              required: ["title", "state"],
+            },
+          },
+        },
+        required: ["steps"],
+      },
+    },
+    // Never asked for: it writes nothing and reads nothing, and a dialog about a progress update is
+    // the kind of prompt that teaches people to click through prompts.
+    approval: () => false,
+    parallel: () => true,
+    async run(args, ctx) {
+      const { plan, error } = parsePlan(args["steps"]);
+      if (!plan) return { content: error ?? "Invalid plan.", isError: true };
+      opts.onPlan?.(plan);
+      const { done, total } = planSummary(plan);
+      ctx.report(`plan: ${done}/${total}`);
+      // Terse on purpose: this result is re-sent on every later step of the turn, and the model
+      // already knows what it just wrote.
+      return { content: `Plan updated (${done}/${total} done).` };
+    },
+  };
 
   const readFileTool: Tool = {
     schema: {
@@ -230,5 +281,5 @@ export function buildCliTools(opts: CliToolOptions): Tool[] {
     },
   };
 
-  return [readFileTool, listFiles, searchText, writeFileTool, editFile, runCommand];
+  return [readFileTool, listFiles, searchText, writeFileTool, editFile, runCommand, updatePlan];
 }

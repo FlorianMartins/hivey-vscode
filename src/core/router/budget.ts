@@ -29,6 +29,26 @@ export class MemorySpendStore implements SpendStore {
   }
 }
 
+/**
+ * The limits the product ships with, in ONE place.
+ *
+ * ⚠️ They were in two, with different numbers, and the consequence was the exact defect this
+ * project had already fixed once. `CHANGELOG` records it for the panel: a $2 daily cap refused the
+ * eighth question of the day, silently, "so what the user saw was an extension that had stopped
+ * working for no reason". The panel was raised to $20. **The terminal client kept `0.25` and `2`
+ * hard-coded in its own config defaults** — so the same product refused in the terminal what it
+ * allowed in the panel, by a factor of ten, and nobody noticed because nobody runs both halves on
+ * the same day.
+ *
+ * It was found by the evaluation harness, which drives the terminal: after eleven tasks the daily
+ * cap was reached and the next forty-two were refused before they started. In the results they were
+ * indistinguishable from forty-two model failures — which is how a measurement comes to say
+ * something that is not true.
+ *
+ * `package.json` declares the same numbers to the editor, and a test asserts the two agree.
+ */
+export const SHIPPED_LIMITS = { perRequestUsd: 2, dailyUsd: 20, perRequestTokens: 200_000 } as const;
+
 export interface BudgetLimits {
   perRequestUsd: number;
   dailyUsd: number; // 0 = no limit
