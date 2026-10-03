@@ -3,6 +3,7 @@
 
 import * as vscode from "vscode";
 import { showKnowledge } from "./knowledge.js";
+import { announcePolicy, policySource, reloadPolicy } from "./policy.js";
 import { setLanguage, t } from "../shared/i18n.js";
 import { Budget } from "../core/router/budget.js";
 import { contextBudget } from "../core/context/budget.js";
@@ -15,6 +16,7 @@ import {
   Keys,
   endpointFor,
   providerFor,
+  managedSettings,
   readSettings,
   recoverMisplacedKeys,
   restoreMisplacedGatewayAddress,
@@ -54,6 +56,10 @@ export function activate(context: vscode.ExtensionContext): void {
   const disposables: vscode.Disposable[] = [];
   const workspace = new WorkspaceContext(disposables);
   watchInstructions(disposables);
+  // Before anything else reads a setting. A refused policy means the extension is in its safest
+  // mode — local only, strongest redaction, nothing auto-approved — and a user who does not know
+  // that reads it as the product being broken. See `policy.ts`.
+  announcePolicy();
   // Before anything is sent. Someone whose key is in the wrong box has an extension that cannot
   // work, and the sooner they are told the fewer questions they ask into the void.
   void recoverMisplacedKeys(keys, log);
@@ -157,6 +163,28 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("hiveyCode.stopAnswer", () => chat.stopTurn()),
 
     vscode.commands.registerCommand("hiveyCode.showKnowledge", () => showKnowledge()),
+    // Reloading is a deliberate act rather than a file watcher: a policy being written half a file
+    // at a time would otherwise be read mid-write and refused, putting the machine into safe mode
+    // because an administrator was in the middle of a deployment.
+    vscode.commands.registerCommand("hiveyCode.reloadPolicy", () => {
+      const state = reloadPolicy();
+      if (state.kind === "none") {
+        void vscode.window.showInformationMessage(
+          t("No organisation policy on this machine. It would be read from {0}.", policySource()),
+        );
+        return;
+      }
+      if (state.kind === "refused") {
+        announcePolicy(state);
+        return;
+      }
+      const managed = managedSettings();
+      void vscode.window.showInformationMessage(
+        managed.keys.length
+          ? t("Policy from {0} in force: {1} setting(s) are managed.", state.policy.organisation ?? policySource(), managed.keys.length)
+          : t("Policy from {0} in force. Nothing you have set conflicts with it.", state.policy.organisation ?? policySource()),
+      );
+    }),
 
     // An instrument rather than another guess. Listings came back empty on a real partition, and
     // there is none here to try anything against, so each fix was a hypothesis handed to somebody

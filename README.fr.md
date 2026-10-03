@@ -224,8 +224,8 @@ décisions : [`docs/adr/`](docs/adr).
 ## Développement
 
 ```bash
-npm test               # construit les bundles, puis 865 tests (node:test)
-npm run test:integration   # charge l'extension dans un vrai VS Code (41 tests, headless)
+npm test               # construit les bundles, puis 889 tests (node:test)
+npm run test:integration   # charge l'extension dans un vrai VS Code (42 tests, headless)
 node scripts/screenshots.mjs  # reprend les images du README depuis ce même éditeur
 npm audit --audit-level=high   # 0 vulnérabilité : 5 outils de dev, aucune dépendance à l'exécution
 npm run typecheck
@@ -239,7 +239,7 @@ prix n'est écrit à la main**.
 
 ## État
 
-`0.74.0` — utilisable au quotidien, prêt à publier (voir `docs/PUBLISHING.md`).
+`0.75.0` — utilisable au quotidien, prêt à publier (voir `docs/PUBLISHING.md`).
 Ce qui est fait et ce qui ne l'est pas : [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Licence

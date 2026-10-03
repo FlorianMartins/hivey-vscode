@@ -2,7 +2,7 @@
 
 Honnête plutôt que flatteur : ce qui marche, ce qui manque, ce qui n'est pas vérifié.
 
-Ce document décrit l'état à la version **0.74.0**. Les chiffres qu'il annonce — version, tests, tâches d'évaluation — sont
+Ce document décrit l'état à la version **0.75.0**. Les chiffres qu'il annonce — version, tests, tâches d'évaluation — sont
 vérifiés par `npm run check:numbers`, que la CI exécute : ils ne peuvent plus vieillir en silence.
 Il était resté figé à `0.3.0` pendant trente-cinq
 versions, ce qui est sa propre leçon : une feuille de route périmée dit « projet abandonné » à
@@ -25,6 +25,18 @@ externe non exécuté ici est « non vérifié ».
 | 0.4 Suite de tests sous Node 22 | fait | **non vérifié ici** — seul Node 18 est installé sur cette machine ; la matrice de CI (18, 20, 22 + Windows) l'établira. Invariants gardés par deux tests |
 | 0.5 Des chiffres qui ne peuvent plus vieillir | fait | **testé** — le contrôleur refuse un chiffre faux et le répare (prouvé dans les deux sens) ; son câblage en CI est gardé par un test |
 | 0.6 Mesurer la qualité sur de vrais modèles | fait (harnais) | **testé** — rapport JSON+Markdown prouvé de bout en bout contre un faux serveur de modèle ; les règles « n'invente aucun chiffre » tenues par 9 tests dans `core` ; banc porté à 40 tâches, 40/40 échouent sur la fixture intacte **et** passent sur leur solution (deux portes de CI). ⚠️ **non mesuré** : aucun modèle réel joignable d'ici — les chiffres de qualité restent à produire |
+
+### Phase 2 — Égaler Copilot sur ce que l'entreprise compare
+
+| Chantier | État | Vérification |
+|---|---|---|
+| 2.1 Politique d'entreprise signée | fait | **testé** — 24 unitaires (signature altérée, signée par un autre, politique supprimée alors que la clé reste, version inconnue, réglage permissif ignoré champ par champ, fusion des listes, utilisateur plus strict laissé tranquille, liste vide = état permissif, adresse comparée sur l'origine et non en préfixe) + **1 test d'intégration dans un vrai éditeur** qui prouve que `readSettings()` revient restreint (retombe sans le point d'étranglement) |
+| 2.2 Envoi du registre vers le SIEM | à faire | — |
+| 2.3 Preuve de souveraineté | à faire | — |
+| 2.4 Hooks avant et après outil | à faire | — |
+| 2.5 Agent en arrière-plan isolé | à faire | — |
+| 2.6 Revue de branche | à faire | — |
+| 2.7 Symboles et graphe d'appels | à faire | — |
 
 ### Phase 1 — Dépasser IBM Bob sur IBM i
 
@@ -49,6 +61,17 @@ Trois niveaux, jamais mélangés :
   nommés.
 
 ## Fait
+
+### Une politique que l'utilisateur ne peut pas desserrer (0.75.0)
+
+- **Politique signée en Ed25519 à un emplacement machine** (testé, y compris dans un vrai éditeur) :
+  elle ne fait que restreindre, donc le pire qu'elle puisse faire est de rendre l'extension moins
+  capable, jamais moins prudente.
+- **Un échec n'est pas une absence** (testé) : signature invalide, version inconnue ou politique
+  supprimée alors que la clé reste épinglée → mode le plus sûr, bruyamment.
+- **Jamais lue depuis l'espace de travail** (testé sur le code du chargeur).
+- ⚠️ La restriction était appliquée **deux fois** — trouvé par le test d'intégration seul.
+
 
 ### Remettre à ARCAD, sans jamais promouvoir (0.74.0)
 
@@ -204,7 +227,7 @@ Trois niveaux, jamais mélangés :
 ### Avant 0.39.0
 
 - Noyau indépendant de l'éditeur : anonymisation, fournisseurs, routeur, budget, complétion, session,
-  carte du dépôt, boucle d'agent. **865 tests unitaires** plus **41 tests d'intégration dans un vrai
+  carte du dépôt, boucle d'agent. **889 tests unitaires** plus **42 tests d'intégration dans un vrai
   VS Code**.
 - Barre latérale : conversation, historique, modèles, permissions, configuration ; modes
   discussion / plan / agent ; budget de raisonnement ; contexte explicite.

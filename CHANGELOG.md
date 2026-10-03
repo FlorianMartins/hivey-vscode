@@ -2,6 +2,58 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.75.0 — 2026-10-03
+
+### Ajouté
+
+- **Chantier 2.1 — une politique d'entreprise signée, que l'utilisateur ne peut pas desserrer.**
+  Un fichier JSON signé en Ed25519 (`node:crypto`), déposé par la DSI à un emplacement **machine**,
+  avec la clé publique épinglée à côté : fournisseurs et adresses permis, plafond d'escalade,
+  niveau d'anonymisation **minimal**, globs et commandes interdits additionnels,
+  `writableLibraries`, plafonds de budget, fonctionnalités désactivées.
+
+  **La politique ne fait que restreindre.** Elle ne peut rien accorder — il n'existe aucune
+  politique qui désactive l'anonymisation ou autorise une adresse que l'utilisateur n'a pas
+  configurée. C'est cette asymétrie qui rend le fichier sûr à déployer par script : le pire qu'une
+  politique erronée puisse faire est de rendre l'extension **moins capable, jamais moins prudente**.
+  Et un développeur plus strict que sa politique est laissé tranquille.
+
+  ⚠️⚠️ **Un échec n'est pas une absence.** Fichier illisible, signature invalide, version inconnue,
+  **ou clé épinglée sans politique à côté** : l'extension passe dans son mode le plus sûr et le dit.
+  Le repli silencieux sur les réglages utilisateur ferait de la suppression d'un fichier la façon
+  d'échapper à la politique. Une version inconnue est refusée plutôt qu'appliquée à moitié :
+  appliquer la part comprise serait annoncer une conformité qu'on n'a pas.
+
+  ⚠️⚠️ **La politique n'est jamais lue depuis l'espace de travail** — une politique arrivée avec un
+  `git clone` serait écrite par celui qui a envoyé le dépôt. Un test lit le code du chargeur et
+  refuse tout accès à l'espace de travail.
+
+  ⚠️ **La signature couvre les octets qui sont analysés** : la politique voyage en base64 dans son
+  enveloppe. Signer un objet JSON exigerait une forme canonique, et chaque schéma qui s'y est essayé
+  a eu un défaut où deux documents différents se canonicalisent identiquement.
+
+  Voir [ADR-0019](docs/adr/0019-la-politique-ne-fait-que-restreindre.md).
+
+### Corrigé
+
+- ⚠️ **La restriction était appliquée deux fois**, et seul le test d'intégration pouvait le voir :
+  idempotent sur les valeurs, donc invisible partout — sauf que l'interface aurait affirmé
+  qu'**aucun réglage n'était géré** sur un poste entièrement géré.
+
+### Précisé
+
+- Nouvelle commande **« Recharger la politique de l'organisation »**. Le rechargement est un acte
+  délibéré et non un observateur de fichier : une politique écrite un demi-fichier à la fois serait
+  lue en cours d'écriture et refusée, mettant le poste en mode sûr parce qu'un administrateur était
+  au milieu d'un déploiement.
+- La restriction est appliquée dans **`readSettings()`**, un seul point d'étranglement. Vérifier la
+  politique au point d'usage est la version de ceci qui a un trou dès qu'on ajoute une
+  fonctionnalité.
+- Une **liste vide est parfois l'état le plus permissif** : `writableLibraries` vide veut dire « la
+  garde est inactive », donc ce n'est pas un accord avec la politique.
+- ⚠️ **Non défendu, et dit** : qui peut écrire dans le répertoire de politique possède la politique,
+  puisque la clé y est épinglée. C'est le périmètre de confiance voulu.
+
 ## 0.74.0 — 2026-10-02
 
 ### Ajouté

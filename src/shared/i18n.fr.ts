@@ -457,6 +457,15 @@ export const FR: Record<string, string> = {
   "read {0} at {1}": "{0} lu à {1}",
   "read {0} commits": "{0} commits lus",
   "read {0}/{1}({2})": "{0}/{1}({2}) lu",
+  "Hivey Code is in its safest mode: {0}": "Hivey Code est dans son mode le plus sûr : {0}",
+  "The policy is read from {0}.": "La politique est lue depuis {0}.",
+  "Where is the policy?": "Où est la politique ?",
+  "No organisation policy on this machine. It would be read from {0}.":
+    "Aucune politique d'organisation sur cette machine. Elle serait lue depuis {0}.",
+  "Policy from {0} in force. Nothing you have set conflicts with it.":
+    "Politique de {0} en vigueur. Rien de ce que vous avez réglé n'entre en conflit avec elle.",
+  "Policy from {0} in force: {1} setting(s) are managed.":
+    "Politique de {0} en vigueur : {1} réglage(s) sont gérés.",
   "Get this change ready to hand to ARCAD.\n\n1. Compile it with ibmi_compile. A member that does not compile has produced no object: there is nothing to deliver and nothing to discuss.\n2. Run the tests with ibmi_test. Compiling proves it is a program; it does not prove it still does what it did. If there are no tests for what you changed, say so plainly rather than treating a clean compile as a pass.\n3. Only then check it in with the arcad checkin action, and ask ARCAD Builder for a build with request_build — in that order, because a build asked for before the check-in builds the previous version and reports success.\n4. Report what you did with the evidence attached: the compile, the tests, and the component you checked in.\n5. Do NOT promote anything. Moving a change towards production is a release decision and it belongs to whoever is accountable for the release — say that the change is ready and who has to take it from here. There is no tool for it and there is not meant to be.":
     "Prépare ce changement pour le remettre à ARCAD.\n\n1. Compile-le avec ibmi_compile. Un membre qui ne compile pas n'a produit aucun objet : il n'y a rien à livrer et rien à discuter.\n2. Lance les tests avec ibmi_test. Compiler prouve que c'est un programme ; cela ne prouve pas qu'il fait encore ce qu'il faisait. S'il n'existe aucun test de ce que tu as changé, dis-le franchement au lieu de traiter une compilation propre comme un succès.\n3. Alors seulement, enregistre-le avec l'action arcad checkin, et demande une construction à ARCAD Builder avec request_build — dans cet ordre, car une construction demandée avant l'enregistrement construit la version précédente et annonce une réussite.\n4. Rends compte de ce que tu as fait avec les preuves : la compilation, les tests, et le composant que tu as enregistré.\n5. Ne promeus RIEN. Faire avancer un changement vers la production est une décision de livraison et elle appartient à qui en est responsable — dis que le changement est prêt et qui doit le reprendre. Il n'y a pas d'outil pour cela et il n'est pas prévu qu'il y en ait.",
   "hand the change to ARCAD, ready for a person to release":

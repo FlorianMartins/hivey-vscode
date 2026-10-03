@@ -6,7 +6,9 @@ import * as vscode from "vscode";
 import * as fs from "node:fs/promises";
 // The settings namespace has one definition; a test that repeats it as a literal is a test that
 // keeps passing after a rename has broken the product.
-import { SECTION, readSettings, providerFor, restoreMisplacedGatewayAddress, Keys } from "../../extension/config.js";
+import { SECTION, managedSettings, readSettings, providerFor, restoreMisplacedGatewayAddress, Keys } from "../../extension/config.js";
+import { reloadPolicy } from "../../extension/policy.js";
+import { generateKeyPairSync, sign } from "node:crypto";
 import { buildTools } from "../../extension/tools.js";
 import { relative } from "../../extension/workspace.js";
 import { buildKnowledgeTools, knowledgeAmbient, knowledgeStore } from "../../extension/knowledge.js";
@@ -1749,6 +1751,131 @@ suite("Hivey Code", () => {
       await config.update("privacy.confirmSend", before.confirm, vscode.ConfigurationTarget.Global);
       await config.update("permissions.autoApprove", before.approve, vscode.ConfigurationTarget.Global);
       stub.close();
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  /**
+   * A signed policy really narrows the settings, in a real editor.
+   *
+   * The unit tests prove the arithmetic. What they cannot prove is that the narrowing is WIRED: that
+   * `readSettings()` — the function every feature in this extension reads its configuration
+   * through — comes back restricted, with a user who has deliberately set the most permissive value
+   * for every field. That is the claim an enterprise review is actually making, and it needs the
+   * real configuration service underneath it.
+   */
+  test("a signed organisation policy narrows the settings the whole extension reads", async () => {
+    const ext = vscode.extensions.getExtension(ID)!;
+    await ext.activate();
+
+    const keys = generateKeyPairSync("ed25519");
+    const dir = await fs.mkdtemp(join(tmpdir(), "hivey-policy-"));
+    const document = Buffer.from(
+      JSON.stringify({
+        version: 1,
+        organisation: "Crédit Foncier",
+        providers: ["local"],
+        escalation: "never",
+        redaction: "strict",
+        allowUnredacted: false,
+        autoApprove: "off",
+        blockedGlobs: ["**/clients/**"],
+        writableLibraries: ["TSTCFC"],
+        budget: { dailyUsd: 3 },
+        disabled: ["completion"],
+      }),
+      "utf8",
+    );
+    await fs.writeFile(
+      join(dir, "policy.json"),
+      JSON.stringify({ policy: document.toString("base64"), signature: sign(null, document, keys.privateKey).toString("base64") }),
+      "utf8",
+    );
+    await fs.writeFile(join(dir, "policy.pub"), keys.publicKey.export({ type: "spki", format: "pem" }).toString(), "utf8");
+
+    const config = vscode.workspace.getConfiguration(SECTION);
+    const before = {
+      provider: config.get("chat.provider"),
+      redaction: config.get("privacy.redaction"),
+      allowUnredacted: config.get("privacy.allowUnredacted"),
+      approve: config.get("permissions.autoApprove"),
+      daily: config.get("budget.dailyUsd"),
+      globs: config.get("privacy.blockedGlobs"),
+      libraries: config.get("ibmi.writableLibraries"),
+      completion: config.get("completion.enabled"),
+    };
+    const policyBefore = process.env["HIVEY_CODE_POLICY_DIR"];
+
+    // A user who has deliberately set the most permissive value for everything.
+    await config.update("chat.provider", "anthropic", vscode.ConfigurationTarget.Global);
+    await config.update("privacy.redaction", "off", vscode.ConfigurationTarget.Global);
+    await config.update("privacy.allowUnredacted", true, vscode.ConfigurationTarget.Global);
+    await config.update("permissions.autoApprove", "all", vscode.ConfigurationTarget.Global);
+    await config.update("budget.dailyUsd", 100, vscode.ConfigurationTarget.Global);
+    await config.update("privacy.blockedGlobs", ["**/.env*"], vscode.ConfigurationTarget.Global);
+    await config.update("ibmi.writableLibraries", ["TSTCFC", "PRODCFC"], vscode.ConfigurationTarget.Global);
+    await config.update("completion.enabled", true, vscode.ConfigurationTarget.Global);
+
+    try {
+      // Unmanaged first: without a policy the permissive settings stand, which is what makes the
+      // rest of this test mean anything.
+      process.env["HIVEY_CODE_POLICY_DIR"] = await fs.mkdtemp(join(tmpdir(), "hivey-nopolicy-"));
+      assert.equal(reloadPolicy().kind, "none");
+      assert.equal(readSettings().privacy.redaction, "off", "the user's own setting must stand when nobody manages this machine");
+      assert.equal(readSettings().permissions.autoApprove, "all");
+
+      process.env["HIVEY_CODE_POLICY_DIR"] = dir;
+      assert.equal(reloadPolicy().kind, "managed");
+
+      const s = readSettings();
+      assert.equal(s.chat.provider, "local", "a forbidden provider was still selected");
+      assert.equal(s.privacy.redaction, "strict", "the user turned redaction off and the policy did not put it back");
+      assert.equal(s.privacy.allowUnredacted, false);
+      assert.equal(s.permissions.autoApprove, "off");
+      assert.equal(s.budget.dailyUsd, 3);
+      assert.equal(s.escalation.policy, "never");
+      assert.equal(s.completion.enabled, false, "a disabled feature is still on");
+      // The lists are added to, not replaced: a policy restricts, so it cannot remove a restriction.
+      assert.ok(s.privacy.blockedGlobs.includes("**/.env*"));
+      assert.ok(s.privacy.blockedGlobs.includes("**/clients/**"));
+      // And the writable libraries are narrowed to the intersection, never widened.
+      assert.deepEqual(s.ibmi.writableLibraries, ["TSTCFC"]);
+
+      // What the interface says, and about whom.
+      const managed = managedSettings();
+      assert.equal(managed.organisation, "Crédit Foncier");
+      assert.ok(managed.keys.includes("privacy.redaction"), `reported: ${managed.keys.join(", ")}`);
+      assert.ok(managed.keys.includes("permissions.autoApprove"));
+
+      // Now tamper with it, the way somebody would who wanted their budget back.
+      const envelope = JSON.parse(await fs.readFile(join(dir, "policy.json"), "utf8")) as { policy: string; signature: string };
+      const raised = Buffer.from(JSON.stringify({ version: 1, budget: { dailyUsd: 500 } }), "utf8");
+      await fs.writeFile(join(dir, "policy.json"), JSON.stringify({ ...envelope, policy: raised.toString("base64") }), "utf8");
+      const refused = reloadPolicy();
+      assert.equal(refused.kind, "refused");
+      // Safest mode, NOT the tampered policy and NOT the user's own settings.
+      const safe = readSettings();
+      assert.equal(safe.privacy.redaction, "strict");
+      assert.equal(safe.chat.provider, "local");
+      assert.equal(safe.permissions.autoApprove, "off");
+      assert.notEqual(safe.budget.dailyUsd, 500);
+
+      // And deleting the policy while the key stays pinned is not a way out either.
+      await fs.rm(join(dir, "policy.json"));
+      assert.equal(reloadPolicy().kind, "refused");
+      assert.equal(readSettings().privacy.redaction, "strict");
+    } finally {
+      if (policyBefore === undefined) delete process.env["HIVEY_CODE_POLICY_DIR"];
+      else process.env["HIVEY_CODE_POLICY_DIR"] = policyBefore;
+      reloadPolicy();
+      await config.update("chat.provider", before.provider, vscode.ConfigurationTarget.Global);
+      await config.update("privacy.redaction", before.redaction, vscode.ConfigurationTarget.Global);
+      await config.update("privacy.allowUnredacted", before.allowUnredacted, vscode.ConfigurationTarget.Global);
+      await config.update("permissions.autoApprove", before.approve, vscode.ConfigurationTarget.Global);
+      await config.update("budget.dailyUsd", before.daily, vscode.ConfigurationTarget.Global);
+      await config.update("privacy.blockedGlobs", before.globs, vscode.ConfigurationTarget.Global);
+      await config.update("ibmi.writableLibraries", before.libraries, vscode.ConfigurationTarget.Global);
+      await config.update("completion.enabled", before.completion, vscode.ConfigurationTarget.Global);
       await fs.rm(dir, { recursive: true, force: true });
     }
   });

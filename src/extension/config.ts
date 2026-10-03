@@ -8,6 +8,8 @@
 //     provider at a public URL gets redaction and consent like any other remote provider.
 
 import * as vscode from "vscode";
+import { allowedEndpoint, applyPolicy, featureDisabled } from "../core/policy/policy.js";
+import { policyState } from "./policy.js";
 import { t } from "../shared/i18n.js";
 import { DEFAULT_GROUPS, type SkillGroup, type SkillPolicy } from "../core/session/skills.js";
 import { makeProvider, type Provider, type ProviderId } from "../core/providers/index.js";
@@ -210,11 +212,24 @@ export async function restoreMisplacedGatewayAddress(
   );
 }
 
+/**
+ * The settings, as every feature in this extension reads them.
+ *
+ * ONE CHOKE POINT. Restricting here is what makes the organisation's policy actually bind, rather
+ * than each feature remembering to ask — and "returning the raw settings and checking the policy at
+ * the point of use" is the version of this that has a hole in it the first time somebody adds a
+ * feature.
+ */
 export function readSettings(scope?: vscode.Uri): Settings {
+  return restrict(readSettingsRaw(scope));
+}
+
+/** The settings as the user wrote them, before the organisation's policy narrows them. */
+function readSettingsRaw(scope?: vscode.Uri): Settings {
   const c = vscode.workspace.getConfiguration(SECTION, scope);
   const level = c.get<RedactionLevel>("privacy.redaction", "strict");
   const allowUnredacted = c.get<boolean>("privacy.allowUnredacted", false);
-  return {
+  const raw: Settings = {
     language: c.get<"auto" | "en" | "fr">("language", "auto"),
     chat: {
       provider: c.get<ProviderId>("chat.provider", "local"),
@@ -298,6 +313,107 @@ export function readSettings(scope?: vscode.Uri): Settings {
       provider: c.get<ProviderId>("escalation.provider", "openrouter"),
       model: c.get<string>("escalation.model", ""),
     },
+  };
+  return raw;
+}
+
+/**
+ * The user's settings, narrowed by the organisation's policy.
+ *
+ * `applyPolicy` in `core/policy/` decides WHAT narrows; this maps the result back onto the shape the
+ * rest of the extension reads. The mapping is the boring half and it is also where a field gets
+ * forgotten, so `managedSettings()` below reports what was decided and the interface shows it.
+ */
+function restrict(raw: Settings): Settings {
+  const state = policyState();
+  if (state.kind === "none") return raw;
+
+  const { settings: narrowed } = applyPolicy(
+    {
+      provider: raw.chat.provider,
+      endpoint: raw.endpoints[raw.chat.provider] ?? "",
+      escalation: raw.escalation.policy,
+      redaction: raw.privacy.redaction,
+      allowUnredacted: raw.privacy.allowUnredacted,
+      blockedGlobs: raw.privacy.blockedGlobs,
+      deniedCommands: raw.permissions.deniedCommands,
+      deniedPaths: raw.permissions.deniedPaths,
+      autoApprove: raw.permissions.autoApprove,
+      writableLibraries: raw.ibmi.writableLibraries,
+      budget: raw.budget,
+    },
+    state,
+  );
+
+  const allowed = state.policy.endpoints;
+  const endpoints = { ...raw.endpoints };
+  if (allowed?.length) {
+    // Every address, not only the selected one: a provider the user switches to a minute from now
+    // must not reach somewhere the policy forbids.
+    for (const id of Object.keys(endpoints) as ProviderId[]) {
+      if (endpoints[id] && !allowedEndpoint(endpoints[id], allowed)) endpoints[id] = "";
+    }
+  }
+
+  return {
+    ...raw,
+    chat: { ...raw.chat, provider: narrowed.provider as ProviderId },
+    endpoints,
+    // An extra server is an address like any other, and the policy's list bounds it too.
+    servers: allowed?.length ? raw.servers.filter((x) => allowedEndpoint(x.url, allowed)) : raw.servers,
+    completion: {
+      ...raw.completion,
+      enabled: raw.completion.enabled && !featureDisabled(state, "completion"),
+    },
+    privacy: {
+      ...raw.privacy,
+      redaction: narrowed.redaction,
+      allowUnredacted: narrowed.allowUnredacted,
+      blockedGlobs: narrowed.blockedGlobs,
+    },
+    budget: narrowed.budget,
+    knowledge: { ...raw.knowledge, enabled: raw.knowledge.enabled && !featureDisabled(state, "knowledge") },
+    ibmi: { ...raw.ibmi, writableLibraries: narrowed.writableLibraries },
+    permissions: {
+      ...raw.permissions,
+      autoApprove: narrowed.autoApprove,
+      deniedCommands: narrowed.deniedCommands,
+      deniedPaths: narrowed.deniedPaths,
+    },
+    escalation: { ...raw.escalation, policy: narrowed.escalation as EscalationPolicy },
+  };
+}
+
+/**
+ * Which settings the organisation decided, and who it is.
+ *
+ * The interface needs both: a value the user cannot change has to say WHY, and "managed" with no
+ * name attached reads as the product being broken rather than as a policy being in force.
+ */
+export function managedSettings(): { organisation?: string; keys: string[]; refused?: string } {
+  const state = policyState();
+  if (state.kind === "none") return { keys: [] };
+  const raw = readSettingsRaw();
+  const { managed } = applyPolicy(
+    {
+      provider: raw.chat.provider,
+      endpoint: raw.endpoints[raw.chat.provider] ?? "",
+      escalation: raw.escalation.policy,
+      redaction: raw.privacy.redaction,
+      allowUnredacted: raw.privacy.allowUnredacted,
+      blockedGlobs: raw.privacy.blockedGlobs,
+      deniedCommands: raw.permissions.deniedCommands,
+      deniedPaths: raw.permissions.deniedPaths,
+      autoApprove: raw.permissions.autoApprove,
+      writableLibraries: raw.ibmi.writableLibraries,
+      budget: raw.budget,
+    },
+    state,
+  );
+  return {
+    ...(state.policy.organisation ? { organisation: state.policy.organisation } : {}),
+    keys: managed,
+    ...(state.kind === "refused" ? { refused: state.why } : {}),
   };
 }
 
