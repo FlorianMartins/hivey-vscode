@@ -107,7 +107,7 @@ Résultat par défaut : **0 $**. Le premier centime dépensé est un choix expli
 
 ### Ce qu'il obtient vraiment
 
-[`eval/QUALITY.md`](eval/QUALITY.md) est le tableau comparatif : chaque configuration qu'on peut
+[`eval/QUALITY.md`](https://github.com/FlorianMartins/hivey-vscode/blob/main/eval/QUALITY.md) est le tableau comparatif : chaque configuration qu'on peut
 choisir — le modèle local seul, le local avec escalade, chaque préréglage — avec la qualité et le
 coût par tâche, sur le banc d'évaluation du dépôt.
 

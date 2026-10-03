@@ -174,7 +174,7 @@ one. This machine has no GPU. See [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ### What it actually scores
 
-[`eval/QUALITY.md`](eval/QUALITY.md) is the comparison table: each configuration somebody can choose —
+[`eval/QUALITY.md`](https://github.com/FlorianMartins/hivey-vscode/blob/main/eval/QUALITY.md) is the comparison table: each configuration somebody can choose —
 the local model alone, the local model with escalation, each preset — with quality and cost per task,
 over the repository's own evaluation set.
 
