@@ -2,6 +2,68 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.93.0 — 2026-10-03
+
+### Corrigé
+
+- **⚠️⚠️ Chantier 4.5 — le contrôle de réflexion était caché sur le modèle le plus fort du produit.**
+  Le projet énonce un invariant : aucune version de modèle en dur. Il est tenu pour les prix, les
+  fenêtres et les préréglages — et ne l'était pas pour la capacité de raisonner, décidée par une
+  expression régulière **nommant des versions** (`o[134]|gpt-5|…|grok-[34]|gemini-[23]`). Elle
+  reconnaît `gpt-5` ; le marché est passé à `gpt-6`.
+
+  Donc **`openai/gpt-6.1-sol-pro` — le modèle vers lequel les *deux* préréglages payants envoient le
+  travail approfondi — était déclaré incapable de raisonner**, et comme ce drapeau commande
+  l'affichage du contrôle, l'utilisateur **ne pouvait pas activer la réflexion** dessus. Idem pour
+  `poolside/laguna-s-2.1`, leur modèle de complétion. OpenRouter annonce `reasoning: true` pour les
+  deux. La capacité est désormais relevée de `supported_parameters` et régénérée par le workflow
+  quotidien comme les prix — 327 modèles sur 454. Voir
+  [ADR-0033](docs/adr/0033-la-capacite-de-raisonner-vient-du-catalogue.md).
+
+  Le repli subsiste, parce que le catalogue ne peut rien dire d'un modèle local qu'aucune passerelle
+  ne liste — une réponse purement catalogue couperait la réflexion de **tous** les modèles locaux
+  d'un coup. Mais **il ne nomme aucune version** : des familles d'éditeur, stables pour des années, et
+  les deux mots qui décrivent la capacité. Un repli qui nommerait des versions serait ce même défaut
+  un étage plus bas, et un test lit son source pour refuser qu'il contienne un chiffre.
+
+### Ajouté
+
+- **Chantier 4.4 — vérifier pendant le tour, pas seulement après.** Un tour se terminait **à
+  l'instant** où le modèle arrêtait d'appeler des outils, et rien ne demandait si le travail avait été
+  vérifié. Le produit avait deux réponses à « ça a l'air inachevé », toutes deux chères : le dire à
+  l'utilisateur, ou **escalader vers un modèle facturé**. Le milieu bon marché manquait — demander au
+  **même** modèle de finir ce qu'il a commencé. Il en est généralement capable : il a oublié, il n'a
+  pas échoué. Voir [ADR-0032](docs/adr/0032-verifier-pendant-le-tour.md).
+
+  **Au plus un rappel par tour** (un second serait une discussion, et un modèle qui insiste ferait du
+  plafond d'étapes le seul frein) ; **il coûte une étape**, parce que c'est un vrai aller-retour et de
+  l'argent réel ; **la réponse prématurée est jetée**, parce qu'afficher les deux se lirait comme
+  l'assistant se contredisant à deux lignes d'intervalle ; et le message est **en forme de preuve**,
+  pas de question — « tu es sûr ? » invite un modèle à rassurer, « tu as changé `src/a.ts` et aucun
+  contrôle n'a tourné » ne laisse qu'une chose à faire. Il ferme aussi l'échappatoire qui serait
+  prise : « s'il n'y a vraiment rien à lancer, dis-le et arrête-toi — n'invente pas de commande ».
+
+  ⚠️ Subtilité corrigée par son propre test : « rien n'a vérifié » veut dire **aucun contrôle n'a
+  tourné**, et non *aucun contrôle n'est passé*. Un modèle qui a lancé les tests et les a vus échouer
+  a un autre problème, que `verifyTurn` escalade déjà.
+
+- **Une modification dit ce qu'elle a cassé.** `edit_file` et `write_file` rapportent les **erreurs**
+  que l'éditeur signale pour ce fichier. Le serveur de langage tourne déjà, analyse à chaque
+  changement et a raison sur le langage — trois choses que l'avis d'un modèle sur son propre diff ne
+  peut pas revendiquer. **Les erreurs seulement** : un avertissement est une opinion de style, et une
+  modification qui en imprimerait serait du bruit à chaque tour. **Rien quand il n'y en a pas** : une
+  liste vide quelques millisecondes après une modification veut dire « il n'a pas encore répondu »
+  aussi souvent que « c'est bon », et une absence ne se rapporte jamais comme un zéro. L'attente est
+  bornée et se résout au premier changement de diagnostics.
+
+### Précisé
+
+- **Ce que 4.5 n'avait pas besoin de faire** : sa rédaction demandait que le *niveau* de réflexion soit
+  choisi d'après le modèle. Vérifié dans le code — la traduction par fournisseur est déjà juste et sans
+  version, l'interaction `max_tokens`/`budget_tokens` d'Anthropic est déjà traitée avec son
+  commentaire, et la capacité publiée par le catalogue est **binaire**. **Quatrième prémisse fausse
+  sur cinq chantiers** de cette phase.
+
 ## 0.92.0 — 2026-10-03
 
 ### Corrigé

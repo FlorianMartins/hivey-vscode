@@ -80,6 +80,18 @@ export interface TurnOptions {
   messages: ChatMessage[];
   tools?: Tool[];
   maxSteps?: number;
+  /**
+   * Asked once, when the model stops calling tools: is this really finished?
+   *
+   * Returns a corrective message to continue with, or nothing to accept the answer. The POLICY lives
+   * with the caller (`selfCheckMessage` in the router) so this file stays free of opinions about
+   * what counts as verified; the MECHANISM is here, and it is deliberately small.
+   *
+   * ⚠️ At most one per turn. A second would be an argument, and a model that insists would turn the
+   * step cap into the only brake. One catches forgetfulness — which is what this is for — and does
+   * not negotiate.
+   */
+  selfCheck?: (trace: TurnResult["trace"]) => string | undefined;
   maxTokens?: number;
   temperature?: number;
   reasoning?: ReasoningEffort;
@@ -186,6 +198,8 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
   const byName = new Map(tools.map((t) => [t.schema.name, t]));
   const schemas: ToolSchema[] = tools.map((t) => t.schema);
   const maxSteps = opts.maxSteps ?? DEFAULT_MAX_STEPS;
+  /** Whether the one self-check of this turn has been spent. See `selfCheck`. */
+  let selfChecked = false;
 
   const working: ChatMessage[] = [...opts.messages];
   const trace: TurnResult["trace"] = [];
@@ -236,7 +250,24 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
     if (answer) text = text ? `${text}\n${answer}` : answer;
     if (res.reasoning) reasoning += res.reasoning;
 
-    if (!res.toolCalls.length) return done("answer");
+    if (!res.toolCalls.length) {
+      // The cheap middle between telling the user and escalating to a billed model: ask the same
+      // model to finish what it started. It usually can — it forgot, it did not fail.
+      const correction = selfChecked ? undefined : opts.selfCheck?.(trace);
+      if (correction) {
+        selfChecked = true;
+        // The premature answer is dropped rather than kept. It said the work was done; the model is
+        // about to supersede it, and showing both would read as the assistant contradicting itself
+        // two lines apart. What it did is still in the trace, which is where a reviewer looks.
+        text = "";
+        working.push({ role: "assistant", content: res.text || "(no answer)" });
+        working.push({ role: "user", content: correction });
+        // Falls through to the next iteration, so it costs a step: this is a real round trip and
+        // real money, and a budget that did not count it would be lying about the turn.
+        continue;
+      }
+      return done("answer");
+    }
 
     opts.onStep?.({ step, toolCalls: res.toolCalls });
     working.push({ role: "assistant", content: res.text, toolCalls: res.toolCalls });

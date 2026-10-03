@@ -3,15 +3,16 @@
 What each configuration scores on this repository's own evaluation set
 (56 tasks). Regenerate with `node scripts/evaluate.mjs --table eval/QUALITY.md`.
 
-Taken 2026-10-03T03:06:06.925Z against `http://127.0.0.1:11434/v1` with `qwen2.5-coder:7b`.
+Taken 2026-10-03T11:53:09.589Z against `https://openrouter.ai/api/v1` with `hivey`.
 
-| configuration | passed | quality | never acted | time | cost |
-| --- | --- | --- | --- | --- | --- |
-| `local only` | 0/56 | 0 % | 51/56 | 2005 s | not priced |
-| `local + escalation` | — | not measured | — | — | — |
-| `hivey/free` | — | not measured | — | — | — |
-| `hivey/balanced` | — | not measured | — | — | — |
-| `hivey/pro` | — | not measured | — | — | — |
+| configuration | passed | quality | never acted | claimed done | time | cost |
+| --- | --- | --- | --- | --- | --- | --- |
+| `local only` | — | not measured | — | — | — | — |
+| `local + escalation` | — | not measured | — | — | — | — |
+| `hivey/free` | — | not measured | — | — | — | — |
+| `hivey/balanced` | — | not measured | — | — | — | — |
+| `hivey/pro` | — | not measured | — | — | — | — |
+| `hivey` | 48/56 | 86 % | 1/56 | 7/56 | 3726 s | $4.3422 ($0.0775/task) |
 
 ### How to read it
 
@@ -21,6 +22,11 @@ it never tried, and those are different problems: one is answered by a better mo
 by the client and the prompt. A configuration with a low score and a high *never acted* has not
 been measured on its reasoning at all.
 
+**claimed done** is how many of those failures the agent reported as a success — it exited
+cleanly and the check failed anyway. It is the number that decides whether a tool can be left
+alone: a model that fails loudly costs you a turn, one that fails while claiming success costs
+the trust that makes it usable.
+
 **not priced** is not free. A local endpoint bills nothing and costs electricity and time; the
 time is in the table and the price is absent rather than written as $0.00.
 
@@ -29,7 +35,7 @@ To reproduce it, or to measure a configuration that reads *not measured*:
 ```bash
 npm run build
 node scripts/evaluate.mjs \
-  --url http://127.0.0.1:11434/v1 --model qwen2.5-coder:7b \
+  --url https://openrouter.ai/api/v1 --model hivey \
   --as "local only" --table eval/QUALITY.md
 ```
 

@@ -2,7 +2,7 @@
 
 Honnête plutôt que flatteur : ce qui marche, ce qui manque, ce qui n'est pas vérifié.
 
-Ce document décrit l'état à la version **0.92.0**. Les chiffres qu'il annonce — version, tests, tâches d'évaluation — sont
+Ce document décrit l'état à la version **0.93.0**. Les chiffres qu'il annonce — version, tests, tâches d'évaluation — sont
 vérifiés par `npm run check:numbers`, que la CI exécute : ils ne peuvent plus vieillir en silence.
 Il était resté figé à `0.3.0` pendant trente-cinq
 versions, ce qui est sa propre leçon : une feuille de route périmée dit « projet abandonné » à
@@ -39,6 +39,8 @@ externe non exécuté ici est « non vérifié ».
 | Passe de qualité mesurée | fait | **mesuré** — `local only` = **0/56**, dont **51/56 sans une seule étape d'outil**, en 33 min (`qwen2.5-coder:7b` sur Ollama, 12 cœurs, sans GPU) ; relevé dans `eval/QUALITY.md`. A révélé que **le mode agent local ne faisait rien** (Ollama rend les appels d'outils en texte, `tool_calls: null`) → corrigé, ADR-0026, 7 tests. ⚠️ **non mesuré** : `local + escalation` et les 3 préréglages (aucune clé de fournisseur ici) ; et aucune colonne Copilot/Bob, par principe |
 | 4.1 Le plan devient une preuve | fait | **testé** — 8 tests : pas de plan ≠ échec, étapes restantes nommées, `skipped` réglé, verdict classé **en dernier** derrière un contrôle qui échoue (retombe si on retire la lecture du plan), outil offert au terminal, `planLeft` absent sans plan. A révélé **deux défauts plus graves que le chantier** : le terminal refusait ce que le panneau autorisait (plafonds codés en dur, défaut déjà corrigé une fois dans l'autre moitié) et **un refus de budget était indiscernable d'un échec du modèle** dans le relevé (42 refus lus comme 42 échecs). ADR-0028 |
 | 4.3 Délégation, et le terminal | fait | **testé** — 6 tests : un agent sans liste n'hérite pas de `run_agent`, le demander explicitement ne l'autorise pas, la règle est **une** liste (`NEVER_DELEGATES`), aucun agent intégré ne voulait déléguer, la trace nomme l'agent, le terminal offre le dispatch par la même intersection. Les trois correctifs prouvés en les retirant **séparément**. Vérifié de bout en bout contre un vrai modèle (`explorer` dispatché depuis le terminal, 0,0157 $). ⚠️ Le parallélisme et la synthèse existaient déjà — rédaction fausse une 3e fois |
+| 4.4 Vérifier pendant le tour | fait | **testé** — 11 tests : un changement non vérifié déclenche un rappel **en forme de preuve**, un tour qui n'a rien changé n'en déclenche pas, un contrôle **lancé** (même échoué) suffit à se taire, une modification refusée n'est pas un changement, liste de fichiers bornée et dédupliquée ; et côté boucle : **un seul rappel** (prouvé en retirant le garde), il coûte une étape, la réponse prématurée est jetée, et sans `selfCheck` le tour finit exactement comme avant. + `edit_file`/`write_file` rapportent les **erreurs** de l'éditeur (jamais les avertissements, **rien** quand il n'y en a pas, attente bornée). ADR-0032. ⚠️ Effet sur `claimedDone` **pas encore mesuré** |
+| 4.5 Capacité de raisonner | fait | **testé** — 4 tests, les 3 premiers retombent si on rétablit l'ancienne expression : le catalogue reconnaît une génération le jour de sa sortie, **chaque modèle `deep` d'un préréglage payant doit pouvoir raisonner**, le repli **ne contient aucun chiffre** (lu dans son source), et la capacité est générée depuis `supported_parameters`. ⚠️ Défaut réel : la regex nommait `gpt-5`, le marché est à `gpt-6` → le contrôle de réflexion était **caché sur le modèle le plus fort du produit**. ADR-0033. Le reste du chantier (choisir le niveau) n'existait pas : traduction déjà juste, capacité binaire |
 
 ### Phase 2 — Égaler Copilot sur ce que l'entreprise compare
 
@@ -334,7 +336,7 @@ Trois niveaux, jamais mélangés :
 ### Avant 0.39.0
 
 - Noyau indépendant de l'éditeur : anonymisation, fournisseurs, routeur, budget, complétion, session,
-  carte du dépôt, boucle d'agent. **1147 tests unitaires** plus **43 tests d'intégration dans un vrai
+  carte du dépôt, boucle d'agent. **1164 tests unitaires** plus **43 tests d'intégration dans un vrai
   VS Code**.
 - Barre latérale : conversation, historique, modèles, permissions, configuration ; modes
   discussion / plan / agent ; budget de raisonnement ; contexte explicite.

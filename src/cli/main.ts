@@ -20,7 +20,8 @@ import { makeProvider, PROVIDER_IDS, type ProviderId } from "../core/providers/i
 import { hiveyModel, isHivey } from "../core/router/hivey.js";
 import { planSummary, planVerdict, type Plan } from "../core/agent/plan.js";
 import { youShouldKnow, type Notice } from "../core/session/notices.js";
-import { MUTATING_TOOLS, VERIFIER_TOOLS } from "../core/router/outcome.js";
+import { MUTATING_TOOLS, selfCheckMessage, VERIFIER_TOOLS } from "../core/router/outcome.js";
+import { callSignature, safeArgs } from "../core/agent/callSignature.js";
 import { catalogueWindow } from "../core/router/window.js";
 import { contextBudget, repoMapBudget } from "../core/context/budget.js";
 import { BUILTIN_AGENTS, parseDefinition, type AgentDefinition } from "../core/agent/definitions.js";
@@ -458,6 +459,17 @@ async function main(): Promise<void> {
         tools,
         signal: ctl.signal,
         maxTokens: 4096,
+        // The same one self-check the panel does, by the same rule: it changed files and ran
+        // nothing, so finish it before saying it is done.
+        selfCheck: (trace) =>
+          selfCheckMessage(
+            trace.map((x) => ({
+              tool: x.call.name,
+              ok: !x.result.isError,
+              summary: x.result.content.split("\n")[0] ?? "",
+              call: callSignature(x.call.name, safeArgs(x.call.args)),
+            })),
+          ),
         onDelta: (d) => {
           if (d.text) {
             // Through the same restorer as the panel: a marker split across two packets is two

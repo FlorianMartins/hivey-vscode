@@ -9,6 +9,7 @@ import * as vscode from "vscode";
 import { t } from "../shared/i18n.js";
 import { GENERATED_MODELS } from "../core/router/catalog.generated.js";
 import { catalogueWindow } from "../core/router/window.js";
+import { canReason } from "../core/router/reasoning.js";
 import { offerable } from "../core/models/offer.js";
 import { isLocalEndpoint, isLoopbackEndpoint } from "../core/redaction/index.js";
 import { discoverLocal, rankModels } from "../core/providers/discover.js";
@@ -295,7 +296,10 @@ export function labelFor(models: UiModel[], id: string): string {
 
 /** Reasoning is only worth offering on models that actually do it. */
 export function supportsReasoning(id: string): boolean {
-  return /o[134]|gpt-5|claude|sonnet|opus|haiku|fable|deepseek|qwen3|reason|think|magistral|grok-[34]|gemini-[23]/i.test(id);
+  // The rule is in `core/router/reasoning.ts`, from the generated catalogue. It was a regular
+  // expression here naming versions, it matched `gpt-5`, the market moved to `gpt-6`, and the
+  // thinking control was hidden on the strongest model the product routes to.
+  return canReason(id);
 }
 
 function safe<T>(fn: () => T): T | undefined {

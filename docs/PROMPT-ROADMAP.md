@@ -536,21 +536,50 @@ qu'un agent a fait à son dépôt a besoin de l'appel »*.
 Mesurer : le taux de réussite, les jetons du contexte **principal** sur les tâches qui demandent de
 l'exploration, et le temps.
 
-### 4.4 La vérification pendant, pas seulement après
+### 4.4 Vérifier pendant le tour — re-dérivé du code
 
-`verifyTurn()` juge un tour **terminé**. Un raisonnement fort vérifie **en cours de route** : il
-écrit le test avant le correctif, il relit ce qu'il vient d'écrire, il refuse de conclure sans preuve.
+Deux faits, vérifiés avant d'écrire une ligne :
 
-À livrer : une étape de vérification que l'agent s'impose avant de rendre sa réponse, et une réponse
-qui **dit ce qu'elle n'a pas vérifié**. Mesurer : l'écart entre « le modèle dit que c'est fini » et
-« le contrôle passe » — c'est le chiffre qui compte vraiment pour un utilisateur.
+1. **`if (!res.toolCalls.length) return done("answer")`** — un tour se termine à l'instant où le
+   modèle arrête d'appeler des outils, et rien ne demande si le travail a été vérifié.
+2. **`edit_file` rend `"Edited src/app.ts."`** et rien d'autre : le modèle vient de changer un fichier
+   et le seul moyen de savoir s'il compile encore est de **choisir** d'appeler `get_diagnostics`.
 
-### 4.5 Le raisonnement suit les derniers modèles
+Et une moitié du chantier était **déjà faite** : « une réponse qui dit ce qu'elle n'a pas vérifié »
+est livrée par la section « À savoir » (ADR-0030).
 
-Les budgets de réflexion sont traduits par fournisseur (`reasoning.effort`, budget de jetons). Ce qui
-manque : que le **niveau** de raisonnement soit choisi d'après ce que le modèle sélectionné sait
-faire, et que cette table se régénère comme le catalogue — même règle qu'en phase 3, aucune version
-en dur, et le défaut de l'ADR-0027 pour mémoire (un critère revendiqué et jamais appliqué).
+Le produit avait donc deux réponses à « ça a l'air inachevé », toutes deux chères : le dire à
+l'utilisateur, ou escalader vers un modèle facturé. **Le milieu bon marché manquait** — demander au
+même modèle de finir. Fait : un seul rappel par tour, en forme de preuve, qui coûte une étape et jette
+la réponse prématurée ; et une modification qui rapporte les **erreurs** de l'éditeur, rien quand il
+n'y en a pas. Voir [ADR-0032](adr/0032-verifier-pendant-le-tour.md).
+
+Le chiffre que cela doit déplacer est **`claimedDone`**, ajouté par 4.1 précisément pour juger
+celui-ci.
+
+### 4.5 La capacité de raisonner vient du catalogue — re-dérivé du code
+
+⚠️⚠️ **Un vrai défaut, et il violait un invariant du projet.** `extension/models.ts` décidait quels
+modèles acceptent un budget de réflexion avec une expression régulière **nommant des versions** :
+`o[134]|gpt-5|…|grok-[34]|gemini-[23]`. Elle reconnaît `gpt-5` ; le marché est passé à `gpt-6`.
+
+Donc **`openai/gpt-6.1-sol-pro`, le modèle vers lequel les *deux* préréglages payants envoient le
+travail approfondi, était déclaré incapable de raisonner** — et comme ce drapeau commande l'affichage
+du contrôle lui-même, **l'utilisateur ne pouvait pas activer la réflexion sur le modèle le plus fort
+du produit**. Idem pour `poolside/laguna-s-2.1`, leur modèle de complétion. OpenRouter annonce
+`reasoning: true` pour les deux.
+
+Fait : `GENERATED_REASONING`, relevé de `supported_parameters` et régénéré par le workflow quotidien
+comme les prix (327 modèles sur 454). Le repli subsiste — le catalogue ne peut rien dire d'un modèle
+local qu'aucune passerelle ne liste — mais **il ne nomme aucune version**, et un test lit son source
+pour refuser qu'il contienne un chiffre. Voir
+[ADR-0033](adr/0033-la-capacite-de-raisonner-vient-du-catalogue.md).
+
+**Ce que ce chantier n'avait pas besoin de faire** : sa rédaction demandait aussi que le *niveau* soit
+choisi d'après le modèle. Vérifié : la traduction par fournisseur est déjà juste et sans version
+(`reasoning.effort`, `reasoning_effort`, budget de jetons), l'interaction délicate est déjà traitée
+(Anthropic refuse `max_tokens <= budget_tokens`), et la capacité publiée est **binaire** — il n'y a
+rien à adapter au-delà du oui/non. Quatrième prémisse fausse sur cinq chantiers.
 
 ### 4.6 DeepSeek v4.1 — à mesurer, pas à supposer
 

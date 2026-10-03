@@ -28,6 +28,11 @@ const { data } = await res.json();
 // [id, display name, vendor, context window, $/M in, $/M out, $/M cached-in]
 const rows = [];
 const vision = [];
+// Models that accept a thinking budget. ⚠️ This used to be a regular expression naming versions —
+// `gpt-5|grok-[34]|gemini-[23]|o[134]` — and it rotted exactly as a version in source always does:
+// the market moved to `gpt-6`, so `openai/gpt-6.1-sol-pro`, the model BOTH paid presets route their
+// deep work to, was reported as unable to reason and the thinking control was hidden on it.
+const reasoning = [];
 let kept = 0;
 for (const m of data ?? []) {
   const p = m.pricing ?? {};
@@ -51,10 +56,12 @@ for (const m of data ?? []) {
   // "gemini" accept images and "gpt-oss" does not, and a heuristic over names is wrong the week
   // after it is written.
   if ((m.architecture?.input_modalities ?? []).includes("image")) vision.push(m.id);
+  if ((m.supported_parameters ?? []).includes("reasoning")) reasoning.push(m.id);
   kept++;
 }
 rows.sort((a, b) => a[0].localeCompare(b[0]));
 vision.sort();
+reasoning.sort();
 
 const body = `// GENERATED FILE — do not edit by hand.
 // Written by \`npm run models\` (scripts/update-models.mjs); a scheduled workflow commits the diff.
@@ -86,6 +93,25 @@ ${rows.map((r) => `  ${JSON.stringify(r)},`).join("\n")}
  */
 export const GENERATED_VISION: ReadonlySet<string> = (() => {
   const ids = ${JSON.stringify(vision)};
+  const set = new Set(ids);
+  for (const id of ids) {
+    const bare = id.includes("/") ? id.slice(id.indexOf("/") + 1) : undefined;
+    if (bare) set.add(bare);
+  }
+  return set;
+})();
+
+/**
+ * The models that accept a thinking budget.
+ *
+ * ⚠️ This was a regular expression naming versions, and it rotted the way a version in source always
+ * does: it matched \`gpt-5\` and the market moved to \`gpt-6\`, so the model both paid presets route
+ * their deep work to was reported as unable to reason — and the control that turns thinking on was
+ * hidden on the strongest model in the product. From the catalogue, regenerated daily, like the
+ * prices and the windows.
+ */
+export const GENERATED_REASONING: ReadonlySet<string> = (() => {
+  const ids = ${JSON.stringify(reasoning)};
   const set = new Set(ids);
   for (const id of ids) {
     const bare = id.includes("/") ? id.slice(id.indexOf("/") + 1) : undefined;

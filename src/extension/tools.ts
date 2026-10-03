@@ -13,6 +13,7 @@ import * as vscode from "vscode";
 import { t } from "../shared/i18n.js";
 import { parsePlan, planSummary, PLAN_TOOL_DESCRIPTION, type Plan } from "../core/agent/plan.js";
 import { NOTE_ASIDE_TOOL, type Notice } from "../core/session/notices.js";
+import { editProblems } from "../core/agent/afterEdit.js";
 import type { Tool, ToolResult } from "../core/agent/loop.js";
 import { headToTokens } from "../core/util/tokens.js";
 import { EgressGate } from "./egress.js";
@@ -300,9 +301,14 @@ export function buildTools(deps: ToolDeps): Tool[] {
       }
       const ok = await vscode.workspace.applyEdit(edit);
       ctx.report(existed ? t("edited {0}", relative(uri)) : t("created {0}", relative(uri)));
-      return ok
-        ? { content: `Wrote ${relative(uri)} (${content.split("\n").length} lines).`, display: { uri: uri.toString() } }
-        : { content: "The editor refused the edit.", isError: true };
+      if (!ok) return { content: "The editor refused the edit.", isError: true };
+      // The same report as `edit_file`: writing a whole file is at least as likely to break it as
+      // replacing a snippet, and the model has even less reason to suspect it did.
+      const problems = await errorsAfterEdit(uri);
+      return {
+        content: `Wrote ${relative(uri)} (${content.split("\n").length} lines).${problems ? `\n${problems}` : ""}`,
+        display: { uri: uri.toString() },
+      };
     },
   };
 
@@ -337,9 +343,42 @@ export function buildTools(deps: ToolDeps): Tool[] {
       edit.replace(uri, new vscode.Range(doc.positionAt(first), doc.positionAt(first + oldText.length)), newText);
       const ok = await vscode.workspace.applyEdit(edit);
       ctx.report(t("edited {0}", relative(uri)));
-      return ok ? { content: `Edited ${relative(uri)}.` } : { content: "The editor refused the edit.", isError: true };
+      if (!ok) return { content: "The editor refused the edit.", isError: true };
+      // What the edit did, from the editor rather than from the model's opinion of its own diff.
+      const problems = await errorsAfterEdit(uri);
+      return { content: `Edited ${relative(uri)}.${problems ? `\n${problems}` : ""}` };
     },
   };
+
+  /**
+   * The errors the editor reports for a file just edited, after waiting for it to catch up.
+   *
+   * A language server parses on change and debounces, so asking immediately gets the state from
+   * before the edit. The wait is bounded and resolves early on the first diagnostics change for this
+   * file: a long wait would make every edit feel slow, and no wait would make this report the past.
+   *
+   * Errors only — a warning is a style opinion, and an edit that printed warnings would be noise on
+   * every turn. And nothing is returned when there are none: see `editProblems` for why silence is
+   * the honest answer rather than "no problems found".
+   */
+  async function errorsAfterEdit(uri: vscode.Uri): Promise<string> {
+    await new Promise<void>((resolve) => {
+      const timer = setTimeout(finish, 400);
+      const sub = vscode.languages.onDidChangeDiagnostics((e) => {
+        if (e.uris.some((u) => u.toString() === uri.toString())) finish();
+      });
+      function finish(): void {
+        clearTimeout(timer);
+        sub.dispose();
+        resolve();
+      }
+    });
+    const errors = vscode.languages
+      .getDiagnostics(uri)
+      .filter((d) => d.severity === vscode.DiagnosticSeverity.Error)
+      .map((d) => ({ line: d.range.start.line + 1, message: d.message }));
+    return editProblems(relative(uri), errors);
+  }
 
   const runCommand: Tool = {
     schema: {

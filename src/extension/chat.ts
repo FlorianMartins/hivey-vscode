@@ -7,7 +7,7 @@
 // it is deliberately the only place that knows about all of them.
 
 import * as vscode from "vscode";
-import { callSignature } from "../core/agent/callSignature.js";
+import { callSignature, safeArgs } from "../core/agent/callSignature.js";
 import { knowledgeAmbient } from "./knowledge.js";
 import { language, t } from "../shared/i18n.js";
 import { runTurn, type Tool } from "../core/agent/loop.js";
@@ -17,7 +17,7 @@ import { costOf, estimateCost, makeLookup, type Price } from "../core/router/pri
 import { calibrate, observe, prune, type Calibration } from "../core/util/calibrate.js";
 import { acceptsImages, IMAGE_TOKENS } from "../core/models/vision.js";
 import { checkEndpoint } from "../core/providers/endpoint.js";
-import { handoverNote, verifyTurn, type TurnStep } from "../core/router/outcome.js";
+import { handoverNote, selfCheckMessage, verifyTurn, type TurnStep } from "../core/router/outcome.js";
 import { unifiedDiff } from "../core/text/diff.js";
 import { escalationTarget, route, type Route } from "../core/router/route.js";
 import { describeFallback, fallbackChain, isRetryable } from "../core/router/fallback.js";
@@ -3812,6 +3812,20 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         signal: ctl.signal,
         maxTokens: outputTokens,
         reasoning: this.reasoning,
+        // Asked once, when the model stops calling tools: it changed files and ran nothing, so
+        // finish it. The cheap middle between telling the user and escalating to a billed model.
+        selfCheck: (trace) =>
+          selfCheckMessage(
+            trace.map((x) => ({
+              tool: x.call.name,
+              ok: !x.result.isError,
+              summary: x.result.content.split("\n")[0] ?? "",
+              // From the raw arguments the model sent: the trace keeps the call, not the coerced
+              // arguments, and naming the file is the whole difference between "you changed
+              // something" and a message somebody can act on.
+              call: callSignature(x.call.name, safeArgs(x.call.args)),
+            })),
+          ),
         // Nothing from a stopped turn reaches the panel. Cancellation unwinds through a provider
         // and a tool, and anything still in flight would otherwise stream into whatever turn is on
         // screen by then — text from the question the user gave up on, appearing under the next one.
