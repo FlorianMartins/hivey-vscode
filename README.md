@@ -73,6 +73,14 @@ that does leave is **reversibly pseudonymized** first.
 | **A log you can check** | Every entry in the egress log carries the hash of the one before it, so altering a line means rewriting the whole tail and deleting one leaves a gap the check finds. Exportable as JSONL or RFC 5424 syslog, for the collector that is not on this machine. |
 | **MCP that stays what you approved** | The approval covers the tool **descriptions and schemas**, not just the command that starts the server. A server that rewrites what its tools claim to do asks again, naming what changed — that is what tool poisoning is, and a dialog that only says "something changed" teaches people to click yes. |
 | **Languages** | English and French, following the editor's display language — or pinned with `hiveyCode.language`, for a machine whose editor is in one language and whose user reads another. |
+| **A background task, isolated** | “Run this in the background” gives a request its own **git worktree** and, when a container engine is present, its own container with **no network**. It works while you keep typing, and it reports with a branch you can read a diff of. It cannot reach your checkout, and the git commands it is allowed **do not include `push`** — a background agent that could publish is a background agent that can publish a mistake. |
+| **Hooks** | `.hiveycode/hooks.json`: your own command before or after a tool call. A non-zero exit **before** stops the call; the team's formatter **after** runs on what was written. The exit code of a hook counts as a verification, because it is the team's own check saying the change is or is not acceptable. The file is read from the repository, so it is reviewed like code — and a changed hook file asks again before it runs. |
+| **Review this branch** | Finds the point your branch left its base, reads the whole diff, and puts what it finds in the **Problems panel** as diagnostics on the lines they concern — not as a wall of prose. An empty list is a readable answer, and it is reported as one. |
+| **A second model reads the diff** | Before an edit that touches a **guarded setting**, a file that configures everything else, or a diff too large to have been read, a second model answers one question: does this do something the request did not ask for? Its objections appear on the approval card, named. **Local only, taken at its word** — if the second reader would be a billed model it is not called, and the card says so. Advisory unless your organisation's policy requires otherwise. |
+| **What the compiler already knows** | Three read-only tools over your language server: who calls this, the call hierarchy, and the symbol by name across the workspace. The answer comes from the same index that powers *Go to references* — so it is right for the language you are in, and it costs no tokens to be right. |
+| **Routing that learns, per repository** | Optional. The success rate `verifyTurn()` actually observed, per repository, per kind of task, per model — and then the **cheapest model whose observed rate clears a threshold**. The panel says why: “Chose qwen2.5-coder:7b: 9 out of 10 in this repository”. Never outside the models you authorised, never on too little evidence, and a measurement exists only where something was verified. Two commands: what was learned here, and forget it. |
+| **What this machine learned stays here** | Optional, off by default. When a local model fails and a remote one succeeds **with a check at green**, the episode is kept locally: the request, the files as they were, both diffs, and the command that decided. It exports as `eval/tasks` fixtures or as a JSONL conversation set for fine-tuning a local model. **Nothing leaves** — there is no network call in that code, and a test reads the source to refuse one. |
+| **Finance** | Eight skills for code where the arithmetic is the requirement: half-away-from-zero against half-to-even, money without floats, packed and zoned decimal, T+1/T+2 settlement with holidays as a **parameter**, market hours in the exchange's own timezone, ISIN/LEI/BIC check digits, FIX BodyLength and CheckSum, amortisation schedules whose parts sum to the whole. Each one is backed by an evaluation task that fails before it is applied. |
 | **Your theme** | Every color in the panel is one of the editor's own variables. Not one hex value — [the same picker under a light theme](https://raw.githubusercontent.com/FlorianMartins/hivey-vscode/main/docs/images/picker.light.png), captured by the same script. It follows a theme change immediately, high contrast included. |
 
 ## How the cost tends to zero
@@ -164,6 +172,22 @@ first run.
 The honest limit: the harness has been proven end to end here with a stub model, not with a real
 one. This machine has no GPU. See [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
+### What it actually scores
+
+[`eval/QUALITY.md`](eval/QUALITY.md) is the comparison table: each configuration somebody can choose —
+the local model alone, the local model with escalation, each preset — with quality and cost per task,
+over the repository's own evaluation set.
+
+**Every figure in it currently reads “not measured”, and that is deliberate.** No model is reachable
+from the machine it is generated on, so a number there would be invented, and an invented benchmark is
+the one artefact of this project that would be worth less than nothing — it is the one that gets
+quoted. What *is* proven, on every commit, is the half that makes a score mean anything: each task's
+check **fails on its untouched fixture** and **passes on its reference solution**.
+
+It carries **no column for Copilot and none for IBM Bob**, for the same reason: nobody here has run
+them on these tasks, and a column filled in from a published figure compares two different
+measurements. What it would take to add one honestly is written in the file.
+
 ### Your own account, if you already pay for one
 
 OpenRouter is one key for four hundred models, which is the right default and the wrong answer for
@@ -238,6 +262,13 @@ single most reliable way to get code that cannot compile.
 | **Connected** | Through **Code for IBM i**, on the connection it has already negotiated: the right library list, the right CCSID, a warm SQL job. Hivey Code opens no session of its own, because a second one would run under a different library list and get EBCDIC subtly wrong. |
 | **Under change management** | Through **ARCAD Elias**: check-out, check-in, compile, cross-references, and the Transformer RPG conversion — by calling the `arcad.*` commands Elias registers, so a change stays inside the process the shop already has. |
 | **Commands** | `/tofree` converts a fixed-format member, `/sql` writes Db2 for i rather than generic SQL, `/dds` explains a display file. `#member:LIB/SRCFILE(MBR)` and `#db2:select …` attach the real thing. |
+| **Compiled, read, fixed** | `ibmi_compile` runs `CRTBNDRPG`/`CRTSQLRPGI`/`CRTBNDCL` and the rest through the connection, then **reads the spool file and the job log** and returns the messages with their member, line and message id. A failed compile is a verdict, not an error to retry: the loop “compile, read what it said, fix it, compile again” happens in one turn. An object name it cannot validate is **refused rather than escaped**. |
+| **The house's RPG tests, run** | `ibmi_test` calls the unit-test framework the shop already uses — RPGUnit, or whatever `hiveyCode.ibmi.testCommand` names — and its result counts as a verification, which is what lets the agent know it is finished rather than claim it. |
+| **Who uses this?** | `ibmi_impact` answers the question asked before every change to a file or a program: the programs that reference it, from `DSPPGMREF` into an output file in QTEMP, plus what the SQL catalogue knows about views and dependencies. |
+| **Why this query is slow** | The explain the database can already give, read back as what it means — the index it did not have, the scan it chose — from Db2 for i's own tooling rather than from a model's impression of it. |
+| **What an identifier means here** | Six-character names are not documentation. The naming conventions of **this shop** — read from a file the team writes, not guessed — go into the prompt, so `CFC1234` is read as what it is on this partition. |
+| **Forty skills** | One per thing an IBM i team actually asks, each declaring the evaluation task that proves it: free-form conversion, display files, embedded SQL, overflow, MONITOR, CCSID, journalling, triggers, multi-member modules, and the rest. Where a task could not honestly be written here — because it needs a partition — the skill says so rather than claiming coverage. |
+| **Handed back to ARCAD** | Check-out, check-in, compile and cross-references through the `arcad.*` commands Elias registers. And the one thing the agent will never do: **promote**. Promotion is the step where somebody takes responsibility, and a tool that can do it is a tool that can do it by accident. |
 | **Attached without opening anything** | The `+` menu offers **Source member** — library, then source file, then member, each a list drawn from the partition — and **Stream file (IFS)** by path. Nothing is downloaded into the workspace, nothing is checked out, and no tab is opened: a member comes through Code for IBM i's connection and a stream file through the file system it registers. The source of truth stays on the partition, which is the only place it can be. |
 
 Reading is free; running a CL command is always asked; an SQL statement is asked **only if it
@@ -417,6 +448,20 @@ the day's spend.
   names), `privacy.egressPolicy: "ask-always"`, `budget.dailyUsd`.
 - `hiveyCode.*` settings are workspace-scoped: a sensitive repository can force `chat.provider: "local"`
   in its own `.vscode/settings.json`.
+- **A signed policy the user cannot loosen.** A file on the machine, signed with your key, that
+  *restricts* — a provider, a list of endpoints, a maximum budget, whether a second opinion is
+  advisory or blocking. Verified before anything reads a setting, through the one choke point every
+  setting is read from. It can only narrow what is allowed: a policy that could *grant* something
+  would be a way to turn a guarantee off, and it was built so that is not expressible. An unsigned or
+  tampered policy is **refused**, not ignored.
+- **The egress ledger goes to your collector.** The same ledger you can read in the panel, shipped as
+  **RFC 5424 syslog over TLS** or **OTLP/HTTP**, through an allow-list of fields — so what reaches the
+  SIEM is the metadata and provably never the content. The queue is bounded, it counts what it
+  dropped, and a row is acknowledged only when the collector actually took it.
+- **A proof of sovereignty.** One report, signed, that answers the question an auditor asks: over this
+  period, what left this machine, to whom, and is the record intact? It carries the ledger's hash
+  chain verdict, and optionally an **RFC 3161 timestamp** from your authority, so the report cannot
+  have been written after the fact. It states what it does not prove as plainly as what it does.
 - The extension ships **no runtime dependency**: what you audit is the bundle and nothing else. An
   SBOM is published on every CI run.
 
@@ -460,7 +505,7 @@ Those documents are currently written in French; translations are welcome.
 ## Development
 
 ```bash
-npm test                   # builds the bundles, then 1052 tests (node:test)
+npm test                   # builds the bundles, then 1057 tests (node:test)
 npm run test:integration   # loads the extension into a real VS Code (43 tests, headless)
 npm run eval:verify        # every evaluation task must fail before a model touches it
 node scripts/screenshots.mjs  # retakes the README's images from that same editor
@@ -484,7 +529,7 @@ no entry, so a translation cannot silently rot.
 
 ## Status
 
-`0.84.0` — used every day by its author. [`docs/ROADMAP.md`](docs/ROADMAP.md) is the honest version:
+`0.85.0` — used every day by its author. [`docs/ROADMAP.md`](docs/ROADMAP.md) is the honest version:
 what is tested, what was only checked by hand, and what is written but has never run in the
 conditions it was written for. That last list is not empty and it is named.
 

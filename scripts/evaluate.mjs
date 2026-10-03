@@ -279,6 +279,9 @@ async function main() {
   const endpoint = flag("url", process.env["HIVEY_CODE_URL"] ?? "");
   const models = flag("model", process.env["HIVEY_CODE_MODEL"] ?? "").split(",").map((m) => m.trim()).filter(Boolean);
   const reportDir = flag("report", "");
+  // The committed comparison table. A path rather than a directory, because this one file is meant
+  // to be read in the repository and diffed between runs — see src/core/eval/table.ts.
+  const tableFile = flag("table", "");
 
   if (!endpoint || !models.length) {
     // Not an error, and this is deliberate: the nightly workflow has no model unless somebody
@@ -289,6 +292,9 @@ async function main() {
     // file is read as "the job did not run"; an empty table of zeros is read as a score. Neither is
     // what happened, and only one of the three can be said out loud.
     if (reportDir) await writeReport(reportDir, { at: new Date().toISOString(), endpoint, models, outcomes: [] });
+    // And the table, saying it was not measured, for the same reason: a missing file reads as "the
+    // job did not run" and a table of zeros reads as a score. Only the third thing is true.
+    if (tableFile) await writeTable(tableFile, { taskCount: tasks.length, rows: [] });
     process.exit(0);
   }
 
@@ -324,6 +330,17 @@ async function main() {
     console.log(`written: ${written.join(", ")}`);
   }
 
+  if (tableFile) {
+    const { rowsFromOutcomes } = await import(new URL("../dist/eval-report.mjs", import.meta.url));
+    await writeTable(tableFile, {
+      at: new Date().toISOString(),
+      endpoint,
+      taskCount: tasks.length,
+      rows: rowsFromOutcomes(results),
+    });
+    console.log(`written: ${tableFile}`);
+  }
+
   // The exit code reports whether the harness ran, not whether the models are good. A model that
   // fails four tasks is information; it is not a broken build.
   process.exit(0);
@@ -349,6 +366,19 @@ async function writeReport(dir, input) {
   await writeFile(jsonFile, JSON.stringify(report, null, 2) + "\n");
   await writeFile(mdFile, markdownReport(report));
   return [jsonFile, mdFile];
+}
+
+/**
+ * The comparison table, from the same bundle as the report.
+ *
+ * Written through `core` rather than assembled here for the reason the report is: "publish no figure
+ * nobody measured" is a rule, rules need tests, and a script cannot be unit-tested.
+ */
+async function writeTable(file, input) {
+  const { qualityTable } = await import(new URL("../dist/eval-report.mjs", import.meta.url));
+  await mkdir(dirname(file), { recursive: true });
+  await writeFile(file, qualityTable(input));
+  return file;
 }
 
 main().catch((err) => {

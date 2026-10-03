@@ -5,8 +5,10 @@
 // absence of a measurement look like an absence.
 
 import { test } from "node:test";
+import { readdirSync, readFileSync } from "node:fs";
 import assert from "node:assert/strict";
 import { buildReport, emptyTotals, markdownReport, totalsFor, type RunRecord, type TaskOutcome } from "../src/core/eval/report.js";
+import { CONFIGURATIONS, qualityTable, rowsFromOutcomes } from "../src/core/eval/table.js";
 
 function run(over: Partial<RunRecord> = {}): RunRecord {
   return {
@@ -106,4 +108,75 @@ test("the breakdown is per model and per kind, and each model sees only its own"
   assert.equal(small.totals.passed, 0);
   assert.equal(big.totals.passed, 2);
   assert.deepEqual(big.byKind.map((k) => k.kind), ["bug", "ibmi"]);
+});
+
+// ---------------------------------------------------------------------------
+// The published comparison table (chantier 3.5).
+//
+// Same rule as the report, applied to the artefact somebody actually quotes, plus one that is
+// specific to a table: a row must belong to exactly one configuration.
+
+test("an unmeasured configuration reads as unmeasured, never as zero", () => {
+  const md = qualityTable({ taskCount: 56, rows: [] });
+  assert.match(md, /not measured/);
+  // On the ROWS, not on the file: the prose explains that an unmeasured configuration must never
+  // read `0 %`, so a negative grep over the whole document rejects the document for saying so. That
+  // mistake has been made four times in this repository; a check on the table is the check meant.
+  const cells = md.split("\n").filter((l) => l.startsWith("| `"));
+  for (const line of cells) {
+    assert.ok(!/\b0 %/.test(line), `an unmeasured configuration rendered as a score: ${line}`);
+  }
+  // And it still has to name what it would compare, or the committed file says nothing at all.
+  for (const spec of CONFIGURATIONS) assert.ok(md.includes(spec.configuration), spec.configuration);
+});
+
+test("the table names no competitor it has not run", () => {
+  const md = qualityTable({ taskCount: 56, rows: [] });
+  // Mentioned in prose — the file explains the absence, which is the honest thing to publish — but
+  // never as a row, which is what a reader reads as a measurement.
+  for (const line of md.split("\n").filter((l) => l.startsWith("| `"))) {
+    assert.ok(!/copilot|bob/i.test(line), `a competitor appears as a table row: ${line}`);
+  }
+});
+
+test("an escalated run is not averaged into the bare model's row", () => {
+  // Both of these came from one `--model m`, and only one of them is that model's own score.
+  // Summed, the table would report 50 % for a configuration that scored 100 % and one that scored 0.
+  const rows = rowsFromOutcomes([
+    outcome({ passed: true }),
+    outcome({ passed: false, runs: [run({ escalatedTo: "big" })] }),
+  ]);
+  assert.equal(rows.length, 2, "an escalated run and a bare one must not share a row");
+  assert.equal(rows.find((r) => !r.configuration.includes("escalation"))?.totals.passRate, 1);
+  assert.equal(rows.find((r) => r.configuration.includes("escalation"))?.totals.passRate, 0);
+});
+
+test("a cost nobody could price is not printed as free", () => {
+  const rows = rowsFromOutcomes([outcome({ runs: [run({ usd: undefined })] })]);
+  const md = qualityTable({ taskCount: 1, at: "2026-10-03", rows });
+  assert.match(md, /not priced/);
+  assert.ok(!/\$0\.0000/.test(md), "an unknown price must not render as $0.0000");
+});
+
+// The committed file, against the generator that produces it.
+//
+// This is the one that stops the artefact rotting. `eval/QUALITY.md` is read by people who will
+// never run the harness, and a table that says "51 tasks" after five more were added is wrong in the
+// quietest possible way — nothing fails, the number is simply no longer true. Regenerating it is one
+// command; knowing that it needs regenerating is this test.
+test("the committed quality table still describes the task set it was generated from", () => {
+  const tasks = readdirSync("eval/tasks", { withFileTypes: true }).filter((d) => d.isDirectory()).length;
+  const committed = readFileSync("eval/QUALITY.md", "utf8");
+  // The count, not the whole file: a table somebody has actually MEASURED must be allowed to differ
+  // from what the unmeasured generator emits, which is the entire point of generating it. What may
+  // never differ is how many tasks it claims to be about.
+  assert.ok(
+    committed.includes(`(${tasks} tasks)`),
+    `eval/QUALITY.md does not say ${tasks} tasks — run \`node scripts/evaluate.mjs --table eval/QUALITY.md\``,
+  );
+  // And whatever it says, it says it about the five configurations and about no competitor.
+  for (const spec of CONFIGURATIONS) assert.ok(committed.includes(spec.configuration), spec.configuration);
+  for (const line of committed.split("\n").filter((l) => l.startsWith("| `"))) {
+    assert.ok(!/copilot|bob/i.test(line), `a competitor appears as a row of the committed table: ${line}`);
+  }
 });

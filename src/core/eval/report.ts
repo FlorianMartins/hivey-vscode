@@ -235,3 +235,11 @@ function round1(n: number): number {
 function round4(n: number): number {
   return Math.round(n * 10_000) / 10_000;
 }
+
+/**
+ * The comparison table, re-exported so the harness has one bundle to import.
+ *
+ * `esbuild` builds this file alone into `dist/eval-report.mjs`; a second entry point would mean two
+ * bundles that can disagree about the arithmetic they share.
+ */
+export { qualityTable, rowsFromOutcomes, CONFIGURATIONS, ESCALATED_SUFFIX, type Measured, type TableInput } from "./table.js";

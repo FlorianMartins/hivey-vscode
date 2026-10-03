@@ -65,6 +65,21 @@ ce qui sort est **anonymisé de façon réversible** avant de partir.
 | **Contexte à la taille du modèle** | Le budget suit la fenêtre du modèle réellement choisi plutôt qu'un nombre fixé une fois — 8 000 jetons, c'est l'essentiel d'un petit modèle local et une erreur d'arrondi sur un modèle moderne, et face à ce plafond une conversation était résumée au bout de trois échanges puis répondue depuis le résumé. Une pièce jointe a son propre plafond (`hiveyCode.context.attachmentTokens`, `0` pour des fichiers entiers), et au-delà un fichier arrive sous forme de **plan** — chaque symbole qu'il déclare avec sa ligne — suivi de son début, plutôt que ses N premières lignes et rien sur le reste. Un fichier joint dans cinq tours n'est envoyé **qu'une fois**, dans le message le plus proche de la question. |
 | **Confidentialité** | Anonymisation réversible, fichiers interdits, consentement avant la première destination, **journal des envois** et **rapport de coûts**. |
 | **Langues** | Anglais et français, selon la langue d'affichage de l'éditeur — ou fixée par `hiveyCode.language`, pour un poste dont l'éditeur est dans une langue et l'utilisateur dans une autre. |
+| **Une tâche en arrière-plan, isolée** | « Lancer en arrière-plan » donne à une demande son propre **arbre de travail git** et, si un moteur de conteneur est présent, son propre conteneur **sans réseau**. Elle travaille pendant que vous continuez à taper et rend compte avec une branche dont vous pouvez lire le diff. Elle n'atteint pas votre copie de travail, et les commandes git qui lui sont permises **n'incluent pas `push`** : un agent de fond qui pourrait publier est un agent de fond qui peut publier une erreur. |
+| **Hooks** | `.hiveycode/hooks.json` : votre commande avant ou après un appel d'outil. Un code de retour non nul **avant** annule l'appel ; le formateur de l'équipe **après** s'exécute sur ce qui vient d'être écrit. Le code de retour d'un hook **compte comme une vérification**, parce que c'est le contrôle de l'équipe qui dit si le changement est acceptable. Le fichier vient du dépôt, donc il est relu comme du code — et un fichier de hooks modifié redemande avant de s'exécuter. |
+| **Revoir cette branche** | Détecte le point où votre branche a quitté sa base, lit tout le diff, et met ce qu'il trouve dans le **panneau Problèmes**, sur les lignes concernées — pas en pavé de prose. Une liste vide est une réponse lisible, et elle est rendue comme telle. |
+| **Un second modèle relit le diff** | Avant une modification qui touche un **réglage gardé**, un fichier qui configure tout le reste, ou un diff trop gros pour avoir été lu, un second modèle répond à une seule question : est-ce que ceci fait quelque chose que la demande n'a pas demandé ? Ses objections apparaissent sur la carte d'approbation, avec le nom du modèle. **Local uniquement, pris au mot** : si le second lecteur serait un modèle facturé, il n'est pas appelé et la carte le dit. Consultatif, sauf si la politique de votre organisation exige le contraire. |
+| **Ce que le compilateur sait déjà** | Trois outils en lecture sur votre serveur de langage : qui appelle ceci, la hiérarchie d'appels, et le symbole par son nom dans tout l'espace de travail. La réponse vient du même index que « Aller aux références » — donc elle est juste pour le langage où vous êtes, et avoir raison ne coûte aucun jeton. |
+| **Un routage qui apprend, par dépôt** | Optionnel. Le taux de réussite réellement constaté par `verifyTurn()`, par dépôt, par genre de tâche et par modèle — puis **le modèle le moins cher dont le taux observé dépasse un seuil**. Le panneau dit pourquoi : « Choisi qwen2.5-coder:7b : 9 sur 10 dans ce dépôt ». Jamais hors des modèles que vous avez autorisés, jamais sur trop peu d'historique, et une mesure n'existe que là où quelque chose a vérifié. Deux commandes : ce qui a été appris ici, et l'oublier. |
+| **Ce que cette machine a appris reste ici** | Optionnel, désactivé par défaut. Quand un modèle local échoue et qu'un distant réussit **avec une vérification au vert**, l'épisode est conservé localement : la demande, les fichiers tels qu'ils étaient, les deux diffs, et la commande qui a tranché. Exportable en fixtures `eval/tasks` ou en jeu de conversations JSONL pour affiner un modèle local. **Rien ne sort** — aucune requête réseau n'existe dans ce code, et un test lit le source pour la refuser. |
+| **Finance** | Huit compétences pour le code dont l'arithmétique **est** l'exigence : demi-loin-de-zéro contre demi-au-pair, de l'argent sans flottant, décimal packé et zoné, règlement T+1/T+2 avec les jours fériés en **paramètre**, heures de marché dans le fuseau de la place, clés de contrôle ISIN/LEI/BIC, BodyLength et CheckSum FIX, échéanciers dont les parts font le tout. Chacune est adossée à une tâche d'évaluation qui échoue avant qu'on l'applique. |
+| **Compilé, lu, corrigé** | `ibmi_compile` lance `CRTBNDRPG`, `CRTSQLRPGI`, `CRTBNDCL` et les autres sur la connexion, puis **lit le spool et le job log** et rend les messages avec leur membre, leur ligne et leur identifiant. Une compilation qui échoue est un verdict, pas une erreur à réessayer : la boucle « compiler, lire ce qui a été dit, corriger, recompiler » tient dans un seul tour. Un nom d'objet invalidable est **refusé plutôt qu'échappé**. |
+| **Les tests RPG de la maison, exécutés** | `ibmi_test` appelle le cadre de tests que la boutique utilise déjà — RPGUnit, ou ce que nomme `hiveyCode.ibmi.testCommand` — et son résultat **compte comme une vérification** : c'est ce qui permet à l'agent de savoir qu'il a fini au lieu de l'affirmer. |
+| **Qui utilise ceci ?** | `ibmi_impact` répond à la question posée avant chaque changement sur un fichier ou un programme : les programmes qui le référencent, par `DSPPGMREF` vers un fichier de sortie en QTEMP, plus ce que le catalogue SQL sait des vues et des dépendances. |
+| **Pourquoi cette requête est lente** | L'explication que la base peut déjà donner, relue pour ce qu'elle veut dire — l'index qui manquait, le parcours choisi — depuis l'outillage de Db2 for i et non depuis l'impression qu'en a un modèle. |
+| **Ce que veut dire un identifiant ici** | Un nom de six caractères n'est pas une documentation. Les conventions de nommage de **cette** boutique — lues dans un fichier que l'équipe écrit, pas devinées — vont dans le prompt, pour que `CFC1234` soit lu pour ce qu'il est sur cette partition. |
+| **Quarante compétences IBM i** | Une par chose qu'une équipe IBM i demande vraiment, chacune déclarant la tâche d'évaluation qui l'éprouve : passage en format libre, fichiers écran, SQL embarqué, débordement, MONITOR, CCSID, journalisation, triggers, modules multi-membres, et le reste. Là où une tâche ne pouvait pas être écrite honnêtement ici — parce qu'il faut une partition — la compétence le dit au lieu de prétendre à une couverture. |
+| **Remis à ARCAD** | Check-out, check-in, compilation et références croisées par les commandes `arcad.*` qu'Elias enregistre. Et la seule chose que l'agent ne fera jamais : **promouvoir**. La promotion est l'étape où quelqu'un prend la responsabilité, et un outil qui peut le faire est un outil qui peut le faire par accident. |
 | **Votre thème** | Chaque couleur du panneau est une variable de l'éditeur. Pas une seule valeur en dur — [le même sélecteur sous un thème clair](docs/images/picker.light.png), pris par le même script. Il suit un changement de thème immédiatement, contraste élevé compris. |
 
 ## Comment le coût tend vers zéro
@@ -89,6 +104,22 @@ Ce n'est pas un slogan, c'est une architecture. Cinq leviers, dans l'ordre de le
    réel quand le fournisseur le communique (OpenRouter le fait).
 
 Résultat par défaut : **0 $**. Le premier centime dépensé est un choix explicite.
+
+### Ce qu'il obtient vraiment
+
+[`eval/QUALITY.md`](eval/QUALITY.md) est le tableau comparatif : chaque configuration qu'on peut
+choisir — le modèle local seul, le local avec escalade, chaque préréglage — avec la qualité et le
+coût par tâche, sur le banc d'évaluation du dépôt.
+
+**Tous les chiffres y disent aujourd'hui « non mesuré », et c'est volontaire.** Aucun modèle n'est
+joignable depuis la machine qui le génère, donc un chiffre y serait inventé — et un banc d'essai
+inventé est le seul artefact de ce projet qui vaudrait moins que rien, parce que c'est celui qu'on
+cite. Ce qui **est** prouvé, à chaque commit, c'est la moitié qui donne un sens à un score : le
+contrôle de chaque tâche **échoue sur sa fixture intacte** et **passe sur sa solution de référence**.
+
+Il ne porte **aucune colonne Copilot ni IBM Bob**, pour la même raison : personne ici ne les a
+exécutés sur ces tâches, et une colonne remplie depuis un chiffre publié compare deux mesures
+différentes. Ce qu'il faudrait pour en ajouter une honnêtement est écrit dans le fichier.
 
 ## Comment la confidentialité est tenue
 
@@ -193,6 +224,22 @@ avec la même configuration que la barre latérale.
   de projets), `privacy.egressPolicy: "ask-always"`, `budget.dailyUsd`.
 - Les réglages `hiveyCode.*` sont validés par espace de travail : un dépôt sensible peut imposer
   `chat.provider: "local"` dans son `.vscode/settings.json`.
+- **Une politique signée que l'utilisateur ne peut pas desserrer.** Un fichier sur le poste, signé
+  avec votre clé, qui **restreint** : un fournisseur, une liste d'adresses, un budget maximum, un
+  second avis consultatif ou bloquant. Vérifiée avant que quoi que ce soit lise un réglage, par le
+  point de passage unique où tous les réglages sont lus. Elle ne peut que resserrer : une politique
+  qui pourrait **accorder** quelque chose serait un moyen de désactiver une garantie, et c'est
+  inexprimable par construction. Une politique non signée ou altérée est **refusée**, pas ignorée.
+- **Le registre des sorties part vers votre collecteur.** Le même journal que vous lisez dans le
+  panneau, expédié en **syslog RFC 5424 sur TLS** ou en **OTLP/HTTP**, à travers une liste blanche de
+  champs — ce qui arrive au SIEM est donc la métadonnée et jamais le contenu, et c'est démontrable.
+  La file est bornée, elle compte ce qu'elle a jeté, et une ligne n'est acquittée que si le collecteur
+  l'a réellement prise.
+- **Une preuve de souveraineté.** Un rapport, signé, qui répond à la question d'un auditeur : sur
+  cette période, qu'est-ce qui est sorti de ce poste, vers qui, et le registre est-il intact ? Il porte
+  le verdict de la chaîne de hachage et, si vous le voulez, un **horodatage RFC 3161** de votre
+  autorité, pour qu'il n'ait pas pu être écrit après coup. Il énonce ce qu'il **ne** prouve **pas**
+  aussi clairement que ce qu'il prouve.
 - L'extension n'embarque **aucune dépendance à l'exécution** : le paquet à auditer, c'est le bundle
   et rien d'autre. Le SBOM est publié à chaque CI.
 
@@ -224,7 +271,7 @@ décisions : [`docs/adr/`](docs/adr).
 ## Développement
 
 ```bash
-npm test               # construit les bundles, puis 1052 tests (node:test)
+npm test               # construit les bundles, puis 1057 tests (node:test)
 npm run test:integration   # charge l'extension dans un vrai VS Code (43 tests, headless)
 node scripts/screenshots.mjs  # reprend les images du README depuis ce même éditeur
 npm audit --audit-level=high   # 0 vulnérabilité : 5 outils de dev, aucune dépendance à l'exécution
@@ -239,7 +286,7 @@ prix n'est écrit à la main**.
 
 ## État
 
-`0.84.0` — utilisable au quotidien, prêt à publier (voir `docs/PUBLISHING.md`).
+`0.85.0` — utilisable au quotidien, prêt à publier (voir `docs/PUBLISHING.md`).
 Ce qui est fait et ce qui ne l'est pas : [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Licence

@@ -2,6 +2,58 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.85.0 — 2026-10-03
+
+### Ajouté
+
+- **Chantier 3.5 — le tableau de qualité publié, et ce qu'il refuse de contenir.**
+  `node scripts/evaluate.mjs --table eval/QUALITY.md` produit le tableau comparatif que la feuille de
+  route demandait : chaque configuration qu'on peut réellement choisir — le modèle local seul, le
+  local avec escalade, chaque préréglage — avec la qualité et le coût par tâche, dans un fichier
+  versionné qu'on peut donc **comparer d'une exécution à l'autre**.
+
+  ⚠️⚠️ **Tous les chiffres du fichier livré disent « not measured », et c'est la décision.** Aucun
+  modèle n'est joignable depuis cette machine : chaque cellule aurait donc été inventée, et un banc
+  d'essai inventé est le seul artefact de ce projet qui vaudrait **moins que rien**, parce que c'est
+  celui qu'on cite. Ce qui **est** prouvé, à chaque commit, c'est la moitié difficile : le contrôle de
+  chacune des 56 tâches **échoue sur sa fixture intacte** et **passe sur sa solution de référence**.
+  Ce qui manque est une machine avec un modèle dessus, et le fichier donne la commande.
+
+  ⚠️ **Aucune colonne Copilot, aucune colonne IBM Bob.** Non par pudeur — c'est la comparaison que ce
+  produit existe pour gagner — mais parce que personne ici ne les a exécutés sur ces tâches. Une
+  colonne remplie depuis un chiffre publié compare deux mesures différentes, sur deux jeux de tâches,
+  sur deux machines, à deux dates ; elle ne survivrait pas à la première question de la réunion où on
+  la citerait. Le fichier écrit à la place **ce qu'il faudrait** pour en ajouter une honnêtement.
+
+  Voir [ADR-0024](docs/adr/0024-un-tableau-qui-dit-ce-qu-il-n-a-pas-mesure.md).
+
+### Précisé
+
+- ⚠️ **Une ligne du tableau appartient à exactement une configuration.** Le harnais reçoit un
+  *modèle*, pas une configuration, et le même modèle exécuté seul puis autorisé à escalader produit
+  des résultats que rien ne distingue sinon un champ. Les additionner donnerait une qualité que
+  personne ne peut reproduire — celle d'aucun des deux montages. `rowsFromOutcomes` sépare sur ce
+  champ, et un test le prouve en retirant la séparation.
+- ⚠️ **Le test a d'abord échoué sur ma propre prose** : il refusait `0 %` dans tout le document, or le
+  document explique justement qu'une configuration non mesurée ne doit jamais s'afficher `0 %`. C'est
+  la cinquième fois dans ce dépôt qu'un grep structurel rejette un fichier pour s'être expliqué ; le
+  contrôle porte désormais sur les **lignes du tableau**.
+- Le nombre de tâches annoncé par le tableau est tenu par `check:numbers` **et** par un test : un
+  tableau qui dit 51 après qu'on en a ajouté cinq est faux de la façon la plus discrète qui soit —
+  rien ne casse, le chiffre a simplement cessé d'être vrai.
+
+### Documentation
+
+- **Les deux README rattrapent les phases 1 à 3.** Ils décrivaient la version 0.67 : ni la boucle de
+  compilation IBM i, ni les tests RPG, ni `ibmi_impact`, ni les quarante compétences, ni la politique
+  signée, ni l'expédition du registre vers un SIEM, ni la preuve de souveraineté, ni les hooks, ni la
+  tâche de fond isolée, ni la revue de branche, ni les outils de serveur de langage, ni le second
+  lecteur, ni le routage qui apprend, ni le corpus local, ni la famille `finance` n'y figuraient. Le
+  `.vsix` embarquait donc quinze chantiers que sa page d'accueil ne mentionnait pas.
+- Les deux renvoient à `eval/QUALITY.md` **en disant que les chiffres n'y sont pas mesurés**. Le
+  document perd en force de vente ce qu'il gagne en défendabilité, et c'est l'arbitrage voulu : le
+  lecteur à convaincre reconnaît un chiffre non sourcé.
+
 ## 0.84.0 — 2026-10-03
 
 ### Ajouté
