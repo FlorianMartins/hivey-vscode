@@ -26,6 +26,7 @@ import { buildKnowledgeTools } from "./knowledge.js";
 import type { McpManager } from "./integrations/mcp.js";
 import { runCommandInTerminal } from "./terminal.js";
 import { withHooks, type Hooks } from "./hooks.js";
+import { buildSymbolTools } from "./symbols.js";
 import { isAbsolutePath, tidyPath, underRoot } from "../core/fs/within.js";
 
 /**
@@ -445,6 +446,7 @@ export function buildTools(deps: ToolDeps): Tool[] {
   };
 
   return withHooks([
+    ...buildSymbolTools(),
     readFile,
     listFiles,
     searchText,

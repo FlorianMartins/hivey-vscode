@@ -2,7 +2,7 @@
   "name": "hivey-code",
   "displayName": "Hivey Code",
   "description": "%extension.description%",
-  "version": "0.79.0",
+  "version": "0.80.0",
   "publisher": "hivey",
   "license": "Apache-2.0",
   "repository": {
@@ -356,6 +356,11 @@
       {
         "command": "hiveyCode.backgroundTasks",
         "title": "%command.backgroundTasks.title%",
+        "category": "Hivey Code"
+      },
+      {
+        "command": "hiveyCode.reviewBranch",
+        "title": "%command.reviewBranch.title%",
         "category": "Hivey Code"
       }
     ],

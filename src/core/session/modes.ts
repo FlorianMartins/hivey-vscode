@@ -46,6 +46,12 @@ const READ_ONLY = new Set([
   "ibmi_members",
   "ibmi_objects",
   "ibmi_library_list",
+  // What the language server already knows. Every one of these is a question with an exact answer
+  // the editor is holding, and a plan is exactly where somebody wants it: "who calls this" decides
+  // whether to change a signature, and deciding is what plan mode is for.
+  "find_references",
+  "call_hierarchy",
+  "workspace_symbols",
   // Impact analysis reads. It is here despite writing an output file, because the only library it
   // writes is QTEMP — created per job, destroyed with it, invisible to every other job — and the
   // gate knows that explicitly rather than the tool claiming it (`SCRATCH_LIBRARY`,

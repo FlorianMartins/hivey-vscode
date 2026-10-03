@@ -460,8 +460,8 @@ Those documents are currently written in French; translations are welcome.
 ## Development
 
 ```bash
-npm test                   # builds the bundles, then 974 tests (node:test)
-npm run test:integration   # loads the extension into a real VS Code (42 tests, headless)
+npm test                   # builds the bundles, then 994 tests (node:test)
+npm run test:integration   # loads the extension into a real VS Code (43 tests, headless)
 npm run eval:verify        # every evaluation task must fail before a model touches it
 node scripts/screenshots.mjs  # retakes the README's images from that same editor
 npm run typecheck
@@ -484,7 +484,7 @@ no entry, so a translation cannot silently rot.
 
 ## Status
 
-`0.79.0` — used every day by its author. [`docs/ROADMAP.md`](docs/ROADMAP.md) is the honest version:
+`0.80.0` — used every day by its author. [`docs/ROADMAP.md`](docs/ROADMAP.md) is the honest version:
 what is tested, what was only checked by hand, and what is written but has never run in the
 conditions it was written for. That last list is not empty and it is named.
 

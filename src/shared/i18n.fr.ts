@@ -245,7 +245,6 @@ export const FR: Record<string, string> = {
   "Request refused: the rest of the turn was not sent.": "Envoi refusé : la suite du tour n'a pas été transmise.",
   "Retry": "Réessayer",
   "Review this code for defects: wrong results, unhandled failures, races, injection, resource leaks. Say what input triggers each one. If you find nothing, say so rather than inventing something.": "Cherche les défauts de ce code : résultats faux, échecs non gérés, accès concurrents, injection, fuites de ressources. Dis quelle entrée déclenche chacun. Si tu ne trouves rien, dis-le plutôt que d’inventer quelque chose.",
-  "Review this code: bugs first, then security, then readability. Order by severity, cite the lines, and report nothing you are unsure of.": "Fais la revue de ce code : bugs d'abord, puis sécurité, puis lisibilité. Ordonne par gravité, cite les lignes, ne signale rien dont tu ne sois pas sûr.",
   "Revoke all": "Tout révoquer",
   "Rewind the conversation to before this question — that turn changed no file": "Revenir dans la conversation à juste avant cette question — ce tour n’a modifié aucun fichier",
   "Rewritten in the file": "Réécrit dans le fichier",
@@ -460,6 +459,28 @@ export const FR: Record<string, string> = {
   "Hivey Code is in its safest mode: {0}": "Hivey Code est dans son mode le plus sûr : {0}",
   "The policy is read from {0}.": "La politique est lue depuis {0}.",
   "Where is the policy?": "Où est la politique ?",
+  "I cannot find a file called {0} in this workspace.": "Je ne trouve pas de fichier nommé {0} dans cet espace de travail.",
+  "I cannot open {0}.": "Je ne peux pas ouvrir {0}.",
+  "{0} does not appear in {1}.": "{0} n'apparaît pas dans {1}.",
+  "No language server answered for {0}. That is not the same as “no references” — it may still be indexing.":
+    "Aucun serveur de langage n'a répondu pour {0}. Ce n'est pas la même chose que « aucune référence » — il indexe peut-être encore.",
+  "{0} reference(s) to {1}": "{0} référence(s) à {1}",
+  "No call hierarchy for {0} at {1}. Either the language server does not provide one for this language, or it is still indexing.":
+    "Pas de hiérarchie d'appels pour {0} à {1}. Soit le serveur de langage n'en fournit pas pour ce langage, soit il indexe encore.",
+  "{0} {1} call(s)": "{0} appel(s) {1}",
+  "No language server answered. That is not the same as “no such symbol”.":
+    "Aucun serveur de langage n'a répondu. Ce n'est pas la même chose que « ce symbole n'existe pas ».",
+  "{0} symbol(s) matching {1}": "{0} symbole(s) correspondant à {1}",
+  "Review this code: bugs first, then security, then readability. Order by severity, cite the lines, and report nothing you are unsure of.\n\nIf nothing is attached, review what THIS BRANCH changes: use git_diff against the branch point rather than reading the whole repository, because a line nobody touched is not this branch's problem however much you would have written it differently. A change that is correct but incomplete — a case not handled, a test not written — is a finding.\n\nSay what you did NOT review: a file you could not read, a diff that was cut short.":
+    "Revois ce code : d'abord les défauts, puis la sécurité, puis la lisibilité. Classe par gravité, cite les lignes, et ne signale rien dont tu n'es pas sûr.\n\nSi rien n'est joint, revois ce que CETTE BRANCHE change : emploie git_diff contre le point de départ plutôt que de lire tout le dépôt, car une ligne que personne n'a touchée n'est pas le problème de cette branche, quelle que soit la façon dont tu l'aurais écrite. Un changement correct mais incomplet — un cas non traité, un test non écrit — est un constat.\n\nDis ce que tu n'as PAS revu : un fichier illisible, un diff coupé.",
+  "Reviewing a branch needs a folder open.": "Revoir une branche demande un dossier ouvert.",
+  "I could not work out what this branch came from: none of the usual bases resolved. Name one and I will review against it.":
+    "Je n'ai pas pu établir d'où vient cette branche : aucune des bases habituelles ne se résout. Nommez-en une et je revois contre elle.",
+  "This branch changes nothing against its base, so there is nothing to review.":
+    "Cette branche ne change rien par rapport à sa base, il n'y a donc rien à revoir.",
+  "{0}. They are in the Problems panel.": "{0}. Ils sont dans le panneau Problèmes.",
+  "{0}. {1} part(s) of the answer could not be read — see the output channel.":
+    "{0}. {1} partie(s) de la réponse n'ont pas pu être lues — voir le canal de sortie.",
   "A background task needs a folder open: it works in a git worktree of it.":
     "Une tâche de fond a besoin d'un dossier ouvert : elle travaille dans un worktree git de celui-ci.",
   "No container engine, so this task will not be able to run any command. Start it anyway?":

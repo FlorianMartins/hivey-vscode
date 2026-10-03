@@ -143,5 +143,6 @@
   "config.background.cpus": "Combien de processeurs le conteneur d'une tâche de fond peut utiliser.",
   "config.background.memory": "Combien de mémoire le conteneur d'une tâche de fond peut utiliser, avec une unité — `2g`, `512m`. Une compilation qui s'emballe ne doit pas mettre la machine à genoux pendant que son auteur est absent.",
   "command.runInBackground.title": "Lancer une tâche en arrière-plan",
-  "command.backgroundTasks.title": "Tâches en arrière-plan"
+  "command.backgroundTasks.title": "Tâches en arrière-plan",
+  "command.reviewBranch.title": "Revoir cette branche"
 }

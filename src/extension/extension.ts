@@ -6,6 +6,7 @@ import { showKnowledge } from "./knowledge.js";
 import { announcePolicy, policySource, reloadPolicy } from "./policy.js";
 import { SiemShipper } from "./siem.js";
 import { Background } from "./background.js";
+import { ReviewDiagnostics, parseFindings, prepareReview, summarise } from "./review.js";
 import { sovereigntyReport } from "./sovereignty.js";
 import type { ReportRow } from "../core/audit/sovereignty.js";
 import { setLanguage, t } from "../shared/i18n.js";
@@ -78,6 +79,10 @@ export function activate(context: vscode.ExtensionContext): void {
   // Each task gets its own worktree and its own branch, so several can run at once without
   // seeing each other's work — or the work of the person who started them.
   const background = new Background(keys, log, () => status.show());
+  // One collection, replaced by each review: leaving the previous one behind would mean somebody
+  // fixing a finding and still seeing it.
+  const reviewDiagnostics = new ReviewDiagnostics();
+  disposables.push(reviewDiagnostics);
   gate.onRecord = (row) => siem.offer(row);
   disposables.push(siem);
 
@@ -177,6 +182,29 @@ export function activate(context: vscode.ExtensionContext): void {
 
     vscode.commands.registerCommand("hiveyCode.showKnowledge", () => showKnowledge()),
     vscode.commands.registerCommand("hiveyCode.siemStatus", () => siem.report()),
+    vscode.commands.registerCommand("hiveyCode.reviewBranch", async () => {
+      const root = vscode.workspace.workspaceFolders?.[0];
+      if (!root) {
+        void vscode.window.showWarningMessage(t("Reviewing a branch needs a folder open."));
+        return;
+      }
+      const prepared = await prepareReview(root.uri.fsPath);
+      if ("refused" in prepared) {
+        void vscode.window.showInformationMessage(prepared.refused);
+        return;
+      }
+      // Through the chat view, because that is where the model, the budget and the egress gate are.
+      // A review with its own request path would be a second place a request can leave the machine.
+      const answer = await chat.askAndWait(prepared.prompt);
+      const { findings, problems } = parseFindings(answer);
+      reviewDiagnostics.publish(root.uri.fsPath, findings);
+      for (const problem of problems) log.appendLine(`[review] ${problem}`);
+      void vscode.window.showInformationMessage(
+        problems.length
+          ? t("{0}. {1} part(s) of the answer could not be read — see the output channel.", summarise(findings), problems.length)
+          : t("{0}. They are in the Problems panel.", summarise(findings)),
+      );
+    }),
     vscode.commands.registerCommand("hiveyCode.runInBackground", async () => {
       const task = await vscode.window.showInputBox({
         title: t("Run a task in the background"),

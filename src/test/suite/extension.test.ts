@@ -1879,6 +1879,40 @@ suite("Hivey Code", () => {
       await fs.rm(dir, { recursive: true, force: true });
     }
   });
+
+  /**
+   * The language server's own answers, in a real editor.
+   *
+   * These tools exist because a grep answers the same questions approximately. That claim can only be
+   * checked where there IS a language server, which is here: VS Code's own TypeScript service indexes
+   * this extension's source, so `workspace_symbols` has something real to find.
+   */
+  test("the language-server tools answer from the editor, not from a text search", async () => {
+    const ext = vscode.extensions.getExtension(ID)!;
+    await ext.activate();
+    const tools = buildTools({ settings: () => readSettings() });
+    const byName = new Map(tools.map((t) => [t.schema.name, t]));
+    for (const name of ["find_references", "call_hierarchy", "workspace_symbols"]) {
+      assert.ok(byName.has(name), `${name} is not in the tool set`);
+    }
+
+    const ctx = { signal: new AbortController().signal, report: () => {} };
+    // A symbol this repository really declares. The harness opens no folder, so the workspace symbol
+    // provider has nothing to index — which is itself the case worth asserting: the answer must say
+    // a provider did not answer rather than "no such symbol".
+    const result = await byName.get("workspace_symbols")!.run({ query: "verifyTurn" }, ctx as never);
+    const text = String(result.content);
+    if (result.isError) {
+      assert.match(text, /not the same as/, "a silent provider must not read as an empty answer");
+    } else {
+      assert.match(text, /symbol\(s\) matching/);
+    }
+
+    // And a file that does not exist is refused with the file named, not with an empty list.
+    const missing = await byName.get("find_references")!.run({ file: "no-such-file.ts", symbol: "x" }, ctx as never);
+    assert.equal(missing.isError, true);
+    assert.match(String(missing.content), /no-such-file\.ts/);
+  });
 });
 
 

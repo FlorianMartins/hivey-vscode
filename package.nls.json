@@ -143,5 +143,6 @@
   "config.background.cpus": "How many CPUs a background task's container may use.",
   "config.background.memory": "How much memory a background task's container may use, with a unit — `2g`, `512m`. A runaway build must not take the machine down while its author is away.",
   "command.runInBackground.title": "Run a task in the background",
-  "command.backgroundTasks.title": "Background tasks"
+  "command.backgroundTasks.title": "Background tasks",
+  "command.reviewBranch.title": "Review this branch"
 }

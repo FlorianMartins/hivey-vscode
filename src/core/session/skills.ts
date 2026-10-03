@@ -146,7 +146,21 @@ export const BUILTIN_SKILLS: BuiltinSkill[] = [
   { group: "general", name: t("/explain"), hint: t("explain the file or the selection"), prompt: t("Explain this code: what it does, how it fits into the rest, and what deserves attention."), attach: true },
   { group: "general", name: "/tests", hint: t("write tests"), prompt: t("Write tests for this code, in the style and with the tools already used in this repository. Cover the edge cases."), attach: true },
   { group: "general", name: t("/fix"), hint: t("find and fix the problem"), prompt: t("Find the defect in this code and fix it. Say in one sentence what was wrong."), attach: true },
-  { group: "general", name: t("/review"), hint: t("review: bugs, security, readability"), prompt: t("Review this code: bugs first, then security, then readability. Order by severity, cite the lines, and report nothing you are unsure of."), attach: true },
+  {
+    group: "general",
+    name: t("/review"),
+    hint: t("review: bugs, security, readability"),
+    prompt: t(
+      "Review this code: bugs first, then security, then readability. Order by severity, cite the lines, " +
+        "and report nothing you are unsure of.\n\n" +
+        "If nothing is attached, review what THIS BRANCH changes: use git_diff against the branch point " +
+        "rather than reading the whole repository, because a line nobody touched is not this branch's " +
+        "problem however much you would have written it differently. A change that is correct but " +
+        "incomplete — a case not handled, a test not written — is a finding.\n\n" +
+        "Say what you did NOT review: a file you could not read, a diff that was cut short.",
+    ),
+    attach: true,
+  },
   { group: "general", name: "/doc", hint: t("document"), prompt: t("Document this code: a note above it, in the language and style of the file."), attach: true },
   { group: "general", name: t("/optimize"), hint: t("make it faster, without changing what it does"), prompt: t("Make this code faster without changing its behavior. Say what the cost was before and after, and refuse if the gain is not worth the loss of clarity."), attach: true },
   { group: "general", name: "/commit", hint: t("write the commit message"), prompt: t("Read the staged changes with git_diff and write the commit message for them. Subject line, then the why.") },

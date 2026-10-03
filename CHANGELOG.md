@@ -2,6 +2,61 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.80.0 — 2026-10-03
+
+### Ajouté
+
+- **Chantier 2.6 — la revue de branche.** `Hivey Code : Revoir cette branche` détecte le point de
+  départ, lit `git diff <base>...HEAD` et rend des **constats structurés** — fichier, ligne, gravité,
+  catégorie, et le correctif proposé — qui atterrissent dans le **panneau Problèmes** comme
+  diagnostics. Ce n'est pas un choix de présentation : c'est ce qui donne la navigation, le
+  regroupement par fichier, le compteur dans la barre d'état, et un endroit où les constats
+  **restent**. Une revue imprimée dans une conversation est une revue qui défile.
+
+  ⚠️ **Trois points d'exigence.** Le diff est en **trois points** (`base...HEAD`), sinon les commits
+  de quelqu'un d'autre sur la base apparaissent comme le travail de cette branche. La base est
+  **demandée à git** (`merge-base` sur plusieurs candidats), parce qu'un dépôt dont la branche par
+  défaut est `master`, `develop` ou `trunk` est ordinaire et qu'une comparaison contre une branche
+  inexistante rapporterait tout le dépôt comme nouveau. Et **une réponse illisible n'est jamais une
+  revue vide** — un tableau de constats vide sans explication se lit comme « rien à signaler », ce
+  qui est la seule conclusion qu'un échec d'analyse ne doit pas produire.
+
+  ⚠️ **La publication en commentaires de pull request n'est pas là et n'y sera pas.** Cela voudrait
+  dire que cette extension détient un identifiant de forge et écrit au nom de quelqu'un sur un
+  serveur — la seule catégorie d'action extérieure que ce produit ne prend pas. Qui le veut configure
+  un serveur MCP pour sa forge et l'approuve par son nom ; la porte existe et elle est à lui.
+
+- **Chantier 2.7 — ce que le serveur de langage sait déjà.** Trois outils en lecture :
+  `find_references`, `call_hierarchy` et `workspace_symbols`, via
+  `vscode.executeReferenceProvider`, `vscode.prepareCallHierarchy` et
+  `vscode.executeWorkspaceSymbolProvider`. Ils rejoignent la liste blanche du **mode Plan** — « qui
+  appelle ceci » décide s'il faut changer une signature, et décider est ce à quoi le mode Plan sert.
+
+  ⚠️ **Un serveur qui n'a pas répondu n'est jamais rendu par une réponse vide.** « Aucune référence »
+  d'un serveur qui indexe encore n'est pas « aucune référence », et confondre les deux est la façon
+  dont un agent conclut qu'un symbole est inutilisé et le supprime. Les trois outils le disent, dans
+  les mots de leur propre question, et le signalent comme une erreur.
+
+### Corrigé
+
+- ⚠️ **Un tableau de constats vide était traité comme un échec d'analyse** : « j'ai trouvé zéro
+  problème » est une réponse légitime, et la confondre avec « je n'ai pas su lire » aurait transformé
+  chaque revue propre en avertissement. Trouvé par le test qui l'affirmait.
+
+### Précisé
+
+- La compétence `/review` est désormais consciente de la branche : si rien n'est joint, elle revoit
+  ce que **cette branche** change plutôt que de lire tout le dépôt — et elle dit ce qu'elle n'a pas
+  revu. Le comportement sur un fichier joint ne change pas.
+- La revue passe par la vue de conversation et non par son propre chemin de requête : sinon il y
+  aurait un **second endroit** par lequel une requête peut quitter la machine, et ce produit en a un.
+  Un test lit le module de revue et refuse tout accès réseau direct.
+- Un diff coupé est **annoncé au modèle**, pour que son silence sur la suite ne se lise pas comme une
+  revue propre.
+- Les outils de symboles **disent à quelle position ils ont posé la question** : les fournisseurs
+  prennent une position et un modèle a un nom, donc le nom est localisé d'abord — juste presque
+  toujours, et faux pour un nom employé avant sa déclaration. Le dire rend l'erreur visible.
+
 ## 0.79.0 — 2026-10-03
 
 ### Ajouté

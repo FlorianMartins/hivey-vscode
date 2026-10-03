@@ -705,6 +705,33 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this.sendState();
   }
 
+  /**
+   * Those waiting for the current turn's answer. Resolved with the text the model produced.
+   *
+   * There is exactly one caller — the branch review, which has to PARSE the answer — and it goes
+   * through the chat view rather than its own request path because that is where the model, the
+   * budget, the egress gate and the transcript are. A review with its own path out would be a
+   * second place a request can leave the machine, and this product has one.
+   */
+  private waiting: Array<(answer: string) => void> = [];
+
+  /** Ask, and resolve with what came back. Empty when the turn produced nothing. */
+  async askAndWait(text: string, context?: ContextItem): Promise<string> {
+    const answer = new Promise<string>((resolve) => this.waiting.push(resolve));
+    await this.focusWithPrompt(text, context);
+    return answer;
+  }
+
+  /** Called wherever a turn ends, including when it failed or was stopped. */
+  private settle(): void {
+    if (!this.waiting.length) return;
+    const latest = [...this.session.entries].reverse().find((e) => e.role === "assistant");
+    const text = latest?.text ?? "";
+    const waiting = this.waiting;
+    this.waiting = [];
+    for (const resolve of waiting) resolve(text);
+  }
+
   async focusWithPrompt(text: string, context?: ContextItem): Promise<void> {
     await this.focus();
     this.screen = "chat";
@@ -1680,6 +1707,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     // comes next: every callback on the turn checks the signal before posting, and the cleanup only
     // runs if the turn it belongs to is still the current one.
     this.turn = undefined;
+    this.settle();
     this.post({ type: "status", text: t("Stopped.") });
     this.post({ type: "turnEnd" });
     this.persist();
@@ -1701,6 +1729,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private endTurnEarly(ctl: AbortController): void {
     if (this.turn !== ctl) return;
     this.turn = undefined;
+    this.settle();
     this.post({ type: "turnEnd" });
     this.sendState();
   }
@@ -3154,6 +3183,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       // Only if this turn is still the current one. See `runTurn` — same trap, same guard.
       if (this.turn === ctl) {
         this.turn = undefined;
+        this.settle();
+    this.settle();
         this.post({ type: "turnEnd" });
         this.sendState();
       }
@@ -3828,6 +3859,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       // `turnEnd` over a turn that was still streaming.
       if (this.turn === ctl) {
         this.turn = undefined;
+        this.settle();
+    this.settle();
         this.post({ type: "turnEnd" });
         this.sendState();
       }

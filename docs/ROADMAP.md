@@ -2,7 +2,7 @@
 
 Honnête plutôt que flatteur : ce qui marche, ce qui manque, ce qui n'est pas vérifié.
 
-Ce document décrit l'état à la version **0.79.0**. Les chiffres qu'il annonce — version, tests, tâches d'évaluation — sont
+Ce document décrit l'état à la version **0.80.0**. Les chiffres qu'il annonce — version, tests, tâches d'évaluation — sont
 vérifiés par `npm run check:numbers`, que la CI exécute : ils ne peuvent plus vieillir en silence.
 Il était resté figé à `0.3.0` pendant trente-cinq
 versions, ce qui est sa propre leçon : une feuille de route périmée dit « projet abandonné » à
@@ -35,8 +35,8 @@ externe non exécuté ici est « non vérifié ».
 | 2.3 Preuve de souveraineté | fait | **testé** — 21 tests : comptes et destinations, catégories sommées, fenêtre qui borne les comptes mais **pas** la chaîne, ligne modifiée → rupture au bon rang, ligne supprimée → lacune que le rechaînage ne cache pas, troncature tolérée, signature qui détecte toute édition, limites présentes dans le document, et le DER de la requête **relu par openssl**. ⚠️ **non vérifié** : aucune vraie autorité RFC 3161 interrogée d'ici — l'extension ne prétend pas vérifier le jeton, par conception |
 | 2.4 Hooks avant et après outil | fait | **testé** — 18 tests : lecture et défauts, hook non exécutable signalé par son rang, délai plafonné, correspondance sur when/tool/chemin, **un hook filtré par chemin ne se déclenche pas sans chemin**, consentement qui nomme les commandes et empreinte qui ignore un renommage mais pas un changement de commande, `before` qui refuse, `after` qui ne peut pas, délai dépassé ≠ refus, et un hook en échec qui **compte pour `verifyTurn`** (retombe sans le câblage) |
 | 2.5 Agent en arrière-plan isolé | fait | **testé** — 15 tests, dont un **contre un vrai conteneur** (pas d'interface réseau, pas de DNS, chemin hors worktree illisible) ; refus sans moteur et sans image prouvés en les retirant ; commande passée en un seul argument (`; --privileged` ne devient pas une option) ; **aucun outil git et aucun `push`** vérifiés sur le source ; verdict du tour depuis `verifyTurn`. ⚠️ **non vérifié** : aucune tâche de fond complète exécutée contre un vrai modèle |
-| 2.6 Revue de branche | à faire | — |
-| 2.7 Symboles et graphe d'appels | à faire | — |
+| 2.6 Revue de branche | fait | **testé** — 20 tests : constats lus d'un bloc entouré de prose, ligne en chaîne de caractères, tableau vide = réponse légitime (**défaut trouvé et corrigé**), réponse illisible **jamais** une revue vide, constat sans fichier ou sans message signalé, diff en **trois** points, base demandée à git, diagnostics remplacés à chaque revue, aucun accès réseau depuis le module, aucune porte vers une forge |
+| 2.7 Symboles et graphe d'appels | fait | **testé** — 3 unitaires (liste blanche du mode Plan, les trois branches « serveur muet », position annoncée) + **1 test d'intégration dans un vrai éditeur** qui appelle les outils contre le service TypeScript de VS Code |
 
 ### Phase 1 — Dépasser IBM Bob sur IBM i
 
@@ -61,6 +61,18 @@ Trois niveaux, jamais mélangés :
   nommés.
 
 ## Fait
+
+### Revoir une branche, et demander au serveur de langage (0.80.0)
+
+- **Revue de branche en constats navigables** (testé) : fichier, ligne, gravité, catégorie, correctif
+  — dans le panneau Problèmes. Diff en trois points, base demandée à git.
+- ⚠️ **Une réponse illisible n'est jamais une revue vide** — et un tableau vide est une réponse
+  légitime (défaut trouvé par son propre test).
+- ⚠️ **Pas de publication en commentaires de pull request** : ce serait écrire au nom de quelqu'un sur
+  un serveur. La porte est un serveur MCP que l'utilisateur configure.
+- **`find_references`, `call_hierarchy`, `workspace_symbols`** (testé dans un vrai éditeur), en mode
+  Plan — et un serveur muet n'est jamais rendu par une réponse vide.
+
 
 ### Une tâche de fond que personne ne regarde, donc mieux bornée (0.79.0)
 
@@ -270,7 +282,7 @@ Trois niveaux, jamais mélangés :
 ### Avant 0.39.0
 
 - Noyau indépendant de l'éditeur : anonymisation, fournisseurs, routeur, budget, complétion, session,
-  carte du dépôt, boucle d'agent. **974 tests unitaires** plus **42 tests d'intégration dans un vrai
+  carte du dépôt, boucle d'agent. **994 tests unitaires** plus **43 tests d'intégration dans un vrai
   VS Code**.
 - Barre latérale : conversation, historique, modèles, permissions, configuration ; modes
   discussion / plan / agent ; budget de raisonnement ; contexte explicite.
