@@ -692,6 +692,9 @@ function writeRunRecord(
     // Absent when the turn kept no plan: most turns do not need one, and recording 0 would count
     // discipline nobody exercised.
     ...(planLeft === undefined || !result.trace.some((x) => x.call.name === "update_plan") ? {} : { planLeft }),
+    // Only when it fired. `false` on every turn would be a column of noughts saying nothing; what is
+    // being counted is how often the mechanism actually ran.
+    ...(result.selfChecked ? { selfChecked: true } : {}),
   };
   try {
     require("node:fs").appendFileSync(path, `${JSON.stringify(record)}\n`, "utf8");

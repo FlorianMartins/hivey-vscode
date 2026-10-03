@@ -136,6 +136,15 @@ export interface TurnResult {
   usage: Usage;
   /** The tool calls made during this turn, for the transcript and the audit log. */
   trace: Array<{ call: ToolCall; result: ToolResult; approved: boolean }>;
+  /**
+   * Whether the turn's one self-check actually fired.
+   *
+   * Instrumented because the chantier that added the self-check could not be judged without it. The
+   * bench showed no improvement — 48/56 before, 47/56 after, and the figure it was meant to move
+   * unchanged — and the honest question was then "did it ever fire?", which nothing could answer.
+   * Arguing about that instead of measuring it is the failure mode this whole phase exists against.
+   */
+  selfChecked: boolean;
   stoppedBecause: "answer" | "max-steps" | "cancelled";
   /**
    * The model ran out of output budget rather than finishing.
@@ -388,6 +397,6 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
   return done("max-steps");
 
   function done(stoppedBecause: TurnResult["stoppedBecause"]): TurnResult {
-    return { text, reasoning, steps: trace.length, usage, trace, stoppedBecause, truncated };
+    return { text, reasoning, steps: trace.length, usage, trace, stoppedBecause, truncated, selfChecked };
   }
 }

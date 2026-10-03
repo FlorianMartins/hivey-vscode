@@ -9,6 +9,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import assert from "node:assert/strict";
 import { buildReport, emptyTotals, markdownReport, totalsFor, type RunRecord, type TaskOutcome } from "../src/core/eval/report.js";
 import { CONFIGURATIONS, qualityTable, rowsFromOutcomes } from "../src/core/eval/table.js";
+import { HIVEY_VARIANTS } from "../src/core/router/hivey.js";
 
 function run(over: Partial<RunRecord> = {}): RunRecord {
   return {
@@ -264,4 +265,42 @@ test("the table says how many were refused instead of printing a rate", () => {
   const md = qualityTable({ taskCount: 1, at: "2026-10-03", rows });
   assert.match(md, /1 refused — no rate/);
   assert.ok(!/\| 0 % \|/.test(md), "a refusal must never be rendered as a score");
+});
+
+test("the table names the presets the product actually has", () => {
+  // ⚠️ It did not, for three releases, and the CHANGELOG said it did. The edit meant to fix it was a
+  // string replacement that matched nothing and nobody checked the result — so the table listed
+  // `hivey/balanced` and `hivey/pro`, which exist nowhere in the product. A table naming
+  // configurations nobody can choose cannot be reproduced.
+  const ids = new Set(HIVEY_VARIANTS.map((v) => v.id as string));
+  const listed = CONFIGURATIONS.map((c) => c.configuration).filter((c) => c.startsWith("hivey"));
+  for (const id of ids) assert.ok(listed.includes(id), `the table does not list the preset ${id}`);
+  for (const one of listed) assert.ok(ids.has(one), `the table lists ${one}, which is not a preset`);
+});
+
+test("the report counts the turns where the self-check fired", () => {
+  const t = totalsFor([
+    outcome({ runs: [run({ selfChecked: true })] }),
+    outcome({ runs: [run()] }),
+  ]);
+  assert.equal(t.selfChecked, 1);
+  assert.equal(emptyTotals(0).selfChecked, 0);
+});
+
+test("the table reports what the same configuration scored twice", () => {
+  // The number that was nearly published as a finding: three runs of ONE configuration, same tasks,
+  // same build, scored 48, 47 and 50. A single run cannot establish a gap smaller than that, and a
+  // table showing one run per row invites exactly that mistake.
+  const rows = [
+    { configuration: "hivey", totals: { ...emptyTotals(56), passed: 48, passRate: 48 / 56 } },
+    { configuration: "hivey", totals: { ...emptyTotals(56), passed: 50, passRate: 50 / 56 } },
+  ];
+  const md = qualityTable({ taskCount: 56, at: "2026-10-03", rows });
+  assert.match(md, /What the same configuration scored twice/);
+  assert.match(md, /48\/56, 50\/56/);
+  assert.match(md, /spread of 2 task\(s\)/);
+  assert.match(md, /a difference smaller than that spread is not a result/);
+  // And with one run per configuration there is nothing to say, so nothing is said.
+  const single = qualityTable({ taskCount: 56, at: "x", rows: [rows[0]!] });
+  assert.ok(!/scored twice/.test(single));
 });

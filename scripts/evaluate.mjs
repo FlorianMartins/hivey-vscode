@@ -182,7 +182,18 @@ async function runTask(task, model, endpoint) {
       `node ${JSON.stringify(CLI)} --yes ${JSON.stringify(task.prompt)}`,
       dir,
       task.timeoutMs ?? 180_000,
-      { HIVEY_CODE_RUN_REPORT: reportFile },
+      {
+        HIVEY_CODE_RUN_REPORT: reportFile,
+        // Per child rather than on `process.env`, which is what made the loop below sequential by
+        // construction: a global cannot be two values at once.
+        HIVEY_CODE_MODEL: model,
+        // Its own home, so concurrent tasks do not fight over one spend file — and so a measurement
+        // does not read the operator's personal `~/.hiveycode.json`. A benchmark contaminated by
+        // whoever happens to be running it is not reproducible, which is the only property that
+        // makes it worth having.
+        HOME: dir,
+        USERPROFILE: dir,
+      },
     );
     // Re-run the setup before checking: a task whose check needs a database must not be scored on
     // one the model happened to leave behind.
@@ -267,17 +278,31 @@ async function main() {
   // relabelling it or regenerating the document must not mean paying for it again.
   const from = flag("from", "");
   if (from) {
-    const saved = JSON.parse(await readFile(from, "utf8"));
+    // Several files, comma separated: one row each. Comparing two runs is the whole point of the
+    // table, and it could only ever hold one — so a comparison had to be done by eye, which is the
+    // thing a versioned table exists to avoid.
+    const files = from.split(",").map((f) => f.trim()).filter(Boolean);
     const { rowsFromOutcomes } = await import(new URL("../dist/eval-report.mjs", import.meta.url));
+    const override = flag("as", "");
+    const rows = [];
+    const models = [];
+    let at;
+    let endpoint;
+    let partial = false;
+    for (const one of files) {
+      const saved = JSON.parse(await readFile(one, "utf8"));
+      // Each run's own label, recorded when it ran. `--as` overrides only when there is one file:
+      // with several it would name them all the same and the table would collapse into one row.
+      const label = files.length === 1 ? override || saved.as : saved.as;
+      rows.push(...rowsFromOutcomes(saved.results ?? [], label || undefined));
+      models.push(...(saved.models ?? []));
+      at = saved.at;
+      endpoint = saved.endpoint;
+      if (saved.complete === false) partial = true;
+    }
     const out = flag("table", "eval/QUALITY.md");
-    await writeTable(out, {
-      at: saved.at,
-      endpoint: saved.endpoint,
-      models: saved.models,
-      taskCount: tasks.length,
-      rows: rowsFromOutcomes(saved.results ?? [], flag("as", "") || undefined),
-    });
-    console.log(`written: ${out}${saved.complete === false ? "  (from a run that did not finish)" : ""}`);
+    await writeTable(out, { at, endpoint, models: [...new Set(models)], taskCount: tasks.length, rows });
+    console.log(`written: ${out}${partial ? "  (one of these runs did not finish)" : ""}`);
     process.exit(0);
   }
 
@@ -328,23 +353,59 @@ async function main() {
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
   const file = join(RESULTS_DIR, `${stamp}.json`);
 
-  for (const model of models) {
-    process.env["HIVEY_CODE_MODEL"] = model;
-    for (const task of tasks) {
-      process.stdout.write(`${model} · ${task.id} … `);
-      const result = await runTask(task, model, endpoint);
-      results.push(result);
-      console.log(result.passed ? `pass (${result.seconds}s)` : `FAIL (${result.seconds}s)`);
-      // After every task, not at the end. A local model on a CPU takes a minute or two per task, so
-      // a full set is hours — and a run that writes only when it finishes is a run that loses
-      // everything to one interruption. What is on disk is always what has been measured so far,
-      // which is also the only honest thing for a partial run to be.
-      await writeFile(file, JSON.stringify({ at: new Date().toISOString(), endpoint, models, results, complete: false }, null, 2) + "\n");
-    }
-  }
+  // Several at a time.
+  //
+  // ⚠️ This loop was strictly sequential, and the arithmetic of that is brutal: fifty-six tasks at a
+  // minute or two each is an hour and a half of wall clock to answer one question, and the question
+  // is usually "did this change help?" — asked twice, once before and once after. Two and a half
+  // hours to compare two things is a measurement nobody runs, and a measurement nobody runs is a
+  // rule the project only pretends to follow.
+  //
+  // Nothing about a task needed to be sequential. Each one is a throwaway copy of a fixture, its own
+  // child process, its own report file, and now its own HOME — there is no shared state left to
+  // race over. What bounds the concurrency is the far end: a provider's rate limit, and a laptop's
+  // patience with four `node` processes. Four by default, because it is the number that turns hours
+  // into minutes without turning a measurement into a load test.
+  const jobs = Math.max(1, Number(flag("jobs", "4")) || 4);
+  const queue = models.flatMap((model) => tasks.map((task) => ({ model, task })));
+  let next = 0;
+  let done = 0;
+  const save = () =>
+    writeFile(
+      file,
+      JSON.stringify({ at: new Date().toISOString(), endpoint, models, as: as || undefined, results, complete: false }, null, 2) + "\n",
+    );
+
+  console.log(`${queue.length} task(s), ${jobs} at a time\n`);
+  await Promise.all(
+    Array.from({ length: Math.min(jobs, queue.length) }, async () => {
+      for (;;) {
+        const item = queue[next++];
+        if (!item) return;
+        const result = await runTask(item.task, item.model, endpoint);
+        results.push(result);
+        // One line per completion rather than "task … " then the verdict: with several in flight the
+        // two halves of that pair interleave, and the log becomes a puzzle.
+        done += 1;
+        console.log(
+          `[${String(done).padStart(String(queue.length).length)}/${queue.length}] ${result.passed ? "pass" : "FAIL"} ` +
+            `${item.model} · ${item.task.id} (${result.seconds}s)`,
+        );
+        // After every task, not at the end: a run that writes only when it finishes loses everything
+        // to one interruption, and what is on disk is always what has been measured so far.
+        await save();
+      }
+    }),
+  );
+  // Back into the order the task set declares, so two runs of the same set produce diffable files
+  // rather than files that differ by whichever task happened to finish first.
+  results.sort((a, b) => a.model.localeCompare(b.model) || a.task.localeCompare(b.task));
 
   console.log(`\n${table(results, models)}`);
-  await writeFile(file, JSON.stringify({ at: new Date().toISOString(), endpoint, models, results, complete: true }, null, 2) + "\n");
+  await writeFile(
+    file,
+    JSON.stringify({ at: new Date().toISOString(), endpoint, models, as: as || undefined, results, complete: true }, null, 2) + "\n",
+  );
   console.log(`\nwritten: ${file}`);
 
   if (reportDir) {

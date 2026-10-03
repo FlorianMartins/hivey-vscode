@@ -2,6 +2,63 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.94.0 — 2026-10-03
+
+### Corrigé
+
+- **⚠️⚠️ Une correction annoncée dans ce journal n'avait jamais eu lieu.** Les identifiants de
+  préréglage du tableau de qualité (`hivey/balanced`, `hivey/pro` — qui n'existent nulle part dans le
+  produit) étaient déclarés corrigés en 0.90.0. L'édition censée le faire était **un remplacement de
+  chaîne qui n'a rien trouvé**, et dont je n'ai pas regardé le résultat. Le tableau a donc nommé
+  pendant trois versions des configurations que personne ne peut choisir, pendant que le journal
+  affirmait le contraire. C'est la même faute que la sortie de construction masquée plus tôt dans la
+  journée : **une opération dont on ne vérifie pas le résultat**. Réparé, avec un test qui compare la
+  liste du tableau aux préréglages réels, et l'entrée mensongère porte sa correction.
+
+### Ajouté
+
+- **⚠️⚠️ Le banc tourne les tâches en parallèle, et ce n'était pas un détail de confort.** La boucle
+  était strictement séquentielle : 56 tâches à une ou deux minutes chacune font **une heure et demie
+  de temps réel pour répondre à une question** — et la question est d'ordinaire « est-ce que ce
+  changement a aidé ? », posée deux fois. Deux heures et demie pour comparer deux choses est une
+  mesure que personne ne lance, et une mesure que personne ne lance est une règle que le projet
+  prétend seulement suivre. Rien n'avait besoin d'être séquentiel, sauf une ligne :
+  `process.env["HIVEY_CODE_MODEL"] = model`, un global qui ne peut pas valoir deux choses à la fois.
+  Passé à l'enfant ; **six tâches à la fois par défaut** ; les 56 passent de ~90 à **~7 minutes**.
+
+  Et chaque tâche reçoit son propre `HOME`, donc plus aucun état partagé — et une mesure qui ne lit
+  plus le `~/.hiveycode.json` de celui qui l'exécute. Un banc contaminé par son opérateur n'est pas
+  reproductible, ce qui est la seule propriété qui le rende utile.
+
+- **Le tableau peut tenir plusieurs séries** (`--from a.json,b.json`) et **publie son propre bruit**.
+  ⚠️⚠️ Trois séries du **même** préréglage, sur les mêmes tâches et le même build, ont donné **48, 47
+  et 50** réussites : un écart de trois tâches sans que rien ne change entre elles. Donc **une
+  différence inférieure à cet écart n'est pas un résultat** — et un tableau qui montre une série par
+  ligne invite précisément à cette erreur. Rapporté plutôt que moyenné : une moyenne cache l'écart, et
+  l'écart est ce qui dit ce que le pourcentage vaut. C'est le genre de chiffre qu'un banc doit publier
+  sur lui-même avant d'en publier sur les modèles.
+
+- **Le rappel de vérification est instrumenté** (`TurnResult.selfChecked`), parce que le chantier 4.4
+  ne pouvait pas être jugé sans ça.
+
+### Mesuré
+
+- **Chantier 4.6 — DeepSeek v4.1 est abandonné.** 44/56 contre une plage observée de 47 à 50 pour le
+  préréglage, et **plus du double d'échecs annoncés comme des réussites** (11 contre 5 et 7). Sous
+  l'intégralité de la plage mesurée, donc la direction tient malgré le bruit. La décision avait été
+  écrite avant la mesure. Mais le chiffre qui ne va pas dans son sens est écrit aussi : **33 fois
+  moins cher** — 0,0024 $ la tâche contre 0,0766 $. Voir
+  [ADR-0034](docs/adr/0034-deepseek-abandonne-et-le-bruit-du-banc.md).
+
+- **Chantier 4.4 — non éprouvé par ce banc, et ce n'est pas un échec.** Le rappel s'est déclenché
+  **0 fois sur 56**, et l'explication est mesurée plutôt que supposée : **51 tâches sur 56 ont changé
+  quelque chose, et dans les 51 un contrôle a tourné.** La précondition (ça a changé, rien n'a
+  vérifié) n'a jamais été remplie — **0 occasion sur 51** — parce que les tâches de ce banc demandent
+  un résultat vérifiable, donc le modèle lance un contrôle de lui-même. La population que 4.4 visait,
+  « change ça » sans demander de preuve, n'y est pas représentée. Le mécanisme est **gardé** et son
+  état est écrit : non mesuré. La règle de la phase visait un chantier qui a eu sa chance ; celui-ci
+  n'a pas eu d'occasion.
+
 ## 0.93.0 — 2026-10-03
 
 ### Corrigé
@@ -196,6 +253,12 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
   et `hivey/pro` n'existent nulle part dans le produit (ce sont `hivey` et `hivey/smart`). Un tableau
   qui nomme des configurations que personne ne peut choisir est un tableau qu'on ne peut pas
   reproduire.
+
+  ⚠️⚠️ **CORRECTION (0.94.0) : cette entrée était fausse. Le correctif n'avait pas été appliqué.**
+  L'édition censée le faire était un remplacement de chaîne qui n'a rien trouvé, et dont personne n'a
+  regardé le résultat — donc le tableau a continué de nommer `hivey/balanced` et `hivey/pro` pendant
+  trois versions, pendant que ce journal affirmait le contraire. Réparé en 0.94.0, avec un test qui
+  compare la liste du tableau aux préréglages réels du produit.
 
 ### Ajouté
 

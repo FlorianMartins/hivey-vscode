@@ -3,16 +3,29 @@
 What each configuration scores on this repository's own evaluation set
 (56 tasks). Regenerate with `node scripts/evaluate.mjs --table eval/QUALITY.md`.
 
-Taken 2026-10-03T11:53:09.589Z against `https://openrouter.ai/api/v1` with `hivey`.
+Taken 2026-10-03T13:44:56.036Z against `https://openrouter.ai/api/v1` with `deepseek/deepseek-v4.1-flash`, `hivey`.
 
 | configuration | passed | quality | never acted | claimed done | time | cost |
 | --- | --- | --- | --- | --- | --- | --- |
 | `local only` | — | not measured | — | — | — | — |
 | `local + escalation` | — | not measured | — | — | — | — |
+| `remote only` | — | not measured | — | — | — | — |
 | `hivey/free` | — | not measured | — | — | — | — |
-| `hivey/balanced` | — | not measured | — | — | — | — |
-| `hivey/pro` | — | not measured | — | — | — | — |
-| `hivey` | 48/56 | 86 % | 1/56 | 7/56 | 3726 s | $4.3422 ($0.0775/task) |
+| `hivey` | 50/56 | 89 % | 1/56 | 5/56 | 3918 s | $4.2916 ($0.0766/task) |
+| `hivey/smart` | — | not measured | — | — | — | — |
+| `deepseek-v4.1-flash alone` | 44/56 | 79 % | 1/56 | 11/56 | 2296 s | $0.1357 ($0.0024/task) |
+
+### What the same configuration scored twice
+
+Run to run, on the same tasks and the same build:
+
+- `hivey`: 47/56, 50/56 — a spread of 3 task(s) with nothing changed between runs.
+
+**So a difference smaller than that spread is not a result.** A single run of a configuration
+cannot establish a gap of a few tasks, and a table showing one run per row invites exactly that
+mistake — the reader sees two percentages and concludes something the data does not support.
+Reported rather than averaged: an average hides the spread, and the spread is what tells you what
+the percentage is worth.
 
 ### How to read it
 
@@ -35,7 +48,7 @@ To reproduce it, or to measure a configuration that reads *not measured*:
 ```bash
 npm run build
 node scripts/evaluate.mjs \
-  --url https://openrouter.ai/api/v1 --model hivey \
+  --url https://openrouter.ai/api/v1 --model deepseek/deepseek-v4.1-flash \
   --as "local only" --table eval/QUALITY.md
 ```
 

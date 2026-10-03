@@ -46,9 +46,15 @@ export interface TableInput {
 export const CONFIGURATIONS: Array<{ configuration: string; detail: string }> = [
   { configuration: "local only", detail: "the model on your own machine, never escalated" },
   { configuration: "local + escalation", detail: "the same model, with a remote one bought only by a proven failure" },
-  { configuration: "hivey/free", detail: "the free-tier preset" },
-  { configuration: "hivey/balanced", detail: "the everyday preset" },
-  { configuration: "hivey/pro", detail: "the preset that spends in order to be right" },
+  { configuration: "remote only", detail: "one named remote model, every turn, no local step" },
+  // ⚠️ The ids as the product actually spells them. This list said `hivey/balanced` and `hivey/pro`,
+  // which exist nowhere in it — the presets are `hivey/free`, `hivey` and `hivey/smart`. A table
+  // naming configurations nobody can choose cannot be reproduced, and worse: the fix was announced
+  // in the CHANGELOG three releases before it happened, because the edit that was supposed to make
+  // it was a string replacement that silently matched nothing and was never checked.
+  { configuration: "hivey/free", detail: "Hivey Free — free endpoints only" },
+  { configuration: "hivey", detail: "Hivey Smart — a strong model where you feel it, a cheap one for the plumbing" },
+  { configuration: "hivey/smart", detail: "Hivey Pro — the best of the catalogue on the hard work" },
 ];
 
 /** The suffix that distinguishes an escalated run from the bare model. One place, so both agree. */
@@ -103,6 +109,45 @@ function row(configuration: string, totals: Totals): string {
 }
 
 const NOT_MEASURED = (configuration: string) => `| \`${configuration}\` | — | not measured | — | — | — | — |`;
+
+/**
+ * What the same configuration scored on separate runs.
+ *
+ * ⚠️ This exists because of a number that was nearly published as a finding. Three runs of ONE
+ * configuration, on the same tasks and the same build, scored 48, 47 and 50 — a spread of three
+ * tasks with nothing changed between them. A single run is therefore not evidence of a gap smaller
+ * than that, and a table that printed one run per row invited exactly that mistake: the reader sees
+ * 79 % against 84 % and concludes something the data cannot support.
+ *
+ * Reported rather than averaged. An average of three runs hides the spread, and the spread is the
+ * thing a reader needs in order to know what the percentage is worth.
+ */
+function spread(rows: Measured[]): string[] {
+  const byName = new Map<string, Measured[]>();
+  for (const r of rows) byName.set(r.configuration, [...(byName.get(r.configuration) ?? []), r]);
+  const repeated = [...byName.entries()].filter(([, list]) => list.length > 1);
+  if (!repeated.length) return [];
+  const lines = repeated.map(([name, list]) => {
+    const scores = list.map((r) => `${r.totals.passed}/${r.totals.tasks}`).join(", ");
+    const passes = list.map((r) => r.totals.passed);
+    const width = Math.max(...passes) - Math.min(...passes);
+    return `- \`${name}\`: ${scores} — a spread of ${width} task(s) with nothing changed between runs.`;
+  });
+  return [
+    "### What the same configuration scored twice",
+    "",
+    "Run to run, on the same tasks and the same build:",
+    "",
+    ...lines,
+    "",
+    "**So a difference smaller than that spread is not a result.** A single run of a configuration",
+    "cannot establish a gap of a few tasks, and a table showing one run per row invites exactly that",
+    "mistake — the reader sees two percentages and concludes something the data does not support.",
+    "Reported rather than averaged: an average hides the spread, and the spread is what tells you what",
+    "the percentage is worth.",
+    "",
+  ];
+}
 
 /** The table, as the file that gets committed. */
 export function qualityTable(input: TableInput): string {
@@ -160,6 +205,7 @@ export function qualityTable(input: TableInput): string {
         .filter((r) => !CONFIGURATIONS.some((c) => c.configuration === r.configuration))
         .map((r) => row(r.configuration, r.totals)),
       "",
+      ...spread(input.rows),
       "### How to read it",
       "",
       "**never acted** is how many of those tasks the model finished without taking a single tool",

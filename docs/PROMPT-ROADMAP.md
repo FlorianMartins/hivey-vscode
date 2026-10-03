@@ -581,14 +581,31 @@ choisi d'après le modèle. Vérifié : la traduction par fournisseur est déjà
 (Anthropic refuse `max_tokens <= budget_tokens`), et la capacité publiée est **binaire** — il n'y a
 rien à adapter au-delà du oui/non. Quatrième prémisse fausse sur cinq chantiers.
 
-### 4.6 DeepSeek v4.1 — à mesurer, pas à supposer
+### 4.6 DeepSeek v4.1 — mesuré, pas supposé
 
-Florian demande « l'optimisation de DeepSeek v4.1 si c'est faisable sans perte de qualité, sinon
-oublie DeepSeek ». La formulation est la bonne et elle est tenable telle quelle : **c'est une
-hypothèse à mesurer**. `deepseek/deepseek-v4.1-flash` coûte une fraction des modèles que les
-préréglages payants emploient ; s'il obtient le même score sur les 56 tâches, il remplace le modèle
-du rôle concerné ; s'il perd des points, il est abandonné. Le banc tranche, pas la préférence — et le
-résultat est publié dans `eval/QUALITY.md` dans les deux cas.
+Re-dérivé du code comme les précédents, et ici la dérivation ne porte pas sur un défaut : **c'est une
+mesure.** Ce qu'il fallait vérifier avant de la lancer, c'est qu'elle ait un sens.
+
+Faits, relevés sur le catalogue du jour :
+
+| | outils | raisonnement | $/M entrée | $/M sortie | fenêtre |
+|---|---|---|---|---|---|
+| `deepseek/deepseek-v4.1-flash` | oui | oui | **0,30** | **1,20** | 1 048 576 |
+| `openai/gpt-6.1-sol-pro` *(rôle `deep` des deux préréglages payants)* | oui | oui | 2,00 | 10,00 | 1 050 000 |
+
+Donc : **6,7 fois moins cher en entrée, 8,3 fois en sortie, à fenêtre égale, avec les outils et le
+raisonnement.** L'hypothèse est défendable et la comparaison a un sens — ce qui n'était pas acquis :
+un modèle sans appel d'outils ne peut pas faire de travail d'agent, et la mesure aurait comparé deux
+choses différentes.
+
+**Protocole.** Les deux séries tournent sur **le même build** (0.93.0), le même jour, sur les 56
+mêmes tâches, avec les mêmes contrôles qui tranchent. La référence du préréglage `hivey` est
+**remesurée** sur ce build plutôt que reprise de la veille : elle avait été prise sur la 0.92.0, et
+comparer deux clients différents aurait mélangé l'effet du modèle avec celui du chantier 4.4.
+
+**Décision annoncée d'avance, pour qu'elle ne soit pas choisie après coup** : si DeepSeek tient le
+score, il remplace le modèle du rôle concerné ; s'il perd des points, il est abandonné. Le banc
+tranche, pas la préférence — et **le résultat est publié dans les deux cas**.
 
 ⚠️ **Ce qui est explicitement hors de cette phase** : copier un prompt système d'un autre produit, et
 ajuster un prompt jusqu'à ce que le banc remonte. Le second est la façon la plus sûre de fabriquer un

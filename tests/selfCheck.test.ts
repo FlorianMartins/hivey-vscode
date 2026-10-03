@@ -141,3 +141,13 @@ test("both halves ask, and by the same rule", () => {
     assert.match(source, /selfCheckMessage\(/, `${file} has its own idea of unfinished`);
   }
 });
+
+test("whether the self-check fired is recorded, because the chantier could not be judged without it", () => {
+  // The bench showed no improvement — 48/56 before, 47/56 after, and the figure it was meant to move
+  // unchanged — and the honest next question was "did it ever fire?", which nothing could answer.
+  // Arguing about that instead of measuring it is the failure this phase exists against.
+  const { readFileSync } = require("node:fs") as typeof import("node:fs");
+  assert.match(readFileSync("src/core/agent/loop.ts", "utf8"), /selfChecked: boolean;/);
+  // Recorded only when it fired: `false` on every turn is a column of noughts saying nothing.
+  assert.match(readFileSync("src/cli/main.ts", "utf8"), /result\.selfChecked \? \{ selfChecked: true \} : \{\}/);
+});

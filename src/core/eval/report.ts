@@ -33,6 +33,8 @@ export interface RunRecord {
    * pass rate at all.
    */
   refused?: string;
+  /** Whether the turn's one self-check fired — it changed something and had checked nothing. */
+  selfChecked?: boolean;
   /**
    * Steps of its own plan the turn left outstanding, when it kept a plan.
    *
@@ -104,6 +106,14 @@ export interface Totals {
   /** Turns that ended with steps of their own plan outstanding. */
   planLeft: number;
   /**
+   * Tasks where the self-check fired — the model stopped, had changed something, and had checked
+   * nothing, so it was asked once to finish.
+   *
+   * Without this number the chantier that added the self-check could not be judged: the bench showed
+   * no improvement and nothing could say whether the mechanism had ever run.
+   */
+  selfChecked: number;
+  /**
    * Tasks that never ran because a guard refused them.
    *
    * Above zero, `passRate` is ABSENT — not lowered. A refused task says nothing about the model, and
@@ -143,6 +153,7 @@ export function emptyTotals(tasks = 0): Totals {
     claimedDone: 0,
     planLeft: 0,
     refused: 0,
+    selfChecked: 0,
   };
 }
 
@@ -169,6 +180,7 @@ export function totalsFor(outcomes: TaskOutcome[]): Totals {
   // `neverActed`, and before the early return — a task whose client reported nothing still exited.
   out.claimedDone = outcomes.filter((o) => !o.passed && o.agentExit === 0).length;
   out.planLeft = outcomes.filter((o) => o.runs.some((r) => (r.planLeft ?? 0) > 0)).length;
+  out.selfChecked = outcomes.filter((o) => o.runs.some((r) => r.selfChecked)).length;
 
   const runs = outcomes.flatMap((o) => o.runs);
   if (!runs.length) return out;
