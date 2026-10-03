@@ -422,6 +422,80 @@ plus escalade, et chaque préréglage Hivey, avec la qualité et le coût par t�
 dans le dépôt et repris dans le README. Ne compare à Copilot ou à Bob que des chiffres réellement
 mesurés dans les mêmes conditions.
 
+
+## Phase 4 — Le raisonnement
+
+Demande de Florian, le 2026-10-03 : *« je veux vraiment que l'extension soit aussi bonne que toi dans
+son raisonnement, pour un résultat aussi poussé, avec les mêmes types d'agent, skills et sous-agents,
+et que cette réflexion s'adapte toujours aux derniers modèles »*.
+
+Ce n'est pas un chantier, c'est une phase. Et elle a une contrainte qui la rend différente des trois
+premières : **la qualité du raisonnement est la seule chose de ce projet qu'on ne peut pas prouver par
+un test unitaire**. Un test dit qu'une boucle fonctionne ; il ne dit pas qu'elle raisonne mieux. La
+seule preuve disponible est le banc d'évaluation, et il est maintenant en état de servir (phase 3 et
+`eval/QUALITY.md`). **Chaque chantier de cette phase se mesure avant et après, sur les 56 tâches, et
+un chantier qui n'améliore pas le chiffre est annulé plutôt que gardé.**
+
+### 4.1 Un état de plan que le modèle tient
+
+Ce qui distingue le plus un agent qui aboutit d'un agent qui tourne en rond n'est pas la taille du
+modèle, c'est qu'il garde une **liste de ce qui reste à faire** et qu'il la met à jour. Aujourd'hui la
+boucle est sans mémoire de son propre plan : douze étapes, chacune décidée depuis la trace.
+
+À livrer : un état de tâches explicite, écrit et relu par le modèle à chaque étape, visible dans le
+panneau. Mesurer : le taux de réussite, et surtout le nombre de tours qui finissent **sans avoir
+vérifié**.
+
+### 4.2 Les compétences chargées à la demande
+
+Il y a environ 85 compétences. Les décrire toutes dans le prompt coûte des jetons à chaque tour et
+dilue l'attention du modèle. Ce que fait un agent moderne : n'envoyer que les **noms** et charger le
+contenu quand la compétence est choisie — exactement la discipline déjà appliquée à la base de
+connaissance (chapitre 7 du cours : seuls les titres voyagent).
+
+À livrer : une compétence est un nom plus une description d'une ligne dans le prompt ; son contenu
+arrive par un appel d'outil. Mesurer : les jetons du préfixe, et le taux de réussite (il doit **ne pas**
+baisser).
+
+### 4.3 Des sous-agents qui travaillent vraiment en parallèle
+
+`.hiveycode/agents/` existe : un prompt, une liste d'outils intersectée, un modèle, un contexte
+vierge. Ce qui manque est ce qui les rend utiles : **plusieurs à la fois**, et une synthèse de leurs
+retours par l'agent principal. Une recherche qui lirait trente fichiers coûte trente lectures dans le
+contexte principal ; déléguée, elle coûte une réponse.
+
+À livrer : lancer plusieurs sous-agents, attendre, synthétiser. Mesurer : les jetons du contexte
+principal sur les tâches qui demandent de l'exploration, et le temps.
+
+### 4.4 La vérification pendant, pas seulement après
+
+`verifyTurn()` juge un tour **terminé**. Un raisonnement fort vérifie **en cours de route** : il
+écrit le test avant le correctif, il relit ce qu'il vient d'écrire, il refuse de conclure sans preuve.
+
+À livrer : une étape de vérification que l'agent s'impose avant de rendre sa réponse, et une réponse
+qui **dit ce qu'elle n'a pas vérifié**. Mesurer : l'écart entre « le modèle dit que c'est fini » et
+« le contrôle passe » — c'est le chiffre qui compte vraiment pour un utilisateur.
+
+### 4.5 Le raisonnement suit les derniers modèles
+
+Les budgets de réflexion sont traduits par fournisseur (`reasoning.effort`, budget de jetons). Ce qui
+manque : que le **niveau** de raisonnement soit choisi d'après ce que le modèle sélectionné sait
+faire, et que cette table se régénère comme le catalogue — même règle qu'en phase 3, aucune version
+en dur, et le défaut de l'ADR-0027 pour mémoire (un critère revendiqué et jamais appliqué).
+
+### 4.6 DeepSeek v4.1 — à mesurer, pas à supposer
+
+Florian demande « l'optimisation de DeepSeek v4.1 si c'est faisable sans perte de qualité, sinon
+oublie DeepSeek ». La formulation est la bonne et elle est tenable telle quelle : **c'est une
+hypothèse à mesurer**. `deepseek/deepseek-v4.1-flash` coûte une fraction des modèles que les
+préréglages payants emploient ; s'il obtient le même score sur les 56 tâches, il remplace le modèle
+du rôle concerné ; s'il perd des points, il est abandonné. Le banc tranche, pas la préférence — et le
+résultat est publié dans `eval/QUALITY.md` dans les deux cas.
+
+⚠️ **Ce qui est explicitement hors de cette phase** : copier un prompt système d'un autre produit, et
+ajuster un prompt jusqu'à ce que le banc remonte. Le second est la façon la plus sûre de fabriquer un
+chiffre qui ne veut rien dire.
+
 ## Interdits et compte rendu
 
 ### Ce que tu ne fais jamais
