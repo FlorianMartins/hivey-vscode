@@ -2,6 +2,60 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.91.0 — 2026-10-03
+
+### Ajouté
+
+- **« À savoir » : ce qu'il a remarqué, ce qu'il n'a pas vérifié, et l'état de l'outil.** Une section
+  sous la réponse, et **deux de ses trois sources sont dérivées de faits que le produit possède
+  déjà** — la trace du tour, le plan, le budget, et la *forme* des appels d'outils revenus. C'est la
+  décision qui compte : une fonctionnalité qui reposerait sur un modèle choisissant d'être prévenant
+  serait absente précisément sur les modèles qui en ont le plus besoin. Seule la première source a
+  besoin de lui, et elle reçoit **un outil** (`note_aside`) plutôt qu'une convention sur la prose.
+  Voir [ADR-0030](docs/adr/0030-a-savoir.md).
+
+  Quatre règles de retenue, tenues par onze tests : **une notice n'est pas une action** — le résultat
+  de l'outil dit au modèle « noté pour l'utilisateur, ne le corrige pas », parce que toute la valeur
+  est que la trouvaille atteigne la personne sans que le diff grossisse de ce qu'elle n'a pas
+  demandé ; **rien quand il n'y a rien**, parce qu'un pied de réponse toujours présent est du
+  mobilier ; **cinq au maximum**, parce qu'une liste de douze apartés enterre la réponse ; et
+  **ordonné par ce dont ça parle** — votre code, puis cette réponse, puis cette session.
+
+  Activé par défaut (`hiveyCode.notices.enabled`) : ça n'envoie rien et ça ne modifie rien.
+
+### Corrigé
+
+- ⚠️⚠️ **Le terminal fixait sa fenêtre de contexte à 8 000 jetons en dur**, et c'est la nouvelle
+  section qui l'a révélé : au premier essai contre un vrai modèle elle a affiché « le contexte est à
+  100 % » sur un modèle qui tient **un million** de jetons. Le journal de ce projet raconte qu'un
+  chiffre fixe **était** exactement le défaut du panneau — 8 000 jetons, c'est presque toute la
+  fenêtre d'un petit modèle local et une poussière sur un modèle moderne, et contre lui les
+  conversations étaient résumées au bout de trois échanges. Le panneau a été corrigé ; cette moitié a
+  gardé la constante. **Cinquième fois dans cette phase que la moitié terminal est la moitié
+  oubliée**, après l'outil de plan, les plafonds de dépense, les compétences et les sous-agents. La
+  recherche de fenêtre vit maintenant dans le cœur et les deux moitiés posent la même question.
+
+  La leçon porte sur la section elle-même : **une notice qui se déclenche à chaque tour à cause d'une
+  constante périmée est le mobilier qu'elle était censée ne pas être.**
+
+- ⚠️ **`chat.ts` contenait une copie de l'ensemble `VERIFIERS` du routeur** — les cinq mêmes noms,
+  dans deux fichiers, que rien ne tenait synchronisés. Ajouter un vérificateur au routeur aurait
+  **silencieusement** cessé de le compter dans le panneau, et le routage appris aurait continué de
+  mesurer l'ancien ensemble. Supprimée ; `VERIFIER_TOOLS` et `MUTATING_TOOLS` sont exportés et
+  importés par les deux moitiés.
+
+### Précisé
+
+- **Le chantier 4.3 a été re-dérivé du code**, comme la phase l'exige désormais. Sa rédaction était
+  **fausse une troisième fois** : le parallélisme des sous-agents est entièrement implémenté
+  (`Promise.all` sur les appels voisins déclarés sûrs, approbations résolues avant, une par une, et
+  seuls des voisins fusionnés pour préserver l'ordre), et la synthèse **est** le mécanisme — la
+  conclusion revient comme résultat d'outil. Les trois vraies lacunes sont inscrites : **la délégation
+  est transitive et non bornée** (une définition sans ligne `tools:` reçoit `run_agent` et peut
+  déléguer récursivement, sans garde ni test nulle part), le terminal n'a aucun sous-agent, et une
+  ligne de trace ne nomme jamais l'agent dispatché (`callSignature` déclare `agent`, le schéma dit
+  `name`).
+
 ## 0.90.0 — 2026-10-03
 
 ### Corrigé

@@ -4048,3 +4048,43 @@ pre.code code {
   color: var(--vscode-descriptionForeground);
   font-variant-numeric: tabular-nums;
 }
+
+/* "À savoir" — adjacent to the answer, and quieter than it.
+ *
+ * A left rule rather than a box: a box reads as a warning, and most of what appears here is not a
+ * warning — it is something true that nobody asked about. */
+.notices {
+  margin: 8px 0 2px;
+  padding: 2px 0 2px 10px;
+  border-left: 2px solid var(--vscode-editorWidget-border, var(--vscode-panel-border));
+}
+.notices-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--vscode-descriptionForeground);
+  margin-bottom: 3px;
+}
+.notices-list {
+  margin: 0;
+  padding-left: 14px;
+  font-size: 12px;
+  color: var(--vscode-foreground);
+}
+.notice {
+  margin: 2px 0;
+}
+.notice.unverified::marker,
+.notice.tool::marker {
+  color: var(--vscode-descriptionForeground);
+}
+.notice-where {
+  margin-left: 6px;
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+}
+.notices-foot {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+}

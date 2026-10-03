@@ -101,6 +101,9 @@ import type {
 import { SECTION, endpointFor, providerFor, readSettings, routerConfig, type Keys, type Settings, writeTarget } from "./config.js";
 import { EgressGate, safeHost, summarize } from "./egress.js";
 import { renderPromptAudit, type PromptAudit } from "../core/audit/prompt.js";
+import { youShouldKnow, type Notice } from "../core/session/notices.js";
+import { MUTATING_TOOLS, VERIFIER_TOOLS } from "../core/router/outcome.js";
+import { planVerdict } from "../core/agent/plan.js";
 import { contextWindow, labelFor, listModels, openFiles, openFileUris, ownModelIds, supportsReasoning } from "./models.js";
 import { servedSetChanged } from "../core/models/watch.js";
 import { billsTheUser } from "../core/router/billing.js";
@@ -167,7 +170,10 @@ class MementoPermissionStore implements PermissionStore {
  * teach the learned router from nothing — which is how a model with a perfect record turns out to
  * have answered twenty questions nobody checked.
  */
-const VERIFIED_TOOLS = new Set(["run_command", "get_diagnostics", "ibmi_compile", "ibmi_test", "hook"]);
+// ⚠️ This was a second copy of `VERIFIERS` from `core/router/outcome.ts` — the same five names, in
+// two files, with nothing keeping them in step. Adding a verifier to the router would have silently
+// stopped the panel counting it, and the learned routing would have gone on measuring the old set.
+// One source, imported.
 
 export class ChatViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewId = "hiveyCode.chat";
@@ -3448,6 +3454,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       confirmEdit: (u, n) => this.confirmEdit(u, n),
       // The plan goes to the panel as it is written and onto the answer when the turn ends, so it
       // is both a live progress display and part of the record.
+        // Offered only when the section is on: a tool whose output nothing shows spends tokens for
+        // nothing, which is the rule this project already applied to the plan tool.
+        ...(readSettings().notices.enabled ? { onNotice: (notice: Notice) => turnNotices.push(notice) } : {}),
       onPlan: (plan) => {
         if (ctl.signal.aborted) return;
         this.plan = plan;
@@ -3600,6 +3609,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     // actually happened in is preserved and "the last one wins" means what it says.
     const steps: Array<{ tool: string; summary: string; ok: boolean; call?: string }> = hookSteps;
     const verifierOutput = new Map<string, string>();
+    // Asides the model recorded this turn. Cleared with the turn, because an aside about the file
+    // you were editing an hour ago is not something you should know now.
+    const turnNotices: Notice[] = [];
+    // Whether this turn's tool calls arrived through the protocol or had to be read out of the
+    // model's message. A fact about the setup, and the one the user is told about — see
+    // `providers/textToolCall.ts` for what is given up when they come from the text.
+    let usedTextToolCalls = false;
 
     // What this question will send, said before it is sent.
     //
@@ -3820,6 +3836,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           }
         },
         onToolResult: ({ call, result }) => {
+          if (call.source === "text") usedTextToolCalls = true;
           const summary = String(result.content).split("\n")[0]?.slice(0, 120) ?? "";
           // The whole of what a check printed, not the first line of it. The step list wants one
           // line; a model asked to fix the failure wants the error, and the error is never on the
@@ -3927,6 +3944,29 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
       answer.text = result.text || streamed;
       if (this.plan) answer.plan = this.plan;
+      // "À savoir": what it noticed, what it did not verify, and the state of the tool. Two of the
+      // three are derived from facts already in hand rather than asked of the model — a section that
+      // depended on the model volunteering would be absent on the models that most need it.
+      if (settings.notices.enabled) {
+        const unfinished = planVerdict(this.plan);
+        const notices = youShouldKnow({
+          reported: turnNotices,
+          changed: steps.some((x) => MUTATING_TOOLS.has(x.tool) && x.ok),
+          verified: steps.some((x) => VERIFIER_TOOLS.has(x.tool) && x.ok),
+          planLeft: unfinished.left.map((step: { title: string }) => step.title),
+          // From the budget this turn actually used, which is the figure the ring is showing.
+          ...(this.lastPromptTokens && this.budgetTokensFor(settings) > 0
+            ? { contextFill: Math.min(1, this.lastPromptTokens / this.budgetTokensFor(settings)) }
+            : {}),
+          ...(billsTheUser(providerId)
+            ? { spend: { today: this.gate.budget.spentToday(), cap: settings.budget.dailyUsd } }
+            : {}),
+          // Measured, not guessed: true when the runtime returned no tool calls through the
+          // protocol and they had to be read out of the model's message. See `textToolCall.ts`.
+          toolCallsFromText: usedTextToolCalls,
+        });
+        if (notices.length) answer.notices = notices;
+      }
       answer.usdCost = 0;
       answer.usage = {
         promptTokens: result.usage.promptTokens,
@@ -3978,7 +4018,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       // nothing verified counts as neither a success nor a failure and is simply not recorded.
       {
         const verdict = verifyTurn(steps, this.plan);
-        const verified = steps.some((x) => VERIFIED_TOOLS.has(x.tool));
+        const verified = steps.some((x) => VERIFIER_TOOLS.has(x.tool));
         if (verified && !ctl.signal.aborted) {
           void this.learnedRouting?.observe(model, steps.map((x) => x.tool), verdict.kind === "none");
         }

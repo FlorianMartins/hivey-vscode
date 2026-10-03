@@ -8,6 +8,7 @@
 import * as vscode from "vscode";
 import { t } from "../shared/i18n.js";
 import { GENERATED_MODELS } from "../core/router/catalog.generated.js";
+import { catalogueWindow } from "../core/router/window.js";
 import { offerable } from "../core/models/offer.js";
 import { isLocalEndpoint, isLoopbackEndpoint } from "../core/redaction/index.js";
 import { discoverLocal, rankModels } from "../core/providers/discover.js";
@@ -48,7 +49,9 @@ function catalogue(): Map<string, { context: number; inUsd: number; outUsd: numb
  * attachment quietly cut to a fraction of what the model could have read.
  */
 export function contextWindow(id: string): number {
-  return catalogue().get(id)?.context ?? 0;
+  // The lookup is in `core/router/window.ts` so the terminal client can ask the same question and
+  // get the same answer. It had a constant instead, and the constant was wrong.
+  return catalogueWindow(id);
 }
 
 /** Models a provider is currently serving, or an empty list when it cannot be reached. */

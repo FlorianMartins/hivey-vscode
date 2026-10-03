@@ -15,6 +15,7 @@ import { isBlockedPath } from "../core/util/glob.js";
 import { t } from "../shared/i18n.js";
 
 import { parsePlan, planSummary, PLAN_TOOL_DESCRIPTION, type Plan } from "../core/agent/plan.js";
+import { NOTE_ASIDE_TOOL, type Notice } from "../core/session/notices.js";
 
 export interface CliToolOptions {
   cwd: string;
@@ -32,6 +33,14 @@ export interface CliToolOptions {
    * client, could not measure anything about plans at all.
    */
   onPlan?: (plan: Plan) => void;
+  /**
+   * Where an aside goes.
+   *
+   * In the terminal from the start this time. The plan tool, the spending caps and the skills were
+   * each added to the panel and forgotten here, and each time it meant the evaluation harness —
+   * which drives this client — could not measure the thing at all.
+   */
+  onNotice?: (notice: Notice) => void;
 }
 
 const SKIP_DIRS = new Set([".git", "node_modules", "dist", "build", "out", "target", ".venv", "__pycache__", ".next"]);
@@ -281,5 +290,19 @@ export function buildCliTools(opts: CliToolOptions): Tool[] {
     },
   };
 
-  return [readFileTool, listFiles, searchText, writeFileTool, editFile, runCommand, updatePlan];
+  const noteAside: Tool = {
+    schema: NOTE_ASIDE_TOOL,
+    approval: () => false,
+    parallel: () => true,
+    async run(args, ctx) {
+      const what = String(args["what"] ?? "").trim();
+      if (!what) return { content: "An aside needs something to say.", isError: true };
+      const where = String(args["where"] ?? "").trim();
+      opts.onNotice?.({ kind: "noticed", text: what, ...(where ? { where } : {}) });
+      ctx.report(`noted: ${what.slice(0, 60)}`);
+      return { content: "Noted for the user. Do not change it." };
+    },
+  };
+
+  return [readFileTool, listFiles, searchText, writeFileTool, editFile, runCommand, updatePlan, noteAside];
 }

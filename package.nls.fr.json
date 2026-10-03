@@ -158,5 +158,6 @@
   "command.routingShow.title": "Ce qui a été appris dans ce dépôt",
   "command.routingForget.title": "Oublier ce qui a été appris dans ce dépôt",
   "config.secondOpinion.enabled": "Avant d'appliquer un changement qui touche l'un des réglages dont les autres règles dépendent, un fichier qui configure le comportement de tout le reste, ou un diff trop gros pour avoir été lu, un **second modèle** relit la demande et le diff et dit ce que la demande n'avait pas demandé. Ses objections apparaissent sur la carte d'approbation. **Local uniquement** : si le second lecteur serait un modèle facturé, il n'est pas appelé et la carte le dit. Les objections sont consultatives, sauf si la politique de votre organisation exige qu'elles soient résolues.",
-  "command.auditLastPrompt": "Auditer le dernier prompt"
+  "command.auditLastPrompt": "Auditer le dernier prompt",
+  "config.notices.enabled": "Afficher une note « À savoir » sous une réponse : ce que l'assistant a remarqué sans qu'on le lui demande, ce qu'il n'a pas vérifié, et l'état de l'outil. Rien n'est jamais modifié par ce biais."
 }

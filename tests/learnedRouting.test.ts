@@ -203,7 +203,11 @@ test("a turn nothing verified is recorded as neither a success nor a failure", (
   // Otherwise a model with a perfect record turns out to have answered twenty questions nobody
   // checked.
   const chat = readFileSync(join("src", "extension", "chat.ts"), "utf8");
-  assert.match(chat, /const verified = steps\.some\(\(x\) => VERIFIED_TOOLS\.has\(x\.tool\)\);/);
+  // The set is the router's own now, imported rather than copied: `VERIFIED_TOOLS` in this file was
+  // a second copy of `VERIFIERS` from `core/router/outcome.ts` — the same five names, in two files,
+  // with nothing keeping them in step. Adding a verifier to the router would silently have stopped
+  // this measurement counting it. The guarantee asserted here is unchanged.
+  assert.match(chat, /const verified = steps\.some\(\(x\) => VERIFIER_TOOLS\.has\(x\.tool\)\);/);
   assert.match(chat, /if \(verified && !ctl\.signal\.aborted\) \{/);
 });
 

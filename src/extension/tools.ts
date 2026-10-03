@@ -12,6 +12,7 @@
 import * as vscode from "vscode";
 import { t } from "../shared/i18n.js";
 import { parsePlan, planSummary, PLAN_TOOL_DESCRIPTION, type Plan } from "../core/agent/plan.js";
+import { NOTE_ASIDE_TOOL, type Notice } from "../core/session/notices.js";
 import type { Tool, ToolResult } from "../core/agent/loop.js";
 import { headToTokens } from "../core/util/tokens.js";
 import { EgressGate } from "./egress.js";
@@ -153,6 +154,8 @@ export interface ToolDeps {
   mcp?: McpManager;
   /** Where the agent's plan goes when it updates one. Absent means the plan tool is not offered. */
   onPlan?: (plan: Plan) => void;
+  /** Where an aside goes. Absent means the tool is not offered — the user switched the section off. */
+  onNotice?: (notice: Notice) => void;
 }
 
 export function buildTools(deps: ToolDeps): Tool[] {
@@ -445,6 +448,31 @@ export function buildTools(deps: ToolDeps): Tool[] {
     },
   };
 
+  /**
+   * Something the model noticed and was not asked about.
+   *
+   * A tool rather than a convention about prose, for the reason the plan is a tool: a convention is
+   * a request, and what comes back from a request has no shape. And it is RECORDED, not acted on —
+   * the whole value is that the finding reaches the person without the diff growing something they
+   * did not ask for.
+   */
+  const noteAside: Tool = {
+    schema: NOTE_ASIDE_TOOL,
+    // Nothing to approve: it changes nothing and reads nothing. A dialog here would be a dialog
+    // about a sentence.
+    approval: () => false,
+    parallel: () => true,
+    async run(args, ctx): Promise<ToolResult> {
+      const what = String(args["what"] ?? "").trim();
+      if (!what) return { content: "An aside needs something to say.", isError: true };
+      const where = String(args["where"] ?? "").trim();
+      deps.onNotice?.({ kind: "noticed", text: what, ...(where ? { where } : {}) });
+      ctx.report(t("noted: {0}", what.slice(0, 60)));
+      // Terse, and it says the thing the model has to hear: this was not a fix.
+      return { content: "Noted for the user. Do not change it." };
+    },
+  };
+
   return withHooks([
     ...buildSymbolTools(),
     readFile,
@@ -455,6 +483,7 @@ export function buildTools(deps: ToolDeps): Tool[] {
     editFile,
     runCommand,
     ...(deps.onPlan ? [updatePlan] : []),
+    ...(deps.onNotice ? [noteAside] : []),
     ...integrations,
   ], deps.hooks);
 }

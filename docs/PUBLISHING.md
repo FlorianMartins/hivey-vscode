@@ -32,7 +32,7 @@ with a syntax error that looks like a bug in the extension and is not.
 ```bash
 npm ci
 npm run typecheck
-npm test                                # 1128 tests (node:test)
+npm test                                # 1141 tests (node:test)
 xvfb-run -a npm run test:integration    # 43 tests, headless, inside a real VS Code
 npm run eval:verify                     # every task's check fails on its untouched fixture
 npm run eval:solutions                  # and passes on its reference solution

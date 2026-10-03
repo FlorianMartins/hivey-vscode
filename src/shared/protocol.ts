@@ -69,6 +69,12 @@ export interface UiEntry {
   checkpointPartial?: boolean;
   /** The to-do list the agent kept while answering this turn. */
   plan?: Plan;
+  /**
+   * Things worth saying that nobody asked about — see `core/session/notices.ts`.
+   *
+   * Absent when there are none, which is the point: a section that is always there is furniture.
+   */
+  notices?: Notice[];
   /** What the model thought before answering, when a reasoning effort was asked for. */
   reasoning?: string;
   context?: UiContextItem[];
@@ -136,6 +142,7 @@ export interface UiPermissionRule {
 }
 
 /** A model server found running on this machine. */
+import type { Notice } from "../core/session/notices.js";
 import type { Plan } from "../core/agent/plan.js";
 
 /**

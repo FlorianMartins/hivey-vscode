@@ -14,6 +14,7 @@
 // Excluding is not cosmetic: it is the cheapest and most direct control anyone has over both the
 // quality and the price of the next turn.
 
+import type { Notice } from "./notices.js";
 import type { ChatMessage, ImagePart } from "../providers/types.js";
 import type { FileSnapshot } from "./checkpoint.js";
 import type { Plan } from "../agent/plan.js";
@@ -95,6 +96,12 @@ export interface Entry {
   checkpointPartial?: boolean;
   /** The to-do list the agent kept while answering. Never sent back to the model. */
   plan?: Plan;
+  /**
+   * Things worth saying that nobody asked about — see `core/session/notices.ts`.
+   *
+   * Absent when there are none, which is the point: a section that is always there is furniture.
+   */
+  notices?: Notice[];
 }
 
 export interface SessionData {

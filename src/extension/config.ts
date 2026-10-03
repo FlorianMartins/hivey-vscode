@@ -61,6 +61,8 @@ export interface Settings {
     customTerms: string[];
   };
   budget: { perRequestUsd: number; dailyUsd: number; perRequestTokens: number };
+  /** Whether an answer may carry a "To know" note. See `core/session/notices.ts`. */
+  notices: { enabled: boolean };
   context: {
     /** The user's figure when they set one, `undefined` when the budget is derived from the model. */
     maxTokens: number | undefined;
@@ -231,6 +233,9 @@ function readSettingsRaw(scope?: vscode.Uri): Settings {
   const level = c.get<RedactionLevel>("privacy.redaction", "strict");
   const allowUnredacted = c.get<boolean>("privacy.allowUnredacted", false);
   const raw: Settings = {
+    // On by default: it sends nothing, it changes nothing, and the things it says are things somebody
+    // would want to know. Off is a preference, not a safeguard.
+    notices: { enabled: c.get<boolean>("notices.enabled", true) },
     language: c.get<"auto" | "en" | "fr">("language", "auto"),
     chat: {
       provider: c.get<ProviderId>("chat.provider", "local"),
@@ -376,6 +381,7 @@ function restrict(raw: Settings): Settings {
       blockedGlobs: narrowed.blockedGlobs,
     },
     budget: narrowed.budget,
+    notices: raw.notices,
     knowledge: { ...raw.knowledge, enabled: raw.knowledge.enabled && !featureDisabled(state, "knowledge") },
     ibmi: { ...raw.ibmi, writableLibraries: narrowed.writableLibraries },
     permissions: {

@@ -19,6 +19,10 @@ import { runTurn, type TurnResult } from "../core/agent/loop.js";
 import { makeProvider, PROVIDER_IDS, type ProviderId } from "../core/providers/index.js";
 import { hiveyModel, isHivey } from "../core/router/hivey.js";
 import { planSummary, planVerdict, type Plan } from "../core/agent/plan.js";
+import { youShouldKnow, type Notice } from "../core/session/notices.js";
+import { MUTATING_TOOLS, VERIFIER_TOOLS } from "../core/router/outcome.js";
+import { catalogueWindow } from "../core/router/window.js";
+import { contextBudget, repoMapBudget } from "../core/context/budget.js";
 import { BUILTIN_SKILLS, builtinSkillsForModel } from "../core/session/skills.js";
 import { skillsPrompt } from "../core/agent/definitions.js";
 import { isLocalEndpoint, redactMessages, Vault, streamingRestorer } from "../core/redaction/index.js";
@@ -75,7 +79,16 @@ const DEFAULTS: CliConfig = {
   // `0.25` and `2` while the editor shipped `2` and `20`, so the terminal refused what the panel
   // allowed — the same defect this project had already fixed in the panel and not in this half.
   budget: { ...SHIPPED_LIMITS },
-  contextTokens: 8000,
+  // 0 means "ask the catalogue what this model holds".
+  //
+  // ⚠️ It was 8000, hard-coded, and the `CHANGELOG` records that a fixed figure was exactly the
+  // defect the panel had: 8 000 tokens is most of a small local model's window and a rounding error
+  // on a modern one, and against it conversations were summarised after three exchanges and answered
+  // from the digest. The panel was changed to follow the model actually chosen. This half kept the
+  // constant — the same forgotten-half story as the spending caps, the plan tool and the skills —
+  // and it became visible the moment a notice started reporting "the context is 100 % full" on a
+  // model with a million-token window.
+  contextTokens: 0,
   mode: "agent",
 };
 
@@ -159,6 +172,15 @@ async function main(): Promise<void> {
     // The built-in skills the configuration switched on, in the shape the model is offered. The
   // terminal has no settings UI, so the groups come from `.hiveycode.json` and default to the
   // general family — enough to be useful, bounded enough not to spend the context on a catalogue.
+  // What this model actually holds, through the same rule the panel uses — a share of the window,
+  // with a floor and a ceiling, and a configured figure winning when there is one.
+  //
+  // ⚠️ Not `catalogueWindow` on its own: a local runtime the catalogue has never heard of returns 0,
+  // and a budget of zero collapses everything derived from it. The floor is what `contextBudget`
+  // exists for, and reaching for the lookup without the rule put the terminal back in a different
+  // version of the same hole.
+  const contextTokens = contextBudget(cfg.contextTokens > 0 ? cfg.contextTokens : undefined, catalogueWindow(cfg.model));
+
   const cliSkills = builtinSkillsForModel(
     BUILTIN_SKILLS.filter((sk) => (cfg.skillGroups ?? ["general"]).includes(sk.group)),
   );
@@ -311,14 +333,17 @@ async function main(): Promise<void> {
     process.on("SIGINT", onSigint);
 
     // Chat mode answers from what it is given: no repository map, no tools, no surprises.
-    const ambient = mode === "chat" ? undefined : await repoMap(cwd, Math.floor(cfg.contextTokens * 0.35));
+    // The map's share of the budget, capped, from the same function the panel uses: past a few
+    // thousand tokens a list of paths and symbols stops adding knowledge and starts adding haystack,
+    // and it sits in the cacheable prefix so every token is paid on every turn.
+    const ambient = mode === "chat" ? undefined : await repoMap(cwd, repoMapBudget(contextTokens));
     const built = session.build({
       // The same skills the panel offers, by the same mechanism: names and one line each here,
       // instructions on demand through `use_skill`. The terminal had none at all — which also meant
       // the evaluation harness, which drives this client, could not measure whether a skill helps.
       systemPrompt: promptForMode(mode) + skillsPrompt(cliSkills),
       ambient,
-      maxTokens: cfg.contextTokens,
+      maxTokens: contextTokens,
       nonce: randomNonce(),
     });
 
@@ -359,6 +384,7 @@ async function main(): Promise<void> {
     // The plan this turn kept, if it kept one. Read at the end of the turn: a turn that finishes
     // with steps of its own plan outstanding has declared itself done against its own list.
     let turnPlan: Plan | undefined;
+    const turnNotices: Notice[] = [];
 
     // The mode decides the tool set in code: plan mode simply has no tool that writes.
     const tools = toolsForMode(
@@ -369,6 +395,7 @@ async function main(): Promise<void> {
         // Printed, so the terminal shows what the panel shows — and kept, because the verdict at the
         // end of the turn reads it: a turn that ends with its own steps outstanding is a turn that
         // declared itself finished against its own list.
+        onNotice: (notice) => turnNotices.push(notice),
         onPlan: (plan) => {
           turnPlan = plan;
           const { done, total, current } = planSummary(plan);
@@ -440,6 +467,27 @@ async function main(): Promise<void> {
       // reading the terminal is the one who should know that first.
       const unfinished = planVerdict(turnPlan);
       if (unfinished.unfinished) console.log(C.amber(`  ${t("unfinished: {0}", unfinished.why)}`));
+
+      // "À savoir": what it noticed, what it did not verify, and the state of the tool. Two of the
+      // three are derived here rather than asked of the model — see `youShouldKnow`.
+      const notices = youShouldKnow({
+        reported: turnNotices,
+        // Derived from the trace rather than from a second notion of what a step is: a mutating
+        // call that succeeded means something changed, a verifier that succeeded means something
+        // checked. The set of verifiers is the router's own, exported, because two copies of it
+        // would be two different answers to one question.
+        changed: result.trace.some((x) => MUTATING_TOOLS.has(x.call.name) && !x.result.isError),
+        verified: result.trace.some((x) => VERIFIER_TOOLS.has(x.call.name) && !x.result.isError),
+        planLeft: unfinished.left.map((s) => s.title),
+        ...(result.usage.promptTokens && contextTokens
+          ? { contextFill: Math.min(1, result.usage.promptTokens / contextTokens) }
+          : {}),
+        toolCallsFromText: result.trace.some((x) => x.call.source === "text"),
+      });
+      if (notices.length) {
+        console.log(`\n${C.dim(t("To know"))}`);
+        for (const n of notices) console.log(C.dim(`  • ${n.text}${n.where ? ` (${n.where})` : ""}`));
+      }
       writeRunRecord(result, Date.now() - startedAt, cfg.model, !isLocal && cost.known ? cost.usd : undefined, unfinished.left.length);
     } catch (err) {
       console.log(C.red(`\n${(err as Error).message}`));

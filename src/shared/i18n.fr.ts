@@ -1324,4 +1324,7 @@ export const FR: Record<string, string> = {
     "Mesuré depuis les sources : ces chiffres sont proches, pas exacts.",
   "Nothing has been sent yet in this session, so there is nothing to audit.":
     "Rien n'a encore été envoyé dans cette session : il n'y a rien à auditer.",
+  "noted: {0}": "noté : {0}",
+  "To know": "À savoir",
+  "None of this was changed.": "Rien de tout ceci n'a été modifié.",
 };

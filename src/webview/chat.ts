@@ -18,6 +18,7 @@ import { applySuggestion, suggestionsFor, type Suggestion } from "../core/sessio
 import { BUILTIN_SKILLS, type BuiltinSkill } from "../core/session/skills.js";
 import { planComplete, planSummary, type Plan } from "../core/agent/plan.js";
 import { contextBreakdown, OTHER } from "../core/context/breakdown.js";
+import type { Notice } from "../core/session/notices.js";
 import { providerIsReady, whatIsMissing, type ProviderState } from "../core/providers/ready.js";
 
 const MODES: Array<{ id: Mode; label: string; hint: string }> = [
@@ -540,6 +541,7 @@ function renderEntry(entry: UiEntry, state: UiState, deps: ChatDeps): HTMLElemen
   // The plan first, above the answer: it is the summary of what was done, and someone re-reading a
   // turn wants the shape of it before the prose.
   if (entry.plan) wrap.append(planBlock(entry.plan, false));
+  if (entry.notices?.length) wrap.append(noticesBlock(entry.notices));
   if (entry.reasoning) wrap.append(reasoningBlock(entry.reasoning));
   if (entry.steps?.length) wrap.append(stepList(entry.steps));
 
@@ -1556,6 +1558,34 @@ function modelButton(state: UiState, deps: ChatDeps): HTMLElement {
  * Approximate, and it says so: it measures the sources rather than the assembled messages, so the
  * parts do not sum exactly to what a provider counts. Naming the big one correctly is the point.
  */
+/**
+ * "À savoir" — what it noticed, what it did not verify, and the state of the tool.
+ *
+ * Under the answer and visually quieter than it, because it is adjacent to the work rather than part
+ * of it. Nothing here was changed, and the block says so when it carries something the model
+ * noticed: the whole value of an aside is that the finding reaches the person without the diff
+ * growing something nobody asked for.
+ *
+ * Drawn only when there is something. A section that is always there is furniture, and furniture is
+ * what people stop reading.
+ */
+function noticesBlock(notices: Notice[]): HTMLElement {
+  const box = el("div", "notices");
+  box.append(el("div", "notices-title", t("To know")));
+  const list = el("ul", "notices-list");
+  for (const notice of notices) {
+    const item = el("li", `notice ${notice.kind}`);
+    item.append(el("span", "notice-text", notice.text));
+    if (notice.where) item.append(el("code", "notice-where", notice.where));
+    list.append(item);
+  }
+  box.append(list);
+  if (notices.some((n) => n.kind === "noticed")) {
+    box.append(el("div", "notices-foot", t("None of this was changed.")));
+  }
+  return box;
+}
+
 function contextBarSection(state: UiState): HTMLElement[] {
   const parts = state.contextParts ?? [];
   if (!parts.length) {

@@ -2,7 +2,7 @@
   "name": "hivey-code",
   "displayName": "Hivey Code",
   "description": "%extension.description%",
-  "version": "0.90.0",
+  "version": "0.91.0",
   "publisher": "hivey",
   "license": "Apache-2.0",
   "repository": {
@@ -982,6 +982,11 @@
             "type": "number",
             "default": 90,
             "markdownDescription": "%config.corpus.retentionDays%"
+          },
+          "hiveyCode.notices.enabled": {
+            "type": "boolean",
+            "default": true,
+            "description": "%config.notices.enabled%"
           }
         }
       },
