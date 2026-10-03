@@ -7,6 +7,7 @@ import { announcePolicy, policySource, reloadPolicy } from "./policy.js";
 import { SiemShipper } from "./siem.js";
 import { Background } from "./background.js";
 import { Corpus } from "./corpus.js";
+import { LearnedRouting } from "./learned.js";
 import { ReviewDiagnostics, parseFindings, prepareReview, summarise } from "./review.js";
 import { sovereigntyReport } from "./sovereignty.js";
 import type { ReportRow } from "../core/audit/sovereignty.js";
@@ -84,6 +85,9 @@ export function activate(context: vscode.ExtensionContext): void {
   // fixing a finding and still seeing it.
   // Off unless asked for. What this machine learned, kept on this machine — see `corpus.ts`.
   const corpus = new Corpus(context, log);
+  // Per workspace, which is per repository: two checkouts of the same project are two sets of
+  // measurements, and that is correct — the small model may do well in one and not the other.
+  const learnedRouting = new LearnedRouting(context.workspaceState);
   const reviewDiagnostics = new ReviewDiagnostics();
   disposables.push(reviewDiagnostics);
   gate.onRecord = (row) => siem.offer(row);
@@ -114,6 +118,7 @@ export function activate(context: vscode.ExtensionContext): void {
   // property rather than a constructor argument because it is optional by design: absent means
   // nothing is recorded, which is the default.
   chat.corpus = corpus;
+  chat.learnedRouting = learnedRouting;
 
   context.subscriptions.push(
     log,
@@ -189,6 +194,8 @@ export function activate(context: vscode.ExtensionContext): void {
 
     vscode.commands.registerCommand("hiveyCode.showKnowledge", () => showKnowledge()),
     vscode.commands.registerCommand("hiveyCode.siemStatus", () => siem.report()),
+    vscode.commands.registerCommand("hiveyCode.routingShow", () => learnedRouting.show()),
+    vscode.commands.registerCommand("hiveyCode.routingForget", () => learnedRouting.forget()),
     vscode.commands.registerCommand("hiveyCode.corpusStatus", () => corpus.status()),
     vscode.commands.registerCommand("hiveyCode.corpusExport", () => corpus.export()),
     vscode.commands.registerCommand("hiveyCode.corpusPurge", () => corpus.purge()),

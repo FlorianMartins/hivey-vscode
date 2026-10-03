@@ -2,7 +2,7 @@
   "name": "hivey-code",
   "displayName": "Hivey Code",
   "description": "%extension.description%",
-  "version": "0.81.0",
+  "version": "0.82.0",
   "publisher": "hivey",
   "license": "Apache-2.0",
   "repository": {
@@ -377,6 +377,16 @@
         "command": "hiveyCode.corpusPurge",
         "title": "%command.corpusPurge.title%",
         "category": "Hivey Code"
+      },
+      {
+        "command": "hiveyCode.routingShow",
+        "title": "%command.routingShow.title%",
+        "category": "Hivey Code"
+      },
+      {
+        "command": "hiveyCode.routingForget",
+        "title": "%command.routingForget.title%",
+        "category": "Hivey Code"
       }
     ],
     "menus": {
@@ -710,6 +720,26 @@
             "type": "string",
             "default": "",
             "description": "%config.escalation.model%"
+          },
+          "hiveyCode.routing.learned": {
+            "type": "boolean",
+            "default": false,
+            "markdownDescription": "%config.routing.learned%"
+          },
+          "hiveyCode.routing.threshold": {
+            "type": "number",
+            "default": 0.8,
+            "markdownDescription": "%config.routing.threshold%"
+          },
+          "hiveyCode.routing.minAttempts": {
+            "type": "number",
+            "default": 5,
+            "markdownDescription": "%config.routing.minAttempts%"
+          },
+          "hiveyCode.routing.explore": {
+            "type": "number",
+            "default": 0.1,
+            "markdownDescription": "%config.routing.explore%"
           }
         }
       },

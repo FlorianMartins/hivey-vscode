@@ -2,7 +2,7 @@
 
 Honnête plutôt que flatteur : ce qui marche, ce qui manque, ce qui n'est pas vérifié.
 
-Ce document décrit l'état à la version **0.81.0**. Les chiffres qu'il annonce — version, tests, tâches d'évaluation — sont
+Ce document décrit l'état à la version **0.82.0**. Les chiffres qu'il annonce — version, tests, tâches d'évaluation — sont
 vérifiés par `npm run check:numbers`, que la CI exécute : ils ne peuvent plus vieillir en silence.
 Il était resté figé à `0.3.0` pendant trente-cinq
 versions, ce qui est sa propre leçon : une feuille de route périmée dit « projet abandonné » à
@@ -31,7 +31,7 @@ externe non exécuté ici est « non vérifié ».
 | Chantier | État | Vérification |
 |---|---|---|
 | 3.1 Corpus d'apprentissage des escalades | fait | **testé** — 19 tests : globs interdits appliqués et omissions comptées, épisode entièrement bloqué **jeté**, rétention et plafond, fixture = état **avant** (retombe si on y applique le diff), aucun `solution/` écrit, mauvaise réponse jamais un tour d'assistant, épisode gardé seulement si le tour distant est vert, **aucune requête réseau** dans les deux modules, désactivé par défaut |
-| 3.2 Routage appris par dépôt | à faire | — |
+| 3.2 Routage appris par dépôt | fait | **testé** — 20 tests : jamais hors des candidats autorisés, une réussite n'est pas un taux (retombe sans la règle du minimum), le moins cher **assez bon** et non le moins cher, un modèle essayé et insuffisant ne gagne pas et la phrase le dit, un historique d'un autre dépôt ou d'un autre genre ne compte pas, exploration bornée et déterministe sous un tirage injecté, jamais de remesure, tour non vérifié non enregistré, escalade jamais réroutée. ⚠️ **désactivé par défaut** (arbitrage assumé, ADR-0023) |
 | 3.3 Relecture par un second modèle | à faire | — |
 | 3.4 Famille de compétences `finance` | à faire | — |
 | 3.5 Tableau de qualité publié | à faire | — |
@@ -71,6 +71,15 @@ Trois niveaux, jamais mélangés :
   nommés.
 
 ## Fait
+
+### Le routage apprend, par dépôt (0.82.0)
+
+- **Le modèle le moins cher dont le taux observé dépasse le seuil** (testé), avec la phrase qui porte
+  les vrais chiffres — « 9 sur 10 dans ce dépôt ».
+- **Trois limites testées** : jamais hors des modèles autorisés, jamais de confiance avant un
+  échantillon, et aucune mesure sur un tour que rien n'a vérifié.
+- ⚠️ **Désactivé par défaut** : un routeur qui apprend change quel modèle répond.
+
 
 ### Ce que cette machine a appris reste sur cette machine (0.81.0)
 
@@ -303,7 +312,7 @@ Trois niveaux, jamais mélangés :
 ### Avant 0.39.0
 
 - Noyau indépendant de l'éditeur : anonymisation, fournisseurs, routeur, budget, complétion, session,
-  carte du dépôt, boucle d'agent. **1013 tests unitaires** plus **43 tests d'intégration dans un vrai
+  carte du dépôt, boucle d'agent. **1033 tests unitaires** plus **43 tests d'intégration dans un vrai
   VS Code**.
 - Barre latérale : conversation, historique, modèles, permissions, configuration ; modes
   discussion / plan / agent ; budget de raisonnement ; contexte explicite.

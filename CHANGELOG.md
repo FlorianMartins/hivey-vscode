@@ -2,6 +2,43 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.82.0 — 2026-10-03
+
+### Ajouté
+
+- **Chantier 3.2 — le routage apprend, par dépôt.** L'extension mesure, par dépôt, par genre de tâche
+  et par modèle, le taux de réussite constaté par `verifyTurn()`, et choisit **le modèle le moins cher
+  dont le taux observé dépasse un seuil**. Le modèle cher est toujours le choix sûr et toujours le
+  mauvais défaut ; ceci est ce qui rend le modèle économique défendable. Le panneau dit pourquoi :
+  « Choisi qwen2.5-coder:7b : 9 sur 10 dans ce dépôt ».
+
+  Trois limites, chacune avec son test : **jamais hors de ce que l'utilisateur a autorisé** (les
+  candidats sont exactement son modèle de conversation et son modèle d'escalade — un taux observé ne
+  justifie pas d'envoyer une question à un modèle que personne n'a autorisé) ; **jamais de confiance
+  trop tôt** (une réussite n'est pas un taux, et « pas d'historique » n'est pas « mauvais ») ; et
+  **une mesure n'existe que si quelque chose a vérifié** — sans quoi un modèle finit avec un
+  historique parfait après vingt questions que personne n'a vérifiées.
+
+  Deux commandes : ce qui a été appris ici, et l'oublier. Des données locales dont personne ne peut
+  voir le contenu ni se débarrasser ne sont pas des données locales, c'est un cache.
+  Voir [ADR-0023](docs/adr/0023-choisir-le-modele-d-apres-ce-qui-a-marche-ici.md).
+
+### Précisé
+
+- ⚠️ **Désactivé par défaut**, et ce n'est pas ce que la feuille de route demandait : un routeur qui
+  apprend **change quel modèle répond**, et ce n'est pas un changement à imposer le matin où quelqu'un
+  met l'extension à jour. Celui qui l'active a décidé que « moins cher quand c'est prouvé » est ce
+  qu'il veut.
+- Le seuil est **haut** (80 %) parce que se tromper coûte un tour perdu **et** une escalade payante.
+- **L'exploration ne remesure jamais** un modèle qui a déjà un historique, et son tirage est injecté :
+  une fonctionnalité dont le comportement dépend d'un tirage non testable est une fonctionnalité que
+  personne ne peut raisonner le jour où elle surprend.
+- Une **escalade n'est jamais réroutée** par ce qui a été appris : l'avis du routeur sur le modèle qui
+  vient d'échouer est l'avis qui vient de perdre.
+- Le genre de tâche vient de **ce que le tour a fait**, pas de la formulation de la question.
+- Les mesures vivent dans l'état de l'espace de travail, donc par dépôt : deux copies du même projet
+  sont deux jeux de mesures, et c'est correct.
+
 ## 0.81.0 — 2026-10-03
 
 ### Ajouté

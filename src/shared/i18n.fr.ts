@@ -459,6 +459,12 @@ export const FR: Record<string, string> = {
   "Hivey Code is in its safest mode: {0}": "Hivey Code est dans son mode le plus sûr : {0}",
   "The policy is read from {0}.": "La politique est lue depuis {0}.",
   "Where is the policy?": "Où est la politique ?",
+  "Chose {0}: {1}": "Choisi {0} : {1}",
+  "Trying {0}: {1}": "Essai de {0} : {1}",
+  "Nothing has been measured in this repository yet.": "Rien n'a encore été mesuré dans ce dépôt.",
+  "{0} measurement(s) for this repository forgotten.": "{0} mesure(s) de ce dépôt oubliée(s).",
+  "Learned routing is off, so nothing is being measured. What is on disk from before:\n{0}":
+    "Le routage appris est désactivé, donc rien n'est mesuré. Ce qui est sur le disque d'avant :\n{0}",
   "Your organisation has switched the learning corpus off. {0} episode(s) are still on disk.":
     "Votre organisation a désactivé le corpus d'apprentissage. {0} épisode(s) sont encore sur le disque.",
   "The learning corpus is off. {0} episode(s) are on disk from when it was on.":

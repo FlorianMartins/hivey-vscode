@@ -54,6 +54,7 @@ import type { Plan } from "../core/agent/plan.js";
 import { promptForMode, toolsForMode } from "../core/session/modes.js";
 import { Hooks } from "./hooks.js";
 import type { Corpus } from "./corpus.js";
+import type { LearnedRouting } from "./learned.js";
 import type { Episode } from "../core/corpus/corpus.js";
 import { detectIbmiLanguage, ibmiPrompt } from "../core/ibmi/languages.js";
 import { hiveyLabel, hiveyModel, isHivey } from "../core/router/hivey.js";
@@ -148,6 +149,15 @@ class MementoPermissionStore implements PermissionStore {
     void this.memento.update(PERMISSIONS_KEY, rules);
   }
 }
+
+/**
+ * The tools whose presence means a turn was VERIFIED.
+ *
+ * A turn that ran no check is neither a success nor a failure, and recording it as either would
+ * teach the learned router from nothing — which is how a model with a perfect record turns out to
+ * have answered twenty questions nobody checked.
+ */
+const VERIFIED_TOOLS = new Set(["run_command", "get_diagnostics", "ibmi_compile", "ibmi_test", "hook"]);
 
 export class ChatViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewId = "hiveyCode.chat";
@@ -728,6 +738,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
   /** Set by `activate` when the learning corpus is available. Absent means nothing is recorded. */
   corpus: Corpus | undefined;
+
+  /** Set by `activate`. Absent means the turn uses exactly the model the user configured. */
+  learnedRouting: LearnedRouting | undefined;
 
   /** Ask, and resolve with what came back. Empty when the turn produced nothing. */
   async askAndWait(text: string, context?: ContextItem): Promise<string> {
@@ -3465,6 +3478,24 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       }
     }
 
+    // What this repository has actually measured, when the user asked for it. Off by default, and
+    // never to a model they have not configured — see `learned.ts`. A hand-over is left alone: it
+    // exists because a model already failed, and the learned router's opinion of that model is the
+    // opinion that just lost.
+    if (!handover) {
+      const choice = this.learnedRouting?.decide(settings, tools.map((x) => x.schema.name));
+      if (choice && choice.model !== model) {
+        model = choice.model;
+        providerId = choice.provider as ProviderId;
+        this.post({
+          type: "status",
+          text: choice.exploring
+            ? t("Trying {0}: {1}", choice.model, choice.why)
+            : t("Chose {0}: {1}", choice.model, choice.why),
+        });
+      }
+    }
+
     const baseUrl = safeUrl(settings, providerId);
     const isLocal = isLocalEndpoint(baseUrl);
     const vault = new Vault();
@@ -3822,6 +3853,17 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       // that was predicted — see `verifyTurn`.
       if (!handover && !ctl.signal.aborted && mode !== "chat") {
         await this.escalateOnFailure(steps, verifierOutput, settings, model, providerId);
+      }
+
+      // One more measurement for this repository, when the user asked for learned routing. The verdict
+      // is `verifyTurn`'s, which is the same evidence the escalation spends money on — so a turn that
+      // nothing verified counts as neither a success nor a failure and is simply not recorded.
+      {
+        const verdict = verifyTurn(steps);
+        const verified = steps.some((x) => VERIFIED_TOOLS.has(x.tool));
+        if (verified && !ctl.signal.aborted) {
+          void this.learnedRouting?.observe(model, steps.map((x) => x.tool), verdict.kind === "none");
+        }
       }
 
       // The other half of the learning corpus. An episode is kept only when the verification went

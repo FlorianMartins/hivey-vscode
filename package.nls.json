@@ -149,5 +149,11 @@
   "config.corpus.retentionDays": "How long an episode is kept. `0` keeps nothing new without destroying what is already there — the purge command is for that.",
   "command.corpusStatus.title": "What the learning corpus holds",
   "command.corpusExport.title": "Export the learning corpus",
-  "command.corpusPurge.title": "Delete the learning corpus"
+  "command.corpusPurge.title": "Delete the learning corpus",
+  "config.routing.learned": "Choose the model from what has actually worked **in this repository**, measured by the same verification the escalation spends money on. The cheapest model whose observed success rate clears the threshold wins, and the panel says why — « 9 of 10 in this repository ». **Off by default**: a router that learns changes which model answers, and that is not a change to spring on somebody. It never picks a model you have not configured — the candidates are your chat model and your escalation model, and nothing else.",
+  "config.routing.threshold": "The success rate a cheaper model must clear to be chosen over a more expensive one. High on purpose: the cost of being wrong is a wasted turn **and** a paid escalation, so the cheap model has to be reliably right rather than often right.",
+  "config.routing.minAttempts": "How many attempts a model needs before it has a record at all. One success is not a rate, and “no record” is not “bad” — below this, your configured order wins.",
+  "config.routing.explore": "The share of turns that deliberately try a model with no record yet. Enough to notice that a model got better after an upgrade; small enough that somebody who never looks at this does not pay for it. Exploration never re-measures a model that already has a record.",
+  "command.routingShow.title": "What has been learned in this repository",
+  "command.routingForget.title": "Forget what was learned in this repository"
 }

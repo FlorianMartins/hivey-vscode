@@ -149,5 +149,11 @@
   "config.corpus.retentionDays": "Combien de temps un épisode est conservé. `0` n'en garde plus aucun nouveau sans détruire ce qui est déjà là — la commande de purge est pour cela.",
   "command.corpusStatus.title": "Ce que contient le corpus d'apprentissage",
   "command.corpusExport.title": "Exporter le corpus d'apprentissage",
-  "command.corpusPurge.title": "Supprimer le corpus d'apprentissage"
+  "command.corpusPurge.title": "Supprimer le corpus d'apprentissage",
+  "config.routing.learned": "Choisir le modèle d'après ce qui a réellement marché **dans ce dépôt**, mesuré par la même vérification sur laquelle l'escalade dépense de l'argent. Le modèle le moins cher dont le taux de réussite observé dépasse le seuil gagne, et le panneau dit pourquoi — « 9 sur 10 dans ce dépôt ». **Désactivé par défaut** : un routeur qui apprend change quel modèle répond, et ce n'est pas un changement à imposer par surprise. Il ne choisit jamais un modèle que vous n'avez pas configuré — les candidats sont votre modèle de conversation et votre modèle d'escalade, et rien d'autre.",
+  "config.routing.threshold": "Le taux de réussite qu'un modèle moins cher doit dépasser pour être préféré à un plus cher. Élevé à dessein : se tromper coûte un tour perdu **et** une escalade payante, donc le modèle économique doit avoir fiablement raison, pas souvent raison.",
+  "config.routing.minAttempts": "Combien d'essais un modèle doit avoir avant d'avoir un historique. Une réussite n'est pas un taux, et « pas d'historique » n'est pas « mauvais » — en dessous, votre ordre configuré gagne.",
+  "config.routing.explore": "La part de tours qui essaient délibérément un modèle sans historique. Assez pour remarquer qu'un modèle s'est amélioré après une mise à jour ; assez peu pour que quelqu'un qui ne regarde jamais ceci ne le paie pas. L'exploration ne remesure jamais un modèle qui a déjà un historique.",
+  "command.routingShow.title": "Ce qui a été appris dans ce dépôt",
+  "command.routingForget.title": "Oublier ce qui a été appris dans ce dépôt"
 }
