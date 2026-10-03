@@ -2,6 +2,58 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.86.0 — 2026-10-03
+
+### Ajouté
+
+- **Prêt pour la soumission : le contrôle de pré-publication lit le `.vsix`, pas l'intention.**
+  `npm run check:publish` ouvre l'archive qui serait téléversée — avec le lecteur ZIP que l'extension
+  possède déjà pour lire un `.docx` — et vérifie ce pour quoi une soumission est refusée : les champs
+  du manifeste, l'icône contre le 128×128 imposé, le journal des modifications qui doit avoir un titre
+  pour la version expédiée, l'absence de carte de source et de code source, et **tout lien relatif de
+  tout document Markdown qui part**, de façon **sensible à la casse**. Il tourne dans la CI juste après
+  l'empaquetage. Voir [ADR-0025](docs/adr/0025-controler-le-paquet-et-non-l-intention.md).
+
+  ⚠️⚠️ **Huit liens cassés trouvés à la première exécution, dont deux déjà publiés.** `vsce` réécrit
+  les liens relatifs du readme qu'il publie **et de celui-là seulement** : `README.fr.md` est un
+  fichier ordinaire du paquet, ses liens ne sont pas touchés, et `docs/images/` est exclu du paquet —
+  donc un lecteur francophone de l'extension installée voyait **cinq images cassées**, dans le
+  document censé être la page d'accueil du produit dans sa langue. Il renvoyait en plus à `README.md`
+  alors que `vsce` publie le readme en `readme.md` : ça résout sur macOS et renvoie 404 sur Linux.
+  Aucun des deux n'est un plantage, et aucun n'aurait pu être trouvé par un test du comportement de
+  l'extension — ce sont des propriétés du **paquet**.
+
+  ⚠️ **Et un lien mort dans le dépôt lui-même** : l'ADR-0010 renvoyait à un « ADR-0011 » qui n'a
+  jamais été écrit (le numéro 0011 est allé au hachage du registre).
+
+### Corrigé
+
+- ⚠️ **Un défaut dans ma propre règle, trouvé par son test** : la vérification de l'icône exigeait
+  plus de 24 octets alors que 24 suffisent exactement à lire la largeur et la hauteur — un PNG
+  tout juste assez long était déclaré « pas un PNG ».
+- `README.fr.md` n'offrait que la compilation depuis les sources, avec un `cd hivey-code` erroné
+  (le dépôt est `hivey-vscode`). Elle est passée à parité : téléchargement, vérification par
+  signature et empreinte, et compilation.
+
+### Précisé
+
+- **La route d'installation sans terminal**, qui manquait dans les deux langues : *Extensions → menu
+  `…` → Installer à partir d'un VSIX…*. La moitié des gens n'ont pas `code` dans leur PATH, et un
+  `.vsix` n'est pas un fichier qu'on double-clique.
+- **`docs/PUBLISHING.md` nomme les quatre choses que seul le mainteneur peut faire** : créer
+  l'éditeur Marketplace, créer le jeton d'accès (étendu à *toutes* les organisations accessibles —
+  un jeton limité à une seule échoue avec un message qui ne le dit pas), ouvrir un compte **Open VSX**
+  (VSCodium, Cursor, Gitpod — une boutique qui a choisi VSCodium l'a souvent fait pour les raisons qui
+  lui feraient choisir cette extension), et vérifier le domaine. Aucune ne peut être faite depuis la
+  CI, et aucune ne devrait l'être.
+- Les chiffres de `docs/PUBLISHING.md` entrent dans `check:numbers` : il annonçait **193** tests et
+  **27** d'intégration alors que les suites étaient à 1067 et 43. Un chiffre dans un bloc de code est
+  aussi périssable qu'un chiffre dans une phrase, et celui-là est lu par quelqu'un qui est sur le
+  point de publier.
+- Le lecteur ZIP sait maintenant **lister** les entrées d'une archive en plus d'en lire une. La boucle
+  sur le répertoire central est factorisée : deux copies de cette arithmétique à longueur variable
+  feraient deux endroits où se tromper, dont un seul serait testé.
+
 ## 0.85.0 — 2026-10-03
 
 ### Ajouté

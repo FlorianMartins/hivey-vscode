@@ -1,6 +1,6 @@
 # Hivey Code
 
-*[English](README.md)*
+*[English](https://github.com/FlorianMartins/hivey-vscode/blob/main/README.md)*
 
 **Un assistant de code pour VS Code qui ne fait pas sortir votre code.**
 Modèles locaux (Ollama, LM Studio, vLLM, llama.cpp) ou passerelle distante (OpenRouter, Azure,
@@ -8,7 +8,7 @@ LiteLLM, Anthropic) — au choix, par rôle, et **anonymisé quand ça sort**.
 
 Open source (Apache-2.0), **zéro dépendance à l'exécution**, **zéro télémétrie**.
 
-![La barre latérale de Hivey Code dans VS Code](docs/images/conversation.fr.png)
+![La barre latérale de Hivey Code dans VS Code](https://raw.githubusercontent.com/FlorianMartins/hivey-vscode/main/docs/images/conversation.fr.png)
 
 *Captures réelles, prises dans un VS Code lancé par la suite d'intégration — `node
 scripts/screenshots.mjs` les prend, donc elles ne peuvent pas cesser d'être vraies en silence. Le
@@ -17,7 +17,7 @@ panneau. Seul le modèle qui répond est un serveur de test ; tout le reste est 
 
 | Choisir un modèle | Conversations |
 |---|---|
-| ![Le sélecteur de modèle](docs/images/picker.fr.png) | ![Historique et filtres](docs/images/historique.fr.png) |
+| ![Le sélecteur de modèle](https://raw.githubusercontent.com/FlorianMartins/hivey-vscode/main/docs/images/picker.fr.png) | ![Historique et filtres](https://raw.githubusercontent.com/FlorianMartins/hivey-vscode/main/docs/images/historique.fr.png) |
 
 ---
 
@@ -46,7 +46,7 @@ ce qui sort est **anonymisé de façon réversible** avant de partir.
 | **Dans l'éditeur** | `Ctrl+I` réécrit la sélection sur place · clic droit → interroger la sélection · message de commit rédigé depuis l'index · « expliquer la sortie du terminal ». |
 | **Correctifs rapides** | Sur une erreur signalée par votre serveur de langage : « Corriger avec Hivey Code » et « Expliquer ce problème ». Le compilateur dit **quoi** et **où** ; le modèle n'a plus qu'à corriger — c'est ce qui rend un petit modèle local suffisant sur la majorité des cas. |
 | **Raccourcis de saisie** | `#` ouvre le sélecteur de fichiers de VS Code · `/expliquer`, `/tests`, `/corriger`, `/revue`, `/doc` joignent le fichier actif et posent la bonne question. |
-| **Trois modes** | **Discussion** (aucun outil), **Plan** (lit le dépôt, ne modifie rien — [à quoi ressemble un plan](docs/images/plan.fr.png)), **Agent** (lit, modifie, propose des commandes). Le mode décide de l'outillage **dans le code** : en mode Plan, aucun outil d'écriture n'existe — ce n'est pas une consigne dans un prompt. Changeable depuis le composeur, la palette (*Hivey Code : changer de mode*) ou un raccourci. |
+| **Trois modes** | **Discussion** (aucun outil), **Plan** (lit le dépôt, ne modifie rien — [à quoi ressemble un plan](https://raw.githubusercontent.com/FlorianMartins/hivey-vscode/main/docs/images/plan.fr.png)), **Agent** (lit, modifie, propose des commandes). Le mode décide de l'outillage **dans le code** : en mode Plan, aucun outil d'écriture n'existe — ce n'est pas une consigne dans un prompt. Changeable depuis le composeur, la palette (*Hivey Code : changer de mode*) ou un raccourci. |
 | **Raisonnement** | Budget de réflexion réglable (direct / bref / standard / approfondi), traduit pour chaque fournisseur — `reasoning.effort` chez OpenRouter, un budget de jetons chez Anthropic. La réflexion **s'affiche pendant qu'elle s'écrit** — c'est l'essentiel de la raison de l'activer — et se replie d'elle-même dès que la réponse commence, parce qu'elle devient alors de la documentation posée entre vous et la réponse. Elle n'est jamais renvoyée au modèle. |
 | **Permissions** | Par action et par forme d'action : « autoriser une fois », « pour cette conversation », « toujours ». Autoriser `npm test` n'autorise pas `npm publish`. Un écran dédié liste ce qui est permanent et ce qui expire. |
 | **Notation de contexte** | `#file:`, `#selection`, `#changes`, `#problems`, `#codebase`, `#terminal`, `#sym:` — la notation de Copilot, parce qu'on ne devrait pas avoir à en apprendre une seconde. Résolue **sur votre machine** avant tout envoi, ce qui est précisément ce qui permet à `#changes` de joindre du code non publié à une conversation avec un modèle local. |
@@ -80,7 +80,7 @@ ce qui sort est **anonymisé de façon réversible** avant de partir.
 | **Ce que veut dire un identifiant ici** | Un nom de six caractères n'est pas une documentation. Les conventions de nommage de **cette** boutique — lues dans un fichier que l'équipe écrit, pas devinées — vont dans le prompt, pour que `CFC1234` soit lu pour ce qu'il est sur cette partition. |
 | **Quarante compétences IBM i** | Une par chose qu'une équipe IBM i demande vraiment, chacune déclarant la tâche d'évaluation qui l'éprouve : passage en format libre, fichiers écran, SQL embarqué, débordement, MONITOR, CCSID, journalisation, triggers, modules multi-membres, et le reste. Là où une tâche ne pouvait pas être écrite honnêtement ici — parce qu'il faut une partition — la compétence le dit au lieu de prétendre à une couverture. |
 | **Remis à ARCAD** | Check-out, check-in, compilation et références croisées par les commandes `arcad.*` qu'Elias enregistre. Et la seule chose que l'agent ne fera jamais : **promouvoir**. La promotion est l'étape où quelqu'un prend la responsabilité, et un outil qui peut le faire est un outil qui peut le faire par accident. |
-| **Votre thème** | Chaque couleur du panneau est une variable de l'éditeur. Pas une seule valeur en dur — [le même sélecteur sous un thème clair](docs/images/picker.light.png), pris par le même script. Il suit un changement de thème immédiatement, contraste élevé compris. |
+| **Votre thème** | Chaque couleur du panneau est une variable de l'éditeur. Pas une seule valeur en dur — [le même sélecteur sous un thème clair](https://raw.githubusercontent.com/FlorianMartins/hivey-vscode/main/docs/images/picker.light.png), pris par le même script. Il suit un changement de thème immédiatement, contraste élevé compris. |
 
 ## Comment le coût tend vers zéro
 
@@ -156,12 +156,42 @@ Les points où d'autres se trompent, et qui sont traités ici :
 
 ## Installation
 
+**Pas encore sur le Marketplace VS Code ni sur Open VSX.** Tout ce qu'une soumission exige est en
+place et vérifié à chaque construction (`npm run check:publish`) ; ce qui manque est un compte
+d'éditeur et un jeton, que seul le mainteneur peut créer. Dire « cherchez dans le Marketplace » en
+attendant vous ferait perdre votre temps, donc :
+
+Téléchargez `hivey-code.vsix` depuis la [release `build`](https://github.com/FlorianMartins/hivey-vscode/releases/tag/build)
+— elle est reconstruite depuis `main` et son adresse ne change pas — puis installez-le :
+
+```bash
+code --install-extension hivey-code.vsix     # ou : codium, cursor, code-insiders
+```
+
+Ou sans terminal : **Extensions** → le menu `…` en haut du panneau → **Installer à partir d'un
+VSIX…** → choisissez le fichier.
+
+Chaque `.vsix` publié est construit par la CI et en porte la preuve. Pour vérifier que le fichier que
+vous avez est bien celui que ce workflow a produit, depuis le commit qu'il annonce :
+
+```bash
+gh attestation verify hivey-code.vsix --repo FlorianMartins/hivey-vscode
+sha256sum hivey-code.vsix          # à comparer avec SHA256SUMS dans la même release
+```
+
+La reproductibilité octet pour octet n'est **pas** revendiquée : un `.vsix` est un zip, un zip
+enregistre la date de modification de chaque fichier, donc deux constructions du même commit
+diffèrent. Ce qui est offert à la place est plus fort là où ça compte — une signature, émise par
+l'identité OIDC de GitHub pour cette exécution, qui lie ce fichier exact à ce commit exact.
+
+Depuis les sources :
+
 ```bash
 git clone https://github.com/FlorianMartins/hivey-vscode
-cd hivey-code
+cd hivey-vscode
 npm ci
 npm run build
-npx @vscode/vsce package --no-dependencies   # produit hivey-code.vsix
+npm run package                              # produit hivey-code.vsix (Node >= 20)
 code --install-extension hivey-code.vsix
 ```
 
@@ -266,12 +296,12 @@ src/webview/      le panneau : écrans conversation / historique / modèles / pe
 
 Détails : [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) ·
 [`docs/PRIVACY.md`](docs/PRIVACY.md) · [`docs/THREAT-MODEL.md`](docs/THREAT-MODEL.md) ·
-décisions : [`docs/adr/`](docs/adr).
+décisions : [`docs/adr/`](https://github.com/FlorianMartins/hivey-vscode/blob/main/docs/adr).
 
 ## Développement
 
 ```bash
-npm test               # construit les bundles, puis 1057 tests (node:test)
+npm test               # construit les bundles, puis 1067 tests (node:test)
 npm run test:integration   # charge l'extension dans un vrai VS Code (43 tests, headless)
 node scripts/screenshots.mjs  # reprend les images du README depuis ce même éditeur
 npm audit --audit-level=high   # 0 vulnérabilité : 5 outils de dev, aucune dépendance à l'exécution
@@ -286,7 +316,7 @@ prix n'est écrit à la main**.
 
 ## État
 
-`0.85.0` — utilisable au quotidien, prêt à publier (voir `docs/PUBLISHING.md`).
+`0.86.0` — utilisable au quotidien, prêt à publier (voir `docs/PUBLISHING.md`).
 Ce qui est fait et ce qui ne l'est pas : [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Licence

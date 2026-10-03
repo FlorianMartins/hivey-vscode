@@ -370,16 +370,20 @@ the assistant ignore instructions it never received, and leaves nobody able to f
 
 ## Install
 
-**Not on the VS Code Marketplace yet.** Everything needed to publish is in place
-([`docs/PUBLISHING.md`](docs/PUBLISHING.md)); what is missing is a publisher token, which only the
-maintainer can create. Saying "search the Marketplace" until then would waste your time, so:
+**Not on the VS Code Marketplace or on Open VSX yet.** Everything a submission is checked for is in
+place and verified on every build ([`docs/PUBLISHING.md`](docs/PUBLISHING.md), `npm run check:publish`);
+what is missing is a publisher account and a token, which only the maintainer can create. Saying
+"search the Marketplace" until then would waste your time, so:
 
 Download `hivey-code.vsix` from the [`build` release](https://github.com/FlorianMartins/hivey-vscode/releases/tag/build)
-and install it:
+— it is rebuilt from `main` and the link does not change — and install it either way:
 
 ```bash
-code --install-extension hivey-code.vsix
+code --install-extension hivey-code.vsix     # or: codium, cursor, code-insiders
 ```
+
+Or without a terminal: **Extensions** → the `…` menu at the top of the panel → **Install from
+VSIX…** → pick the file. Nothing else to do; the extension activates on the next window.
 
 Every published `.vsix` is built by CI and carries proof of it. To check that the file you have is
 the file that workflow produced, from the commit it says it did:
@@ -505,7 +509,7 @@ Those documents are currently written in French; translations are welcome.
 ## Development
 
 ```bash
-npm test                   # builds the bundles, then 1057 tests (node:test)
+npm test                   # builds the bundles, then 1067 tests (node:test)
 npm run test:integration   # loads the extension into a real VS Code (43 tests, headless)
 npm run eval:verify        # every evaluation task must fail before a model touches it
 node scripts/screenshots.mjs  # retakes the README's images from that same editor
@@ -529,7 +533,7 @@ no entry, so a translation cannot silently rot.
 
 ## Status
 
-`0.85.0` — used every day by its author. [`docs/ROADMAP.md`](docs/ROADMAP.md) is the honest version:
+`0.86.0` — used every day by its author. [`docs/ROADMAP.md`](docs/ROADMAP.md) is the honest version:
 what is tested, what was only checked by hand, and what is written but has never run in the
 conditions it was written for. That last list is not empty and it is named.
 

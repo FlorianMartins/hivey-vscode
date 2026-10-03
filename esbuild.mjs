@@ -94,7 +94,7 @@ const targets = integration
         // script imports this bundle. Nothing in the extension or the client imports it, so it
         // costs the shipped product nothing.
         ...common,
-        entryPoints: ["src/core/eval/report.ts"],
+        entryPoints: ["src/core/release/bundle.ts"],
         outfile: "dist/eval-report.mjs",
         platform: "node",
         format: "esm",

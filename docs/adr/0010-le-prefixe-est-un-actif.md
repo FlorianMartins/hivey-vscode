@@ -54,9 +54,10 @@ toute la conversation.
 - L'invariant ne se lit pas dans le code, donc il est tenu par un test d'intégration : deux tours,
   un fichier différent ouvert à chaque fois, et le premier message des deux requêtes comparé **octet
   par octet**. Retirer le correctif fait tomber ce test.
-- Le classement de la carte peut maintenant utiliser la **question** (voir
-  [ADR-0011](0011-la-carte-est-classee-par-la-question.md)) sans coût de cache : il est calculé une
-  fois, à l'ouverture de la conversation.
+- Le classement de la carte peut maintenant utiliser la **question** sans coût de cache : il est
+  calculé une fois, à l'ouverture de la conversation. (Cette conséquence renvoyait à un « ADR-0011 »
+  qui n'a jamais été écrit — le numéro 0011 est allé au hachage du registre. Le lien mort a été
+  trouvé par le contrôle de pré-publication, qui lit les liens du paquet réel.)
 - Un utilisateur qui veut une carte fraîche a une commande pour cela ; ce n'est plus un effet de
   bord de son navigation.
 

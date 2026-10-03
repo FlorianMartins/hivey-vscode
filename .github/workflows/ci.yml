@@ -105,6 +105,13 @@ jobs:
       - name: Package the extension
         run: npx --yes @vscode/vsce@3.9.2 package --no-dependencies -o hivey-code.vsix
 
+      # Would a submission be refused? Asked of the file that would be uploaded, not of the
+      # repository: `.vscodeignore` says what should ship and the `.vsix` is what does, and the gap
+      # between them is where the defects were. The French readme shipped with five broken image
+      # links and a link to `README.md` that 404s on Linux, both for a whole release.
+      - name: The package would survive a submission
+        run: node scripts/check-publish.mjs hivey-code.vsix
+
       # What somebody who downloads the file can check it against.
       #
       # `.vsix` is a zip, and a zip carries the modification time of every file in it, so two builds

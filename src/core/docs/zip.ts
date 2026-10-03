@@ -19,8 +19,22 @@ export interface ZipEntry {
   bytes: Buffer;
 }
 
-/** Read one named entry, or `undefined` when the archive does not hold it. */
-export function readZipEntry(data: Buffer, wanted: string): Buffer | undefined {
+/** One record of the central directory, as the walk below hands it over. */
+interface CentralRecord {
+  name: string;
+  method: number;
+  compressedSize: number;
+  localOffset: number;
+}
+
+/**
+ * Walk the central directory, stopping as soon as `visit` returns something.
+ *
+ * Factored out of `readZipEntry` when a second caller appeared — listing an archive's names rather
+ * than reading one entry of it. Two copies of this loop would be two places to get the variable-length
+ * record arithmetic wrong, and only one of them would have a test.
+ */
+function walkCentralDirectory<T>(data: Buffer, visit: (record: CentralRecord) => T | undefined): T | undefined {
   const end = findEndOfCentralDirectory(data);
   if (end === undefined) return undefined;
 
@@ -29,18 +43,41 @@ export function readZipEntry(data: Buffer, wanted: string): Buffer | undefined {
 
   for (let i = 0; i < count; i++) {
     if (offset + 46 > data.length || data.readUInt32LE(offset) !== CENTRAL_FILE_HEADER) return undefined;
-    const method = data.readUInt16LE(offset + 10);
-    const compressedSize = data.readUInt32LE(offset + 20);
     const nameLength = data.readUInt16LE(offset + 28);
     const extraLength = data.readUInt16LE(offset + 30);
     const commentLength = data.readUInt16LE(offset + 32);
-    const localOffset = data.readUInt32LE(offset + 42);
-    const name = data.toString("utf8", offset + 46, offset + 46 + nameLength);
-
-    if (name === wanted) return extract(data, localOffset, method, compressedSize);
+    const found = visit({
+      name: data.toString("utf8", offset + 46, offset + 46 + nameLength),
+      method: data.readUInt16LE(offset + 10),
+      compressedSize: data.readUInt32LE(offset + 20),
+      localOffset: data.readUInt32LE(offset + 42),
+    });
+    if (found !== undefined) return found;
     offset += 46 + nameLength + extraLength + commentLength;
   }
   return undefined;
+}
+
+/** Read one named entry, or `undefined` when the archive does not hold it. */
+export function readZipEntry(data: Buffer, wanted: string): Buffer | undefined {
+  return walkCentralDirectory(data, (record) =>
+    record.name === wanted ? extract(data, record.localOffset, record.method, record.compressedSize) : undefined,
+  );
+}
+
+/**
+ * Every name the archive holds, in the order the central directory lists them.
+ *
+ * What a `.vsix` actually contains, as opposed to what `.vscodeignore` says it should — which is the
+ * only version of that question worth asking before publishing.
+ */
+export function listZipEntries(data: Buffer): string[] {
+  const names: string[] = [];
+  walkCentralDirectory(data, (record) => {
+    names.push(record.name);
+    return undefined;
+  });
+  return names;
 }
 
 function extract(data: Buffer, localOffset: number, method: number, compressedSize: number): Buffer | undefined {
