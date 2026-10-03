@@ -53,6 +53,8 @@ import { capture, describeRestore, trimCheckpoints } from "../core/session/check
 import type { Plan } from "../core/agent/plan.js";
 import { promptForMode, toolsForMode } from "../core/session/modes.js";
 import { Hooks } from "./hooks.js";
+import type { Corpus } from "./corpus.js";
+import type { Episode } from "../core/corpus/corpus.js";
 import { detectIbmiLanguage, ibmiPrompt } from "../core/ibmi/languages.js";
 import { hiveyLabel, hiveyModel, isHivey } from "../core/router/hivey.js";
 import { parsePrompt, participantDirective, type MentionKind, type Participant } from "../core/session/mentions.js";
@@ -714,6 +716,18 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    * second place a request can leave the machine, and this product has one.
    */
   private waiting: Array<(answer: string) => void> = [];
+
+  /**
+   * The episode being assembled across an escalation, when the corpus is on.
+   *
+   * It spans two turns — the local attempt and the remote one — and it is kept only if the second
+   * verifies green. Held for exactly one turn: carrying it further would attach a diff nobody can
+   * attribute to the question that produced it.
+   */
+  private pendingEpisode: Episode | undefined;
+
+  /** Set by `activate` when the learning corpus is available. Absent means nothing is recorded. */
+  corpus: Corpus | undefined;
 
   /** Ask, and resolve with what came back. Empty when the turn produced nothing. */
   async askAndWait(text: string, context?: ContextItem): Promise<string> {
@@ -3809,6 +3823,22 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       if (!handover && !ctl.signal.aborted && mode !== "chat") {
         await this.escalateOnFailure(steps, verifierOutput, settings, model, providerId);
       }
+
+      // The other half of the learning corpus. An episode is kept only when the verification went
+      // GREEN after the remote model — an episode whose final diff does not work is not a training
+      // example, it is two wrong answers. `handover` is true on the escalated turn itself, which is
+      // the turn whose verdict decides.
+      if (handover && this.pendingEpisode && !ctl.signal.aborted && verifyTurn(steps).kind === "none") {
+        const episode = this.pendingEpisode;
+        this.pendingEpisode = undefined;
+        void this.corpus?.record({
+          ...episode,
+          final: { model, diff: (await this.turnDiffs()).join("\n") },
+        });
+      } else if (handover) {
+        // One chance. Carrying it into a third turn would attach a diff nobody can attribute.
+        this.pendingEpisode = undefined;
+      }
     } catch (err) {
       const message = (err as Error).message;
       this.log.appendLine(`[turn] ${message}`);
@@ -4122,6 +4152,25 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     }
 
     this.post({ type: "status", text: t("Handing over to {0}: {1}", target.model, verdict.why) });
+    // Captured BEFORE the second turn, because afterwards the local attempt's diff is indistinguishable
+    // from the remote one's: both are on disk. The files are the checkpoint's `before` state, which is
+    // exactly what a fixture needs to be a fixture.
+    if (this.corpus?.enabled()) {
+      const checkpoint = (this.checkpointFor ? this.session.get(this.checkpointFor) : undefined)?.checkpoint ?? [];
+      const asked = [...this.session.entries].reverse().find((e) => e.role === "user")?.text ?? "";
+      const failing = verdict.evidence.at(-1);
+      this.pendingEpisode = {
+        at: Date.now(),
+        request: asked,
+        files: checkpoint.map((snap) => ({ path: snap.path, before: snap.before ?? "" })),
+        local: { model: usedModel, diff: diffs.join("\n"), error: detail ?? verdict.why },
+        final: { model: "", diff: "" },
+        // The command whose exit code decided it, when one did. A verdict from the diagnostics has no
+        // command, and the export says so rather than inventing one.
+        check: failing?.tool === "run_command" ? (failing.call ?? "") : "",
+        omitted: 0,
+      };
+    }
     await this.runTurn({ ...target, note });
   }
 

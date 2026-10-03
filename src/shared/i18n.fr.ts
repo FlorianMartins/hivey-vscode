@@ -459,6 +459,21 @@ export const FR: Record<string, string> = {
   "Hivey Code is in its safest mode: {0}": "Hivey Code est dans son mode le plus sûr : {0}",
   "The policy is read from {0}.": "La politique est lue depuis {0}.",
   "Where is the policy?": "Où est la politique ?",
+  "Your organisation has switched the learning corpus off. {0} episode(s) are still on disk.":
+    "Votre organisation a désactivé le corpus d'apprentissage. {0} épisode(s) sont encore sur le disque.",
+  "The learning corpus is off. {0} episode(s) are on disk from when it was on.":
+    "Le corpus d'apprentissage est désactivé. {0} épisode(s) sont sur le disque, d'une période où il était actif.",
+  "{0} episode(s), {1} file(s) of source, kept for {2} day(s), in this extension's storage and nowhere else.":
+    "{0} épisode(s), {1} fichier(s) de source, conservés {2} jour(s), dans le stockage de cette extension et nulle part ailleurs.",
+  "There is nothing in the corpus to export.": "Il n'y a rien à exporter dans le corpus.",
+  "Where should the corpus go?": "Où le corpus doit-il aller ?",
+  "{0} task(s) and {1} conversation(s) written. Nothing left this machine.":
+    "{0} tâche(s) et {1} conversation(s) écrites. Rien n'a quitté cette machine.",
+  "The corpus is already empty.": "Le corpus est déjà vide.",
+  "Delete {0} episode(s) from the learning corpus? This cannot be undone.":
+    "Supprimer {0} épisode(s) du corpus d'apprentissage ? C'est irréversible.",
+  "Delete them": "Les supprimer",
+  "{0} episode(s) deleted.": "{0} épisode(s) supprimé(s).",
   "I cannot find a file called {0} in this workspace.": "Je ne trouve pas de fichier nommé {0} dans cet espace de travail.",
   "I cannot open {0}.": "Je ne peux pas ouvrir {0}.",
   "{0} does not appear in {1}.": "{0} n'apparaît pas dans {1}.",

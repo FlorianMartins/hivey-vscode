@@ -144,5 +144,10 @@
   "config.background.memory": "How much memory a background task's container may use, with a unit — `2g`, `512m`. A runaway build must not take the machine down while its author is away.",
   "command.runInBackground.title": "Run a task in the background",
   "command.backgroundTasks.title": "Background tasks",
-  "command.reviewBranch.title": "Review this branch"
+  "command.reviewBranch.title": "Review this branch",
+  "config.corpus.enabled": "Keep, on this machine, the cases where a local model failed and a remote one succeeded. Each episode holds the request, the files it touched **as they were**, the failed attempt and the change that worked — which is the most useful training example a team can have, and the one thing a hosted service cannot collect without taking the code. **Off by default**, because an episode holds source code on disk outside the repository. Nothing in this feature sends anything anywhere. The blocked-globs list applies, and your organisation's policy can switch it off.",
+  "config.corpus.retentionDays": "How long an episode is kept. `0` keeps nothing new without destroying what is already there — the purge command is for that.",
+  "command.corpusStatus.title": "What the learning corpus holds",
+  "command.corpusExport.title": "Export the learning corpus",
+  "command.corpusPurge.title": "Delete the learning corpus"
 }

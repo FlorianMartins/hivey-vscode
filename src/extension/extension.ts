@@ -6,6 +6,7 @@ import { showKnowledge } from "./knowledge.js";
 import { announcePolicy, policySource, reloadPolicy } from "./policy.js";
 import { SiemShipper } from "./siem.js";
 import { Background } from "./background.js";
+import { Corpus } from "./corpus.js";
 import { ReviewDiagnostics, parseFindings, prepareReview, summarise } from "./review.js";
 import { sovereigntyReport } from "./sovereignty.js";
 import type { ReportRow } from "../core/audit/sovereignty.js";
@@ -81,6 +82,8 @@ export function activate(context: vscode.ExtensionContext): void {
   const background = new Background(keys, log, () => status.show());
   // One collection, replaced by each review: leaving the previous one behind would mean somebody
   // fixing a finding and still seeing it.
+  // Off unless asked for. What this machine learned, kept on this machine — see `corpus.ts`.
+  const corpus = new Corpus(context, log);
   const reviewDiagnostics = new ReviewDiagnostics();
   disposables.push(reviewDiagnostics);
   gate.onRecord = (row) => siem.offer(row);
@@ -107,6 +110,10 @@ export function activate(context: vscode.ExtensionContext): void {
   const definitions = new DefinitionStore(disposables);
 
   const chat = new ChatViewProvider(context, keys, workspace, gate, log, mcp, definitions);
+  // The corpus records an escalation that WORKED, so the turn has to be able to reach it. A
+  // property rather than a constructor argument because it is optional by design: absent means
+  // nothing is recorded, which is the default.
+  chat.corpus = corpus;
 
   context.subscriptions.push(
     log,
@@ -182,6 +189,9 @@ export function activate(context: vscode.ExtensionContext): void {
 
     vscode.commands.registerCommand("hiveyCode.showKnowledge", () => showKnowledge()),
     vscode.commands.registerCommand("hiveyCode.siemStatus", () => siem.report()),
+    vscode.commands.registerCommand("hiveyCode.corpusStatus", () => corpus.status()),
+    vscode.commands.registerCommand("hiveyCode.corpusExport", () => corpus.export()),
+    vscode.commands.registerCommand("hiveyCode.corpusPurge", () => corpus.purge()),
     vscode.commands.registerCommand("hiveyCode.reviewBranch", async () => {
       const root = vscode.workspace.workspaceFolders?.[0];
       if (!root) {

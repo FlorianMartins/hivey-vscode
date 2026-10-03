@@ -2,7 +2,7 @@
 
 Honnête plutôt que flatteur : ce qui marche, ce qui manque, ce qui n'est pas vérifié.
 
-Ce document décrit l'état à la version **0.80.0**. Les chiffres qu'il annonce — version, tests, tâches d'évaluation — sont
+Ce document décrit l'état à la version **0.81.0**. Les chiffres qu'il annonce — version, tests, tâches d'évaluation — sont
 vérifiés par `npm run check:numbers`, que la CI exécute : ils ne peuvent plus vieillir en silence.
 Il était resté figé à `0.3.0` pendant trente-cinq
 versions, ce qui est sa propre leçon : une feuille de route périmée dit « projet abandonné » à
@@ -25,6 +25,16 @@ externe non exécuté ici est « non vérifié ».
 | 0.4 Suite de tests sous Node 22 | fait | **non vérifié ici** — seul Node 18 est installé sur cette machine ; la matrice de CI (18, 20, 22 + Windows) l'établira. Invariants gardés par deux tests |
 | 0.5 Des chiffres qui ne peuvent plus vieillir | fait | **testé** — le contrôleur refuse un chiffre faux et le répare (prouvé dans les deux sens) ; son câblage en CI est gardé par un test |
 | 0.6 Mesurer la qualité sur de vrais modèles | fait (harnais) | **testé** — rapport JSON+Markdown prouvé de bout en bout contre un faux serveur de modèle ; les règles « n'invente aucun chiffre » tenues par 9 tests dans `core` ; banc porté à 40 tâches, 40/40 échouent sur la fixture intacte **et** passent sur leur solution (deux portes de CI). ⚠️ **non mesuré** : aucun modèle réel joignable d'ici — les chiffres de qualité restent à produire |
+
+### Phase 3 — Ce que ni Copilot ni Bob ne peuvent offrir
+
+| Chantier | État | Vérification |
+|---|---|---|
+| 3.1 Corpus d'apprentissage des escalades | fait | **testé** — 19 tests : globs interdits appliqués et omissions comptées, épisode entièrement bloqué **jeté**, rétention et plafond, fixture = état **avant** (retombe si on y applique le diff), aucun `solution/` écrit, mauvaise réponse jamais un tour d'assistant, épisode gardé seulement si le tour distant est vert, **aucune requête réseau** dans les deux modules, désactivé par défaut |
+| 3.2 Routage appris par dépôt | à faire | — |
+| 3.3 Relecture par un second modèle | à faire | — |
+| 3.4 Famille de compétences `finance` | à faire | — |
+| 3.5 Tableau de qualité publié | à faire | — |
 
 ### Phase 2 — Égaler Copilot sur ce que l'entreprise compare
 
@@ -61,6 +71,17 @@ Trois niveaux, jamais mélangés :
   nommés.
 
 ## Fait
+
+### Ce que cette machine a appris reste sur cette machine (0.81.0)
+
+- **Les escalades réussies sont conservées localement** (testé) : la demande, les fichiers tels qu'ils
+  étaient, les deux diffs, la commande qui a tranché. **Désactivé par défaut** — un épisode contient du
+  code source hors du dépôt — et **rien ne sort** (aucune requête réseau dans le code, vérifié par un
+  test).
+- **Deux exports** : des tâches dont la fixture est l'état *avant*, et un jeu de conversations où la
+  mauvaise réponse est du contexte et non la réponse.
+- **Trois commandes** : ce qu'il contient, l'exporter, le supprimer.
+
 
 ### Revoir une branche, et demander au serveur de langage (0.80.0)
 
@@ -282,7 +303,7 @@ Trois niveaux, jamais mélangés :
 ### Avant 0.39.0
 
 - Noyau indépendant de l'éditeur : anonymisation, fournisseurs, routeur, budget, complétion, session,
-  carte du dépôt, boucle d'agent. **994 tests unitaires** plus **43 tests d'intégration dans un vrai
+  carte du dépôt, boucle d'agent. **1013 tests unitaires** plus **43 tests d'intégration dans un vrai
   VS Code**.
 - Barre latérale : conversation, historique, modèles, permissions, configuration ; modes
   discussion / plan / agent ; budget de raisonnement ; contexte explicite.

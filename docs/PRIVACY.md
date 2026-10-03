@@ -56,6 +56,46 @@ Donc, quand une image part vers un point d'accès distant :
 Les globs interdits s'appliquent à un fichier déposé comme à n'importe quel autre. Ce qu'ils ne
 peuvent pas faire, c'est reconnaître un secret **dans** une image.
 
+## Corpus d'apprentissage des escalades
+
+**Désactivé par défaut.** `hiveyCode.corpus.enabled` vaut `false`, et tant qu'il y reste rien n'est
+enregistré.
+
+Quand il est activé, chaque fois qu'un modèle local échoue et qu'un modèle distant réussit **avec une
+vérification au vert**, l'extension garde **sur cette machine** : la demande, les fichiers touchés
+**tels qu'ils étaient avant**, le diff et l'erreur de la tentative locale, le diff final, et la
+commande dont le code de retour a tranché.
+
+⚠️ **Un épisode contient donc du code source**, sur le disque, **hors du dépôt** (le stockage global
+de l'extension — un corpus dans l'espace de travail est un corpus que le `git add -A` de quelqu'un
+finit par committer). C'est pour cela que la fonctionnalité est désactivée par défaut : c'est une
+chose raisonnable à conserver et une chose déraisonnable à commencer à conserver sans qu'on le
+demande.
+
+**Rien ne sort.** Aucune requête réseau n'existe dans ce code, et un test lit le source pour le
+vérifier. C'est le fondement de la fonctionnalité : c'est précisément ce qu'un service hébergé ne
+peut pas recueillir sans prendre le code.
+
+Les contrôles, un geste chacun, dans la palette de commandes :
+
+- **la liste des globs interdits s'applique** — un fichier qu'on refuse d'envoyer à un modèle est un
+  fichier qu'on ne veut pas dans un corpus ; un épisode dont tous les fichiers étaient bloqués est
+  **jeté** et non conservé amputé ;
+- la **rétention** est configurable (`corpus.retentionDays`, 90 par défaut ; `0` n'en garde plus
+  aucun nouveau sans détruire l'existant) ;
+- **« Ce que contient le corpus d'apprentissage »** dit combien d'épisodes et combien de fichiers de
+  source sont là ;
+- **« Supprimer le corpus d'apprentissage »** détruit tout, après confirmation ;
+- **« Exporter le corpus d'apprentissage »** écrit deux choses dans un dossier choisi : des tâches au
+  format `eval/tasks` (dont la fixture est l'état **avant**, ce qui est ce qui fait échouer leur
+  contrôle) et un jeu de conversations JSONL pour affiner un modèle local. Le dossier contient un
+  `READ-THIS-FIRST.txt` qui dit ce qu'il contient : **un corpus est une copie**, à traiter comme le
+  dépôt lui-même.
+
+La politique de l'organisation peut **désactiver** la fonctionnalité (`disabled: ["corpus"]`). Elle ne
+peut pas l'activer — une politique qui pourrait *accorder* serait un fichier qui vaut la peine d'être
+falsifié ([ADR-0019](adr/0019-la-politique-ne-fait-que-restreindre.md)).
+
 ## Envoi du registre à un collecteur (SIEM)
 
 **Désactivé par défaut.** `hiveyCode.siem.transport` vaut `off` et rien ne part. Un opérateur peut

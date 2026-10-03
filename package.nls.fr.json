@@ -144,5 +144,10 @@
   "config.background.memory": "Combien de mémoire le conteneur d'une tâche de fond peut utiliser, avec une unité — `2g`, `512m`. Une compilation qui s'emballe ne doit pas mettre la machine à genoux pendant que son auteur est absent.",
   "command.runInBackground.title": "Lancer une tâche en arrière-plan",
   "command.backgroundTasks.title": "Tâches en arrière-plan",
-  "command.reviewBranch.title": "Revoir cette branche"
+  "command.reviewBranch.title": "Revoir cette branche",
+  "config.corpus.enabled": "Conserver, sur cette machine, les cas où un modèle local a échoué et un modèle distant a réussi. Chaque épisode retient la demande, les fichiers touchés **tels qu'ils étaient**, la tentative échouée et le changement qui a marché — l'exemple d'apprentissage le plus utile qu'une équipe puisse avoir, et la seule chose qu'un service hébergé ne peut pas recueillir sans prendre le code. **Désactivé par défaut**, parce qu'un épisode retient du code source sur le disque, hors du dépôt. Rien dans cette fonctionnalité n'envoie quoi que ce soit où que ce soit. La liste des globs interdits s'applique, et la politique de votre organisation peut la désactiver.",
+  "config.corpus.retentionDays": "Combien de temps un épisode est conservé. `0` n'en garde plus aucun nouveau sans détruire ce qui est déjà là — la commande de purge est pour cela.",
+  "command.corpusStatus.title": "Ce que contient le corpus d'apprentissage",
+  "command.corpusExport.title": "Exporter le corpus d'apprentissage",
+  "command.corpusPurge.title": "Supprimer le corpus d'apprentissage"
 }

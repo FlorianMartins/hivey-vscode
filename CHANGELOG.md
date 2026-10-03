@@ -2,6 +2,48 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.81.0 — 2026-10-03
+
+### Ajouté
+
+- **Chantier 3.1 — ce que cette machine a appris reste sur cette machine.** Quand un modèle local
+  échoue et qu'un modèle distant réussit **avec une vérification au vert**, l'extension conserve
+  localement la demande, les fichiers touchés **tels qu'ils étaient**, le diff et l'erreur de la
+  tentative locale, le diff final et la commande qui a tranché. C'est l'exemple d'apprentissage le
+  plus utile qu'une équipe puisse avoir — et exactement ce qu'un service hébergé ne peut pas recueillir
+  sans prendre le code.
+
+  Deux exports : des **tâches au format `eval/tasks`** dont la fixture est l'état **avant** (ce qui est
+  ce qui fait échouer leur contrôle), et un **jeu de conversations JSONL** pour affiner un modèle
+  local. Trois commandes, un geste chacune : ce que le corpus contient, l'exporter, le supprimer.
+
+  ⚠️⚠️ **Désactivé par défaut**, et la raison n'est pas la timidité : un épisode contient du code
+  source, sur le disque, **hors du dépôt**. C'est raisonnable à conserver et déraisonnable à
+  *commencer* à conserver sans qu'on le demande. **Rien ne sort** — aucune requête réseau n'existe
+  dans ce code, et un test lit le source pour la refuser.
+
+  ⚠️ **Seules les escalades qui ont réussi.** Un épisode dont le diff final ne marche pas n'est pas un
+  exemple, c'est **deux mauvaises réponses**. Et dans le jeu de conversations, la tentative échouée est
+  du **contexte** et non un tour d'assistant : s'entraîner sur une mauvaise réponse étiquetée comme la
+  bonne est la façon dont un modèle apprend la mauvaise chose.
+
+  Voir [ADR-0022](docs/adr/0022-ce-que-cette-machine-a-appris-reste-sur-cette-machine.md), et le flux
+  documenté dans `docs/PRIVACY.md` et `docs/THREAT-MODEL.md`.
+
+### Précisé
+
+- **La liste des globs interdits s'applique**, et un épisode dont **tous** les fichiers étaient bloqués
+  est **jeté** plutôt que conservé amputé : une fixture sans fichier est une fixture que personne ne
+  peut exécuter. Le nombre de fichiers omis est conservé, pour qu'un épisode maigre soit explicable.
+- **Aucune solution de référence n'est écrite depuis le diff final** : un correctif appliqué à la main
+  dans un répertoire de fixture peut ne pas s'appliquer, et une tâche dont la solution ne s'applique
+  pas est pire qu'une tâche sans solution — `eval:solutions` rapporterait le *contrôle* comme
+  insatisfaisable.
+- La **rétention** et le **plafond** répondent à deux questions : l'une est une promesse à la personne
+  dont c'est le code, l'autre à son disque. `0` n'en garde plus aucun sans détruire l'existant.
+- La politique de l'organisation peut **désactiver** la fonctionnalité ; elle ne peut pas l'activer,
+  parce qu'une politique qui pourrait accorder serait un fichier qui vaut la peine d'être falsifié.
+
 ## 0.80.0 — 2026-10-03
 
 ### Ajouté

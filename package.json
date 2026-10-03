@@ -2,7 +2,7 @@
   "name": "hivey-code",
   "displayName": "Hivey Code",
   "description": "%extension.description%",
-  "version": "0.80.0",
+  "version": "0.81.0",
   "publisher": "hivey",
   "license": "Apache-2.0",
   "repository": {
@@ -361,6 +361,21 @@
       {
         "command": "hiveyCode.reviewBranch",
         "title": "%command.reviewBranch.title%",
+        "category": "Hivey Code"
+      },
+      {
+        "command": "hiveyCode.corpusStatus",
+        "title": "%command.corpusStatus.title%",
+        "category": "Hivey Code"
+      },
+      {
+        "command": "hiveyCode.corpusExport",
+        "title": "%command.corpusExport.title%",
+        "category": "Hivey Code"
+      },
+      {
+        "command": "hiveyCode.corpusPurge",
+        "title": "%command.corpusPurge.title%",
         "category": "Hivey Code"
       }
     ],
@@ -917,6 +932,16 @@
             "type": "string",
             "default": "",
             "markdownDescription": "%config.audit.timestampUrl%"
+          },
+          "hiveyCode.corpus.enabled": {
+            "type": "boolean",
+            "default": false,
+            "markdownDescription": "%config.corpus.enabled%"
+          },
+          "hiveyCode.corpus.retentionDays": {
+            "type": "number",
+            "default": 90,
+            "markdownDescription": "%config.corpus.retentionDays%"
           }
         }
       },

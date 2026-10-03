@@ -125,6 +125,22 @@ personne n'ajoute la mauvaise commande dans six mois. Et l'agent ne propose la r
 fois le changement **compilé et testé dans le tour** : réintégrer un membre qui ne compile pas remet
 un composant cassé à la construction de tout le monde.
 
+**Le corpus d'apprentissage est du code source hors du dépôt.** Désactivé par défaut, il conserve —
+quand on l'active — la demande, les fichiers touchés tels qu'ils étaient, et les diffs des escalades
+réussies, dans le stockage global de l'extension.
+
+**Vecteur.** Un répertoire de code source hors du dépôt échappe aux attentes : il n'est pas dans
+`.gitignore`, il survit à un `git clean`, et une sauvegarde du profil utilisateur l'emporte.
+
+**Parade (code).** Désactivé par défaut ; **la liste des globs interdits s'applique** et un épisode
+dont tous les fichiers étaient bloqués est jeté ; rétention configurable ; une commande détruit tout ;
+une commande dit combien il y a. **Aucune requête réseau n'existe dans ce code** et un test lit le
+source pour le refuser. La politique de l'organisation peut le désactiver.
+
+**Résidu, assumé.** Un poste compromis lit ce répertoire comme il lit le dépôt. Rien à ce niveau ne
+s'y oppose — et c'est pour cela que la fonctionnalité demande à être allumée plutôt que d'être
+allumée par défaut.
+
 **QTEMP est la seule bibliothèque qu'un outil en lecture peut écrire**, et la garde le sait
 explicitement (`SCRATCH_LIBRARY`, `src/core/ibmi/guard.ts`). La raison n'est pas une convention mais
 une propriété de la bibliothèque : elle est créée par travail, détruite avec lui, invisible des
