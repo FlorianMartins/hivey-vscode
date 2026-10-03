@@ -20,7 +20,9 @@ const INTERESTING: Record<string, string[]> = {
   search_text: ["pattern"],
   get_diagnostics: ["path"],
   use_skill: ["name"],
-  run_agent: ["agent", "task"],
+  // ⚠️ `name`, not `agent`: the schema calls it `name`, so `agent` was never found, the fallback
+  // took `task`, and a step line showed the task without saying WHICH agent received it.
+  run_agent: ["name", "task"],
   ibmi_sql: ["sql"],
   ibmi_command: ["command"],
   ibmi_member: ["member", "library"],

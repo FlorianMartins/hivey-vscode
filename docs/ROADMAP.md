@@ -2,7 +2,7 @@
 
 Honnête plutôt que flatteur : ce qui marche, ce qui manque, ce qui n'est pas vérifié.
 
-Ce document décrit l'état à la version **0.91.0**. Les chiffres qu'il annonce — version, tests, tâches d'évaluation — sont
+Ce document décrit l'état à la version **0.92.0**. Les chiffres qu'il annonce — version, tests, tâches d'évaluation — sont
 vérifiés par `npm run check:numbers`, que la CI exécute : ils ne peuvent plus vieillir en silence.
 Il était resté figé à `0.3.0` pendant trente-cinq
 versions, ce qui est sa propre leçon : une feuille de route périmée dit « projet abandonné » à
@@ -38,6 +38,7 @@ externe non exécuté ici est « non vérifié ».
 | Prêt pour la soumission | fait | **testé** — 11 tests sur les règles de pré-publication ; le contrôle lit le `.vsix` réel et a trouvé **8 liens cassés dont 2 déjà publiés** (images du readme français, et `README.md` contre `readme.md` sur Linux) + 1 lien mort d'ADR dans le dépôt ; câblé dans la CI. ⚠️ **non vérifié** : aucune soumission tentée — compte éditeur, jeton Marketplace et jeton Open VSX sont les 4 gestes que seul le mainteneur peut faire (`docs/PUBLISHING.md`) |
 | Passe de qualité mesurée | fait | **mesuré** — `local only` = **0/56**, dont **51/56 sans une seule étape d'outil**, en 33 min (`qwen2.5-coder:7b` sur Ollama, 12 cœurs, sans GPU) ; relevé dans `eval/QUALITY.md`. A révélé que **le mode agent local ne faisait rien** (Ollama rend les appels d'outils en texte, `tool_calls: null`) → corrigé, ADR-0026, 7 tests. ⚠️ **non mesuré** : `local + escalation` et les 3 préréglages (aucune clé de fournisseur ici) ; et aucune colonne Copilot/Bob, par principe |
 | 4.1 Le plan devient une preuve | fait | **testé** — 8 tests : pas de plan ≠ échec, étapes restantes nommées, `skipped` réglé, verdict classé **en dernier** derrière un contrôle qui échoue (retombe si on retire la lecture du plan), outil offert au terminal, `planLeft` absent sans plan. A révélé **deux défauts plus graves que le chantier** : le terminal refusait ce que le panneau autorisait (plafonds codés en dur, défaut déjà corrigé une fois dans l'autre moitié) et **un refus de budget était indiscernable d'un échec du modèle** dans le relevé (42 refus lus comme 42 échecs). ADR-0028 |
+| 4.3 Délégation, et le terminal | fait | **testé** — 6 tests : un agent sans liste n'hérite pas de `run_agent`, le demander explicitement ne l'autorise pas, la règle est **une** liste (`NEVER_DELEGATES`), aucun agent intégré ne voulait déléguer, la trace nomme l'agent, le terminal offre le dispatch par la même intersection. Les trois correctifs prouvés en les retirant **séparément**. Vérifié de bout en bout contre un vrai modèle (`explorer` dispatché depuis le terminal, 0,0157 $). ⚠️ Le parallélisme et la synthèse existaient déjà — rédaction fausse une 3e fois |
 
 ### Phase 2 — Égaler Copilot sur ce que l'entreprise compare
 
@@ -333,7 +334,7 @@ Trois niveaux, jamais mélangés :
 ### Avant 0.39.0
 
 - Noyau indépendant de l'éditeur : anonymisation, fournisseurs, routeur, budget, complétion, session,
-  carte du dépôt, boucle d'agent. **1141 tests unitaires** plus **43 tests d'intégration dans un vrai
+  carte du dépôt, boucle d'agent. **1147 tests unitaires** plus **43 tests d'intégration dans un vrai
   VS Code**.
 - Barre latérale : conversation, historique, modèles, permissions, configuration ; modes
   discussion / plan / agent ; budget de raisonnement ; contexte explicite.

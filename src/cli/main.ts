@@ -11,7 +11,7 @@
 // environment, so a team can commit a shared configuration without committing a key.
 
 import { createInterface, type Interface } from "node:readline/promises";
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { readFile, writeFile, mkdir, readdir } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, dirname } from "node:path";
 import { stdin, stdout } from "node:process";
@@ -23,6 +23,7 @@ import { youShouldKnow, type Notice } from "../core/session/notices.js";
 import { MUTATING_TOOLS, VERIFIER_TOOLS } from "../core/router/outcome.js";
 import { catalogueWindow } from "../core/router/window.js";
 import { contextBudget, repoMapBudget } from "../core/context/budget.js";
+import { BUILTIN_AGENTS, parseDefinition, type AgentDefinition } from "../core/agent/definitions.js";
 import { BUILTIN_SKILLS, builtinSkillsForModel } from "../core/session/skills.js";
 import { skillsPrompt } from "../core/agent/definitions.js";
 import { isLocalEndpoint, redactMessages, Vault, streamingRestorer } from "../core/redaction/index.js";
@@ -180,6 +181,10 @@ async function main(): Promise<void> {
   // exists for, and reaching for the lookup without the rule put the terminal back in a different
   // version of the same hole.
   const contextTokens = contextBudget(cfg.contextTokens > 0 ? cfg.contextTokens : undefined, catalogueWindow(cfg.model));
+
+  // The sub-agents this client offers: the repository's own, then the built-in ones, by the same
+  // precedence the panel uses — a team that wrote an agent with that name meant theirs.
+  const cliAgents = await loadCliAgents(cwd);
 
   const cliSkills = builtinSkillsForModel(
     BUILTIN_SKILLS.filter((sk) => (cfg.skillGroups ?? ["general"]).includes(sk.group)),
@@ -395,6 +400,41 @@ async function main(): Promise<void> {
         // Printed, so the terminal shows what the panel shows — and kept, because the verdict at the
         // end of the turn reads it: a turn that ends with its own steps outstanding is a turn that
         // declared itself finished against its own list.
+        agents: cliAgents,
+        // One turn of its own: its body as the system prompt, its task as the question, its tools,
+        // its step cap. Redacted through the same vault as the main turn, because a sub-agent's
+        // request leaves by the same door — a second notion of what is safe to send would be a
+        // second answer to the question this product exists to answer.
+        runSubAgent: async ({ definition, task, signal }) => {
+          const sub = buildCliTools({
+            cwd,
+            blockedGlobs: cfg.blockedGlobs,
+            showDiff: (path, before, after) => printDiff(path, before, after),
+          }).filter((tool) => definition.tools.includes(tool.schema.name));
+          const messages = [
+            { role: "system" as const, content: definition.body, cacheable: true },
+            { role: "user" as const, content: task },
+          ];
+          const prepared = isLocal
+            ? messages
+            : redactMessages(messages, vault, {
+                level: cfg.redaction,
+                customTerms: cfg.customTerms,
+                blockOnSecret: true,
+              }).messages;
+          const answer = await runTurn({
+            provider,
+            model: cfg.model,
+            messages: prepared,
+            tools: toolsForMode(sub, mode),
+            maxSteps: definition.maxSteps ?? 8,
+            ...(signal ? { signal } : {}),
+            approve: async () => yes,
+            afterResponse: (text) => vault.restore(text),
+            restoreArgs: (text) => vault.restore(text),
+          });
+          return vault.restore(answer.text);
+        },
         onNotice: (notice) => turnNotices.push(notice),
         onPlan: (plan) => {
           turnPlan = plan;
@@ -495,6 +535,37 @@ async function main(): Promise<void> {
       process.off("SIGINT", onSigint);
     }
   }
+}
+
+/**
+ * The sub-agent definitions this client can offer.
+ *
+ * Read from the repository and from the user's home, with the shared parser from `core` — the same
+ * files the panel reads, so a team that wrote an agent gets it in both halves. Problems are reported
+ * and skipped rather than fatal: one malformed file must not take the whole feature down.
+ */
+async function loadCliAgents(cwd: string): Promise<AgentDefinition[]> {
+  const own: AgentDefinition[] = [];
+  for (const dir of [join(cwd, ".hiveycode", "agents"), join(homedir(), ".hiveycode", "agents")]) {
+    let names: string[];
+    try {
+      names = (await readdir(dir)).filter((f) => f.endsWith(".md"));
+    } catch {
+      continue;
+    }
+    for (const name of names) {
+      try {
+        const text = await readFile(join(dir, name), "utf8");
+        const { definition, problems } = parseDefinition("agent", join(dir, name), text);
+        for (const problem of problems) console.log(C.dim(`  ${name}: ${problem}`));
+        if (definition?.kind === "agent" && !own.some((a) => a.name === definition.name)) own.push(definition);
+      } catch {
+        /* an unreadable definition is one fewer agent, not a broken client */
+      }
+    }
+  }
+  const taken = new Set(own.map((a) => a.name));
+  return [...own, ...BUILTIN_AGENTS.filter((a) => !taken.has(a.name))];
 }
 
 async function repoMap(cwd: string, budgetTokens: number): Promise<string | undefined> {

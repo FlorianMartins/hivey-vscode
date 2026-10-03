@@ -2,6 +2,58 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.92.0 — 2026-10-03
+
+### Corrigé
+
+- **⚠️⚠️ Chantier 4.3 — la délégation était transitive et non bornée.** `toolsForAgent` rendait **tous**
+  les outils disponibles quand une définition de sous-agent n'a pas de ligne `tools:`. C'est le bon
+  défaut pour lire et écrire — un fichier de définition ne doit pas pouvoir s'accorder un outil que le
+  mode n'offre pas — et c'était le mauvais pour **le seul outil qui récurse** : `run_agent` en faisait
+  partie. Un sous-agent défini sans restriction pouvait donc dispatcher des sous-agents, qui
+  pouvaient en dispatcher à leur tour. La largeur de chaque niveau est bornée par son plafond
+  d'étapes ; **la profondeur ne l'était par rien**, et aucune garde ni aucun test n'existait nulle
+  part.
+
+  La règle posée est celle que la description de l'outil **promettait déjà** — « il travaille seul et
+  ne rend que sa conclusion » : **un sous-agent est une feuille**. `NEVER_DELEGATES`, soustrait des
+  **deux** branches, parce que demander explicitement n'est pas une autorisation. Pas un réglage :
+  c'est une garantie, et une garantie vit dans le code. Voir
+  [ADR-0031](docs/adr/0031-un-sous-agent-est-une-feuille.md).
+
+- ⚠️ **Une ligne de trace ne nommait jamais le sous-agent dispatché.** `callSignature` déclarait
+  `run_agent: ["agent", "task"]` alors que le paramètre du schéma s'appelle `name` : l'argument
+  n'existait jamais, le repli prenait `task`, et la trace montrait la tâche **sans dire quel agent
+  l'avait reçue**. C'est précisément le défaut que ce fichier existe pour empêcher — « quelqu'un qui
+  relit ce qu'un agent a fait à son dépôt a besoin de l'appel ».
+
+### Ajouté
+
+- **Le terminal a des sous-agents.** Quatrième moitié oubliée de cette phase, et comme à chaque fois
+  la conséquence n'était pas seulement la fonctionnalité absente : le banc **pilote ce client**, donc
+  rien de la délégation n'était mesurable. Il lit les définitions du dépôt et du dossier personnel
+  avec l'analyseur du cœur — les mêmes fichiers que le panneau — puis les fusionne avec les quatre
+  intégrés (`explorer`, `reviewer`, `tester`, `dba`), les siennes d'abord. Un fichier mal formé est
+  signalé et ignoré : il doit coûter un agent, pas la fonctionnalité. Les agents en **lecture seule**
+  peuvent partir à plusieurs, les autres non — la règle est une propriété des agents, pas du client.
+  Et un sous-agent du terminal est **anonymisé par le même coffre** que le tour principal : sa requête
+  sort par la même porte, et une seconde notion de ce qu'il est sûr d'envoyer serait une seconde
+  réponse à la question que ce produit existe pour répondre.
+
+  Vérifié de bout en bout contre un vrai modèle : le terminal dispatche `explorer`, l'agent travaille,
+  rend sa conclusion, et la trace le nomme.
+
+### Précisé
+
+- **Ce que 4.3 n'avait pas besoin de faire**, et que sa rédaction affirmait manquant : le parallélisme
+  est entièrement implémenté (`Promise.all` sur les appels voisins déclarés sûrs, approbations
+  résolues avant et une par une, voisins seuls fusionnés pour préserver l'ordre) et la synthèse **est**
+  le mécanisme — la conclusion revient comme résultat d'outil. Quatrième fois dans cette phase qu'un
+  chantier a été écrit depuis une hypothèse ; troisième fois que la prémisse était fausse.
+- ⚠️ Et une erreur plus bête, le même jour : j'ai masqué la sortie de la construction du paquet de
+  tests, la compilation a échoué, et j'ai lu un **compte de tests périmé** comme un succès. **Un
+  contrôle dont on ne regarde pas la sortie n'est pas un contrôle.**
+
 ## 0.91.0 — 2026-10-03
 
 ### Ajouté

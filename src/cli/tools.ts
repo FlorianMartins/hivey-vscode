@@ -16,6 +16,7 @@ import { t } from "../shared/i18n.js";
 
 import { parsePlan, planSummary, PLAN_TOOL_DESCRIPTION, type Plan } from "../core/agent/plan.js";
 import { NOTE_ASIDE_TOOL, type Notice } from "../core/session/notices.js";
+import { toolsForAgent, type AgentDefinition } from "../core/agent/definitions.js";
 
 export interface CliToolOptions {
   cwd: string;
@@ -34,6 +35,16 @@ export interface CliToolOptions {
    */
   onPlan?: (plan: Plan) => void;
   /**
+   * Runs a sub-agent and returns its conclusion. Absent means the tool is not offered.
+   *
+   * A callback, like the panel's, because dispatching needs a provider and a key and this file has
+   * neither — and because the decision of how a sub-agent's request is redacted belongs with the one
+   * that redacts the main turn, not duplicated here.
+   */
+  runSubAgent?: (run: { definition: AgentDefinition; task: string; signal?: AbortSignal }) => Promise<string>;
+  /** The agents on offer, repository ones first. Empty means the tool is not offered. */
+  agents?: AgentDefinition[];
+  /**
    * Where an aside goes.
    *
    * In the terminal from the start this time. The plan tool, the spending caps and the skills were
@@ -44,6 +55,14 @@ export interface CliToolOptions {
 }
 
 const SKIP_DIRS = new Set([".git", "node_modules", "dist", "build", "out", "target", ".venv", "__pycache__", ".next"]);
+
+/**
+ * Agents that only read, so several may run at once.
+ *
+ * The same list the panel uses, and for the same reason: three of them reading three parts of a
+ * repository at once is the whole point of having them, while two that can write is a race.
+ */
+const READ_ONLY_TOOLS = new Set(["read_file", "list_files", "search_text", "update_plan", "note_aside"]);
 
 export function safeResolve(opts: CliToolOptions, path: string): string {
   const full = isAbsolute(path) ? path : resolve(opts.cwd, path);
@@ -304,5 +323,65 @@ export function buildCliTools(opts: CliToolOptions): Tool[] {
     },
   };
 
-  return [readFileTool, listFiles, searchText, writeFileTool, editFile, runCommand, updatePlan, noteAside];
+  const agents = opts.agents ?? [];
+  const runAgent: Tool | undefined =
+    agents.length && opts.runSubAgent
+      ? {
+          schema: {
+            name: "run_agent",
+            description:
+              `Hand a self-contained task to a sub-agent. It works on its own and returns only its conclusion. Available: ${agents
+                .map((a) => `${a.name} (${a.description})`)
+                .join("; ")}`,
+            parameters: {
+              type: "object",
+              properties: {
+                name: { type: "string", enum: agents.map((a) => a.name), description: "Which sub-agent." },
+                task: {
+                  type: "string",
+                  description: "What it should do, in full — it sees nothing of this conversation.",
+                },
+              },
+              required: ["name", "task"],
+            },
+          },
+          // Read-only agents may fan out; one that can write may not. Two agents editing files at the
+          // same time is a race nobody reconstructs from a transcript — the panel's rule, and the
+          // same one, because it is a property of the agents and not of the client.
+          parallel: (args) => {
+            const found = agents.find((a) => a.name === String(args["name"] ?? ""));
+            if (!found?.tools.length) return false; // no restriction means it may write
+            return found.tools.every((tool) => READ_ONLY_TOOLS.has(tool));
+          },
+          // Not asked for here: whatever the sub-agent does goes through the same approver, so a
+          // dialog still appears at the moment something is actually changed.
+          approval: () => false,
+          async run(args, ctx): Promise<ToolResult> {
+            const wanted = String(args["name"] ?? "");
+            const definition = agents.find((a) => a.name === wanted);
+            if (!definition) {
+              return { content: `No agent named "${wanted}". Available: ${agents.map((a) => a.name).join(", ")}.`, isError: true };
+            }
+            const task = String(args["task"] ?? "").trim();
+            if (!task) return { content: "A sub-agent needs a task. It cannot see this conversation.", isError: true };
+            // `toolsForAgent` intersects with what this client offers AND subtracts `run_agent`: a
+            // sub-agent is a leaf. See `NEVER_DELEGATES`.
+            const allowed = toolsForAgent(definition, [
+              readFileTool, listFiles, searchText, writeFileTool, editFile, runCommand, updatePlan, noteAside,
+            ].map((tool) => tool.schema.name));
+            ctx.report(`agent ${definition.name}: ${task.slice(0, 60)}`);
+            const answer = await opts.runSubAgent!({
+              definition: { ...definition, tools: allowed },
+              task,
+              ...(ctx.signal ? { signal: ctx.signal } : {}),
+            });
+            return { content: answer || "The sub-agent returned nothing." };
+          },
+        }
+      : undefined;
+
+  return [
+    readFileTool, listFiles, searchText, writeFileTool, editFile, runCommand, updatePlan, noteAside,
+    ...(runAgent ? [runAgent] : []),
+  ];
 }
