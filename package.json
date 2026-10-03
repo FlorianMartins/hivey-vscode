@@ -2,7 +2,7 @@
   "name": "hivey-code",
   "displayName": "Hivey Code",
   "description": "%extension.description%",
-  "version": "0.78.0",
+  "version": "0.79.0",
   "publisher": "hivey",
   "license": "Apache-2.0",
   "repository": {
@@ -346,6 +346,16 @@
       {
         "command": "hiveyCode.sovereigntyReport",
         "title": "%command.sovereigntyReport.title%",
+        "category": "Hivey Code"
+      },
+      {
+        "command": "hiveyCode.runInBackground",
+        "title": "%command.runInBackground.title%",
+        "category": "Hivey Code"
+      },
+      {
+        "command": "hiveyCode.backgroundTasks",
+        "title": "%command.backgroundTasks.title%",
         "category": "Hivey Code"
       }
     ],
@@ -963,6 +973,21 @@
               "type": "object"
             },
             "markdownDescription": "%config.hooks%"
+          },
+          "hiveyCode.background.image": {
+            "type": "string",
+            "default": "",
+            "markdownDescription": "%config.background.image%"
+          },
+          "hiveyCode.background.cpus": {
+            "type": "number",
+            "default": 2,
+            "markdownDescription": "%config.background.cpus%"
+          },
+          "hiveyCode.background.memory": {
+            "type": "string",
+            "default": "2g",
+            "markdownDescription": "%config.background.memory%"
           }
         }
       },

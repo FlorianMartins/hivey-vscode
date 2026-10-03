@@ -5,6 +5,7 @@ import * as vscode from "vscode";
 import { showKnowledge } from "./knowledge.js";
 import { announcePolicy, policySource, reloadPolicy } from "./policy.js";
 import { SiemShipper } from "./siem.js";
+import { Background } from "./background.js";
 import { sovereigntyReport } from "./sovereignty.js";
 import type { ReportRow } from "../core/audit/sovereignty.js";
 import { setLanguage, t } from "../shared/i18n.js";
@@ -74,6 +75,9 @@ export function activate(context: vscode.ExtensionContext): void {
   // decides for itself whether there is anywhere to send it — one place that knows, rather than the
   // egress path asking.
   const siem = new SiemShipper(context, log);
+  // Each task gets its own worktree and its own branch, so several can run at once without
+  // seeing each other's work — or the work of the person who started them.
+  const background = new Background(keys, log, () => status.show());
   gate.onRecord = (row) => siem.offer(row);
   disposables.push(siem);
 
@@ -173,6 +177,31 @@ export function activate(context: vscode.ExtensionContext): void {
 
     vscode.commands.registerCommand("hiveyCode.showKnowledge", () => showKnowledge()),
     vscode.commands.registerCommand("hiveyCode.siemStatus", () => siem.report()),
+    vscode.commands.registerCommand("hiveyCode.runInBackground", async () => {
+      const task = await vscode.window.showInputBox({
+        title: t("Run a task in the background"),
+        prompt: t("It gets its own branch and its own directory, and it never pushes."),
+      });
+      if (task?.trim()) await background.start(task.trim());
+    }),
+    vscode.commands.registerCommand("hiveyCode.backgroundTasks", async () => {
+      const tasks = background.list();
+      if (!tasks.length) {
+        void vscode.window.showInformationMessage(t("No background task is running."));
+        return;
+      }
+      const picked = await vscode.window.showQuickPick(
+        tasks.map((task) => ({
+          label: task.branch,
+          description: `${task.state} · ${task.steps} step(s)`,
+          detail: task.summary ?? task.task,
+          id: task.id,
+          state: task.state,
+        })),
+        { title: t("Background tasks") },
+      );
+      if (picked?.state === "running") background.cancel(picked.id);
+    }),
     vscode.commands.registerCommand("hiveyCode.sovereigntyReport", () =>
       sovereigntyReport(gate.ledger() as unknown as ReportRow[], context.secrets),
     ),

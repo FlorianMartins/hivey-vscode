@@ -94,6 +94,25 @@ C'est un problème de vigilance humaine, pas d'exécution.
   hasard ;
 - l'absence de rappel d'approbation vaut refus (`runTurn` : le silence n'est pas un consentement).
 
+**En arrière-plan, personne ne regarde — donc la barrière est plus haute, pas plus basse.**
+Une tâche de fond (`src/core/background/`) obtient son propre **worktree git** sur sa propre branche,
+et deux limites qui ne sont pas celles du mode interactif :
+
+- **sans moteur de conteneur, `run_command` est REFUSÉ** et non exécuté sur l'hôte. C'est la décision
+  qui rend le reste défendable : un agent de fond capable de lancer n'importe quoi sur l'hôte est un
+  agent de fond que personne ne devrait démarrer. Le refus nomme les deux issues — installer Docker
+  ou Podman, ou lancer la tâche au premier plan — parce que « refusé » sans étape suivante est la
+  façon dont quelqu'un finit par lancer la commande à la main ;
+- avec un moteur, **aucun réseau du tout** (`--network none`), **seul le worktree monté**, et des
+  quotas de processeur et de mémoire pour qu'une compilation emballée ne mette pas la machine à
+  genoux en l'absence de son auteur. Un test le vérifie **contre un vrai conteneur** : pas
+  d'interface réseau, pas de résolution de noms, et un chemin hors du worktree illisible.
+
+Les **outils de fichier** sont un jeu à part, enraciné dans le worktree — pas ceux de l'éditeur, qui
+sont enracinés dans l'espace de travail et permettraient à l'agent de modifier le fichier que son
+auteur a ouvert, au milieu de sa propre édition. Et il n'y a **aucun outil git** : la branche reste
+locale, l'agent ne pousse jamais, et un test lit le module pour s'en assurer.
+
 **La promotion vers la production n'est pas un outil de l'agent**, et ne peut pas être configurée
 pour l'être. Sur une partition gérée par ARCAD Elias, un changement n'entre pas en production parce
 que quelqu'un a édité un membre : il est extrait, modifié, réintégré, construit, puis **promu** par

@@ -460,6 +460,23 @@ export const FR: Record<string, string> = {
   "Hivey Code is in its safest mode: {0}": "Hivey Code est dans son mode le plus sûr : {0}",
   "The policy is read from {0}.": "La politique est lue depuis {0}.",
   "Where is the policy?": "Où est la politique ?",
+  "A background task needs a folder open: it works in a git worktree of it.":
+    "Une tâche de fond a besoin d'un dossier ouvert : elle travaille dans un worktree git de celui-ci.",
+  "No container engine, so this task will not be able to run any command. Start it anyway?":
+    "Aucun moteur de conteneur, donc cette tâche ne pourra exécuter aucune commande. La lancer quand même ?",
+  "Start it": "La lancer",
+  "Could not create the worktree: {0}": "Impossible de créer le worktree : {0}",
+  "Background task finished on {0}.": "Tâche de fond terminée sur {0}.",
+  "Background task cancelled on {0}.": "Tâche de fond annulée sur {0}.",
+  "Background task failed on {0}: {1}": "Tâche de fond en échec sur {0} : {1}",
+  "Nothing in the task reports a failure.": "Rien dans la tâche ne signale d'échec.",
+  "Open the diff": "Ouvrir le diff",
+  "Discard the branch": "Jeter la branche",
+  "Run a task in the background": "Lancer une tâche en arrière-plan",
+  "It gets its own branch and its own directory, and it never pushes.":
+    "Elle obtient sa propre branche et son propre répertoire, et elle ne pousse jamais.",
+  "No background task is running.": "Aucune tâche de fond en cours.",
+  "Background tasks": "Tâches en arrière-plan",
   "Run them": "Les exécuter",
   "Never in this workspace": "Jamais dans cet espace de travail",
   "The last 7 days": "Les 7 derniers jours",

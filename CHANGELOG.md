@@ -2,6 +2,50 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.79.0 — 2026-10-03
+
+### Ajouté
+
+- **Chantier 2.5 — une tâche en arrière-plan, isolée.** « Lancer une tâche en arrière-plan » crée un
+  **worktree git sur une nouvelle branche** et y exécute la boucle d'agent. Plusieurs tâches peuvent
+  tourner en parallèle — chacune a son worktree, donc elles ne voient ni le travail des autres ni
+  celui de la personne qui les a lancées. À la fin : la branche, un résumé, le diff ouvert dans
+  l'éditeur, et **le verdict de `verifyTurn()`** — parce qu'un agent qui a écrit un fichier, lancé les
+  tests, vu l'échec et s'est arrêté a « terminé » sans avoir réussi, et que l'auteur doit le savoir
+  avant de lire le diff.
+
+  ⚠️⚠️ **C'est la fonctionnalité au pire mode de défaillance du produit**, et la règle n'est donc pas
+  « demander moins puisque personne ne regarde » mais l'inverse : **sans moteur de conteneur,
+  `run_command` est REFUSÉ** et non exécuté sur l'hôte. Avec un moteur : **aucun réseau**
+  (`--network none`), **seul le worktree monté**, quotas de processeur et de mémoire,
+  `no-new-privileges`. Un test le vérifie **contre un vrai conteneur** — pas d'interface réseau, pas
+  de résolution de noms, un chemin hors du worktree illisible — et **échoue** si aucun moteur n'est
+  joignable.
+
+  ⚠️ **L'image n'est jamais devinée** : la première commande d'une tâche a autant de chances d'être
+  `make` que `npm test`, et se tromper produit un « command not found » qui se lit comme une
+  fonctionnalité cassée. Sans `background.image`, les commandes sont refusées.
+
+  ⚠️ **L'agent ne pousse jamais** : il n'y a aucun outil git du tout, la branche reste locale, et un
+  test lit les modules pour vérifier qu'aucune invocation n'est un `push`.
+
+### Précisé
+
+- **Les outils de fichier d'une tâche de fond sont un jeu à part**, enraciné dans le worktree et dont
+  chaque chemin passe par la règle d'appartenance (`underRoot`). Réutiliser ceux de l'éditeur aurait
+  permis à l'agent de modifier le fichier que son auteur a ouvert, au milieu de sa propre édition.
+  Le jeu est délibérément petit : pas de diagnostics (il n'y a pas d'éditeur), pas d'outil de plan
+  (personne ne le regarde se construire), aucun outil IBM i (une partition est partagée, et un agent
+  de fond qui en atteint une est l'inverse d'isolé).
+- **La commande est un seul argument** passé à `sh -c` dans le conteneur : construire la ligne comme
+  une chaîne et laisser un shell la découper est la façon dont un `; --privileged` dans une commande
+  devient un conteneur privilégié. Un test l'exige.
+- **L'absence de moteur est dite avant que la tâche démarre**, pas quand la première commande est
+  refusée : quelqu'un qui l'apprend vingt minutes plus tard a perdu vingt minutes.
+- Le worktree est créé sur une **branche nommée** depuis `HEAD` — pas détaché (du travail qu'il faut
+  secourir) et pas depuis un distant (chercher est une opération réseau qu'une tâche de fond n'a pas
+  à faire). Le répertoire est **laissé en place** à la fin : le supprimer emporterait le diff.
+
 ## 0.78.0 — 2026-10-03
 
 ### Ajouté
