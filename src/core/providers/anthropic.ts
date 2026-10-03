@@ -8,6 +8,7 @@
 import { request } from "../util/http.js";
 import { sseData, sseLines } from "../util/sse.js";
 import type { ChatDelta, ChatRequest, ChatResult, Provider, ToolCall, Usage } from "./types.js";
+import { toolCallsFromText } from "./textToolCall.js";
 import { EMPTY_USAGE, THINKING_BUDGET } from "./types.js";
 import { keepCacheMarks } from "./cache.js";
 import { describeHttpError } from "./openai.js";
@@ -161,6 +162,20 @@ export class AnthropicProvider implements Provider {
       .sort((a, b) => a[0] - b[0])
       .map(([i, b]) => ({ id: b.id ?? `call_${i}`, name: b.name ?? "", args: b.json || "{}" }))
       .filter((t) => t.name);
+
+    // The same fallback the OpenAI-compatible client has, for the same reason, applied here for
+    // symmetry rather than because Anthropic needs it: `api.anthropic.com` always returns `tool_use`
+    // natively. What does not is a GATEWAY speaking Anthropic's shape in front of something else —
+    // which is an ordinary enterprise deployment, and would have failed exactly as Ollama did.
+    // Leaving one of the two clients without the fallback would mean the bug is fixed depending on
+    // which wire format the operator's proxy happens to speak.
+    if (!toolCalls.length && text.trim()) {
+      const written = toolCallsFromText(text, (req.tools ?? []).map((t) => t.name));
+      if (written.length) {
+        toolCalls.push(...written);
+        text = "";
+      }
+    }
     if (toolCalls.length) stopReason = "tool_calls";
 
     return { text, reasoning, toolCalls, usage, stopReason };

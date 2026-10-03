@@ -311,7 +311,7 @@ décisions : [`docs/adr/`](https://github.com/FlorianMartins/hivey-vscode/blob/m
 ## Développement
 
 ```bash
-npm test               # construit les bundles, puis 1078 tests (node:test)
+npm test               # construit les bundles, puis 1079 tests (node:test)
 npm run test:integration   # charge l'extension dans un vrai VS Code (43 tests, headless)
 node scripts/screenshots.mjs  # reprend les images du README depuis ce même éditeur
 npm audit --audit-level=high   # 0 vulnérabilité : 5 outils de dev, aucune dépendance à l'exécution
@@ -326,7 +326,7 @@ prix n'est écrit à la main**.
 
 ## État
 
-`0.87.0` — utilisable au quotidien, prêt à publier (voir `docs/PUBLISHING.md`).
+`0.88.0` — utilisable au quotidien, prêt à publier (voir `docs/PUBLISHING.md`).
 Ce qui est fait et ce qui ne l'est pas : [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Licence

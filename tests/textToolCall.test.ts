@@ -88,3 +88,18 @@ test("a call with no arguments at all is still a call", () => {
   const [call] = toolCallsFromText('{"name":"read_file"}', OFFERED);
   assert.equal(call?.args, "{}");
 });
+
+test("both wire formats have the fallback, not just the one that needed it", () => {
+  // The bug was found on Ollama, which speaks OpenAI's shape. A gateway speaking ANTHROPIC's shape in
+  // front of a local model is an ordinary enterprise deployment and would have failed identically —
+  // and fixing one client only means the bug is fixed depending on which proxy the operator runs.
+  // Read from the source, because this is a claim about two files agreeing.
+  const { readFileSync } = require("node:fs") as typeof import("node:fs");
+  for (const file of ["src/core/providers/openai.ts", "src/core/providers/anthropic.ts"]) {
+    const source = readFileSync(file, "utf8");
+    assert.match(source, /toolCallsFromText\(/, `${file} has no text fallback`);
+    // And it must be guarded by "the protocol returned nothing", or it would compete with a native
+    // call rather than stand in for a missing one.
+    assert.match(source, /!toolCalls\.length && text\.trim\(\)/, `${file} applies it unguarded`);
+  }
+});

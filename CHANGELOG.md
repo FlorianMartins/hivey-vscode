@@ -2,6 +2,21 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.88.0 — 2026-10-03
+
+### Corrigé
+
+- **Le filet des appels d'outils en texte s'applique aux deux formats de fil, pas seulement à celui
+  où le défaut a été trouvé.** Le bug a été vu sur Ollama, qui parle la forme OpenAI. Une
+  **passerelle au format Anthropic** devant un modèle local — un déploiement d'entreprise ordinaire
+  (LiteLLM, un proxy maison, un relais Bedrock) — aurait échoué à l'identique : `api.anthropic.com`
+  rend toujours ses `tool_use` nativement, ce qui se trouve devant une passerelle, non. Corriger un
+  seul client voulait dire que le défaut était réparé **selon le proxy que l'exploitant fait tourner**.
+
+  Un test lit maintenant les deux sources et exige qu'elles s'accordent : le filet présent dans les
+  deux, et dans les deux **gardé par « le protocole n'a rien rendu »**, pour qu'il remplace un appel
+  manquant au lieu de concurrencer un appel natif.
+
 ## 0.87.0 — 2026-10-03
 
 ### Corrigé
