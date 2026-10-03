@@ -2,7 +2,7 @@
 
 Honnête plutôt que flatteur : ce qui marche, ce qui manque, ce qui n'est pas vérifié.
 
-Ce document décrit l'état à la version **0.86.0**. Les chiffres qu'il annonce — version, tests, tâches d'évaluation — sont
+Ce document décrit l'état à la version **0.87.0**. Les chiffres qu'il annonce — version, tests, tâches d'évaluation — sont
 vérifiés par `npm run check:numbers`, que la CI exécute : ils ne peuvent plus vieillir en silence.
 Il était resté figé à `0.3.0` pendant trente-cinq
 versions, ce qui est sa propre leçon : une feuille de route périmée dit « projet abandonné » à
@@ -36,6 +36,7 @@ externe non exécuté ici est « non vérifié ».
 | 3.4 Famille de compétences `finance` | fait | **testé** — 8 compétences, chacune **déclarant** sa tâche (retombe si on en retire une), aucune lacune admise dans cette famille, et un test exige que les tâches couvrent ≥ 3 langages. Banc 51 → **56 tâches** : ISIN/LEI/BIC, règlement avec jours fériés fournis, heures de marché à travers un changement d'heure, FIX (longueur + somme de contrôle), packed/zoned avec débordement — 56/56 honnêtes dans les deux sens |
 | 3.5 Tableau de qualité publié | fait | **testé** — générateur livré (`--table eval/QUALITY.md`), 4 tests : non-mesuré ≠ 0 %, aucun concurrent en ligne de tableau, escalade jamais fondue dans la ligne du modèle nu (prouvé en retirant la séparation), prix inconnu jamais rendu « gratuit ». ⚠️ **aucun chiffre mesuré** : aucun modèle joignable ici, le fichier le dit et donne la commande |
 | Prêt pour la soumission | fait | **testé** — 11 tests sur les règles de pré-publication ; le contrôle lit le `.vsix` réel et a trouvé **8 liens cassés dont 2 déjà publiés** (images du readme français, et `README.md` contre `readme.md` sur Linux) + 1 lien mort d'ADR dans le dépôt ; câblé dans la CI. ⚠️ **non vérifié** : aucune soumission tentée — compte éditeur, jeton Marketplace et jeton Open VSX sont les 4 gestes que seul le mainteneur peut faire (`docs/PUBLISHING.md`) |
+| Passe de qualité mesurée | fait | **mesuré** — `local only` = **0/56**, dont **51/56 sans une seule étape d'outil**, en 33 min (`qwen2.5-coder:7b` sur Ollama, 12 cœurs, sans GPU) ; relevé dans `eval/QUALITY.md`. A révélé que **le mode agent local ne faisait rien** (Ollama rend les appels d'outils en texte, `tool_calls: null`) → corrigé, ADR-0026, 7 tests. ⚠️ **non mesuré** : `local + escalation` et les 3 préréglages (aucune clé de fournisseur ici) ; et aucune colonne Copilot/Bob, par principe |
 
 ### Phase 2 — Égaler Copilot sur ce que l'entreprise compare
 
@@ -331,7 +332,7 @@ Trois niveaux, jamais mélangés :
 ### Avant 0.39.0
 
 - Noyau indépendant de l'éditeur : anonymisation, fournisseurs, routeur, budget, complétion, session,
-  carte du dépôt, boucle d'agent. **1067 tests unitaires** plus **43 tests d'intégration dans un vrai
+  carte du dépôt, boucle d'agent. **1078 tests unitaires** plus **43 tests d'intégration dans un vrai
   VS Code**.
 - Barre latérale : conversation, historique, modèles, permissions, configuration ; modes
   discussion / plan / agent ; budget de raisonnement ; contexte explicite.

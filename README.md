@@ -178,11 +178,21 @@ one. This machine has no GPU. See [`docs/ROADMAP.md`](docs/ROADMAP.md).
 the local model alone, the local model with escalation, each preset — with quality and cost per task,
 over the repository's own evaluation set.
 
-**Every figure in it currently reads “not measured”, and that is deliberate.** No model is reachable
-from the machine it is generated on, so a number there would be invented, and an invented benchmark is
-the one artefact of this project that would be worth less than nothing — it is the one that gets
-quoted. What *is* proven, on every commit, is the half that makes a score mean anything: each task's
-check **fails on its untouched fixture** and **passes on its reference solution**.
+**One configuration has now been measured, and the result is bad.** `local only` —
+`qwen2.5-coder:7b` on Ollama, the setup this README tells you to install — scored **0 out of 56**.
+The number that explains it is next to it: in **51 of those 56 tasks the model never took a single
+tool step**. It wrote the change as a code block and asked whether it should proceed. In the five
+where it did act, it never once called an editing tool. So this is not a measurement of the model's
+reasoning; it is a measurement of a 7B model's willingness to act, on this runtime, through this
+client.
+
+That figure is published rather than buried because it is the honest state of the thing, and because
+it says what to fix next. It also happens to be the argument for the escalation design: a local model
+that cannot be relied on to act is exactly the case escalation exists for — though `local +
+escalation` has **not** been measured here, and reads *not measured* rather than being guessed at.
+
+What *is* proven, on every commit, is the half that makes any score mean anything: each task's check
+**fails on its untouched fixture** and **passes on its reference solution**.
 
 It carries **no column for Copilot and none for IBM Bob**, for the same reason: nobody here has run
 them on these tasks, and a column filled in from a published figure compares two different
@@ -509,7 +519,7 @@ Those documents are currently written in French; translations are welcome.
 ## Development
 
 ```bash
-npm test                   # builds the bundles, then 1067 tests (node:test)
+npm test                   # builds the bundles, then 1078 tests (node:test)
 npm run test:integration   # loads the extension into a real VS Code (43 tests, headless)
 npm run eval:verify        # every evaluation task must fail before a model touches it
 node scripts/screenshots.mjs  # retakes the README's images from that same editor
@@ -533,7 +543,7 @@ no entry, so a translation cannot silently rot.
 
 ## Status
 
-`0.86.0` — used every day by its author. [`docs/ROADMAP.md`](docs/ROADMAP.md) is the honest version:
+`0.87.0` — used every day by its author. [`docs/ROADMAP.md`](docs/ROADMAP.md) is the honest version:
 what is tested, what was only checked by hand, and what is written but has never run in the
 conditions it was written for. That last list is not empty and it is named.
 

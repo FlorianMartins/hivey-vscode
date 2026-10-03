@@ -6,6 +6,17 @@ export interface ToolCall {
   id: string;
   name: string;
   args: string; // raw JSON, parsed by the caller so a malformed call is a tool error, not a crash
+  /**
+   * Where the call came from, when it was not the protocol.
+   *
+   * `"text"` means the model wrote it in its message and the runtime returned no `tool_calls` — see
+   * `providers/textToolCall.ts`. Absent for an ordinary call, so no existing code changes meaning.
+   *
+   * It exists to be SHOWN. Reading a call out of prose collapses a separation the protocol keeps:
+   * with native calls, a model talking about an action cannot perform one. The user who approves is
+   * told which channel the action arrived on, because that is the part they cannot see otherwise.
+   */
+  source?: "text";
 }
 
 /**

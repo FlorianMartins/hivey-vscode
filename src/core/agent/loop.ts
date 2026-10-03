@@ -21,6 +21,7 @@ import type { ChatMessage, ChatResult, Provider, ReasoningEffort, ToolCall, Tool
 import { coerceArgs, parseToolArgs, unknownToolMessage, validateArgs } from "./toolcall.js";
 import { estimateMessageTokens } from "../util/tokens.js";
 import { restoreDeep } from "../redaction/index.js";
+import { t } from "../../shared/i18n.js";
 
 export interface ToolContext {
   /** Cancels when the user stops the turn. */
@@ -297,7 +298,13 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
       const needs = tool.approval(args);
       let approved = true;
       if (needs !== false) {
-        approved = opts.approve ? await opts.approve({ tool: call.name, description: needs, args }) : false;
+        // A call the runtime did not deliver through the protocol says so, here, where the person
+        // deciding can read it. Recognising a call written in a message collapses a separation the
+        // protocol maintains — talking about an action cannot be performing one — and the honest
+        // compensation is not cleverness, it is telling the user which channel this arrived on.
+        // See `providers/textToolCall.ts`.
+        const description = call.source === "text" ? `${needs} ${t("(read from the model's message, not from a tool call)")}` : needs;
+        approved = opts.approve ? await opts.approve({ tool: call.name, description, args }) : false;
       }
       if (!approved) {
         const result: ToolResult = { content: "The user declined this action.", isError: true };

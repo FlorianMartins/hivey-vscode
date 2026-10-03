@@ -78,11 +78,23 @@ export interface Totals {
   outOfSteps: number;
   truncated: number;
   escalations: number;
+  /**
+   * Tasks where the model took no tool step at all.
+   *
+   * The most informative number this harness produces, and it was not here until a real run needed
+   * it. A score of 0 % says a model is not good enough; this says WHY — `qwen2.5-coder:7b` on Ollama
+   * mostly does not act. It writes the change as a code block and asks whether it should proceed, so
+   * the task is failed without an edit ever being attempted. A reader deciding whether a local model
+   * can do agentic work needs that distinction far more than they need the percentage.
+   *
+   * A plain count, and 0 is meaningful: it means the model acted every time.
+   */
+  neverActed: number;
 }
 
 /** Nothing measured, stated as such. The one shape that must never be confused with a bad score. */
 export function emptyTotals(tasks = 0): Totals {
-  return { tasks, passed: 0, seconds: 0, unpriced: 0, outOfSteps: 0, truncated: 0, escalations: 0 };
+  return { tasks, passed: 0, seconds: 0, unpriced: 0, outOfSteps: 0, truncated: 0, escalations: 0, neverActed: 0 };
 }
 
 /**
@@ -97,6 +109,10 @@ export function totalsFor(outcomes: TaskOutcome[]): Totals {
   out.passed = outcomes.filter((o) => o.passed).length;
   out.passRate = out.passed / outcomes.length;
   out.seconds = round1(outcomes.reduce((n, o) => n + o.seconds, 0));
+
+  // Counted over TASKS, not runs, and before the early return: a task whose client reported nothing
+  // took no step either, and "the model never acted" is exactly as true then.
+  out.neverActed = outcomes.filter((o) => o.runs.reduce((n, r) => n + r.steps, 0) === 0).length;
 
   const runs = outcomes.flatMap((o) => o.runs);
   if (!runs.length) return out;

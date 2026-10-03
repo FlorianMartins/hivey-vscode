@@ -111,10 +111,20 @@ Résultat par défaut : **0 $**. Le premier centime dépensé est un choix expli
 choisir — le modèle local seul, le local avec escalade, chaque préréglage — avec la qualité et le
 coût par tâche, sur le banc d'évaluation du dépôt.
 
-**Tous les chiffres y disent aujourd'hui « non mesuré », et c'est volontaire.** Aucun modèle n'est
-joignable depuis la machine qui le génère, donc un chiffre y serait inventé — et un banc d'essai
-inventé est le seul artefact de ce projet qui vaudrait moins que rien, parce que c'est celui qu'on
-cite. Ce qui **est** prouvé, à chaque commit, c'est la moitié qui donne un sens à un score : le
+**Une configuration est désormais mesurée, et le résultat est mauvais.** `local only` —
+`qwen2.5-coder:7b` sur Ollama, soit le montage que ce README vous dit d'installer — obtient **0 sur
+56**. Le chiffre qui l'explique est juste à côté : sur ces 56 tâches, **51 fois le modèle n'a pas
+pris une seule étape d'outil**. Il écrit la modification dans un bloc de code et demande s'il doit
+procéder. Dans les cinq où il a agi, il n'a **jamais** appelé d'outil d'édition. Ce n'est donc pas une
+mesure du raisonnement du modèle : c'est une mesure de la disposition d'un 7B à agir, sur ce runtime,
+à travers ce client.
+
+Ce chiffre est publié plutôt qu'enterré parce que c'est l'état honnête de la chose, et parce qu'il dit
+quoi corriger ensuite. Il se trouve aussi qu'il est l'argument du mécanisme d'escalade : un modèle
+local dont on ne peut pas attendre qu'il agisse est exactement le cas pour lequel l'escalade existe —
+mais `local + escalation` n'a **pas** été mesuré ici, et affiche *not measured* au lieu d'être deviné.
+
+Ce qui **est** prouvé, à chaque commit, c'est la moitié qui donne un sens à n'importe quel score : le
 contrôle de chaque tâche **échoue sur sa fixture intacte** et **passe sur sa solution de référence**.
 
 Il ne porte **aucune colonne Copilot ni IBM Bob**, pour la même raison : personne ici ne les a
@@ -301,7 +311,7 @@ décisions : [`docs/adr/`](https://github.com/FlorianMartins/hivey-vscode/blob/m
 ## Développement
 
 ```bash
-npm test               # construit les bundles, puis 1067 tests (node:test)
+npm test               # construit les bundles, puis 1078 tests (node:test)
 npm run test:integration   # charge l'extension dans un vrai VS Code (43 tests, headless)
 node scripts/screenshots.mjs  # reprend les images du README depuis ce même éditeur
 npm audit --audit-level=high   # 0 vulnérabilité : 5 outils de dev, aucune dépendance à l'exécution
@@ -316,7 +326,7 @@ prix n'est écrit à la main**.
 
 ## État
 
-`0.86.0` — utilisable au quotidien, prêt à publier (voir `docs/PUBLISHING.md`).
+`0.87.0` — utilisable au quotidien, prêt à publier (voir `docs/PUBLISHING.md`).
 Ce qui est fait et ce qui ne l'est pas : [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Licence

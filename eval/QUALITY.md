@@ -3,34 +3,39 @@
 What each configuration scores on this repository's own evaluation set
 (56 tasks). Regenerate with `node scripts/evaluate.mjs --table eval/QUALITY.md`.
 
-## Nothing here has been measured
+Taken 2026-10-03T03:06:06.925Z against `http://127.0.0.1:11434/v1` with `qwen2.5-coder:7b`.
 
-**No figure below has been taken.** No model was reachable from the machine this was last
-generated on, so every cell would have been invented — and a table of invented numbers is the
-one artefact of this project that would be worth less than nothing, because it is the one
-somebody quotes.
+| configuration | passed | quality | never acted | time | cost |
+| --- | --- | --- | --- | --- | --- |
+| `local only` | 0/56 | 0 % | 51/56 | 2005 s | not priced |
+| `local + escalation` | — | not measured | — | — | — |
+| `hivey/free` | — | not measured | — | — | — |
+| `hivey/balanced` | — | not measured | — | — | — |
+| `hivey/pro` | — | not measured | — | — | — |
 
-What does exist is the thing that makes a score mean anything: every task's check is proven to
-**fail on its untouched fixture** and to **pass on its reference solution**, on every commit.
-A task set that is honest in both directions is the hard half. What is missing is a machine
-with a model on it.
+### How to read it
+
+**never acted** is how many of those tasks the model finished without taking a single tool
+step. It is here because a score on its own does not say whether a model was wrong or whether
+it never tried, and those are different problems: one is answered by a better model, the other
+by the client and the prompt. A configuration with a low score and a high *never acted* has not
+been measured on its reasoning at all.
+
+**not priced** is not free. A local endpoint bills nothing and costs electricity and time; the
+time is in the table and the price is absent rather than written as $0.00.
+
+To reproduce it, or to measure a configuration that reads *not measured*:
 
 ```bash
 npm run build
 node scripts/evaluate.mjs \
   --url http://127.0.0.1:11434/v1 --model qwen2.5-coder:7b \
-  --table eval/QUALITY.md
+  --as "local only" --table eval/QUALITY.md
 ```
 
-## The configurations it will compare
-
-| configuration | how |
-| --- | --- |
-| `local only` | the model on your own machine, never escalated |
-| `local + escalation` | the same model, with a remote one bought only by a proven failure |
-| `hivey/free` | the free-tier preset |
-| `hivey/balanced` | the everyday preset |
-| `hivey/pro` | the preset that spends in order to be right |
+`--as` names the configuration, because the harness is given a model and only the person
+running it knows which setup that model was standing in for. `--from <results.json>` rebuilds
+this document from a run that already happened, which matters when a run takes half an hour.
 
 ## What this table deliberately leaves out
 

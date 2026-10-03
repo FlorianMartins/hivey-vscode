@@ -1302,4 +1302,6 @@ export const FR: Record<string, string> = {
   "first {0} of {1} tokens": "{0} premiers jetons sur {1}",
   "outline of {0} symbols + head, {1} of {2} tokens": "plan de {0} symboles + début, {1} jetons sur {2}",
   "compile it and fix what the compiler says": "compiler et corriger ce que dit le compilateur",
+  "(read from the model's message, not from a tool call)":
+    "(lu dans le message du modèle, pas dans un appel d'outil)",
 };

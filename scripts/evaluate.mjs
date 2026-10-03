@@ -263,6 +263,24 @@ async function main() {
     process.exit(2);
   }
 
+  // The table, rebuilt from a run that already happened. A measurement takes hours on a CPU, and
+  // relabelling it or regenerating the document must not mean paying for it again.
+  const from = flag("from", "");
+  if (from) {
+    const saved = JSON.parse(await readFile(from, "utf8"));
+    const { rowsFromOutcomes } = await import(new URL("../dist/eval-report.mjs", import.meta.url));
+    const out = flag("table", "eval/QUALITY.md");
+    await writeTable(out, {
+      at: saved.at,
+      endpoint: saved.endpoint,
+      models: saved.models,
+      taskCount: tasks.length,
+      rows: rowsFromOutcomes(saved.results ?? [], flag("as", "") || undefined),
+    });
+    console.log(`written: ${out}${saved.complete === false ? "  (from a run that did not finish)" : ""}`);
+    process.exit(0);
+  }
+
   if (has("verify-tasks")) {
     process.exit((await verifyTasks(tasks)) ? 0 : 1);
   }
@@ -282,6 +300,10 @@ async function main() {
   // The committed comparison table. A path rather than a directory, because this one file is meant
   // to be read in the repository and diffed between runs — see src/core/eval/table.ts.
   const tableFile = flag("table", "");
+  // Which configuration these figures belong to — `local only`, `hivey/balanced`. The harness is
+  // given a model and cannot know that; only the person running it does, so it is said rather than
+  // inferred. Without it the row is labelled by the model, which is honest and less useful.
+  const as = flag("as", "");
 
   if (!endpoint || !models.length) {
     // Not an error, and this is deliberate: the nightly workflow has no model unless somebody
@@ -302,6 +324,10 @@ async function main() {
   process.env["HIVEY_CODE_PROVIDER"] = process.env["HIVEY_CODE_PROVIDER"] ?? "local";
 
   const results = [];
+  await mkdir(RESULTS_DIR, { recursive: true });
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const file = join(RESULTS_DIR, `${stamp}.json`);
+
   for (const model of models) {
     process.env["HIVEY_CODE_MODEL"] = model;
     for (const task of tasks) {
@@ -309,15 +335,16 @@ async function main() {
       const result = await runTask(task, model, endpoint);
       results.push(result);
       console.log(result.passed ? `pass (${result.seconds}s)` : `FAIL (${result.seconds}s)`);
+      // After every task, not at the end. A local model on a CPU takes a minute or two per task, so
+      // a full set is hours — and a run that writes only when it finishes is a run that loses
+      // everything to one interruption. What is on disk is always what has been measured so far,
+      // which is also the only honest thing for a partial run to be.
+      await writeFile(file, JSON.stringify({ at: new Date().toISOString(), endpoint, models, results, complete: false }, null, 2) + "\n");
     }
   }
 
   console.log(`\n${table(results, models)}`);
-
-  await mkdir(RESULTS_DIR, { recursive: true });
-  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const file = join(RESULTS_DIR, `${stamp}.json`);
-  await writeFile(file, JSON.stringify({ at: new Date().toISOString(), endpoint, models, results }, null, 2) + "\n");
+  await writeFile(file, JSON.stringify({ at: new Date().toISOString(), endpoint, models, results, complete: true }, null, 2) + "\n");
   console.log(`\nwritten: ${file}`);
 
   if (reportDir) {
@@ -336,7 +363,8 @@ async function main() {
       at: new Date().toISOString(),
       endpoint,
       taskCount: tasks.length,
-      rows: rowsFromOutcomes(results),
+      models,
+      rows: rowsFromOutcomes(results, as || undefined),
     });
     console.log(`written: ${tableFile}`);
   }

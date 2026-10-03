@@ -2,6 +2,70 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.87.0 — 2026-10-03
+
+### Corrigé
+
+- **⚠️⚠️ LE MODE AGENT NE FAISAIT RIEN SUR UN MODÈLE LOCAL.** Trouvé en lançant la première vraie
+  mesure, et c'est exactement ce qu'une mesure sert à trouver.
+
+  Ollama ne rend **pas** les appels d'outils de `qwen2.5-coder:7b` par le protocole — ni par sa couche
+  compatible OpenAI, ni par son endpoint natif. Il les écrit **en texte, dans `content`**, avec
+  `tool_calls: null` et `finish_reason: "stop"`. Le client voyait donc un message ordinaire sans appel
+  d'outil, imprimait le JSON comme s'il s'agissait d'une réponse, et ne modifiait aucun fichier
+  (`steps: 0`, `tools: {}`). Ce n'est pas une configuration exotique : c'est **la configuration par
+  défaut**, le modèle que ce README nomme sur le runtime que ce même README dit d'installer.
+
+  Un appel d'outil écrit dans le message est désormais reconnu, avec trois bornes : **seulement si le
+  protocole n'a rien rendu**, **seulement si l'appel est délimité et en fin de message** — « voici le
+  JSON que tu enverrais, ça supprimerait tout » reste une phrase — et **seulement pour un outil
+  réellement offert**. Voir [ADR-0026](docs/adr/0026-un-appel-d-outil-ecrit-dans-le-message.md).
+
+  ⚠️ **La règle a été assouplie une fois, après mesure** : la première version exigeait que le message
+  ne contienne *rien d'autre* que l'appel, et ces modèles **narrent avant d'agir** (« Avant de faire
+  quoi que ce soit, je vais vérifier que `count.js` existe… »), donc l'agent restait inopérant. Ce qui
+  est gardé est la frontière qui porte la garantie : **rien ne doit suivre l'appel**.
+
+  ⚠️ **Ce que ça coûte est dit, pas masqué.** Lire un appel dans la prose **réunit deux canaux que le
+  protocole tient séparés** : avec un appel natif, un modèle qui *parle* d'une action ne peut pas en
+  *faire* une. La compensation n'est pas de l'astuce, c'est de le dire — l'appel porte
+  `source: "text"` et **la carte d'approbation l'affiche** (« lu dans le message du modèle, pas dans
+  un appel d'outil »). L'action est contrôlée exactement comme un appel natif. Inscrit comme résidu
+  dans `docs/THREAT-MODEL.md`.
+
+### Ajouté
+
+- **`eval/QUALITY.md` porte enfin un chiffre mesuré — et il est mauvais.** `local only`
+  (`qwen2.5-coder:7b` sur Ollama, 12 cœurs, sans GPU) obtient **0 sur 56**, en 33 minutes. Le chiffre
+  qui l'explique est à côté : **51 des 56 tâches sans une seule étape d'outil**. Et dans les 5 où le
+  modèle a agi, il n'a **jamais** appelé d'outil d'édition — `run_command` quatre fois, `list_files`
+  une fois, une étape chacune. Ce n'est donc pas une mesure du raisonnement du modèle mais de sa
+  **disposition à agir**, sur ce runtime, à travers ce client.
+
+  Le chiffre est publié plutôt qu'enterré : c'est l'état honnête de la chose, et il dit quoi corriger
+  ensuite. `local + escalation` et les préréglages restent à **not measured** — aucun n'a été exécuté,
+  et aucun n'est deviné.
+
+- **Une colonne *never acted*** dans le tableau. Un score seul ne dit pas si un modèle s'est trompé ou
+  s'il n'a jamais essayé, et ce sont deux problèmes différents : l'un se règle avec un meilleur
+  modèle, l'autre avec le client et le prompt. Comptée sur les **tâches** et avant la sortie
+  anticipée, parce qu'une tâche dont le client n'a rien rapporté n'a pas pris d'étape non plus.
+
+- **`--as <configuration>`**, parce que le harnais reçoit un *modèle* et que seule la personne qui
+  l'exécute sait de quelle configuration ce modèle tenait la place. Nommé plutôt que déduit.
+- **`--from <results.json>`**, pour régénérer le tableau depuis un run déjà fait : une mesure prend
+  une demi-heure, la relabelliser ne doit pas la refaire payer.
+- Le tableau mesuré explique maintenant **comment le lire** (ce que valent *never acted* et *not
+  priced*) et **comment le reproduire**, avec l'endpoint et le modèle réellement employés.
+
+### Précisé
+
+- **Les résultats sont écrits après chaque tâche**, plus seulement à la fin. Un modèle local sur
+  processeur prend une à deux minutes par tâche ; un run qui n'écrit qu'en terminant perd tout à la
+  première interruption, et ce qui est sur le disque est désormais toujours ce qui a été mesuré.
+- Les deux README annonçaient « aucun chiffre mesuré » : ils portent le résultat, la cause, et ce qui
+  reste non mesuré.
+
 ## 0.86.0 — 2026-10-03
 
 ### Ajouté

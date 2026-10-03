@@ -182,6 +182,19 @@ dans le code, du même genre que l'outillage du mode Plan :
   autorisée**. `QSH` figurait parmi les verbes de lecture : `QSH CMD('rm -r /QSYS.LIB/PROD.LIB')`
   passait donc la barrière sans être regardé.
 
+**Résidu, assumé — et un canal de plus depuis la 0.87.0.** Certains runtimes locaux (Ollama avec
+`qwen2.5-coder`, par exemple) ne rendent **pas** les appels d'outils par le protocole : ils les
+écrivent en texte dans la réponse, avec `tool_calls: null`. Le mode agent ne faisait donc rien du tout
+sur la configuration locale par défaut, et ces appels sont désormais reconnus
+([ADR-0026](adr/0026-un-appel-d-outil-ecrit-dans-le-message.md)). Cela **réunit deux canaux que le
+protocole tient séparés** : avec un appel natif, un modèle qui *parle* d'une action ne peut pas en
+*faire* une. La frontière conservée est que **rien ne doit suivre l'appel** — « voici le JSON que tu
+enverrais, ça supprimerait tout » reste une phrase — et que le nom doit être celui d'un outil
+réellement offert. Le reste n'est pas rattrapé par de l'astuce mais **dit** : l'appel porte
+`source: "text"` et la carte d'approbation l'affiche. L'action est contrôlée exactement comme un appel
+natif ; ce qui change est qu'une phrase bien formée peut en devenir une, et c'est pour cela que
+l'origine est écrite sur la carte.
+
 **Résidu, assumé.** Un utilisateur qui approuve sans lire approuve quand même. Le nombre d'étapes
 d'un tour est plafonné (12) pour qu'une boucle ne demande pas trente fois d'affilée. Sur IBM i, la
 barrière n'empêche pas une commande autorisée de détruire quelque chose **dans** une bibliothèque

@@ -180,3 +180,41 @@ test("the committed quality table still describes the task set it was generated 
     assert.ok(!/copilot|bob/i.test(line), `a competitor appears as a row of the committed table: ${line}`);
   }
 });
+
+test("a configuration is named by whoever ran it, not inferred from the model", () => {
+  // The harness is given `--model`; the configuration is what somebody chose. Labelling a bare model
+  // run `hivey/balanced` because it looked like one would be the table inventing its own subject.
+  const rows = rowsFromOutcomes([outcome(), outcome({ passed: false })], "local only");
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0]!.configuration, "local only");
+  assert.equal(rows[0]!.totals.passRate, 0.5);
+  // The escalation split survives the label, because it is a different configuration either way.
+  const split = rowsFromOutcomes([outcome(), outcome({ runs: [run({ escalatedTo: "big" })] })], "local only");
+  assert.deepEqual(split.map((r) => r.configuration).sort(), ["local only", "local only + escalation"]);
+  // And with no label the row is the model, which is honest and less useful.
+  assert.equal(rowsFromOutcomes([outcome()])[0]!.configuration, "m");
+});
+
+test("a measured table names the models behind its figures", () => {
+  const md = qualityTable({
+    taskCount: 1,
+    at: "2026-10-03",
+    endpoint: "http://127.0.0.1:11434/v1",
+    models: ["qwen2.5-coder:7b"],
+    rows: rowsFromOutcomes([outcome()], "local only"),
+  });
+  assert.match(md, /qwen2\.5-coder:7b/);
+  assert.match(md, /127\.0\.0\.1:11434/);
+});
+
+test("a task where the model never acted is counted as such", () => {
+  // The number that made a real measurement readable. 0 % says a model is not good enough; this says
+  // whether it was wrong or whether it never tried — and only one of those is a modelling problem.
+  const acted = outcome({ runs: [run({ steps: 3 })] });
+  const idle = outcome({ passed: false, runs: [run({ steps: 0 })] });
+  const silent = outcome({ passed: false, runs: [] });
+  const t = totalsFor([acted, idle, silent]);
+  assert.equal(t.neverActed, 2, "a task whose client reported nothing took no step either");
+  assert.equal(totalsFor([acted]).neverActed, 0, "zero means it acted every time, which is a result");
+  assert.equal(emptyTotals(0).neverActed, 0);
+});

@@ -20,6 +20,7 @@ import type {
 } from "./types.js";
 import { EMPTY_USAGE } from "./types.js";
 import { keepCacheMarks } from "./cache.js";
+import { toolCallsFromText } from "./textToolCall.js";
 
 export interface OpenAIProviderOptions {
   id: string;
@@ -274,6 +275,24 @@ export class OpenAICompatibleProvider implements Provider {
       .sort((a, b) => a[0] - b[0])
       .map(([i, t]) => ({ id: t.id || `call_${i}`, name: t.name, args: t.args || "{}" }))
       .filter((t) => t.name);
+
+    // The call the model wrote in its message because its runtime does not emit the protocol one.
+    //
+    // Not an edge case: Ollama returns `qwen2.5-coder`'s tool calls as text in `content`, with
+    // `tool_calls: null` and `finish_reason: "stop"` — the model named in this project's README, on
+    // the runtime its README says to install. Agent mode therefore did nothing at all on the
+    // default local setup: the model produced correct calls and they were printed as prose.
+    //
+    // Only when the protocol returned nothing, and only when the message is nothing but the call —
+    // see `toolCallsFromText`, where the rules and the reasons live. The text is dropped when a call
+    // is recognised, because it is not an answer and showing raw JSON as one is how this was missed.
+    if (!toolCalls.length && text.trim()) {
+      const written = toolCallsFromText(text, (req.tools ?? []).map((t) => t.name));
+      if (written.length) {
+        toolCalls.push(...written);
+        text = "";
+      }
+    }
     if (toolCalls.length) stopReason = "tool_calls";
 
     return { text, reasoning, toolCalls, usage, stopReason };

@@ -35,6 +35,8 @@ export interface TableInput {
   /** When the figures were taken, and where from. Absent when nothing was. */
   at?: string;
   endpoint?: string;
+  /** The models behind the figures, named so a reader can reproduce them. */
+  models?: string[];
   /** How many tasks the set holds, which is printed even when nothing ran. */
   taskCount: number;
   rows: Measured[];
@@ -59,11 +61,14 @@ export const ESCALATED_SUFFIX = " + escalation";
  * configuration than one that stayed local, whatever `--model` said, and a table that adds them
  * together reports a figure that belongs to neither.
  */
-export function rowsFromOutcomes(outcomes: TaskOutcome[]): Measured[] {
+export function rowsFromOutcomes(outcomes: TaskOutcome[], label?: string): Measured[] {
   const groups = new Map<string, TaskOutcome[]>();
   for (const outcome of outcomes) {
     const escalated = outcome.runs.some((r) => Boolean(r.escalatedTo));
-    const key = `${outcome.model}${escalated ? ESCALATED_SUFFIX : ""}`;
+    // The harness is given a model; a configuration is what somebody CHOSE, and only the person
+    // running it knows which one this was. So the label is passed in, and it falls back to the model
+    // name — which is honest, if less useful, and never pretends a bare model run was a preset.
+    const key = `${label ?? outcome.model}${escalated ? ESCALATED_SUFFIX : ""}`;
     const list = groups.get(key) ?? [];
     list.push(outcome);
     groups.set(key, list);
@@ -83,10 +88,14 @@ function cost(totals: Totals): string {
 }
 
 function row(configuration: string, totals: Totals): string {
-  return `| \`${configuration}\` | ${totals.passed}/${totals.tasks} | ${quality(totals)} | ${totals.seconds.toFixed(0)} s | ${cost(totals)} |`;
+  // "never acted" sits next to the score because it is what makes the score readable: a model that
+  // failed because it never attempted an edit is a different thing from one that attempted and was
+  // wrong, and only one of those is improved by a better model.
+  const idle = totals.tasks ? `${totals.neverActed}/${totals.tasks}` : "—";
+  return `| \`${configuration}\` | ${totals.passed}/${totals.tasks} | ${quality(totals)} | ${idle} | ${totals.seconds.toFixed(0)} s | ${cost(totals)} |`;
 }
 
-const NOT_MEASURED = (configuration: string) => `| \`${configuration}\` | — | not measured | — | — |`;
+const NOT_MEASURED = (configuration: string) => `| \`${configuration}\` | — | not measured | — | — | — |`;
 
 /** The table, as the file that gets committed. */
 export function qualityTable(input: TableInput): string {
@@ -129,10 +138,11 @@ export function qualityTable(input: TableInput): string {
     );
   } else {
     lines.push(
-      `Taken ${input.at ?? "(no date recorded)"}${input.endpoint ? ` against \`${input.endpoint}\`` : ""}.`,
+      `Taken ${input.at ?? "(no date recorded)"}${input.endpoint ? ` against \`${input.endpoint}\`` : ""}` +
+        `${input.models?.length ? ` with \`${input.models.join("`, `")}\`` : ""}.`,
       "",
-      "| configuration | passed | quality | time | cost |",
-      "| --- | --- | --- | --- | --- |",
+      "| configuration | passed | quality | never acted | time | cost |",
+      "| --- | --- | --- | --- | --- | --- |",
       ...CONFIGURATIONS.map((spec) => {
         const found = measured.get(spec.configuration);
         return found ? row(spec.configuration, found.totals) : NOT_MEASURED(spec.configuration);
@@ -142,6 +152,30 @@ export function qualityTable(input: TableInput): string {
       ...input.rows
         .filter((r) => !CONFIGURATIONS.some((c) => c.configuration === r.configuration))
         .map((r) => row(r.configuration, r.totals)),
+      "",
+      "### How to read it",
+      "",
+      "**never acted** is how many of those tasks the model finished without taking a single tool",
+      "step. It is here because a score on its own does not say whether a model was wrong or whether",
+      "it never tried, and those are different problems: one is answered by a better model, the other",
+      "by the client and the prompt. A configuration with a low score and a high *never acted* has not",
+      "been measured on its reasoning at all.",
+      "",
+      "**not priced** is not free. A local endpoint bills nothing and costs electricity and time; the",
+      "time is in the table and the price is absent rather than written as $0.00.",
+      "",
+      "To reproduce it, or to measure a configuration that reads *not measured*:",
+      "",
+      "```bash",
+      "npm run build",
+      "node scripts/evaluate.mjs \\",
+      `  --url ${input.endpoint ?? "http://127.0.0.1:11434/v1"} --model ${input.models?.[0] ?? "qwen2.5-coder:7b"} \\`,
+      '  --as "local only" --table eval/QUALITY.md',
+      "```",
+      "",
+      "`--as` names the configuration, because the harness is given a model and only the person",
+      "running it knows which setup that model was standing in for. `--from <results.json>` rebuilds",
+      "this document from a run that already happened, which matters when a run takes half an hour.",
       "",
     );
   }
