@@ -71,7 +71,7 @@ export interface ManagedPolicy {
   /** IBM i libraries the agent may change. The user can narrow this, never widen it. */
   writableLibraries?: string[];
   /** Ceilings. A user figure above one of these is clamped to it. */
-  budget?: { perRequestUsd?: number; dailyUsd?: number };
+  budget?: { perRequestUsd?: number; dailyUsd?: number; perRequestTokens?: number };
   /** MCP servers allowed, by fingerprint of their command and tool definitions. */
   mcp?: Array<{ name: string; fingerprint: string }>;
   /** Hook commands allowed, by fingerprint. An empty array forbids hooks entirely. */
@@ -217,7 +217,7 @@ export interface Restrictable {
   deniedPaths: string[];
   autoApprove: ApprovalCeiling;
   writableLibraries: string[];
-  budget: { perRequestUsd: number; dailyUsd: number };
+  budget: { perRequestUsd: number; dailyUsd: number; perRequestTokens: number };
 }
 
 /** What was overridden, so the interface can say "managed by your organisation" against each one. */
@@ -289,6 +289,14 @@ export function applyPolicy(settings: Restrictable, state: PolicyState): Applied
       ? intersect(out.writableLibraries, policy.writableLibraries)
       : [...policy.writableLibraries];
     managed.push("ibmi.writableLibraries");
+  }
+  // A size ceiling of 0 means "no limit", so a policy tightening it has to be able to go from 0 to a
+  // number — which is a RESTRICTION even though the number is larger. Treated as unlimited rather
+  // than as zero, the way every other "0 = off" limit in this file is.
+  const sizeNow = out.budget.perRequestTokens || Infinity;
+  if (policy.budget?.perRequestTokens !== undefined && sizeNow > policy.budget.perRequestTokens) {
+    out.budget.perRequestTokens = policy.budget.perRequestTokens;
+    managed.push("budget.perRequestTokens");
   }
   if (policy.budget?.perRequestUsd !== undefined && out.budget.perRequestUsd > policy.budget.perRequestUsd) {
     out.budget.perRequestUsd = policy.budget.perRequestUsd;

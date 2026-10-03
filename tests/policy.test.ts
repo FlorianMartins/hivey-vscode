@@ -44,7 +44,7 @@ const POLICY: ManagedPolicy = {
   deniedCommands: ["curl", "scp"],
   autoApprove: "off",
   writableLibraries: ["TSTCFC", "DEVCFC"],
-  budget: { perRequestUsd: 0.5, dailyUsd: 5 },
+  budget: { perRequestUsd: 0.5, dailyUsd: 5, perRequestTokens: 200_000 },
   disabled: ["completion"],
 };
 
@@ -59,7 +59,7 @@ test("a signed policy is accepted", () => {
 test("a policy altered after signing is refused, and the refusal says which of the two happened", () => {
   const signed = JSON.parse(envelopeFor(POLICY)) as { policy: string; signature: string };
   // One byte of the document changed: the budget raised.
-  const tampered = { ...POLICY, budget: { perRequestUsd: 50, dailyUsd: 500 } };
+  const tampered = { ...POLICY, budget: { perRequestUsd: 50, dailyUsd: 500, perRequestTokens: 200_000 } };
   signed.policy = Buffer.from(JSON.stringify(tampered)).toString("base64");
   const state = verifyPolicy({ envelope: JSON.stringify(signed), publicKey: PUBLIC });
   assert.equal(state.kind, "refused");
@@ -137,7 +137,7 @@ const permissive: Restrictable = {
   deniedPaths: [],
   autoApprove: "all",
   writableLibraries: [],
-  budget: { perRequestUsd: 10, dailyUsd: 100 },
+  budget: { perRequestUsd: 10, dailyUsd: 100, perRequestTokens: 200_000 },
 };
 
 test("a permissive user setting is ignored, one field at a time", () => {
@@ -173,7 +173,7 @@ test("a user who is STRICTER than the policy is left alone", () => {
     redaction: "strict",
     allowUnredacted: false,
     autoApprove: "off",
-    budget: { perRequestUsd: 0.01, dailyUsd: 0.5 },
+    budget: { perRequestUsd: 0.01, dailyUsd: 0.5, perRequestTokens: 200_000 },
   };
   const { settings, managed } = applyPolicy(strict, verifyPolicy({ envelope: envelopeFor(POLICY), publicKey: PUBLIC }));
   assert.equal(settings.budget.dailyUsd, 0.5, "the policy's ceiling must not raise a lower user figure");

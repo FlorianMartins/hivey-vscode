@@ -17,6 +17,7 @@ import { join, dirname } from "node:path";
 import { stdin, stdout } from "node:process";
 import { runTurn, type TurnResult } from "../core/agent/loop.js";
 import { makeProvider, PROVIDER_IDS, type ProviderId } from "../core/providers/index.js";
+import { hiveyModel, isHivey } from "../core/router/hivey.js";
 import { isLocalEndpoint, redactMessages, Vault, streamingRestorer } from "../core/redaction/index.js";
 import type { RedactionLevel } from "../core/redaction/types.js";
 import type { RunRecord } from "../core/eval/report.js";
@@ -128,6 +129,19 @@ class FileSpendStore implements SpendStore {
 async function main(): Promise<void> {
   const cwd = process.cwd();
   const cfg = await loadConfig(cwd);
+  // A Hivey preset is a ROUTING, not a model id — sending `hivey` as a model gets a 400 saying it is
+  // not one. The extension resolves it per role; the terminal resolves it once, as `deep`, because a
+  // terminal turn drives the tool loop and `deep` is the role that exists for exactly that.
+  //
+  // Without this the presets could not be tried from the terminal at all, which also meant the
+  // evaluation harness — which drives this client — could not measure them. A table that promises a
+  // row per preset and a harness that cannot fill one is a table that stays empty for a reason
+  // nobody can see.
+  if (isHivey(cfg.model)) {
+    const resolved = hiveyModel(cfg.model, "deep");
+    console.log(C.dim(t("{0} → {1}", cfg.model, resolved)));
+    cfg.model = resolved;
+  }
   const apiKey = cfg.apiKeyEnv ? process.env[cfg.apiKeyEnv] : process.env[ENV.key];
   const isLocal = isLocalEndpoint(cfg.baseUrl);
   const provider = makeProvider({ id: cfg.provider, baseUrl: cfg.baseUrl, apiKey });
@@ -311,7 +325,7 @@ async function main(): Promise<void> {
       }
       const price = prices(cfg.model);
       const estimate = price ? (built.estimatedTokens * price.in * 1.25) / 1_000_000 : 0;
-      const verdict = budget.check(estimate);
+      const verdict = budget.check(estimate, built.estimatedTokens);
       if (!verdict.ok) {
         console.log(C.red(t("budget: {0}", verdict.message)));
         process.off("SIGINT", onSigint);

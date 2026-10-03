@@ -83,8 +83,11 @@ demandée ; un chantier n'est terminé que lorsque les onze étapes sont faites.
 5. **Intégration.** Ajoute un test dans `src/test/suite/` quand le risque est dans le câblage :
    sortie réseau, préfixe, approbation, porte de sortie.
 6. **Réglages.** Tout nouveau réglage a un défaut sûr (désactivé s'il envoie quoi que ce soit), se
-   lit par espace de travail, est décrit en anglais et en français, et documenté dans `README.md` et
-   `README.fr.md`.
+   lit par espace de travail, est décrit en anglais et en français, et documenté dans `README.md`.
+   Si le réglage change ce que l'utilisateur peut comprendre du produit, mets à jour le chapitre
+   concerné de `docs/cours/` — et la ligne de version de son index, que `npm run check:course`
+   vérifie. (`README.fr.md` a été supprimé : c'était la traduction du README, donc deux documents à
+   maintenir pour le même lecteur, et celui qui était en retard était toujours le français.)
 7. **Flux de données.** Tout nouveau flux met à jour `docs/PRIVACY.md` (une ligne du tableau) et
    `docs/THREAT-MODEL.md` (vecteur, impact, parade dans le code, résidu assumé).
 8. **Décision.** Toute décision structurante a son ADR `docs/adr/NNNN-<titre>.md`, en français, avec

@@ -2,6 +2,100 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.89.0 — 2026-10-03
+
+### Corrigé
+
+- **⚠️⚠️ « Récence » était revendiquée dans l'en-tête du fichier généré et n'existait pas.** Le terme
+  valait `1.5 × (created / newest)` sur deux horodatages Unix : mesuré sur le catalogue réel, il
+  **variait de 0,0885 entre GPT-3.5 (2023) et un modèle publié la veille**, quand un bonus d'éditeur
+  vaut 1,2. Ce n'était pas un critère, c'était une erreur d'arrondi portant son nom. Conséquences :
+  `hivey` tournait sur `claude-opus-5` (juillet, **25 $/M**) alors que `claude-opus-5.5` (septembre,
+  **20 $/M**) tenait dans le même budget — plus récent **et** moins cher ; et `hivey/smart`, le
+  préréglage qui existe pour être le meilleur, tournait sur `gpt-5-pro` — **octobre 2025, 120 $/M** —
+  quand `gpt-6.1-sol-pro` était disponible à **10 $/M**. **Douze fois le prix pour un modèle d'un an
+  plus vieux.** Voir [ADR-0027](docs/adr/0027-la-recence-etait-une-erreur-d-arrondi.md).
+
+- **Les règles de sélection déménagent dans le cœur** (`src/core/router/curate.ts`, 14 tests) et le
+  script importe le paquet construit. Elles vivaient dans un script, donc hors de portée des tests —
+  et le défaut ci-dessus est exactement celui qu'un test attrape et qu'une relecture ne voit pas.
+
+- ⚠️ **Un modèle sans prix coté n'était pas refusé** là où la règle le disait : elle lisait
+  `outPrice(m) > 0` et `outPrice` rend `Infinity`, donc `Infinity > 0` laissait passer précisément ce
+  que cette ligne existe pour exclure. Inoffensif **par accident** — le plafond du rôle les rejetait
+  plus loin. Une règle qui tient parce qu'autre chose l'attrape cesse de tenir quand l'autre chose
+  bouge.
+
+- **Le client terminal résout un préréglage.** Envoyer `hivey` comme identifiant de modèle donnait une
+  erreur 400 : les préréglages ne pouvaient donc pas être essayés depuis le terminal **ni mesurés**,
+  puisque le banc pilote ce client. Un tableau qui promet une ligne par préréglage et un harnais
+  incapable d'en remplir une, c'est un tableau vide pour une raison invisible.
+
+### Ajouté
+
+- **Un plafond de taille par requête** (`hiveyCode.budget.perRequestTokens`, 200 000 par défaut), et
+  la raison est la conséquence la plus instructive de ce chantier. Les plafonds de dépense étaient
+  calibrés quand le préréglage du milieu visait un modèle à 120 $/M ; en le passant aux modèles
+  actuels à 10 $/M — **une amélioration de dix fois** — le même prompt emballé de 400 000 jetons est
+  tombé à 80 centimes, sous un plafond de 2 $, et **passait sans question**. Un plafond en dollars se
+  **desserre à chaque baisse du marché**, ce qui pour un outil dont l'argument est que votre code ne
+  part pas est exactement la mauvaise direction. 400 000 jetons de votre dépôt qui partent méritent
+  une question à n'importe quel prix. Une politique d'entreprise peut le resserrer, jamais le
+  desserrer ; et « toujours autoriser » relève désormais le plafond **de taille** et non un plafond en
+  dollars que personne n'avait interrogé.
+
+- **Un filtre de péremption** : dans une même gamme d'un même éditeur, un modèle plus récent, pas plus
+  cher, avec au moins autant de contexte et d'outils **retire** l'autre avant le classement. Un score
+  est un équilibre entre choses désirables ; « ne jamais payer plus pour un modèle plus vieux de la
+  même gamme » est une règle, et une règle va dans un filtre. ⚠️ **« Même gamme » a été appris à la
+  dure au premier essai** : la règle était « même éditeur », et comme Anthropic publie Opus et Sonnet
+  ensemble, `claude-sonnet-5.5` (plus récent, moitié prix) a déclaré le vaisseau amiral périmé par le
+  milieu de gamme.
+
+- **`HIVEY_OVERLAPS`** dans le fichier généré : les rôles où un préréglage plus cher a acheté la même
+  chose qu'un moins cher. ⚠️ Une fois la récence réparée, `hivey` et `hivey/smart` ont choisi le même
+  modèle pour `deep`, à **0,007 point** près. À cette distance le choix est du bruit, et ajuster les
+  poids jusqu'à ce qu'ils diffèrent aurait été ajuster les règles à un catalogue d'un après-midi. La
+  lecture honnête : le meilleur modèle actuel tient déjà dans le budget du moins cher, donc le plus
+  cher n'a rien de mieux à acheter. Le produit le **dit** au lieu de prétendre le contraire.
+
+### Documentation
+
+- **`README.fr.md` est supprimé, et remplacé par un cours.** Il avait deux défauts. Il **doublait le
+  travail** sans rien ajouter — deux documents à maintenir, donc un des deux toujours en retard, et
+  c'était toujours le français (il a annoncé 284 tests quand il y en avait 700, et la version
+  `0.11.1` quand le projet était à `0.61.0`). Et il s'adressait **au même lecteur** que l'anglais :
+  quelqu'un qui code.
+
+  À la place, **`docs/cours/`** : treize chapitres et un glossaire qui expliquent le produit **à
+  quelqu'un qui ne sait pas programmer** — ce qu'est un modèle de langage, un jeton, une fenêtre de
+  contexte ; où tourne le modèle et ce que « souverain » veut dire ; ce qu'est une API et comment un
+  modèle demande à agir ; les trois modes et pourquoi « Plan ne modifie rien » est une propriété du
+  code et non une consigne ; ce que **RAG** veut dire et pourquoi il n'y a **pas** d'index vectoriel
+  ici ; ce qu'est **MCP**, comment on en branche un et ce qu'est l'empoisonnement d'outils ; la
+  chaîne de confidentialité étape par étape, hachage et signature expliqués ; le coût et l'escalade ;
+  IBM i et pourquoi une colonne change le sens d'une ligne ; comment on mesure la qualité ; et une
+  installation pas-à-pas sans terminal. Chaque chapitre finit par ce que le projet a **choisi** et
+  pourquoi, parce que la plupart de ces choix sont des arbitrages.
+
+- **Et il est tenu par un contrôle, parce qu'une promesse n'est pas un mécanisme.** L'index déclare la
+  version pour laquelle il est à jour, et `npm run check:course` **refuse la construction** quand ce
+  n'est plus celle du projet. ⚠️ **Délibérément non réparable automatiquement** : réécrire le numéro
+  est exactement ce qui ne doit pas être automatique, puisque le travail est de lire ce qui a changé
+  et de décider ce que le cours doit dire. Le contrôle attrape aussi un chapitre que l'index ne cite
+  pas, et un lien de l'index vers un chapitre qui n'existe pas — les deux faces d'une édition laissée
+  à moitié.
+
+- La méthode (`docs/PROMPT-ROADMAP.md`) demande désormais de mettre à jour le chapitre concerné quand
+  un réglage change ce que l'utilisateur peut comprendre du produit.
+
+### Précisé
+
+- Le prix est lu vers le haut **proportionnellement au budget du préréglage** : un budget n'est pas
+  une limite qu'on évite, c'est ce à quoi sert le préréglage.
+- Le workflow quotidien du catalogue fait désormais `npm ci` et `npm run build`, puisque les règles
+  qu'il applique sont dans le cœur et testées.
+
 ## 0.88.0 — 2026-10-03
 
 ### Corrigé

@@ -59,7 +59,7 @@ export interface Settings {
     auditLog: boolean;
     customTerms: string[];
   };
-  budget: { perRequestUsd: number; dailyUsd: number };
+  budget: { perRequestUsd: number; dailyUsd: number; perRequestTokens: number };
   context: {
     /** The user's figure when they set one, `undefined` when the budget is derived from the model. */
     maxTokens: number | undefined;
@@ -271,6 +271,7 @@ function readSettingsRaw(scope?: vscode.Uri): Settings {
     },
     budget: {
       perRequestUsd: c.get<number>("budget.perRequestUsd", 2),
+      perRequestTokens: c.get<number>("budget.perRequestTokens", 200_000),
       dailyUsd: c.get<number>("budget.dailyUsd", 20),
     },
     context: {

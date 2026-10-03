@@ -1304,4 +1304,6 @@ export const FR: Record<string, string> = {
   "compile it and fix what the compiler says": "compiler et corriger ce que dit le compilateur",
   "(read from the model's message, not from a tool call)":
     "(lu dans le message du modèle, pas dans un appel d'outil)",
+  "Size ceiling raised to {0} tokens.": "Plafond de taille relevé à {0} jetons.",
+  "{0} → {1}": "{0} → {1}",
 };

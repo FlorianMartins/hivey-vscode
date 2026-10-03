@@ -172,10 +172,19 @@ test("the shipped per-request cap clears an ordinary agent turn on every model t
 test("the cap still catches the accident it exists for", () => {
   // A pasted build log, a tool that read a minified bundle: the guard is worth having, and the fix
   // for the cap firing too early must not be "stop guarding".
-  const budget = new Budget(new MemorySpendStore(), {
+  //
+  // ⚠️ This used to be checked in DOLLARS, and dollars could not hold the line. The caps were
+  // calibrated when the middle preset routed to a $120/M flagship; the presets were then moved onto
+  // current models at $10/M — a tenfold improvement — and the same 400 000-token runaway dropped to
+  // about 80 cents, under a $2 cap, and went through unquestioned. The guard loosened because the
+  // market got cheaper, which for a tool whose argument is that your code does not leave is exactly
+  // the wrong direction. So the size is now asked about on its own terms.
+  const limits = {
     perRequestUsd: shippedDefault("hiveyCode.budget.perRequestUsd"),
     dailyUsd: shippedDefault("hiveyCode.budget.dailyUsd"),
-  });
+    perRequestTokens: shippedDefault("hiveyCode.budget.perRequestTokens"),
+  };
+  const budget = new Budget(new MemorySpendStore(), limits);
   const price = makeLookup(GENERATED_PRICES);
   // A free endpoint costs nothing however much is sent to it, so there is nothing for a spending cap
   // to say about one. The accident this guard exists for is the same prompt on a model that bills.
@@ -184,11 +193,22 @@ test("the cap still catches the accident it exists for", () => {
     .filter((p): p is NonNullable<typeof p> => !!p && p.in > 0)
     .sort((a, b) => b.in + 0.25 * b.out - (a.in + 0.25 * a.out))[0]!;
   // 400k tokens is a pasted build log or a tool that read a minified bundle.
-  assert.equal(
-    budget.check(estimateCost(400_000, dearestRouted)).ok,
-    false,
-    "a runaway prompt goes through unquestioned",
-  );
+  const verdict = budget.check(estimateCost(400_000, dearestRouted), 400_000);
+  assert.equal(verdict.ok, false, "a runaway prompt goes through unquestioned");
+
+  // And the part that matters: it is refused for its SIZE, not because it happened to be dear. The
+  // same request on a model ten times cheaper must still be questioned.
+  assert.equal(verdict.ok === false && verdict.reason, "per-request-size");
+  const cheap = { in: dearestRouted.in / 10, out: dearestRouted.out / 10 };
+  assert.equal(budget.check(estimateCost(400_000, cheap), 400_000).ok, false, "cheap does not mean unremarkable");
+
+  // An ordinary turn is not questioned by either dimension, which is the other half of the contract.
+  assert.equal(budget.check(estimateCost(12_000, dearestRouted), 12_000).ok, true);
+});
+
+test("a size ceiling of zero means no ceiling, like every other limit here", () => {
+  const budget = new Budget(new MemorySpendStore(), { perRequestUsd: 0, dailyUsd: 0, perRequestTokens: 0 });
+  assert.equal(budget.check(0, 5_000_000).ok, true);
 });
 
 test("the shipped daily cap allows a day's work, not a handful of questions", () => {

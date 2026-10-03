@@ -32,7 +32,7 @@ with a syntax error that looks like a bug in the extension and is not.
 ```bash
 npm ci
 npm run typecheck
-npm test                                # 1079 tests (node:test)
+npm test                                # 1098 tests (node:test)
 xvfb-run -a npm run test:integration    # 43 tests, headless, inside a real VS Code
 npm run eval:verify                     # every task's check fails on its untouched fixture
 npm run eval:solutions                  # and passes on its reference solution
@@ -142,10 +142,11 @@ Two consequences worth knowing before the first publish:
 - **`vsce` rewrites relative links in the readme it publishes, and in that one only.** This is worth
   understanding precisely, because getting it half-right is what shipped five broken images for a
   whole release. `README.md` is processed: its relative links are rewritten against `repository`, so
-  they work on the Marketplace. `README.fr.md` is an ordinary file in the package: its links are
-  **not** touched, and `docs/images/` is excluded from the package, so every relative screenshot link
-  in it was broken for anybody reading the French page inside the editor. Anything other than the
-  published readme needs its own absolute URLs
+  they work on the Marketplace. **Every other Markdown file in the package is left alone** — this was
+  found on the French README, which shipped five relative links into `docs/images/`, a directory the
+  package excludes, so a French reader of the installed extension saw five broken images. (That file
+  has since been replaced by `docs/cours/`.) Anything other than the published readme needs its own
+  absolute URLs
   (`https://raw.githubusercontent.com/FlorianMartins/hivey-vscode/main/docs/images/x.png`).
   `npm run check:publish` is what makes sure this stays true.
 - **The published readme is `readme.md`, lower-case.** A document linking to `README.md` resolves on

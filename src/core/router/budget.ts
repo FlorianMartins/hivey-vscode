@@ -32,9 +32,24 @@ export class MemorySpendStore implements SpendStore {
 export interface BudgetLimits {
   perRequestUsd: number;
   dailyUsd: number; // 0 = no limit
+  /**
+   * Prompt tokens past which one request is questioned whatever it costs. `0` = no limit.
+   *
+   * ⚠️ The dollar caps alone could not hold this line, and the reason is structural rather than a
+   * mistake: they LOOSEN every time models get cheaper. The guard was calibrated when the middle
+   * preset routed to a $120/M flagship, where a pasted build log of 400 000 tokens blew straight
+   * through a $2 cap. The presets were then moved onto current models at $10/M — a tenfold
+   * improvement, and the same runaway prompt now costs 80 cents and passes unquestioned. A test
+   * caught it; nobody would have.
+   *
+   * For a tool whose argument is that your code does not leave, that is the wrong direction to
+   * drift. 400 000 tokens of your repository going to a provider is worth a question at any price,
+   * so the size is asked about on its own terms.
+   */
+  perRequestTokens?: number;
 }
 
-export type BudgetVerdict = { ok: true } | { ok: false; reason: "per-request" | "daily"; message: string };
+export type BudgetVerdict = { ok: true } | { ok: false; reason: "per-request" | "per-request-size" | "daily"; message: string };
 
 export class Budget {
   constructor(
@@ -58,7 +73,18 @@ export class Budget {
   }
 
   /** Called before a remote request, with the estimated cost. Local calls never come here. */
-  check(estimatedUsd: number): BudgetVerdict {
+  check(estimatedUsd: number, promptTokens?: number): BudgetVerdict {
+    // Size first, because it is the question that does not get cheaper. A request this large is
+    // almost always an accident — a pasted build log, a tool that read a minified bundle — and the
+    // person wants to be asked even when the bill is small.
+    const tokenCap = this.limits.perRequestTokens ?? 0;
+    if (tokenCap > 0 && promptTokens !== undefined && promptTokens > tokenCap) {
+      return {
+        ok: false,
+        reason: "per-request-size",
+        message: `${promptTokens.toLocaleString("en-US")} prompt tokens exceeds the per-request ceiling of ${tokenCap.toLocaleString("en-US")}`,
+      };
+    }
     if (this.limits.perRequestUsd > 0 && estimatedUsd > this.limits.perRequestUsd) {
       return {
         ok: false,

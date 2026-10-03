@@ -20,6 +20,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
+          cache: npm
+      # The selection rules are in `src/core/router/curate.ts` with their tests, and this script
+      # imports the built bundle. That costs an install and a build on a daily job, and it is less
+      # than the cost of a rule nobody can test: the recency term was a rounding error for months
+      # while the file it wrote claimed recency in its header (ADR-0027).
+      - run: npm ci
+      - run: npm run build
       - run: node scripts/update-models.mjs
       - name: Commit when something moved
         run: |

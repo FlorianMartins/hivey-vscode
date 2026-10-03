@@ -126,125 +126,22 @@ export const GENERATED_PRICES: Record<string, Price> = (() => {
 // wins, every day, in a diff a human can read.
 const HIVEY_OUT = "src/core/router/hivey.generated.ts";
 
-// Vendors whose models are worth reaching for first. Names, never versions: a vendor is stable for
-// years, a version for weeks. The bonus is small enough that a genuinely better outsider still wins.
-const STRONG_VENDORS = new Set([
-  "anthropic", "openai", "google", "x-ai", "deepseek", "qwen", "mistralai", "meta-llama",
-  "moonshotai", "z-ai", "nvidia", "cohere",
-]);
-
-// A model that advertises code and nothing else is a poor writer of commit messages, and a general
-// model is a poor completion engine. The preference goes both ways, which is why it is signed.
-const CODEY = /cod(?:e|er|ing)|devstral|laguna|starcoder|seed-.*code|qwen.*coder/i;
-
-/**
- * What each role needs, and what each preset will pay for it.
- *
- * `ceiling` is dollars per million OUTPUT tokens — the number that dominates the bill on an agent
- * turn. `want` is the only other decision: a role either wants the cheapest model that clears the
- * bar, or the most capable one the budget can reach. Nothing else varies, which is what makes the
- * three presets comparable to each other and explainable in one line.
- */
-const HIVEY_ROLES = {
-  // Titles, commit messages, summaries, classification. High frequency, low value per call — and
-  // the traffic that decides whether this costs cents or tens of dollars a day.
-  chore: { tools: false, want: "cheap", minContext: 16000, ceiling: { "hivey/free": 0, hivey: 1.5, "hivey/smart": 5 } },
-  // An ordinary chat turn.
-  everyday: { tools: true, want: "capable", minContext: 64000, ceiling: { "hivey/free": 0, hivey: 8, "hivey/smart": 30 } },
-  // An agent turn, or a question the router graded hard. The role the presets exist to separate.
-  deep: { tools: true, want: "capable", minContext: 128000, ceiling: { "hivey/free": 0, hivey: 25, "hivey/smart": 150 } },
-  // Inline completion: one request per keystroke pause. Fast, cheap, and code-shaped, or not at all.
-  completion: { tools: false, want: "cheap", codey: true, minContext: 8000, ceiling: { "hivey/free": 0, hivey: 1.5, "hivey/smart": 1.5 } },
-};
-
-const HIVEY_VARIANT_IDS = ["hivey/free", "hivey", "hivey/smart"];
-
-function curateHivey(all) {
-  const out = {};
-  const newest = Math.max(...all.map((m) => m.created || 0), 1);
-  const outPrice = (m) => {
-    const n = Number(m.pricing?.completion);
-    return Number.isFinite(n) ? n * 1_000_000 : Infinity;
-  };
-  const textOut = (m) => (m.architecture?.output_modalities ?? ["text"]).includes("text");
-  const hasTools = (m) => (m.supported_parameters ?? []).includes("tools");
-  // A model that advertises code is what you want completing a line and not what you want writing
-  // a commit message, so the preference is signed rather than absolute.
-  const codey = (m) => CODEY.test(m.id);
-  // Billions of parameters, when the id says so. On the free pool every price is zero, so this is
-  // the only capability signal left there.
-  const size = (m) => {
-    const b = /[-/](\d{1,4})b\b/i.exec(m.id);
-    return b ? Math.min(Number(b[1]), 200) / 200 : 0;
-  };
-
-  /** Everything that could serve any role of this preset, before the role's own budget applies. */
-  const eligible = (m, wantFree) => {
-    if (/^~/.test(m.id)) return false; // a moving alias is not a stable id to commit
-    if (/preview|-exp\b|experimental|:extended|:thinking|:online/i.test(m.id)) return false;
-    // A `:batch` endpoint costs half and answers in hours. Half price is no price at all for a
-    // panel whose whole contract is that the answer starts arriving while you watch.
-    if (/:batch$/.test(m.id)) return false;
-    // OpenRouter's own `auto` and `pareto` products are routers, not models. Picking one would mean
-    // this table routes to a router: an unpredictable model at an unpredictable price, chosen by
-    // someone else's rules. A preset has to be able to say what it runs. (They also quote no price,
-    // which a budget then reads as "free" — that is how `openrouter/auto-beta` once won the
-    // cheapest role of all three presets at once.)
-    if (m.id.startsWith("openrouter/")) return false;
-    if (wantFree !== /:free$/.test(m.id)) return false;
-    if (!textOut(m)) return false;
-    // On a paid preset, a model quoting no price is a model whose bill cannot be predicted.
-    return wantFree || outPrice(m) > 0;
-  };
-
-  for (const variant of HIVEY_VARIANT_IDS) {
-    const wantFree = variant === "hivey/free";
-    const universe = all.filter((m) => eligible(m, wantFree));
-    // The price ladder is built over the WHOLE universe, not over each role's shortlist, and that
-    // is what keeps the three presets in order. Ranked inside its own shortlist, a $25 flagship
-    // looked cheap against a $150 budget and dear against a $25 one — so Pro chose a $2.50 model
-    // for its deep role while Smart chose the flagship. Against a fixed ladder, raising a budget
-    // can only add candidates, so a dearer preset is never served a worse model than a cheaper one.
-    const prices = [...new Set(universe.map(outPrice))].sort((a, b) => a - b);
-    const rank = (m) => (prices.length < 2 ? 0.5 : prices.indexOf(outPrice(m)) / (prices.length - 1));
-
-    out[variant] = {};
-    for (const [role, need] of Object.entries(HIVEY_ROLES)) {
-      const ceiling = need.ceiling[variant];
-      const cheap = need.want === "cheap";
-      const score = (m) => {
-        let s = 1.5 * ((m.created || 0) / newest);
-        // Saturating, because a window is a threshold and not a quantity: past a few hundred
-        // thousand tokens the extra million buys this extension nothing, and rewarding it linearly
-        // let one enormous window outweigh every other property a model has.
-        s += (cheap ? 0.4 : 1.2) * (Math.min(m.context_length || 0, 400_000) / 400_000);
-        if (STRONG_VENDORS.has(m.id.split("/")[0])) s += cheap ? 0.4 : 1.2;
-        if (codey(m)) s += need.codey ? 0.8 : -1;
-        // Price is the only capability signal this catalogue carries, and it is a weak one — so it
-        // is read in the direction the role wants and never on its own.
-        s += cheap ? 1.5 * (1 - rank(m)) - 0.3 * size(m) : 1.6 * rank(m) + 0.5 * size(m);
-        return s;
-      };
-      const pick = (withTools) => {
-        const pool = universe.filter(
-          (m) =>
-            (!withTools || hasTools(m)) &&
-            (m.context_length || 0) >= need.minContext &&
-            outPrice(m) <= ceiling,
-        );
-        return pool.sort((a, b) => score(b) - score(a))[0];
-      };
-      // Tools are required where the role drives a tool loop — but a preset with no tool-capable
-      // model in its budget must still answer, so the requirement is relaxed rather than the role
-      // left empty. That case is real: the free pool is eighteen models on a good day.
-      const chosen = (need.tools ? pick(true) : undefined) ?? pick(false);
-      if (chosen) out[variant][role] = chosen.id;
-    }
-  }
-  return out;
-}
-
+// The selection rules are NOT here any more.
+//
+// They lived in this file for months and could not be unit tested, and the defect that moved them
+// out is exactly the kind a test catches and a reading does not: the recency term was
+// `created / newest` over two Unix timestamps, so it varied by 0.0885 across the whole catalogue
+// while a vendor bonus was worth 1.2. The generated file's header claimed "recency" throughout.
+// `hivey/smart` ran a model from October 2025 at $120/M with its September 2026 successor available
+// at $10/M.
+//
+// They are in `src/core/router/curate.ts`, with eleven tests, and this script imports the built
+// bundle. That is why this workflow now needs `npm ci && npm run build` before it runs.
+const { curateHivey, HIVEY_VARIANT_IDS, presetOverlaps } = await import(new URL("../dist/eval-report.mjs", import.meta.url));
 const hivey = curateHivey(data ?? []);
+// Where a dearer preset bought nothing. Written into the file rather than hidden, because it is a
+// fact about the market that the product should state — see `presetOverlaps`.
+const overlaps = presetOverlaps(hivey);
 const hiveyBody = `// GENERATED FILE — do not edit by hand.
 // Written by \`npm run models\` (scripts/update-models.mjs); the daily workflow commits the diff.
 //
@@ -252,9 +149,19 @@ const hiveyBody = `// GENERATED FILE — do not edit by hand.
 // catalogue — budget, capability, vendor family, recency — so that no version is ever named in this
 // repository's source. When a vendor ships a successor, this file moves; nothing else does.
 //
-// The rules live in scripts/update-models.mjs. Read them there before doubting a row.
+// The rules live in src/core/router/curate.ts, with their tests. Read them there before doubting a row.
 
 export const HIVEY_GENERATED_AT = ${JSON.stringify(new Date().toISOString().slice(0, 10))};
+
+/**
+ * Roles where a dearer preset resolved to the same model as a cheaper one, on the day this ran.
+ *
+ * Not a defect. It means the strongest current model was already inside the cheaper preset's budget,
+ * so the dearer one had nothing better to buy. Stated rather than engineered away: the margin that
+ * decided it was 0.007 of a point, and tuning weights until the presets differed would be fitting
+ * the rules to one afternoon's catalogue.
+ */
+export const HIVEY_OVERLAPS: string[] = ${JSON.stringify(overlaps, null, 2)};
 
 /** variant → role → model id. */
 export const HIVEY_ROUTING: Record<string, Record<string, string>> = ${JSON.stringify(hivey, null, 2)};

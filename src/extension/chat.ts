@@ -303,8 +303,23 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    * request fits under rather than one glued to this exact figure. Written globally: a spending
    * limit is a fact about the person paying, not about the folder that happens to be open.
    */
-  private async raiseBudget(reason: "per-request" | "daily", estimateUsd: number): Promise<void> {
+  private async raiseBudget(
+    reason: "per-request" | "per-request-size" | "daily",
+    estimateUsd: number,
+    promptTokens?: number,
+  ): Promise<void> {
     const config = vscode.workspace.getConfiguration(SECTION);
+    // A size refusal raises the SIZE ceiling. Raising a dollar cap because somebody accepted a very
+    // large request would answer a question nobody asked, and would leave the ceiling that actually
+    // stopped them exactly where it was — so the next identical request asks again.
+    if (reason === "per-request-size") {
+      const current = config.get<number>("budget.perRequestTokens", 0);
+      const next = Math.max(current, Math.ceil(((promptTokens ?? 0) * 2) / 1000) * 1000);
+      if (next === current) return;
+      await config.update("budget.perRequestTokens", next, vscode.ConfigurationTarget.Global);
+      this.post({ type: "status", text: t("Size ceiling raised to {0} tokens.", next.toLocaleString()) });
+      return;
+    }
     const key = reason === "per-request" ? "budget.perRequestUsd" : "budget.dailyUsd";
     const current = config.get<number>(key, 0);
     const floor = reason === "per-request" ? estimateUsd : this.gate.budget.spentToday() + estimateUsd;
@@ -3624,7 +3639,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       // the turn without a readable reason protects the user from nothing.
       if (billsTheUser(providerId) && !this.budgetWaived) {
         const estimate = estimateCost(this.tokensFor(model, prepared.estimatedTokens), this.priceLookup(model));
-        const verdict = this.gate.budget.check(estimate);
+        const verdict = this.gate.budget.check(estimate, prepared.estimatedTokens);
         if (!verdict.ok) {
           const decision = await new Promise<"once" | "session" | "always" | "no">((resolve) => {
             this.askInPanel(
@@ -3655,7 +3670,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           }
           // The exception lasts as long as the piece of work does, and no longer.
           if (decision === "session") this.budgetWaived = true;
-          if (decision === "always") await this.raiseBudget(verdict.reason, estimate);
+          if (decision === "always") await this.raiseBudget(verdict.reason, estimate, prepared.estimatedTokens);
         }
       }
 

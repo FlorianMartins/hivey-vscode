@@ -10,3 +10,9 @@
 export * from "../eval/report.js";
 export * from "../release/preflight.js";
 export { listZipEntries, readZipEntry } from "../docs/zip.js";
+// The Hivey preset curation, for `scripts/update-models.mjs`. Same reason as the rest of this file:
+// the rules need tests, a script cannot have them, so the rules live in core and the script imports
+// this bundle.
+export * from "../router/curate.js";
+// And the course gate, for `scripts/check-course.mjs`.
+export * from "./course.js";

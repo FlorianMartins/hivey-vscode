@@ -83,6 +83,11 @@ jobs:
       # Not the evaluation itself, which needs a model. This is the gate that makes the evaluation
       # worth running at all: every task's check must FAIL on its untouched fixture, or the task
       # scores every model 100 % and measures nothing. It needs no GPU, so it runs on every commit.
+      # The course describes the whole product to somebody who does not code, and its failure mode is
+      # silent: it goes on describing a version that no longer exists. Not auto-fixable on purpose.
+      - name: The course still describes this version
+        run: npm run check:course
+
       - name: Evaluation tasks are honest
         run: npm run eval:verify
 

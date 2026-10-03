@@ -1,0 +1,1519 @@
+{
+  "at": "2026-10-03T09:18:24.296Z",
+  "endpoint": "https://openrouter.ai/api/v1",
+  "models": [
+    "x-ai/grok-4.7"
+  ],
+  "outcomes": [
+    {
+      "task": "feature-cli-flag",
+      "kind": "feature",
+      "model": "x-ai/grok-4.7",
+      "passed": true,
+      "seconds": 9.6,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "x-ai/grok-4.7",
+          "steps": 6,
+          "promptTokens": 12963,
+          "completionTokens": 535,
+          "usd": 0.012624,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "list_files": 1,
+            "search_text": 1,
+            "read_file": 2,
+            "edit_file": 1,
+            "run_command": 1
+          },
+          "ms": 9398
+        }
+      ]
+    },
+    {
+      "task": "feature-validate",
+      "kind": "feature",
+      "model": "x-ai/grok-4.7",
+      "passed": true,
+      "seconds": 10.8,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "x-ai/grok-4.7",
+          "steps": 4,
+          "promptTokens": 11374,
+          "completionTokens": 440,
+          "usd": 0.018476,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "read_file": 2,
+            "edit_file": 1,
+            "run_command": 1
+          },
+          "ms": 10555
+        }
+      ]
+    },
+    {
+      "task": "fin-amortisation",
+      "kind": "bug",
+      "model": "x-ai/grok-4.7",
+      "passed": true,
+      "seconds": 7,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "x-ai/grok-4.7",
+          "steps": 4,
+          "promptTokens": 11841,
+          "completionTokens": 299,
+          "usd": 0.011268,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "read_file": 2,
+            "edit_file": 1,
+            "run_command": 1
+          },
+          "ms": 6741
+        }
+      ]
+    },
+    {
+      "task": "fin-fix-message",
+      "kind": "bug",
+      "model": "x-ai/grok-4.7",
+      "passed": true,
+      "seconds": 7.8,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "x-ai/grok-4.7",
+          "steps": 4,
+          "promptTokens": 13170,
+          "completionTokens": 529,
+          "usd": 0.020682,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "read_file": 2,
+            "edit_file": 1,
+            "run_command": 1
+          },
+          "ms": 7547
+        }
+      ]
+    },
+    {
+      "task": "fin-iban",
+      "kind": "bug",
+      "model": "x-ai/grok-4.7",
+      "passed": true,
+      "seconds": 10.6,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "x-ai/grok-4.7",
+          "steps": 5,
+          "promptTokens": 15572,
+          "completionTokens": 567,
+          "usd": 0.021297999999999997,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "read_file": 2,
+            "edit_file": 1,
+            "run_command": 2
+          },
+          "ms": 10523
+        }
+      ]
+    },
+    {
+      "task": "fin-identifiers",
+      "kind": "bug",
+      "model": "x-ai/grok-4.7",
+      "passed": true,
+      "seconds": 15.9,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "x-ai/grok-4.7",
+          "steps": 7,
+          "promptTokens": 26360,
+          "completionTokens": 1100,
+          "usd": 0.030328,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "read_file": 2,
+            "write_file": 1,
+            "run_command": 3,
+            "edit_file": 1
+          },
+          "ms": 15748
+        }
+      ]
+    },
+    {
+      "task": "fin-market-hours",
+      "kind": "bug",
+      "model": "x-ai/grok-4.7",
+      "passed": true,
+      "seconds": 8.5,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "x-ai/grok-4.7",
+          "steps": 5,
+          "promptTokens": 13042,
+          "completionTokens": 455,
+          "usd": 0.015373999999999999,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "read_file": 2,
+            "write_file": 1,
+            "run_command": 2
+          },
+          "ms": 8343
+        }
+      ]
+    },
+    {
+      "task": "fin-minor-units",
+      "kind": "bug",
+      "model": "x-ai/grok-4.7",
+      "passed": true,
+      "seconds": 10,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "x-ai/grok-4.7",
+          "steps": 4,
+          "promptTokens": 12386,
+          "completionTokens": 372,
+          "usd": 0.018172,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "read_file": 2,
+            "edit_file": 1,
+            "run_command": 1
+          },
+          "ms": 9714
+        }
+      ]
+    },
+    {
+      "task": "fin-settlement",
+      "kind": "bug",
+      "model": "x-ai/grok-4.7",
+      "passed": true,
+      "seconds": 9.1,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "x-ai/grok-4.7",
+          "steps": 4,
+          "promptTokens": 12725,
+          "completionTokens": 485,
+          "usd": 0.013384,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "read_file": 2,
+            "edit_file": 1,
+            "run_command": 1
+          },
+          "ms": 8847
+        }
+      ]
+    },
+    {
+      "task": "ibmi-cl-monmsg",
+      "kind": "ibmi",
+      "model": "x-ai/grok-4.7",
+      "passed": true,
+      "seconds": 9.8,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "x-ai/grok-4.7",
+          "steps": 2,
+          "promptTokens": 7480,
+          "completionTokens": 496,
+          "usd": 0.011023999999999999,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "read_file": 1,
+            "edit_file": 1
+          },
+          "ms": 9699
+        }
+      ]
+    },
+    {
+      "task": "ibmi-cl-qualify",
+      "kind": "ibmi",
+      "model": "x-ai/grok-4.7",
+      "passed": true,
+      "seconds": 22.4,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "x-ai/grok-4.7",
+          "steps": 2,
+          "promptTokens": 7580,
+          "completionTokens": 1559,
+          "usd": 0.017602,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "read_file": 1,
+            "write_file": 1
+          },
+          "ms": 22275
+        }
+      ]
+    },
+    {
+      "task": "ibmi-cl-sbmjob",
+      "kind": "ibmi",
+      "model": "x-ai/grok-4.7",
+      "passed": false,
+      "seconds": 87.2,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "x-ai/grok-4.7",
+          "steps": 2,
+          "promptTokens": 7595,
+          "completionTokens": 7360,
+          "usd": 0.052629999999999996,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "read_file": 1,
+            "write_file": 1
+          },
+          "ms": 87084
+        }
+      ],
+      "why": "",
+      "agent": "list, and a failed `SBMJOB` still falls through to the success message. I’ll pin the job name, job description, and library list, and turn a submit failure into an escape.\u001b[2m  auto-approved: write NIGHTLY.clle\u001b[0m\n\u001b[1m\n  NIGHTLY.clle\u001b[0m\n\u001b[31m  - /* Submit the nightly close. */\u001b[0m\n\u001b[31m  -              SBMJOB     CMD(CALL PGM(NIGHTCLS))\u001b[0m\n\u001b[32m  +              DCL        VAR(&MSGID) TYPE(*CHAR) LEN(7)\u001b[0m\n\u001b[32m  +              DCL        VAR(&FAILTXT) TYPE(*CHAR) LEN(80)\u001b[0m\n\u001b[32m  + \u001b[0m\n\u001b[32m  + /* Submit the nightly close under a fixed job name, job      */\u001b[0m\n\u001b[32m  + /* description and library list — not the caller's.          */\u001b[0m\n\u001b[32m  +              SBMJOB     CMD(CALL PGM(NIGHTCLS)) +\u001b[0m\n\u001b[32m  +                           JOB(NIGHTCLS) +\u001b[0m\n\u001b[32m  +                           JOBD(NIGHTLIB/NIGHTLY) +\u001b[0m\n\u001b[32m  +                           INLLIBL(NIGHTLIB QGPL QTEMP)\u001b[0m\n\u001b[32m  +              MONMSG     MSGID(CPF0000) EXEC(DO)\u001b[0m\n\u001b[32m  +                RCVMSG     MSGTYPE(*EXCP) MSGID(&MSGID) RMV(*NO)\u001b[0m\n\u001b[32m  +                CHGVAR     VAR(&FAILTXT) +\u001b[0m\n\u001b[32m  +                             VALUE('Nightly submit failed: ' *CAT +\u001b[0m\n\u001b[32m  +                             &MSGID)\u001b[0m\n\u001b[32m  +                SNDPGMMSG  MSGID(CPF9898) MSGF(QCPFMSG) +\u001b[0m\n\u001b[32m  +                             MSGDTA(&FAILTXT) MSGTYPE(*ESCAPE)\u001b[0m\n\u001b[32m  +              ENDDO\u001b[0m\n\n\u001b[2m  wrote NIGHTLY.clle\u001b[0m\n`NIGHTLY.clle` no longer submits with a bare `SBMJOB`. The nightly close is now submitted as job `NIGHTCLS`, under job description `NIGHTLIB/NIGHTLY`, with an initial library list of `NIGHTLIB`, `QGPL`, and `QTEMP`, so it no longer inherits the caller’s job description, library list, or output queue.\n\nThe submission itself is monitored. Any exception (`CPF0000`) is received, and the program sends `CPF9898` as an escape — `Nightly submit failed: ` plus the failing message id — instead of falling through to `Nightly submitted`.\n\u001b[2m  7595+7360 tokens · $0.0526\u001b[0m\n"
+    },
+    {
+      "task": "ibmi-db2-catalog",
+      "kind": "ibmi",
+      "model": "x-ai/grok-4.7",
+      "passed": true,
+      "seconds": 27.2,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "x-ai/grok-4.7",
+          "steps": 1,
+          "promptTokens": 4793,
+          "completionTokens": 2064,
+          "usd": 0.016978,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "write_file": 1
+          },
+          "ms": 27065
+        }
+      ]
+    },
+    {
+      "task": "ibmi-db2-commit",
+      "kind": "ibmi",
+      "model": "x-ai/grok-4.7",
+      "passed": false,
+      "seconds": 21.8,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "x-ai/grok-4.7",
+          "steps": 4,
+          "promptTokens": 10068,
+          "completionTokens": 1473,
+          "usd": 0.018798000000000002,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "search_text": 1,
+            "list_files": 1,
+            "read_file": 1,
+            "edit_file": 1
+          },
+          "ms": 21743
+        }
+      ],
+      "why": "",
+      "agent": "emote, redaction strict\u001b[0m\u001b[0m\n\u001b[2m/help for the commands, Ctrl+C to quit.\n\u001b[0m\nI'll look up the transfer program and see how the two account updates are written today.\u001b[2m  0 match(es)\u001b[0m\n\u001b[2m  1 file(s)\u001b[0m\n\u001b[2m  read TRANSFER.sqlrpgle\u001b[0m\nThe two updates run independently, so a failure after the debit never credits the other account. I'll put them in one transaction and only commit when both SQLCODEs are zero.\u001b[2m  auto-approved: edit TRANSFER.sqlrpgle\u001b[0m\n\u001b[1m\n  TRANSFER.sqlrpgle\u001b[0m\n\u001b[31m  - exec sql\u001b[0m\n\u001b[31m  -   update ACCOUNT set BALANCE = BALANCE - :cents where ACCTNO = :fromAcct;\u001b[0m\n\u001b[31m  - \u001b[0m\n\u001b[31m  - exec sql\u001b[0m\n\u001b[31m  -   update ACCOUNT set BALANCE = BALANCE + :cents where ACCTNO = :toAcct;\u001b[0m\n\u001b[32m  + exec sql set option commit = *chg;\u001b[0m\n\u001b[32m  + \u001b[0m\n\u001b[32m  + exec sql\u001b[0m\n\u001b[32m  +   update ACCOUNT set BALANCE = BALANCE - :cents where ACCTNO = :fromAcct;\u001b[0m\n\u001b[32m  + \u001b[0m\n\u001b[32m  + if sqlcode <> 0;\u001b[0m\n\u001b[32m  +   inError = *on;\u001b[0m\n\u001b[32m  + else;\u001b[0m\n\u001b[32m  +   exec sql\u001b[0m\n\u001b[32m  +     update ACCOUNT set BALANCE = BALANCE + :cents where ACCTNO = :toAcct;\u001b[0m\n\u001b[32m  + \u001b[0m\n\u001b[32m  +   if sqlcode <> 0;\u001b[0m\n\u001b[32m  +     inError = *on;\u001b[0m\n\u001b[32m  +   endif;\u001b[0m\n\u001b[32m  + endif;\u001b[0m\n\u001b[32m  + \u001b[0m\n\u001b[32m  + if inError;\u001b[0m\n\u001b[32m  +   exec sql rollback;\u001b[0m\n\u001b[32m  + else;\u001b[0m\n\u001b[32m  +   exec sql commit;\u001b[0m\n\u001b[32m  +   if sqlcode <> 0;\u001b[0m\n\u001b[32m  +     inError = *on;\u001b[0m\n\u001b[32m  +     exec sql rollback;\u001b[0m\n\u001b[32m  +   endif;\u001b[0m\n\u001b[32m  + endif;\u001b[0m\n\n\u001b[2m  edited TRANSFER.sqlrpgle\u001b[0m\nBoth updates now share one commitment-control unit of work.\n\n- `SET OPTION COMMIT = *CHG` turns commitment control on for the module.\n- `SQLCODE` is checked after the debit, the credit, and the commit.\n- Both succeed and the commit returns zero: the transfer is committed and `inError` stays off.\n- Either update fails, or the commit itself fails: `inError` is set and the work is rolled back, so the debit cannot stand without the credit.\n\u001b[2m  10068+1473 tokens · $0.0188\u001b[0m\n"
+    },
+    {
+      "task": "ibmi-db2-ddl",
+      "kind": "ibmi",
+      "model": "x-ai/grok-4.7",
+      "passed": true,
+      "seconds": 9.2,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "x-ai/grok-4.7",
+          "steps": 2,
+          "promptTokens": 8102,
+          "completionTokens": 463,
+          "usd": 0.009766,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "read_file": 1,
+            "write_file": 1
+          },
+          "ms": 9074
+        }
+      ]
+    },
+    {
+      "task": "ibmi-dds-field",
+      "kind": "ibmi",
+      "model": "x-ai/grok-4.7",
+      "passed": true,
+      "seconds": 18.9,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "x-ai/grok-4.7",
+          "steps": 3,
+          "promptTokens": 10969,
+          "completionTokens": 1587,
+          "usd": 0.018404,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "read_file": 1,
+            "run_command": 1,
+            "edit_file": 1
+          },
+          "ms": 18754
+        }
+      ]
+    },
+    {
+      "task": "ibmi-dds-logical",
+      "kind": "ibmi",
+      "model": "x-ai/grok-4.7",
+      "passed": true,
+      "seconds": 33.9,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "x-ai/grok-4.7",
+          "steps": 2,
+          "promptTokens": 7327,
+          "completionTokens": 2659,
+          "usd": 0.021968,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "read_file": 1,
+            "write_file": 1
+          },
+          "ms": 33802
+        }
+      ]
+    },
+    {
+      "task": "ibmi-dds-printer",
+      "kind": "ibmi",
+      "model": "x-ai/grok-4.7",
+      "passed": true,
+      "seconds": 87.6,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "x-ai/grok-4.7",
+          "steps": 3,
+          "promptTokens": 11334,
+          "completionTokens": 6187,
+          "usd": 0.051342000000000006,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "read_file": 1,
+            "run_command": 1,
+            "write_file": 1
+          },
+          "ms": 87488
+        }
+      ]
+    },
+    {
+      "task": "ibmi-rpg-copy-proto",
+      "kind": "ibmi",
+      "model": "x-ai/grok-4.7",
+      "passed": true,
+      "seconds": 33.4,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "x-ai/grok-4.7",
+          "steps": 5,
+          "promptTokens": 10427,
+          "completionTokens": 2164,
+          "usd": 0.02539,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "search_text": 1,
+            "list_files": 1,
+            "read_file": 1,
+            "write_file": 1,
+            "edit_file": 1
+          },
+          "ms": 33258
+        }
+      ]
+    },
+    {
+      "task": "ibmi-rpg-doc",
+      "kind": "ibmi",
+      "model": "x-ai/grok-4.7",
+      "passed": true,
+      "seconds": 24.9,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "x-ai/grok-4.7",
+          "steps": 6,
+          "promptTokens": 14285,
+          "completionTokens": 1126,
+          "usd": 0.022845999999999998,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "read_file": 2,
+            "search_text": 1,
+            "list_files": 1,
+            "edit_file": 2
+          },
+          "ms": 24725
+        }
+      ]
+    },
+    {
+      "task": "ibmi-rpg-fixed-lr",
+      "kind": "ibmi",
+      "model": "x-ai/grok-4.7",
+      "passed": true,
+      "seconds": 51.6,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "x-ai/grok-4.7",
+          "steps": 2,
+          "promptTokens": 7507,
+          "completionTokens": 3300,
+          "usd": 0.02771,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "read_file": 1,
+            "edit_file": 1
+          },
+          "ms": 51484
+        }
+      ]
+    },
+    {
+      "task": "ibmi-rpg-freeform",
+      "kind": "ibmi",
+      "model": "x-ai/grok-4.7",
+      "passed": true,
+      "seconds": 92.5,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "x-ai/grok-4.7",
+          "steps": 4,
+          "promptTokens": 14077,
+          "completionTokens": 6124,
+          "usd": 0.049729999999999996,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "read_file": 1,
+            "run_command": 2,
+            "write_file": 1
+          },
+          "ms": 92387
+        }
+      ]
+    },
+    {
+      "task": "ibmi-rpg-indicators",
+      "kind": "ibmi",
+      "model": "x-ai/grok-4.7",
+      "passed": true,
+      "seconds": 21.4,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "x-ai/grok-4.7",
+          "steps": 4,
+          "promptTokens": 10451,
+          "completionTokens": 1218,
+          "usd": 0.019762,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "list_files": 1,
+            "search_text": 1,
+            "read_file": 1,
+            "edit_file": 1
+          },
+          "ms": 21270
+        }
+      ]
+    },
+    {
+      "task": "ibmi-rpg-monitor",
+      "kind": "ibmi",
+      "model": "x-ai/grok-4.7",
+      "passed": true,
+      "seconds": 8.2,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "x-ai/grok-4.7",
+          "steps": 4,
+          "promptTokens": 9859,
+          "completionTokens": 294,
+          "usd": 0.009770000000000001,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "search_text": 1,
+            "list_files": 1,
+            "read_file": 1,
+            "edit_file": 1
+          },
+          "ms": 8116
+        }
+      ]
+    },
+    {
+      "task": "ibmi-rpg-move",
+      "kind": "ibmi",
+      "model": "x-ai/grok-4.7",
+      "passed": true,
+      "seconds": 273.4,
+      "agentExit": 124,
+      "runs": [
+        {
+          "model": "x-ai/grok-4.7",
+          "steps": 5,
+          "promptTokens": 12927,
+          "completionTokens": 17714,
+          "usd": 0.11985000000000001,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "search_text": 2,
+            "list_files": 1,
+            "read_file": 1,
+            "edit_file": 1
+          },
+          "ms": 273300
+        }
+      ]
+    },
+    {
+      "task": "ibmi-rpg-packed",
+      "kind": "ibmi",
+      "model": "x-ai/grok-4.7",
+      "passed": true,
+      "seconds": 44,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "x-ai/grok-4.7",
+          "steps": 4,
+          "promptTokens": 10241,
+          "completionTokens": 2799,
+          "usd": 0.0271,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "list_files": 1,
+            "search_text": 1,
+            "read_file": 1,
+            "write_file": 1
+          },
+          "ms": 43898
+        }
+      ]
+    },
+    {
+      "task": "ibmi-rpg-procedure",
+      "kind": "ibmi",
+      "model": "x-ai/grok-4.7",
+      "passed": true,
+      "seconds": 22.8,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "x-ai/grok-4.7",
+          "steps": 4,
+          "promptTokens": 10885,
+          "completionTokens": 1574,
+          "usd": 0.01835,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "search_text": 1,
+            "list_files": 1,
+            "read_file": 1,
+            "write_file": 1
+          },
+          "ms": 22675
+        }
+      ]
+    },
+    {
+      "task": "ibmi-rpg-sql-cursor",
+      "kind": "ibmi",
+      "model": "x-ai/grok-4.7",
+      "passed": true,
+      "seconds": 10.5,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "x-ai/grok-4.7",
+          "steps": 3,
+          "promptTokens": 10635,
+          "completionTokens": 678,
+          "usd": 0.012474,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "read_file": 1,
+            "search_text": 1,
+            "write_file": 1
+          },
+          "ms": 10392
+        }
+      ]
+    },
+    {
+      "task": "ibmi-rpg-srvpgm",
+      "kind": "ibmi",
+      "model": "x-ai/grok-4.7",
+      "passed": true,
+      "seconds": 13.6,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "x-ai/grok-4.7",
+          "steps": 6,
+          "promptTokens": 10445,
+          "completionTokens": 782,
+          "usd": 0.015214,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "list_files": 1,
+            "search_text": 1,
+            "read_file": 1,
+            "write_file": 3
+          },
+          "ms": 13498
+        }
+      ]
+    },
+    {
+      "task": "ibmi-rpg-unittest",
+      "kind": "test",
+      "model": "x-ai/grok-4.7",
+      "passed": true,
+      "seconds": 61.3,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "x-ai/grok-4.7",
+          "steps": 2,
+          "promptTokens": 7796,
+          "completionTokens": 5719,
+          "usd": 0.039538,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "read_file": 1,
+            "write_file": 1
+          },
+          "ms": 61165
+        }
+      ]
+    },
+    {
+      "task": "ibmi-sql-db2",
+      "kind": "ibmi",
+      "model": "x-ai/grok-4.7",
+      "passed": true,
+      "seconds": 8.9,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "x-ai/grok-4.7",
+          "steps": 4,
+          "promptTokens": 9681,
+          "completionTokens": 350,
+          "usd": 0.011094,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "search_text": 1,
+            "list_files": 1,
+            "read_file": 1,
+            "write_file": 1
+          },
+          "ms": 8850
+        }
+      ]
+    },
+    {
+      "task": "java-equals-hashcode",
+      "kind": "bug",
+      "model": "x-ai/grok-4.7",
+      "passed": true,
+      "seconds": 5.6,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "x-ai/grok-4.7",
+          "steps": 3,
+          "promptTokens": 7509,
+          "completionTokens": 267,
+          "usd": 0.00798,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "read_file": 1,
+            "edit_file": 2
+          },
+          "ms": 5496
+        }
+      ]
+    },
+    {
+      "task": "java-junit",
+      "kind": "test",
+      "model": "x-ai/grok-4.7",
+      "passed": true,
+      "seconds": 10,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "x-ai/grok-4.7",
+          "steps": 2,
+          "promptTokens": 8002,
+          "completionTokens": 605,
+          "usd": 0.009074,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "read_file": 1,
+            "write_file": 1
+          },
+          "ms": 9913
+        }
+      ]
+    },
+    {
+      "task": "java-optional",
+      "kind": "refactor",
+      "model": "x-ai/grok-4.7",
+      "passed": true,
+      "seconds": 17.7,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "x-ai/grok-4.7",
+          "steps": 6,
+          "promptTokens": 8128,
+          "completionTokens": 1272,
+          "usd": 0.015056000000000002,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "read_file": 3,
+            "list_files": 1,
+            "edit_file": 2
+          },
+          "ms": 17643
+        }
+      ]
+    },
+    {
+      "task": "java-try-with-resources",
+      "kind": "bug",
+      "model": "x-ai/grok-4.7",
+      "passed": true,
+      "seconds": 11.1,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "x-ai/grok-4.7",
+          "steps": 2,
+          "promptTokens": 7552,
+          "completionTokens": 718,
+          "usd": 0.011156,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "read_file": 1,
+            "edit_file": 1
+          },
+          "ms": 10971
+        }
+      ]
+    },
+    {
+      "task": "js-async-race",
+      "kind": "bug",
+      "model": "x-ai/grok-4.7",
+      "passed": true,
+      "seconds": 8.6,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "x-ai/grok-4.7",
+          "steps": 4,
+          "promptTokens": 10898,
+          "completionTokens": 340,
+          "usd": 0.009052,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "read_file": 2,
+            "edit_file": 1,
+            "run_command": 1
+          },
+          "ms": 8218
+        }
+      ]
+    },
+    {
+      "task": "js-money-rounding",
+      "kind": "bug",
+      "model": "x-ai/grok-4.7",
+      "passed": true,
+      "seconds": 7.5,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "x-ai/grok-4.7",
+          "steps": 4,
+          "promptTokens": 11402,
+          "completionTokens": 266,
+          "usd": 0.013264000000000001,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "read_file": 2,
+            "edit_file": 1,
+            "run_command": 1
+          },
+          "ms": 7163
+        }
+      ]
+    },
+    {
+      "task": "js-null-crash",
+      "kind": "bug",
+      "model": "x-ai/grok-4.7",
+      "passed": true,
+      "seconds": 5.6,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "x-ai/grok-4.7",
+          "steps": 4,
+          "promptTokens": 10482,
+          "completionTokens": 250,
+          "usd": 0.0096,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "read_file": 2,
+            "edit_file": 1,
+            "run_command": 1
+          },
+          "ms": 5399
+        }
+      ]
+    },
+    {
+      "task": "js-off-by-one",
+      "kind": "bug",
+      "model": "x-ai/grok-4.7",
+      "passed": true,
+      "seconds": 8,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "x-ai/grok-4.7",
+          "steps": 5,
+          "promptTokens": 10576,
+          "completionTokens": 215,
+          "usd": 0.01073,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "read_file": 2,
+            "list_files": 1,
+            "edit_file": 1,
+            "run_command": 1
+          },
+          "ms": 7714
+        }
+      ]
+    },
+    {
+      "task": "py-aware-datetime",
+      "kind": "bug",
+      "model": "x-ai/grok-4.7",
+      "passed": true,
+      "seconds": 8.9,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "x-ai/grok-4.7",
+          "steps": 6,
+          "promptTokens": 15183,
+          "completionTokens": 445,
+          "usd": 0.016908,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "read_file": 2,
+            "edit_file": 2,
+            "run_command": 2
+          },
+          "ms": 8795
+        }
+      ]
+    },
+    {
+      "task": "py-date-parse",
+      "kind": "bug",
+      "model": "x-ai/grok-4.7",
+      "passed": true,
+      "seconds": 7.5,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "x-ai/grok-4.7",
+          "steps": 5,
+          "promptTokens": 13275,
+          "completionTokens": 216,
+          "usd": 0.013638,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "read_file": 2,
+            "edit_file": 1,
+            "run_command": 2
+          },
+          "ms": 7379
+        }
+      ]
+    },
+    {
+      "task": "py-decimal-money",
+      "kind": "bug",
+      "model": "x-ai/grok-4.7",
+      "passed": true,
+      "seconds": 8,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "x-ai/grok-4.7",
+          "steps": 5,
+          "promptTokens": 14215,
+          "completionTokens": 355,
+          "usd": 0.016928000000000002,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "read_file": 2,
+            "write_file": 1,
+            "run_command": 2
+          },
+          "ms": 7915
+        }
+      ]
+    },
+    {
+      "task": "py-mutable-default",
+      "kind": "bug",
+      "model": "x-ai/grok-4.7",
+      "passed": true,
+      "seconds": 9.3,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "x-ai/grok-4.7",
+          "steps": 5,
+          "promptTokens": 14258,
+          "completionTokens": 441,
+          "usd": 0.013305999999999998,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "read_file": 2,
+            "edit_file": 1,
+            "run_command": 2
+          },
+          "ms": 9172
+        }
+      ]
+    },
+    {
+      "task": "py-reiterable",
+      "kind": "bug",
+      "model": "x-ai/grok-4.7",
+      "passed": true,
+      "seconds": 8.8,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "x-ai/grok-4.7",
+          "steps": 5,
+          "promptTokens": 14387,
+          "completionTokens": 451,
+          "usd": 0.015927999999999998,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "read_file": 2,
+            "edit_file": 1,
+            "run_command": 2
+          },
+          "ms": 8650
+        }
+      ]
+    },
+    {
+      "task": "refactor-extract",
+      "kind": "refactor",
+      "model": "x-ai/grok-4.7",
+      "passed": true,
+      "seconds": 9.4,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "x-ai/grok-4.7",
+          "steps": 4,
+          "promptTokens": 11559,
+          "completionTokens": 417,
+          "usd": 0.014484,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "read_file": 2,
+            "write_file": 1,
+            "run_command": 1
+          },
+          "ms": 9135
+        }
+      ]
+    },
+    {
+      "task": "sql-fanout-double-count",
+      "kind": "bug",
+      "model": "x-ai/grok-4.7",
+      "passed": true,
+      "seconds": 12,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "x-ai/grok-4.7",
+          "steps": 6,
+          "promptTokens": 14740,
+          "completionTokens": 556,
+          "usd": 0.015344,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "list_files": 1,
+            "search_text": 1,
+            "read_file": 2,
+            "edit_file": 1,
+            "run_command": 1
+          },
+          "ms": 11876
+        }
+      ]
+    },
+    {
+      "task": "sql-index-advice",
+      "kind": "bug",
+      "model": "x-ai/grok-4.7",
+      "passed": true,
+      "seconds": 4.7,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "x-ai/grok-4.7",
+          "steps": 4,
+          "promptTokens": 7220,
+          "completionTokens": 164,
+          "usd": 0.0069759999999999996,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "read_file": 3,
+            "write_file": 1
+          },
+          "ms": 4649
+        }
+      ]
+    },
+    {
+      "task": "sql-join-fix",
+      "kind": "bug",
+      "model": "x-ai/grok-4.7",
+      "passed": true,
+      "seconds": 11.6,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "x-ai/grok-4.7",
+          "steps": 6,
+          "promptTokens": 10636,
+          "completionTokens": 575,
+          "usd": 0.011666,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "read_file": 3,
+            "list_files": 1,
+            "edit_file": 1,
+            "run_command": 1
+          },
+          "ms": 11449
+        }
+      ]
+    },
+    {
+      "task": "sql-latest-per-group",
+      "kind": "bug",
+      "model": "x-ai/grok-4.7",
+      "passed": true,
+      "seconds": 13.2,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "x-ai/grok-4.7",
+          "steps": 7,
+          "promptTokens": 15992,
+          "completionTokens": 401,
+          "usd": 0.01231,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "list_files": 1,
+            "read_file": 3,
+            "write_file": 1,
+            "run_command": 2
+          },
+          "ms": 13125
+        }
+      ]
+    },
+    {
+      "task": "sql-not-in-null",
+      "kind": "bug",
+      "model": "x-ai/grok-4.7",
+      "passed": true,
+      "seconds": 12.3,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "x-ai/grok-4.7",
+          "steps": 7,
+          "promptTokens": 12910,
+          "completionTokens": 629,
+          "usd": 0.013274000000000001,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "list_files": 1,
+            "search_text": 1,
+            "read_file": 3,
+            "edit_file": 1,
+            "run_command": 1
+          },
+          "ms": 12162
+        }
+      ]
+    },
+    {
+      "task": "test-regression",
+      "kind": "test",
+      "model": "x-ai/grok-4.7",
+      "passed": true,
+      "seconds": 8.6,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "x-ai/grok-4.7",
+          "steps": 5,
+          "promptTokens": 10605,
+          "completionTokens": 412,
+          "usd": 0.012546,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "read_file": 2,
+            "edit_file": 2,
+            "run_command": 1
+          },
+          "ms": 8276
+        }
+      ]
+    },
+    {
+      "task": "test-write-vat",
+      "kind": "test",
+      "model": "x-ai/grok-4.7",
+      "passed": true,
+      "seconds": 13.8,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "x-ai/grok-4.7",
+          "steps": 3,
+          "promptTokens": 10523,
+          "completionTokens": 870,
+          "usd": 0.013402,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "read_file": 1,
+            "write_file": 1,
+            "run_command": 1
+          },
+          "ms": 13560
+        }
+      ]
+    },
+    {
+      "task": "ts-exhaustive-switch",
+      "kind": "feature",
+      "model": "x-ai/grok-4.7",
+      "passed": false,
+      "seconds": 6,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "x-ai/grok-4.7",
+          "steps": 2,
+          "promptTokens": 7569,
+          "completionTokens": 257,
+          "usd": 0.006312000000000001,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "read_file": 1,
+            "edit_file": 1
+          },
+          "ms": 5926
+        }
+      ],
+      "why": "",
+      "agent": "/bin/sh: 1: never: not found\n\u001b[1mHivey Code\u001b[0m\u001b[2m — sovereign coding assistant\u001b[0m\n\u001b[2mx-ai/grok-4.7 · openrouter.ai · mode agent · \u001b[33mremote, redaction strict\u001b[0m\u001b[0m\n\u001b[2m/help for the commands, Ctrl+C to quit.\n\u001b[0m\n\u001b[2m  read events.ts\u001b[0m\nThe union now includes `refunded`, and the `default` branch hides that. I will handle that case and replace `default` with an exhaustiveness check.\u001b[2m  auto-approved: edit events.ts\u001b[0m\n\u001b[1m\n  events.ts\u001b[0m\n\u001b[31m  -     default:\u001b[0m\n\u001b[31m  -       return \"unknown event\";\u001b[0m\n\u001b[32m  +     case \"refunded\":\u001b[0m\n\u001b[32m  +       return `invoice ${event.id} refunded ${event.cents} cents`;\u001b[0m\n\u001b[32m  +     default: {\u001b[0m\n\u001b[32m  +       const _exhaustive: never = event;\u001b[0m\n\u001b[32m  +       return _exhaustive;\u001b[0m\n\u001b[32m  +     }\u001b[0m\n\n\u001b[2m  edited events.ts\u001b[0m\n`describe` now handles `refunded`, and the `default` assigns `event` to `never`. A new kind that is not handled will fail to compile instead of falling through.\n\u001b[2m  7569+257 tokens · $0.0063\u001b[0m\n"
+    },
+    {
+      "task": "ts-impossible-state",
+      "kind": "refactor",
+      "model": "x-ai/grok-4.7",
+      "passed": true,
+      "seconds": 17.7,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "x-ai/grok-4.7",
+          "steps": 2,
+          "promptTokens": 7487,
+          "completionTokens": 1120,
+          "usd": 0.014974,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "read_file": 1,
+            "write_file": 1
+          },
+          "ms": 17641
+        }
+      ]
+    },
+    {
+      "task": "ts-narrow-any",
+      "kind": "refactor",
+      "model": "x-ai/grok-4.7",
+      "passed": false,
+      "seconds": 180.1,
+      "agentExit": 124,
+      "runs": [],
+      "why": "",
+      "agent": "/bin/sh: 1: any: not found\n/bin/sh: 1: any: not found\n"
+    },
+    {
+      "task": "ts-readonly-input",
+      "kind": "bug",
+      "model": "x-ai/grok-4.7",
+      "passed": true,
+      "seconds": 5.3,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "x-ai/grok-4.7",
+          "steps": 2,
+          "promptTokens": 7224,
+          "completionTokens": 205,
+          "usd": 0.005502,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "read_file": 1,
+            "edit_file": 1
+          },
+          "ms": 5173
+        }
+      ]
+    }
+  ],
+  "byModel": [
+    {
+      "model": "x-ai/grok-4.7",
+      "totals": {
+        "tasks": 56,
+        "passed": 52,
+        "seconds": 1485.1,
+        "unpriced": 0,
+        "outOfSteps": 0,
+        "truncated": 0,
+        "escalations": 0,
+        "neverActed": 1,
+        "passRate": 0.9285714285714286,
+        "steps": 221,
+        "promptTokens": 606229,
+        "completionTokens": 83919,
+        "usd": 1.0684
+      },
+      "byKind": [
+        {
+          "kind": "bug",
+          "totals": {
+            "tasks": 24,
+            "passed": 24,
+            "seconds": 216.9,
+            "unpriced": 0,
+            "outOfSteps": 0,
+            "truncated": 0,
+            "escalations": 0,
+            "neverActed": 0,
+            "passRate": 1,
+            "steps": 113,
+            "promptTokens": 303555,
+            "completionTokens": 10301,
+            "usd": 0.3341
+          }
+        },
+        {
+          "kind": "feature",
+          "totals": {
+            "tasks": 3,
+            "passed": 2,
+            "seconds": 26.4,
+            "unpriced": 0,
+            "outOfSteps": 0,
+            "truncated": 0,
+            "escalations": 0,
+            "neverActed": 0,
+            "passRate": 0.6666666666666666,
+            "steps": 12,
+            "promptTokens": 31906,
+            "completionTokens": 1232,
+            "usd": 0.0374
+          }
+        },
+        {
+          "kind": "ibmi",
+          "totals": {
+            "tasks": 21,
+            "passed": 19,
+            "seconds": 923.2,
+            "unpriced": 0,
+            "outOfSteps": 0,
+            "truncated": 0,
+            "escalations": 0,
+            "neverActed": 0,
+            "passRate": 0.9047619047619048,
+            "steps": 72,
+            "promptTokens": 206668,
+            "completionTokens": 61971,
+            "usd": 0.5778
+          }
+        },
+        {
+          "kind": "refactor",
+          "totals": {
+            "tasks": 4,
+            "passed": 3,
+            "seconds": 224.9,
+            "unpriced": 0,
+            "outOfSteps": 0,
+            "truncated": 0,
+            "escalations": 0,
+            "neverActed": 1,
+            "passRate": 0.75,
+            "steps": 12,
+            "promptTokens": 27174,
+            "completionTokens": 2809,
+            "usd": 0.0445
+          }
+        },
+        {
+          "kind": "test",
+          "totals": {
+            "tasks": 4,
+            "passed": 4,
+            "seconds": 93.7,
+            "unpriced": 0,
+            "outOfSteps": 0,
+            "truncated": 0,
+            "escalations": 0,
+            "neverActed": 0,
+            "passRate": 1,
+            "steps": 12,
+            "promptTokens": 36926,
+            "completionTokens": 7606,
+            "usd": 0.0746
+          }
+        }
+      ]
+    }
+  ],
+  "measured": true
+}
