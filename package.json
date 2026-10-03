@@ -2,7 +2,7 @@
   "name": "hivey-code",
   "displayName": "Hivey Code",
   "description": "%extension.description%",
-  "version": "0.75.0",
+  "version": "0.76.0",
   "publisher": "hivey",
   "license": "Apache-2.0",
   "repository": {
@@ -336,6 +336,11 @@
       {
         "command": "hiveyCode.reloadPolicy",
         "title": "%command.reloadPolicy.title%",
+        "category": "Hivey Code"
+      },
+      {
+        "command": "hiveyCode.siemStatus",
+        "title": "%command.siemStatus.title%",
         "category": "Hivey Code"
       }
     ],
@@ -834,6 +839,59 @@
             "type": "number",
             "default": 20,
             "description": "%config.budget.dailyUsd%"
+          },
+          "hiveyCode.siem.transport": {
+            "type": "string",
+            "enum": [
+              "off",
+              "syslog-tls",
+              "otlp"
+            ],
+            "default": "off",
+            "markdownDescription": "%config.siem.transport%"
+          },
+          "hiveyCode.siem.host": {
+            "type": "string",
+            "default": "",
+            "markdownDescription": "%config.siem.host%"
+          },
+          "hiveyCode.siem.port": {
+            "type": "number",
+            "default": 6514,
+            "markdownDescription": "%config.siem.port%"
+          },
+          "hiveyCode.siem.url": {
+            "type": "string",
+            "default": "",
+            "markdownDescription": "%config.siem.url%"
+          },
+          "hiveyCode.siem.caFile": {
+            "type": "string",
+            "default": "",
+            "markdownDescription": "%config.siem.caFile%"
+          },
+          "hiveyCode.siem.rejectUnauthorized": {
+            "type": "boolean",
+            "default": true,
+            "markdownDescription": "%config.siem.rejectUnauthorized%"
+          },
+          "hiveyCode.siem.headers": {
+            "type": "object",
+            "default": {},
+            "additionalProperties": {
+              "type": "string"
+            },
+            "markdownDescription": "%config.siem.headers%"
+          },
+          "hiveyCode.siem.userId": {
+            "type": "string",
+            "default": "",
+            "markdownDescription": "%config.siem.userId%"
+          },
+          "hiveyCode.siem.flushSeconds": {
+            "type": "number",
+            "default": 30,
+            "markdownDescription": "%config.siem.flushSeconds%"
           }
         }
       },

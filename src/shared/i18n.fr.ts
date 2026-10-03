@@ -460,6 +460,13 @@ export const FR: Record<string, string> = {
   "Hivey Code is in its safest mode: {0}": "Hivey Code est dans son mode le plus sûr : {0}",
   "The policy is read from {0}.": "La politique est lue depuis {0}.",
   "Where is the policy?": "Où est la politique ?",
+  "No SIEM is configured, so nothing is being shipped.":
+    "Aucun SIEM n'est configuré, donc rien n'est envoyé.",
+  "{0} row(s) waiting.": "{0} ligne(s) en attente.",
+  "The oldest has been waiting {0} minute(s).": "La plus ancienne attend depuis {0} minute(s).",
+  "{0} row(s) were dropped because the queue was full.":
+    "{0} ligne(s) ont été perdues parce que la file était pleine.",
+  "Last reached the collector at {0}.": "Dernier envoi parvenu au collecteur à {0}.",
   "No organisation policy on this machine. It would be read from {0}.":
     "Aucune politique d'organisation sur cette machine. Elle serait lue depuis {0}.",
   "Policy from {0} in force. Nothing you have set conflicts with it.":

@@ -4,6 +4,7 @@
 import * as vscode from "vscode";
 import { showKnowledge } from "./knowledge.js";
 import { announcePolicy, policySource, reloadPolicy } from "./policy.js";
+import { SiemShipper } from "./siem.js";
 import { setLanguage, t } from "../shared/i18n.js";
 import { Budget } from "../core/router/budget.js";
 import { contextBudget } from "../core/context/budget.js";
@@ -67,6 +68,12 @@ export function activate(context: vscode.ExtensionContext): void {
   void restoreMisplacedGatewayAddress(keys, log);
   const budget = new Budget(new WorkspaceSpendStore(context.globalState), readSettings().budget);
   const gate = new EgressGate(context.globalState, budget);
+  // Off unless an operator configured a collector. The shipper is handed every ledger row and
+  // decides for itself whether there is anywhere to send it — one place that knows, rather than the
+  // egress path asking.
+  const siem = new SiemShipper(context, log);
+  gate.onRecord = (row) => siem.offer(row);
+  disposables.push(siem);
 
   const status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
   const completion = new InlineCompletionProvider(keys, status, log);
@@ -163,6 +170,7 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("hiveyCode.stopAnswer", () => chat.stopTurn()),
 
     vscode.commands.registerCommand("hiveyCode.showKnowledge", () => showKnowledge()),
+    vscode.commands.registerCommand("hiveyCode.siemStatus", () => siem.report()),
     // Reloading is a deliberate act rather than a file watcher: a policy being written half a file
     // at a time would otherwise be read mid-write and refused, putting the machine into safe mode
     // because an administrator was in the middle of a deployment.

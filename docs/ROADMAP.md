@@ -2,7 +2,7 @@
 
 Honnête plutôt que flatteur : ce qui marche, ce qui manque, ce qui n'est pas vérifié.
 
-Ce document décrit l'état à la version **0.75.0**. Les chiffres qu'il annonce — version, tests, tâches d'évaluation — sont
+Ce document décrit l'état à la version **0.76.0**. Les chiffres qu'il annonce — version, tests, tâches d'évaluation — sont
 vérifiés par `npm run check:numbers`, que la CI exécute : ils ne peuvent plus vieillir en silence.
 Il était resté figé à `0.3.0` pendant trente-cinq
 versions, ce qui est sa propre leçon : une feuille de route périmée dit « projet abandonné » à
@@ -31,7 +31,7 @@ externe non exécuté ici est « non vérifié ».
 | Chantier | État | Vérification |
 |---|---|---|
 | 2.1 Politique d'entreprise signée | fait | **testé** — 24 unitaires (signature altérée, signée par un autre, politique supprimée alors que la clé reste, version inconnue, réglage permissif ignoré champ par champ, fusion des listes, utilisateur plus strict laissé tranquille, liste vide = état permissif, adresse comparée sur l'origine et non en préfixe) + **1 test d'intégration dans un vrai éditeur** qui prouve que `readSettings()` revient restreint (retombe sans le point d'étranglement) |
-| 2.2 Envoi du registre vers le SIEM | à faire | — |
+| 2.2 Envoi du registre vers le SIEM | fait | **testé** — 31 tests, dont 10 **contre un vrai serveur TLS local** (envoi et cadrage RFC 5425, collecteur absent, raccrochage pendant la poignée de main, certificat non épinglé refusé, reprise de la file) ; liste blanche de champs prouvée en la transformant en liste noire ; file durable, acquittement par identité, borne comptée ; identité jamais découverte. ⚠️ le test de certificat exige `openssl` et **échoue** s'il manque. ⚠️ limite assumée et testée : syslog n'a pas d'accusé de réception |
 | 2.3 Preuve de souveraineté | à faire | — |
 | 2.4 Hooks avant et après outil | à faire | — |
 | 2.5 Agent en arrière-plan isolé | à faire | — |
@@ -61,6 +61,18 @@ Trois niveaux, jamais mélangés :
   nommés.
 
 ## Fait
+
+### Le registre part vers le SIEM, sans jamais emporter de contenu (0.76.0)
+
+- **Deux transports écrits à la main** (testé contre un vrai serveur TLS local) : syslog RFC
+  5424/5425 et OTLP/HTTP. Désactivé par défaut.
+- **Liste blanche de champs, jamais une liste noire** (testé, retombe si on l'inverse) : un champ
+  ajouté au registre demain n'atteint pas le collecteur tant que personne ne l'y ajoute.
+- **Une file sur disque, et une ligne non envoyée reste visible** (testé) : l'acquittement retire les
+  lignes envoyées et non les n premières, et la borne compte ce qu'elle perd.
+- ⚠️ **Défaut trouvé par son propre test** : les lignes étaient acquittées sur une écriture dans le
+  tampon du noyau, donc un collecteur qui raccrochait obtenait un succès.
+
 
 ### Une politique que l'utilisateur ne peut pas desserrer (0.75.0)
 
@@ -227,7 +239,7 @@ Trois niveaux, jamais mélangés :
 ### Avant 0.39.0
 
 - Noyau indépendant de l'éditeur : anonymisation, fournisseurs, routeur, budget, complétion, session,
-  carte du dépôt, boucle d'agent. **889 tests unitaires** plus **42 tests d'intégration dans un vrai
+  carte du dépôt, boucle d'agent. **920 tests unitaires** plus **42 tests d'intégration dans un vrai
   VS Code**.
 - Barre latérale : conversation, historique, modèles, permissions, configuration ; modes
   discussion / plan / agent ; budget de raisonnement ; contexte explicite.

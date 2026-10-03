@@ -2,6 +2,63 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.76.0 — 2026-10-03
+
+### Ajouté
+
+- **Chantier 2.2 — le registre des sorties part vers le collecteur de l'organisation.**
+  **Désactivé par défaut.** Deux transports écrits à la main : syslog RFC 5424 sur TLS (RFC 5425)
+  avec `node:tls`, et journaux OTLP/HTTP en JSON vers le collecteur de l'organisation. Les
+  organisations ont l'une de deux choses et jamais les deux.
+
+  ⚠️⚠️ **Jamais de contenu, et ce n'est pas une intention** : la ligne exportée est **construite**
+  depuis une liste blanche de champs, pas obtenue en retirant ceux qu'on juge sensibles. Une liste
+  noire laisserait passer **par défaut** le champ ajouté au registre le mois prochain — et c'est
+  exactement celui où quelqu'un aura mis un chemin de fichier. Un test tient la liste ; un second
+  vérifie qu'aucun formateur ne peut émettre de contenu quoi que porte la ligne.
+
+  **Une file sur disque, et une ligne non envoyée reste visible.** Un expéditeur qui perd des lignes
+  quand le collecteur est en panne est pire que pas d'expéditeur : le SIEM montre un après-midi
+  calme et personne ne sait s'il était calme ou si le tuyau était cassé. Une ligne n'est retirée que
+  lorsque le collecteur l'a prise, l'acquittement retire **les lignes envoyées et non les n
+  premières** (une ligne peut avoir été mise en file pendant que le lot était en vol), et la borne de
+  la file **compte** ce qu'elle perd. Nouvelle commande « Où en est le flux d'audit ».
+
+  **L'identité est choisie, jamais découverte** : `siem.userId` est vide par défaut et rien ne le
+  remplit. Une adresse e-mail prise dans une configuration git serait une donnée personnelle
+  expédiée sans consentement, dans un système avec sa propre rétention. Un test lit le source et
+  refuse toute tentative de la découvrir.
+
+  Voir [ADR-0020](docs/adr/0020-expedier-le-registre-sans-jamais-expedier-de-contenu.md).
+
+### Corrigé
+
+- ⚠️ **Les lignes étaient acquittées sur une écriture dans le tampon du noyau.** Un collecteur qui
+  terminait la poignée de main TLS puis raccrochait obtenait un succès pour des lignes qui
+  n'arrivaient nulle part — le cas exact que ce module existe pour empêcher. L'acquittement est
+  désormais la **fermeture propre** du socket après l'écriture complète. Trouvé par le test qui
+  affirmait la garantie.
+
+### Précisé
+
+- **Le cadrage compte des octets, pas des caractères** : un nom de modèle avec un caractère
+  non-ASCII fait divergher `string.length` et la longueur en octets, et le collecteur lit alors le
+  début du message suivant comme la fin de celui-ci.
+- **Les trois caractères que la RFC 5424 réserve** (`"`, `\`, `]`) sont échappés : s'y tromper ne
+  produit pas un message rejeté mais un message analysé **dans les mauvais champs**, ce qui a l'air
+  correct.
+- La vérification du certificat est **activée par défaut**, désactivable délibérément — l'alternative
+  est un opérateur avec un collecteur auto-signé et une échéance qui désactive tout.
+- ⚠️ **Limite assumée** : syslog n'a aucun accusé de réception applicatif. « Envoyé » signifie « la
+  connexion TLS s'est terminée sans erreur » ; un collecteur qui accepte les octets et les jette est
+  indiscernable d'un qui les stocke. **Un test enregistre cette limite** au lieu de la cacher. OTLP
+  rend un code HTTP, et c'est la seule des deux voies où un refus est connu.
+- Tests contre un **vrai serveur TLS local** : envoi et cadrage, collecteur absent, raccrochage
+  pendant la poignée de main, certificat signé par une autorité non épinglée, et reprise de la file
+  après la panne. ⚠️ Le certificat est fabriqué par `openssl` à l'exécution du test — une clé privée
+  dans le dépôt n'est pas l'alternative — et le test **échoue** si `openssl` manque plutôt que de
+  passer sans avoir rien testé.
+
 ## 0.75.0 — 2026-10-03
 
 ### Ajouté

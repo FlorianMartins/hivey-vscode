@@ -183,6 +183,15 @@ export class EgressGate {
    * whether anybody changed it" — see `core/audit/chain.ts`. It costs one hash per remote request,
    * which is nothing next to the request itself.
    */
+  /**
+   * Where a ledger row goes next, when the organisation ships its audit stream.
+   *
+   * A property rather than a constructor argument because the gate is built before the shipper —
+   * and because this must stay optional: on an unmanaged machine nothing is listening, and that is
+   * the default rather than a configuration.
+   */
+  onRecord?: (row: Record<string, unknown>) => void;
+
   record(entry: EgressRecord, settings: Settings): void {
     this.budget.record(entry.usd);
     if (!settings.privacy.auditLog) return;
@@ -191,6 +200,14 @@ export class EgressGate {
     const linked = link(entry as unknown as Record<string, unknown>, ledger[0]) as unknown as LedgerEntry;
     ledger.unshift(linked);
     void this.state.update(LEDGER_KEY, ledger.slice(0, LEDGER_MAX));
+    // And out to the organisation's collector, when there is one. Offered rather than sent: the
+    // shipper owns the decision, the queue and the transport, and a collector that is down must
+    // never be able to fail a request that has already happened.
+    try {
+      this.onRecord?.(linked as unknown as Record<string, unknown>);
+    } catch {
+      /* a log shipper may not break the thing it is logging */
+    }
   }
 
   ledger(): LedgerEntry[] {
