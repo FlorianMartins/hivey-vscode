@@ -25,6 +25,7 @@ import { arcadInstalled, buildArcadTools, type ArcadDeps } from "./integrations/
 import { buildKnowledgeTools } from "./knowledge.js";
 import type { McpManager } from "./integrations/mcp.js";
 import { runCommandInTerminal } from "./terminal.js";
+import { withHooks, type Hooks } from "./hooks.js";
 import { isAbsolutePath, tidyPath, underRoot } from "../core/fs/within.js";
 
 /**
@@ -141,6 +142,8 @@ function resolve(path: string, settings: Settings): vscode.Uri {
 
 export interface ToolDeps {
   settings: () => Settings;
+  /** The workspace's own commands, run around every tool call. Absent means none are configured. */
+  hooks?: Hooks;
   /** Shows a diff and returns what the user chose. */
   confirmEdit?: (uri: vscode.Uri, next: string) => Promise<boolean>;
   /** The Elias credentials, read from the keychain when an ARCAD call needs them. */
@@ -441,7 +444,7 @@ export function buildTools(deps: ToolDeps): Tool[] {
     },
   };
 
-  return [
+  return withHooks([
     readFile,
     listFiles,
     searchText,
@@ -451,5 +454,5 @@ export function buildTools(deps: ToolDeps): Tool[] {
     runCommand,
     ...(deps.onPlan ? [updatePlan] : []),
     ...integrations,
-  ];
+  ], deps.hooks);
 }

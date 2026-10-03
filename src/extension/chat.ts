@@ -52,6 +52,7 @@ import {
 import { capture, describeRestore, trimCheckpoints } from "../core/session/checkpoint.js";
 import type { Plan } from "../core/agent/plan.js";
 import { promptForMode, toolsForMode } from "../core/session/modes.js";
+import { Hooks } from "./hooks.js";
 import { detectIbmiLanguage, ibmiPrompt } from "../core/ibmi/languages.js";
 import { hiveyLabel, hiveyModel, isHivey } from "../core/router/hivey.js";
 import { parsePrompt, participantDirective, type MentionKind, type Participant } from "../core/session/mentions.js";
@@ -3299,8 +3300,16 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       this.frozenMapAt = this.workspace.structureVersion();
     }
     const ambient = mode !== "chat" && settings.context.repoMap ? this.frozenMap : undefined;
+    // The workspace's own commands, run around every tool call. The steps they produce are pushed
+    // into the same list the tool calls are, so a failing hook reaches `verifyTurn` exactly as a
+    // failing test does — see `core/hooks/hooks.ts`.
+    const hookSteps: Array<{ tool: string; summary: string; ok: boolean; call?: string }> = [];
     const allTools: Tool[] = buildTools({
       settings: () => settings,
+      hooks: new Hooks(this.ctx.workspaceState, this.log, (step) => {
+        hookSteps.push({ tool: "hook", summary: step.summary, ok: step.ok, call: step.command });
+        if (!ctl.signal.aborted) this.post({ type: "status", text: step.summary, tool: "hook", ok: step.ok });
+      }),
       confirmEdit: (u, n) => this.confirmEdit(u, n),
       // The plan goes to the panel as it is written and onto the answer when the turn ends, so it
       // is both a live progress display and part of the record.
@@ -3414,7 +3423,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const baseUrl = safeUrl(settings, providerId);
     const isLocal = isLocalEndpoint(baseUrl);
     const vault = new Vault();
-    const steps: Array<{ tool: string; summary: string; ok: boolean }> = [];
+    // Shared with the hook runner above: `hookSteps` is the same array, so the order the turn
+    // actually happened in is preserved and "the last one wins" means what it says.
+    const steps: Array<{ tool: string; summary: string; ok: boolean; call?: string }> = hookSteps;
     const verifierOutput = new Map<string, string>();
 
     // What this question will send, said before it is sent.

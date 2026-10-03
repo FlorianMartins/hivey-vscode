@@ -460,6 +460,8 @@ export const FR: Record<string, string> = {
   "Hivey Code is in its safest mode: {0}": "Hivey Code est dans son mode le plus sûr : {0}",
   "The policy is read from {0}.": "La politique est lue depuis {0}.",
   "Where is the policy?": "Où est la politique ?",
+  "Run them": "Les exécuter",
+  "Never in this workspace": "Jamais dans cet espace de travail",
   "The last 7 days": "Les 7 derniers jours",
   "The last 30 days": "Les 30 derniers jours",
   "The last 90 days": "Les 90 derniers jours",

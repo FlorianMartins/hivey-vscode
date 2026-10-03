@@ -2,6 +2,47 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.78.0 — 2026-10-03
+
+### Ajouté
+
+- **Chantier 2.4 — des hooks avant et après un outil.** Déclarés dans `.hiveycode/hooks.json`
+  (versionné, donc partagé par l'équipe) ou dans les réglages, filtrés par outil et par glob de
+  chemin. **Avant** un outil, un code de retour non nul **refuse l'appel** ; **après**, il est
+  signalé au modèle et **compte pour `verifyTurn()`** — au même titre qu'un test en échec, parce que
+  c'est ce que c'est : le contrôle de l'équipe disant que la modification n'est pas acceptable.
+
+  ⚠️⚠️ **Un hook venu du dépôt est une exécution de code**, donc il reçoit exactement le traitement
+  d'un serveur MCP en stdio : la question nomme **chaque commande**, et l'approbation est **épinglée
+  à une empreinte** de ce qui s'exécute. Une commande qui change redemande ; un hook renommé ne
+  redemande pas, parce que poser la question sur une étiquette est la façon d'apprendre aux gens à
+  cliquer oui. Un refus est **retenu** : être interrogé à chaque appel d'outil est la façon dont un
+  non devient un oui.
+
+  Un hook écrit dans les **réglages** n'est pas soumis à cette question — l'utilisateur l'a écrit
+  lui-même, sur sa propre machine, et c'est toute la différence avec un fichier arrivé par un
+  `git clone`.
+
+### Précisé
+
+- **Tous les outils sont enveloppés d'un coup**, plutôt que chaque outil appelant les hooks :
+  un outil qui devait y penser l'oublierait, et celui qu'il oublierait est celui pour lequel
+  quelqu'un a écrit le hook.
+- **Un hook qui n'a pas fini n'a pas dit non.** Un `before` dont le verdict est inconnu ne laisse pas
+  passer l'appel ; refuser sur un délai dépassé ferait d'un linter lent un agent cassé, donc le cas
+  est **rapporté** plutôt que traité comme un refus.
+- **Un `after` ne peut pas refuser** : l'appel a déjà eu lieu, et prétendre le contraire serait
+  mentir au modèle sur l'état du disque. Son verdict est **ajouté** au résultat de l'outil, pas
+  substitué : le modèle a besoin de ce qu'il a fait **et** de ce que le contrôle en dit.
+- **La sortie du hook est transmise**, tronquée : la plainte d'un linter EST l'instruction, et « le
+  hook a échoué » sans rien d'autre est une impasse à laquelle le modèle répond en devinant.
+- Un hook qui ne peut pas être lancé est un hook qui a échoué, avec la raison. Un hook déclaré sans
+  `command`, sans `when` ou sans `tool` est **signalé par son rang** dans le fichier, jamais ignoré
+  en silence.
+- Un hook filtré par chemin **ne se déclenche pas** sur un appel sans chemin : « après `write_file`
+  sur `src/**` » parle d'un fichier, et le lancer quand l'agent a lancé une commande serait le lancer
+  sur le mauvais événement.
+
 ## 0.77.0 — 2026-10-03
 
 ### Ajouté

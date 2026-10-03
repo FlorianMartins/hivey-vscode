@@ -2,7 +2,7 @@
 
 Honnête plutôt que flatteur : ce qui marche, ce qui manque, ce qui n'est pas vérifié.
 
-Ce document décrit l'état à la version **0.77.0**. Les chiffres qu'il annonce — version, tests, tâches d'évaluation — sont
+Ce document décrit l'état à la version **0.78.0**. Les chiffres qu'il annonce — version, tests, tâches d'évaluation — sont
 vérifiés par `npm run check:numbers`, que la CI exécute : ils ne peuvent plus vieillir en silence.
 Il était resté figé à `0.3.0` pendant trente-cinq
 versions, ce qui est sa propre leçon : une feuille de route périmée dit « projet abandonné » à
@@ -33,7 +33,7 @@ externe non exécuté ici est « non vérifié ».
 | 2.1 Politique d'entreprise signée | fait | **testé** — 24 unitaires (signature altérée, signée par un autre, politique supprimée alors que la clé reste, version inconnue, réglage permissif ignoré champ par champ, fusion des listes, utilisateur plus strict laissé tranquille, liste vide = état permissif, adresse comparée sur l'origine et non en préfixe) + **1 test d'intégration dans un vrai éditeur** qui prouve que `readSettings()` revient restreint (retombe sans le point d'étranglement) |
 | 2.2 Envoi du registre vers le SIEM | fait | **testé** — 31 tests, dont 10 **contre un vrai serveur TLS local** (envoi et cadrage RFC 5425, collecteur absent, raccrochage pendant la poignée de main, certificat non épinglé refusé, reprise de la file) ; liste blanche de champs prouvée en la transformant en liste noire ; file durable, acquittement par identité, borne comptée ; identité jamais découverte. ⚠️ le test de certificat exige `openssl` et **échoue** s'il manque. ⚠️ limite assumée et testée : syslog n'a pas d'accusé de réception |
 | 2.3 Preuve de souveraineté | fait | **testé** — 21 tests : comptes et destinations, catégories sommées, fenêtre qui borne les comptes mais **pas** la chaîne, ligne modifiée → rupture au bon rang, ligne supprimée → lacune que le rechaînage ne cache pas, troncature tolérée, signature qui détecte toute édition, limites présentes dans le document, et le DER de la requête **relu par openssl**. ⚠️ **non vérifié** : aucune vraie autorité RFC 3161 interrogée d'ici — l'extension ne prétend pas vérifier le jeton, par conception |
-| 2.4 Hooks avant et après outil | à faire | — |
+| 2.4 Hooks avant et après outil | fait | **testé** — 18 tests : lecture et défauts, hook non exécutable signalé par son rang, délai plafonné, correspondance sur when/tool/chemin, **un hook filtré par chemin ne se déclenche pas sans chemin**, consentement qui nomme les commandes et empreinte qui ignore un renommage mais pas un changement de commande, `before` qui refuse, `after` qui ne peut pas, délai dépassé ≠ refus, et un hook en échec qui **compte pour `verifyTurn`** (retombe sans le câblage) |
 | 2.5 Agent en arrière-plan isolé | à faire | — |
 | 2.6 Revue de branche | à faire | — |
 | 2.7 Symboles et graphe d'appels | à faire | — |
@@ -61,6 +61,16 @@ Trois niveaux, jamais mélangés :
   nommés.
 
 ## Fait
+
+### Les commandes de l'équipe autour d'un appel d'outil (0.78.0)
+
+- **Hooks avant et après** (testé) : `before` refuse l'appel, `after` est signalé au modèle et
+  compte pour le verdict du tour — au même titre qu'un test en échec.
+- ⚠️ **Un hook du dépôt est une exécution de code** : la question nomme chaque commande et
+  l'approbation est épinglée par empreinte, comme un serveur MCP en stdio. Un renommage ne redemande
+  pas ; un changement de commande, si.
+- **Tous les outils sont enveloppés d'un coup** (testé) : un outil qui devait y penser l'oublierait.
+
 
 ### Une preuve qui dit ce qu'elle ne prouve pas (0.77.0) — résidu n°9 fermé
 
@@ -250,7 +260,7 @@ Trois niveaux, jamais mélangés :
 ### Avant 0.39.0
 
 - Noyau indépendant de l'éditeur : anonymisation, fournisseurs, routeur, budget, complétion, session,
-  carte du dépôt, boucle d'agent. **941 tests unitaires** plus **42 tests d'intégration dans un vrai
+  carte du dépôt, boucle d'agent. **959 tests unitaires** plus **42 tests d'intégration dans un vrai
   VS Code**.
 - Barre latérale : conversation, historique, modèles, permissions, configuration ; modes
   discussion / plan / agent ; budget de raisonnement ; contexte explicite.

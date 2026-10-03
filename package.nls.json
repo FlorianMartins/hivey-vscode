@@ -137,5 +137,6 @@
   "config.siem.flushSeconds": "How often the queue is flushed. The queue is on disk, so an outage costs a delay and never a row.",
   "command.siemStatus.title": "Where the audit stream is",
   "config.audit.timestampUrl": "An RFC 3161 timestamping authority, configured by your organisation. When set, the sovereignty report asks it to timestamp the **head of the audit chain** — one hash and nothing else leaves. That is what ties a local chain to a clock outside this machine: rewriting the ledger from the beginning produces a different head, and no authority ever saw it. This extension obtains and keeps the token; it does **not** verify it, because verifying needs your own trust anchor — `openssl ts -verify -in head.tsr -queryfile head.tsq -CAfile your-tsa-ca.pem`.",
-  "command.sovereigntyReport.title": "Produce a sovereignty report"
+  "command.sovereigntyReport.title": "Produce a sovereignty report",
+  "config.hooks": "Your own commands, run around the agent's tool calls. Each entry is `{ \"when\": \"before\" | \"after\", \"tool\": \"write_file\" | [\"write_file\",\"edit_file\"] | \"*\", \"path\": \"src/**\", \"command\": \"npm run lint\", \"name\": \"lint\", \"timeoutMs\": 60000 }`. **Before** a tool, a non-zero exit refuses the call; **after**, it is reported to the model as a failing check and counts for the turn's verdict. These are yours, on your machine, so they are not asked about — a `.hiveycode/hooks.json` in the repository is, by name, because it came from somewhere else."
 }
