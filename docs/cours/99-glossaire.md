@@ -142,6 +142,11 @@ modifié. → [9](09-la-confidentialite.md)
 **SSE** (*Server-Sent Events*) — La technique qui fait apparaître une réponse mot à mot, et qui
 permet de l'arrêter avant de l'avoir payée en entier. → [4](04-comment-on-lui-parle.md)
 
+**Solde, plafond de clé, rechargement automatique** — Trois choses différentes. Le solde est de
+l'argent ; le plafond d'une clé est l'autorisation de dépenser l'argent que le compte possède ; le
+rechargement automatique est ce qui remplit le solde. Un `402 Payment Required` désigne l'un des
+trois, et relever un plafond ne change rien à un solde. → [10](10-le-cout.md)
+
 **Souverain** — Vous décidez où va votre code, et vous pouvez le vérifier. Ni « gratuit », ni
 « hors ligne ». → [3](03-ou-tourne-le-modele.md)
 

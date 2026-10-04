@@ -88,11 +88,17 @@ avec un palmarès parfait après vingt questions que personne n'a contrôlées.
 Plutôt que de choisir un modèle, vous pouvez choisir une **intention**. Trois préréglages, qui sont
 des **routages** et non des modèles :
 
-| Préréglage | Promesse |
-|---|---|
-| **Hivey Free** | Uniquement des points d'accès gratuits. Ne coûte rien, et est limité en débit comme tout ce qui est gratuit. |
-| **Hivey Smart** | Un modèle fort là où ça se sent, un modèle bon marché pour la plomberie. |
-| **Hivey Pro** | Le meilleur du catalogue sur le travail difficile, sans le payer pour écrire des messages de commit. |
+| Préréglage | Son identifiant | Promesse |
+|---|---|---|
+| **Hivey Free** | `hivey/free` | Uniquement des points d'accès gratuits. Ne coûte rien, et est limité en débit comme tout ce qui est gratuit. |
+| **Hivey Smart** | `hivey` | Un modèle fort là où ça se sent, un modèle bon marché pour la plomberie. |
+| **Hivey Pro** | `hivey/smart` | Le meilleur du catalogue sur le travail difficile, sans le payer pour écrire des messages de commit. |
+
+⚠️ La colonne du milieu n'est pas un détail d'implémentation : le libellé et l'identifiant **ne se
+correspondent pas**. « Hivey Smart » s'appelle `hivey`, et « Hivey Pro » s'appelle `hivey/smart`.
+C'est un héritage de deux renommages, et c'est visible : le tableau de mesures du
+[chapitre 12](12-la-qualite-mesuree.md) publie les **identifiants**, donc sans cette colonne un
+lecteur ne peut pas relier une promesse à son résultat mesuré.
 
 Chacun attribue un modèle à chacun des quatre rôles (corvée, courant, approfondi, complétion). Et le
 point essentiel : **aucun nom de modèle n'est écrit en dur dans le projet**. Un fichier généré chaque
@@ -110,6 +116,46 @@ d'**octobre 2025 à 120 $/M** alors que son successeur de septembre 2026 était 
 testé, et une deuxième règle y a été ajoutée : **dans une même gamme d'un même éditeur, un modèle plus
 récent et pas plus cher retire l'autre de la liste**, parce que « ne jamais payer plus pour un modèle
 plus vieux » est une règle et pas un équilibre de points.
+
+## Solde, plafond, rechargement : trois choses différentes
+
+Ces trois mots se ressemblent et désignent trois objets sans rapport. Les confondre coûte une
+après-midi, et c'est arrivé sur ce projet.
+
+- Le **solde** est de l'argent. Vous avez versé 20 $ chez le fournisseur, il vous reste 20 $, chaque
+  requête en retire un peu. Quand il tombe à zéro, plus rien ne part.
+- Le **plafond d'une clé** est une **autorisation**, pas de l'argent. Une clé plafonnée à 50 $ veut
+  dire : « avec cette clé, on peut dépenser **jusqu'à** 50 $ **de l'argent du compte** ». C'est une
+  limite de dégâts si la clé fuite, exactement comme un plafond de carte bancaire. Sur un compte à
+  zéro, une clé plafonnée à 50 $ ne peut rien dépenser : 50 $ de rien font rien.
+- Le **rechargement automatique** est ce qui relie les deux : « dès que le solde passe sous 5 $,
+  prélève 20 $ sur ma carte ». C'est **lui**, et lui seul, qui transforme un plafond en marge
+  utilisable dans le temps.
+
+Quand une requête est refusée pour cause d'argent, le fournisseur renvoie une erreur `402 Payment
+Required`. Hivey Code lit la raison exacte que le fournisseur donne et dit laquelle des trois est en
+cause, parce que le message brut du fournisseur, lui, conseille généralement de relever le plafond de
+la clé — ce qui ne sert à rien neuf fois sur dix.
+
+⚠️ Le cas vécu, et pourquoi il est instructif : la clé annonçait **48,42 $ de marge sous un plafond de
+70 $**, ce qui se lit naturellement comme « il y a du crédit ». Les chiffres du compte disaient autre
+chose : **240,00 $ achetés depuis toujours, 240,11 $ consommés**, donc un solde de **−0,11 $**. Le
+plafond était intact parce qu'un plafond ne se consomme pas ; c'est l'argent qui manquait. Et le
+rechargement automatique n'avait pas eu lieu — sinon le solde n'aurait jamais atteint zéro. Trois
+causes possibles, toutes invisibles depuis l'extension : il n'est pas activé, son seuil de
+déclenchement n'a pas été franchi, ou **le moyen de paiement a échoué** (carte expirée, refus
+bancaire — le cas le plus fréquent, et le fournisseur n'en dit rien dans l'erreur).
+
+La leçon pour l'outil : **aucun code ne peut financer une réponse avec un solde négatif.** Ce que le
+logiciel peut faire, il le fait — distinguer les trois causes, nommer la bonne, et ne pas vous
+envoyer régler le mauvais réglage. Ce qu'il ne peut pas faire, il ne prétend pas le faire.
+
+Il reste un cas où le logiciel répare vraiment, et il est différent : quand il y a **un peu** d'argent
+mais pas assez pour la réponse demandée. Le refus dit alors « vous avez demandé 4 096 jetons, vous ne
+pouvez en financer que 1 991 ». Hivey Code refait la requête à 1 991 jetons, et vous dit que la
+réponse a été raccourcie — pour que vous ne preniez pas une réponse coupée pour une réponse complète.
+En dessous d'un plancher (256 jetons), il renonce : une réponse trop courte pour être utile est un
+échec plus honnête qu'un fragment.
 
 ## Dans Hivey Code
 

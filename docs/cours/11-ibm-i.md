@@ -98,7 +98,7 @@ installation qui ne la configure pas n'a pas de périmètre.
 
 ## Dans Hivey Code
 
-Quarante compétences IBM i (`/tofree` pour convertir un membre en format libre, `/sql` pour écrire du
+41 compétences IBM i (`/tofree` pour convertir un membre en format libre, `/sql` pour écrire du
 Db2 for i et non du SQL générique, `/dds` pour expliquer un fichier écran…), **chacune adossée à une
 tâche d'évaluation** qui échoue avant qu'on l'applique ([chapitre 12](12-la-qualite-mesuree.md)).
 

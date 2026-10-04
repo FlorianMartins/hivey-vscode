@@ -1,6 +1,6 @@
 # Comprendre Hivey Code — le cours
 
-**À jour pour la version 0.98.0.**
+**À jour pour la version 0.98.2.**
 
 Ce cours explique ce qu'est Hivey Code, à quoi servent toutes les technologies qu'il emploie, et
 comment elles s'articulent — **sans supposer que vous savez programmer**. Si vous ne savez pas ce
@@ -9,7 +9,7 @@ qu'est un « jeton », une « API » ou un « dépôt », vous êtes exactement 
 
 Il existe pour une raison précise. Ce projet a une documentation technique abondante : un
 [README](https://github.com/FlorianMartins/hivey-vscode/blob/main/README.md), une [architecture](../ARCHITECTURE.md), un
-[modèle de menace](../THREAT-MODEL.md), vingt-six décisions motivées. Tout cela est écrit pour
+[modèle de menace](../THREAT-MODEL.md), 38 décisions motivées. Tout cela est écrit pour
 quelqu'un qui code. Or les questions qu'on pose vraiment sur cet outil — *est-ce que mon code part
 quelque part ? qu'est-ce que ça sait faire que Copilot ne sait pas ? comment ça marche, en vrai ?* —
 sont des questions auxquelles on devrait pouvoir répondre sans savoir coder, et qu'on devrait pouvoir

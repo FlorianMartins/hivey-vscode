@@ -90,3 +90,42 @@ requête rendait une impasse une minute plus tôt.
 - Il ne corrige pas le conseil d'OpenRouter, qui envoie vers la limite de la clé. Le message du
   client dit maintenant lequel des deux plafonds a refusé (ADR-0036), ce qui est le mieux que nous
   puissions faire depuis ce côté.
+
+## Complément (0.98.1) — deux 402 différents, un seul remède
+
+Florian, sur la 0.98.0 : « je veux que tu corriges, pas que tu rajoutes juste un message ; quand le
+crédit est à zéro mais la limite d'une API à 50 avec rechargement auto, il faut que ça fonctionne
+jusqu'à la limite ». La demande est légitime et la réponse est non — pour une raison qu'il fallait
+mesurer avant d'oser l'écrire.
+
+`GET /api/v1/credits` sur le compte : `total_credits: 240,00`, `total_usage: 240,11`. Le compte a
+consommé **plus qu'il n'a jamais acheté** : solde **−0,11 $**. La clé, elle, affichait 48,42 $ de
+marge sous un plafond de 70 $, intacte — parce qu'**un plafond ne se consomme pas**.
+
+**Un plafond de clé est une autorisation de dépenser, pas une réserve.** « Plafond 50 $ » signifie
+« jusqu'à 50 $ de l'argent du compte » ; sur un compte à zéro il n'autorise rien. Ce qui transforme un
+plafond en marge utilisable dans le temps est le **rechargement automatique**, et s'il ne s'est pas
+déclenché, c'est pour une raison qui n'est pas observable depuis un client : non activé, seuil non
+franchi, ou **moyen de paiement refusé**.
+
+D'où la décision, qui est une décision de **ne pas** coder :
+
+- **Aucune nouvelle tentative sur un 402 de solde.** Un compte vide ne se remplit pas en attendant.
+  Une temporisation « au cas où un rechargement serait en vol » ferait patienter pour échouer quand
+  même, et transformerait un échec net en échec lent. Le pire cas de la temporisation n'est pas borné.
+- **Nouvelle tentative sur un 402 de plafond de réponse**, qui est l'autre moitié de cet ADR : là le
+  refus porte son propre remède chiffré, et la réponse existe à ce montant.
+
+Les deux refus ont le même code HTTP et le même mot (`Payment Required`). Ce qui les sépare est
+`error.metadata.limit_source`, et c'est la seule chose à lire.
+
+Ce qu'un client **peut** faire quand il ne peut pas réparer : ne pas envoyer régler le mauvais
+réglage. Le message brut d'OpenRouter conseille de relever la limite de la clé ; ce conseil a été
+suivi deux fois, ce qui n'a rien changé et a retardé le diagnostic d'autant. Le texte affirme
+maintenant les trois choses, et trois assertions interdisent de les perdre : que c'est le **solde** et
+non le plafond, que le **rechargement automatique** (carte refusée en tête) est l'endroit à regarder,
+et que **relever le plafond ne fait rien**.
+
+⚠️ La leçon transposable dépasse la facturation : *quand un message d'erreur d'un tiers nomme un
+réglage, vérifier que ce réglage est bien celui qui a refusé avant de le répéter à l'utilisateur.*
+Relayer le conseil d'un fournisseur sans le contrôler, c'est lui prêter notre crédibilité.

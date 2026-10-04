@@ -3,7 +3,7 @@
 [← Chapitre précédent](03-ou-tourne-le-modele.md) · [Sommaire](README.md) · [Chapitre suivant →](05-les-trois-modes-et-les-outils.md)
 
 Ce chapitre est le plus technique du cours, et il mérite l'effort : il explique un défaut réel du
-projet, trouvé il y a deux jours, qui empêchait complètement l'outil de fonctionner avec un modèle
+projet, trouvé en octobre 2026, qui empêchait complètement l'outil de fonctionner avec un modèle
 local. On ne peut pas le comprendre sans savoir ce qu'est une API.
 
 ## Une API, c'est un guichet

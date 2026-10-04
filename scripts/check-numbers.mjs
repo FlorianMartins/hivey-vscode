@@ -35,6 +35,13 @@ const truth = {
   // The integration suite nests its tests inside one `suite(...)`, so they are indented.
   integration: countTests("src/test/suite", "  "),
   tasks: readdirSync("eval/tasks", { withFileTypes: true }).filter((e) => e.isDirectory()).length,
+  decisions: readdirSync("docs/adr").filter((f) => /^\d{4}-.+\.md$/.test(f)).length,
+  // The IBM i skills, which the course counts. Four families — a skill's family IS what makes it an
+  // IBM i skill, so this is read from the source rather than remembered: the course said "forty"
+  // while there were 41, and nothing could have noticed.
+  ibmiSkills: (readFileSync("src/core/session/skills.ts", "utf8").match(
+    /group: "(?:rpg|cl|dds|db2i)"/g,
+  ) ?? []).length,
 };
 
 /**
@@ -60,6 +67,15 @@ const CLAIMS = [
   // `npm run check:course`, which refuses the build instead of rewriting it, because reading what
   // changed is the work and the number is only the receipt.
   { file: "docs/cours/12-la-qualite-mesuree.md", pattern: /\*\*(\d+) tâches\*\*/g, of: "tasks" },
+  // ⚠️ Both course indexes count the decision records, and this claim is here because of how it was
+  // found: the French one said "vingt-six" while there were 37 — the exact rot the course spends a
+  // page warning about, inside the course. It was invisible to this script for a reason worth
+  // keeping: A NUMBER WRITTEN IN WORDS CANNOT BE CHECKED. It was rewritten as a digit, which is the
+  // only form a guard can read, and now neither edition can drift.
+  { file: "docs/cours/README.md", pattern: /(\d+) décisions motivées/g, of: "decisions" },
+  { file: "docs/course/README.md", pattern: /(\d+) reasoned decisions/g, of: "decisions" },
+  { file: "docs/cours/11-ibm-i.md", pattern: /(\d+) compétences IBM i/g, of: "ibmiSkills" },
+  { file: "docs/course/11-ibm-i.md", pattern: /(\d+) IBM i skills/g, of: "ibmiSkills" },
   // The release runbook prints the commands with the counts they should print. It said 193 and 27
   // while the suites were at 1067 and 43 — a figure in a code block is exactly as perishable as one
   // in prose, and this one is read by somebody about to publish.

@@ -2,6 +2,97 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.98.2 — 2026-10-04
+
+### Ajouté
+
+- **Le cours existe en anglais** (`docs/course/`, 14 chapitres), demandé par Florian. Ce n'est pas une
+  traduction mot à mot : c'est la même progression, écrite pour la même personne — celle qui ne code
+  pas — et les chapitres portent des slugs anglais (`10-the-cost.md`).
+
+  ⚠️ Et il est **tenu par le même contrôle**, parce que le projet a déjà payé l'autre approche :
+  `README.fr.md` avait fini par annoncer 284 tests alors qu'il y en avait 700. `check:course` exige
+  donc maintenant que les **deux éditions** déclarent la version du projet **et qu'aucune ne porte un
+  chapitre que l'autre n'a pas** — ce qui rend une modification d'une édition non finissable sans
+  l'autre. La parité se juge sur le **numéro** de chapitre, pas sur le nom de fichier : les slugs sont
+  traduits, et comparer les noms déclarerait chaque chapitre manquant des deux côtés.
+  [`ADR-0038`](docs/adr/0038-deux-editions-du-cours-tenues-ensemble.md).
+
+### Corrigé
+
+- **⚠️⚠️ Deux chiffres faux dans le cours français, trouvés en écrivant l'anglais — et tous les deux
+  invisibles au contrôle pour la même raison.** L'index annonçait « vingt-six décisions motivées »
+  (il y en avait **37**) et le chapitre IBM i « Quarante compétences » (il y en a **41**).
+
+  `check:numbers` ne pouvait rien y voir : **un nombre écrit en lettres ne peut pas être vérifié.**
+  Les deux sont passés en chiffres, ajoutés au contrôle, et leur source est **calculée depuis le
+  dépôt** — le nombre de fichiers d'ADR, et le nombre de `group:` des quatre familles IBM i — plutôt
+  que mémorisée. Troisième fois sur ce projet qu'un garde-fou manquait son sujet parce que la
+  **forme** de la donnée l'en empêchait.
+
+- **Le tableau des préréglages ne permettait pas de relier une promesse à sa mesure.** Il donnait les
+  libellés (« Hivey Smart », « Hivey Pro ») quand le chapitre sur la qualité publie les identifiants
+  (`hivey`, `hivey/smart`) — et les deux **ne se correspondent pas**, héritage de deux renommages.
+  Les deux éditions portent la colonne des identifiants et disent que le décalage existe.
+
+- **Une date relative dans un document maintenu** : « trouvé il y a deux jours » est devenu « trouvé
+  en octobre 2026 ».
+
+### Mesuré
+
+- **La série `hivey` rejouée après ajout de crédit.** Le diagnostic de la 0.98.1 est confirmé par
+  Florian : *« j'ai mis des credits, le auto-fill etait effectivement desactivé »*. La même série qui
+  avait donné **2/62** — entièrement à cause des 402 — repasse normalement, et une requête payante
+  réelle a été vérifiée de bout en bout (5 étapes, 17 519 jetons, 0,0459 $, aucun raccourcissement).
+  Les refus n'étaient pas du bruit de mesure : ils **étaient** la mesure.
+
+## 0.98.1 — 2026-10-04
+
+### Corrigé
+
+- **⚠️⚠️ « Le crédit est à zéro mais la limite de la clé est à 50 avec rechargement auto, il faut que
+  ça fonctionne jusqu'à la limite » — et la réponse honnête est qu'aucun code ne peut faire ça.**
+  Reproche de Florian sur la 0.98.0 : « je veux que tu corriges, pas que tu rajoutes juste un
+  message ». Il avait raison sur le principe, et les chiffres du compte disent pourquoi le correctif
+  demandé n'existe pas.
+
+  **Mesuré** (`GET /api/v1/credits`) : `total_credits: 240,00` $ achetés depuis toujours,
+  `total_usage: 240,11` $ consommés. Le solde est donc de **−0,11 $**. Pendant ce temps la clé
+  affichait **48,42 $ de marge sous un plafond de 70 $** — intacte, parce qu'**un plafond ne se
+  consomme pas**.
+
+  ⚠️ **Un plafond de clé est une autorisation de dépenser, pas de l'argent.** « 50 $ » veut dire
+  « jusqu'à 50 $ **de l'argent du compte** ». Sur un compte à zéro, 50 $ de rien font rien. Ce qui
+  transforme un plafond en marge utilisable dans le temps est le **rechargement automatique** — et
+  il n'avait pas eu lieu, sinon le solde ne serait jamais tombé à zéro. Trois causes, toutes
+  invisibles depuis l'extension : pas activé, seuil non franchi, ou **moyen de paiement refusé** (le
+  cas le plus fréquent, et le fournisseur n'en dit rien).
+
+  Donc **pas de nouvelle tentative sur un 402 de solde** : réessayer un compte vide ne le remplit
+  pas, ça fait attendre pour échouer quand même. Ce qui change, c'est ce que l'outil **affirme** —
+  et c'est un correctif, pas un message de plus, parce que l'ancien texte envoyait régler le mauvais
+  réglage :
+
+  > That is the account **BALANCE**, not your key's limit — a limit is permission to spend money the
+  > account has. Check the balance and auto top-up (a declined card is the usual cause); raising the
+  > key's limit does nothing.
+
+  Le plafond de la clé a été relevé deux fois avant de comprendre, en suivant le conseil du message
+  brut d'OpenRouter. Trois assertions interdisent maintenant de revenir en arrière sur chacune des
+  trois affirmations.
+
+  Le cas où le logiciel **répare** vraiment reste celui de la 0.98.0, et il est différent : quand il
+  y a un peu d'argent mais pas assez, le refus porte son propre remède (« 4 096 demandés, 1 991
+  finançables ») et la requête est refaite à ce montant.
+
+### Documentation
+
+- `docs/cours/10-le-cout.md` gagne **« Solde, plafond, rechargement : trois choses différentes »** —
+  les trois mots se ressemblent, désignent trois objets sans rapport, et les confondre a coûté une
+  après-midi. Avec les chiffres réels et la raison pour laquelle l'outil ne peut pas s'en sortir seul.
+- [`docs/adr/0037`](docs/adr/0037-un-402-qui-dit-ce-qu-il-peut-payer.md) complété : un 402 de solde et
+  un 402 de plafond de réponse sont deux refus différents, un seul a un remède.
+
 ## 0.98.0 — 2026-10-04
 
 ### Corrigé

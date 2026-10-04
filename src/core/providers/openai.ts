@@ -590,7 +590,14 @@ export async function describeHttpError(res: Response, provider?: string): Promi
               // capping it. Sending somebody to the wrong one of those costs an afternoon.
               ` — the limit that refused this is \`${limitSource}\`. ${
                 /credit/i.test(limitSource)
-                  ? `That is the account balance at ${provider ?? "the provider"}: no key setting and no retry changes it, only adding credit.`
+                  ? // ⚠️ Said this plainly because the obvious reading is the wrong one, and it cost an
+                    // afternoon: a key's limit is PERMISSION TO SPEND, not money. A $50 limit on an
+                    // account with a zero balance means "you may spend up to $50 of what you have",
+                    // and there is nothing to spend. What turns a limit into usable headroom is auto
+                    // top-up — so when a balance refuses a request, auto top-up either is not on, has
+                    // not reached its threshold, or its payment failed. The provider's own message
+                    // sends you to the key's limit, which changes none of those.
+                    `That is the account BALANCE, not your key's limit — a limit is permission to spend money the account has. Check the balance and auto top-up (a declined card is the usual cause); raising the key's limit does nothing.`
                   : "That is a configured cap rather than the balance — raise it where it is set."
               } A Hivey preset always bills your OpenRouter account, whichever provider the panel shows.`
             : ` — this is the account balance at ${provider ?? "the provider"}, not the API key. A Hivey preset always bills your OpenRouter account, whichever provider the panel shows.`

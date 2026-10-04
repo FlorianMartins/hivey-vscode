@@ -66,7 +66,13 @@ test("a 402 says WHICH limit refused it, when the provider says so", async () =>
   });
   const said = await describeHttpError(new Response(body, { status: 402, statusText: "Payment Required" }), "openrouter");
   assert.match(said, /the limit that refused this is `openrouter_credits`/);
-  assert.match(said, /only adding credit/);
+  // ⚠️ It must say that a limit is not money, because the obvious reading is the wrong one and it
+  // cost an afternoon: a $50 limit on a zero balance means "you may spend up to $50 of what you
+  // have". And it must name auto top-up, which is the thing that turns a limit into usable headroom
+  // — a declined card being the usual reason it has not.
+  assert.match(said, /account BALANCE, not your key's limit/);
+  assert.match(said, /auto top-up/);
+  assert.match(said, /raising the key's limit does nothing/);
 
   // A configured cap is the other case, and it must not be described as an empty account.
   const capped = JSON.stringify({ error: { message: "over limit", metadata: { limit_source: "key_limit" } } });
