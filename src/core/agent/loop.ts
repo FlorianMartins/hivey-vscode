@@ -145,6 +145,8 @@ export interface TurnResult {
    * Arguing about that instead of measuring it is the failure mode this whole phase exists against.
    */
   selfChecked: boolean;
+  /** The cap a provider's refusal forced the last request down to, when one did. */
+  shortenedTo?: number;
   stoppedBecause: "answer" | "max-steps" | "cancelled";
   /**
    * The model ran out of output budget rather than finishing.
@@ -209,6 +211,8 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
   const maxSteps = opts.maxSteps ?? DEFAULT_MAX_STEPS;
   /** Whether the one self-check of this turn has been spent. See `selfCheck`. */
   let selfChecked = false;
+  /** Carried out of the provider: a refusal capped an answer, and the user has to be told. */
+  let shortenedTo: number | undefined;
 
   const working: ChatMessage[] = [...opts.messages];
   const trace: TurnResult["trace"] = [];
@@ -255,6 +259,7 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
     if (typeof res.usage.costUsd === "number") usage.costUsd = (usage.costUsd ?? 0) + res.usage.costUsd;
 
     truncated = res.stopReason === "length";
+    if (res.shortenedTo) shortenedTo = res.shortenedTo;
     const answer = opts.afterResponse ? opts.afterResponse(res.text) : res.text;
     if (answer) text = text ? `${text}\n${answer}` : answer;
     if (res.reasoning) reasoning += res.reasoning;
@@ -397,6 +402,16 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
   return done("max-steps");
 
   function done(stoppedBecause: TurnResult["stoppedBecause"]): TurnResult {
-    return { text, reasoning, steps: trace.length, usage, trace, stoppedBecause, truncated, selfChecked };
+    return {
+      text,
+      reasoning,
+      steps: trace.length,
+      usage,
+      trace,
+      stoppedBecause,
+      truncated,
+      selfChecked,
+      ...(shortenedTo ? { shortenedTo } : {}),
+    };
   }
 }

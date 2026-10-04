@@ -2,7 +2,7 @@
 
 Honnête plutôt que flatteur : ce qui marche, ce qui manque, ce qui n'est pas vérifié.
 
-Ce document décrit l'état à la version **0.97.0**. Les chiffres qu'il annonce — version, tests, tâches d'évaluation — sont
+Ce document décrit l'état à la version **0.98.0**. Les chiffres qu'il annonce — version, tests, tâches d'évaluation — sont
 vérifiés par `npm run check:numbers`, que la CI exécute : ils ne peuvent plus vieillir en silence.
 Il était resté figé à `0.3.0` pendant trente-cinq
 versions, ce qui est sa propre leçon : une feuille de route périmée dit « projet abandonné » à
@@ -46,6 +46,7 @@ externe non exécuté ici est « non vérifié ».
 | Qualité mesurée | **4 lignes** | `remote only` (`qwen3.7-flash`) **45/62 pour 0,043 $** · `hivey/free` **32/62 pour 0 $** — les deux sur le jeu complet avec les consignes corrigées, **sans aucun refus**, donc les seules comparables entre elles. `hivey` 50/56 et `deepseek` 44/56 datent d'avant la réparation des consignes et le tableau le dit. ADR-0036 |
 | 4.4 — confirmé à l'échelle | **mesuré** | Rappel déclenché **23/62** (`qwen3.7-flash`), **15/62** (gratuit), **0/56** (`gpt-6.1-sol-pro`). Entre un quart et un tiers des tours d'un modèle bon marché finissent sur un changement non vérifié, aucun chez un modèle fort ⇒ filet pour les modèles bon marché, confirmé hors des 6 tâches construites exprès |
 | **Phase 5 — écrite** | à faire | Dérivée des chiffres, pas d'impressions (`docs/PROMPT-ROADMAP.md`). **5.1 rendre le banc capable de trancher** (48/47/50 sur 3 séries identiques ⇒ un effet de 2 tâches n'est pas jugeable — passe devant tout le reste) · **5.2 une réponse ne peut pas contredire son verdict** (10 des 17 échecs annoncés comme réussites arrivent **après** un rappel, 5 avec un échec visible dans la trace) · **5.3 vérifier la bonne chose** (les 5 autres n'ont rien vu échouer ; 7/10 sont des tâches IBM i à contrôle **structurel**, donc autant le banc que le modèle) · **5.4 `use_skill` = 0 sur 180 tours** → forcer, mesurer, réparer la sélection ou retirer l'offre · **5.5 `run_agent` = 1 sur 180** → même protocole · **5.6 `local only` inutilisable** (0/56, 51 sans aucune étape d'outil) alors que c'est la configuration qui porte l'argument du produit |
+| ⚠️ 402 n'est plus une impasse | **corrigé, éprouvé en vrai** | Deux défauts, l'un cachant l'autre : la porte d'`adaptRequest` ne lisait que `400`, donc **le seul refus portant son remède n'atteignait jamais les remèdes** ; et quand il y arrivait, la règle générique **supprimait** `max_tokens` (le message du 402 contient ces mots) — demander l'illimité quand le serveur demande moins. Le plafond est désormais **abaissé** au montant finançable, jamais supprimé ; sous 256 jetons le refus tient (un fragment en silence est pire que l'erreur) ; et la réponse dit qu'elle a été raccourcie. ⚠️ « il y a du crédit » = marge sous le **plafond de la clé**, pas le **solde du compte**. ADR-0037 |
 | ⚠️ Consignes corrompues | **corrigé** | Les consignes passaient par `sh -c` : les accents graves étaient **exécutés**. `` `any` `` disparaissait, `` `open` `` était remplacé par l'aide de `xdg-open`. **3 tâches des 56 d'origine** touchées, donc tous les chiffres publiés les incluaient. Passage en **argv** |
 | ⚠️ Refus du fournisseur | **corrigé** | Un `402` d'OpenRouter (crédit retenu par les requêtes en vol) a frappé **54 tâches sur 62** et le harnais a compté **8/62** — il aurait publié **13 %** comme une qualité. Enregistré comme refus ; un jeu qui en contient n'énonce aucun taux. + concurrence **adaptative** et réserves (`--note`) portées par le tableau |
 | 4.4 — verdict | **non éprouvé** | Le rappel s'est déclenché **0 fois sur 56**, et c'est expliqué par la mesure : **51 tâches ont changé quelque chose, et dans les 51 un contrôle a tourné** → 0 occasion sur 51. Les tâches du banc demandent un résultat vérifiable, donc le modèle contrôle de lui-même ; la population visée (« change ça » sans demander de preuve) n'y est pas. Mécanisme **gardé**, état écrit |
@@ -346,7 +347,7 @@ Trois niveaux, jamais mélangés :
 ### Avant 0.39.0
 
 - Noyau indépendant de l'éditeur : anonymisation, fournisseurs, routeur, budget, complétion, session,
-  carte du dépôt, boucle d'agent. **1177 tests unitaires** plus **43 tests d'intégration dans un vrai
+  carte du dépôt, boucle d'agent. **1184 tests unitaires** plus **43 tests d'intégration dans un vrai
   VS Code**.
 - Barre latérale : conversation, historique, modèles, permissions, configuration ; modes
   discussion / plan / agent ; budget de raisonnement ; contexte explicite.

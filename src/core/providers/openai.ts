@@ -147,17 +147,39 @@ export class OpenAICompatibleProvider implements Provider {
         continue;
       }
 
-      if (res.ok || res.status !== 400 || tries >= 2) return res;
+      // 400 is the server objecting to a FIELD. 402 is it objecting to the SIZE — and it says by
+      // how much: "you requested up to 4096 tokens, but can only afford 1991".
+      //
+      // ⚠️ Only 400 came here, so the one refusal that carries its own remedy was the one that never
+      // reached the code that applies remedies. A funded-but-nearly-empty account got a dead end
+      // where a shorter answer was available, and the fix to `adaptRequest` was unreachable until
+      // this line changed. Two defects, one of them hiding the other.
+      const adaptable = res.status === 400 || res.status === 402;
+      if (res.ok || !adaptable || tries >= 2) return res;
       // The body has to be read to know what it objected to, which consumes it — so a response that
       // teaches us nothing is rebuilt from what was read rather than returned half-drunk.
       const detail = await res.text();
       const fixed = adaptRequest(attempt, detail);
       if (!fixed) return new Response(detail, { status: res.status, statusText: res.statusText });
+      // What it accepted, so the answer can say it was shortened rather than let the user read a
+      // fragment as the model's opinion.
+      const capped = Number(fixed["max_tokens"] ?? fixed["max_completion_tokens"] ?? 0);
+      if (res.status === 402 && capped > 0) this.lastShortened = capped;
       attempt = fixed;
     }
   }
 
+  /**
+   * The cap a 402 forced this request down to, when one did.
+   *
+   * On the instance rather than threaded through, because the adaptation happens two layers below
+   * `chat` and the only consumer is the result it returns. Cleared at the start of every turn, so a
+   * later answer never inherits an earlier shortening.
+   */
+  private lastShortened: number | undefined;
+
   async chat(req: ChatRequest, onDelta?: (d: ChatDelta) => void): Promise<ChatResult> {
+    this.lastShortened = undefined;
     // The same ceiling of four, because the same models are behind OpenRouter — a request with five
     // breakpoints is refused by Anthropic whichever door it came through.
     const marks = keepCacheMarks(req.messages.flatMap((m, i) => (m.cacheable ? [i] : [])));
@@ -295,7 +317,14 @@ export class OpenAICompatibleProvider implements Provider {
     }
     if (toolCalls.length) stopReason = "tool_calls";
 
-    return { text, reasoning, toolCalls, usage, stopReason };
+    return {
+      text,
+      reasoning,
+      toolCalls,
+      usage,
+      stopReason,
+      ...(this.lastShortened ? { shortenedTo: this.lastShortened } : {}),
+    };
   }
 
   /**
@@ -401,10 +430,60 @@ export class OpenAICompatibleProvider implements Provider {
  * an empty message, a content filter — because retrying those would only spend the user's time
  * twice on the same error.
  */
+/**
+ * How many tokens the provider says the balance can still afford.
+ *
+ * OpenRouter's 402 carries the answer inside the refusal:
+ *
+ *     "This request requires more credits, or fewer max_tokens.
+ *      You requested up to 4096 tokens, but can only afford 1991."
+ *
+ * and its `remedy_hint` says the same thing: add credit, **or lower `max_tokens` to fit the
+ * remaining balance**. So the request is repeatable for what is affordable, and the user gets a
+ * shorter answer where they used to get an error.
+ */
+export function affordableTokens(error: string): number | undefined {
+  const found = /can only afford\s+(\d+)/i.exec(error ?? "");
+  if (!found) return undefined;
+  const n = Number(found[1]);
+  return Number.isFinite(n) && n > 0 ? n : undefined;
+}
+
+/**
+ * Below this, there is no answer worth returning.
+ *
+ * A reply in a hundred and fifty tokens is not a short answer, it is a fragment — and a fragment
+ * returned silently is worse than the error, because the user reads it as what the model thinks.
+ * Under the floor the refusal stands and says the balance is the problem.
+ */
+const MIN_USEFUL_ANSWER = 256;
+
 export function adaptRequest(body: Record<string, unknown>, error: string): Record<string, unknown> | undefined {
   const said = error.toLowerCase();
   const next = { ...body };
   let changed = false;
+
+  // The balance, first and on its own, because the generic rule below would get this exactly
+  // backwards.
+  //
+  // ⚠️ The refusal contains the words `max_tokens` — "requires more credits, or fewer max_tokens" —
+  // so "remove whatever the server names" DELETED the cap and retried without one: asking for an
+  // unbounded answer at the moment the server said to ask for a smaller one. It was then refused
+  // again, and the user saw a dead end where a shorter answer was available.
+  const affordable = affordableTokens(error);
+  if (affordable !== undefined) {
+    const asked = Number(next["max_tokens"] ?? next["max_completion_tokens"] ?? 0);
+    // Only when it is genuinely lower. If the cap was already under what is affordable then the
+    // refusal is about the PROMPT, not the answer, and lowering it further would claim to have fixed
+    // something it has not.
+    if (affordable >= MIN_USEFUL_ANSWER && asked > affordable) {
+      if ("max_tokens" in next) next["max_tokens"] = affordable;
+      if ("max_completion_tokens" in next) next["max_completion_tokens"] = affordable;
+      return next;
+    }
+    // Nothing worth retrying for: let the refusal stand, with its own text, which names the remedy.
+    return undefined;
+  }
 
   // OpenAI's rename. Only when the server asks for it by name: elsewhere `max_tokens` is the field
   // that works, and swapping it blindly would break every server that never renamed anything.

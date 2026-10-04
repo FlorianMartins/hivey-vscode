@@ -536,6 +536,7 @@ async function main(): Promise<void> {
           ? { contextFill: Math.min(1, result.usage.promptTokens / contextTokens) }
           : {}),
         toolCallsFromText: result.trace.some((x) => x.call.source === "text"),
+        ...(result.shortenedTo ? { shortenedTo: result.shortenedTo } : {}),
       });
       if (notices.length) {
         console.log(`\n${C.dim(t("To know"))}`);

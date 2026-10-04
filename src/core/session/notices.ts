@@ -60,6 +60,14 @@ export interface NoticeInput {
    * none through the protocol. A measured fact about the setup, not a guess about the model.
    */
   toolCallsFromText?: boolean;
+  /**
+   * The answer cap a provider's refusal forced this turn down to, when one did.
+   *
+   * A short answer returned in silence is worse than the refusal it replaced: the user reads a
+   * fragment as what the model thinks. This is the one place that says the balance, not the model,
+   * decided where the answer stopped.
+   */
+  shortenedTo?: number;
 }
 
 /**
@@ -87,6 +95,12 @@ export function youShouldKnow(input: NoticeInput): Notice[] {
     out.push({
       kind: "tool",
       text: "This model did not return tool calls through the protocol; they were read from its message. Agent mode is working, with less of a guarantee than usual.",
+    });
+  }
+  if (input.shortenedTo) {
+    out.push({
+      kind: "tool",
+      text: `The provider would not fund a full answer, so this one was capped at ${input.shortenedTo.toLocaleString("en-US")} tokens. Add credit if it reads as cut off.`,
     });
   }
   if (input.contextFill !== undefined && input.contextFill >= 0.85) {

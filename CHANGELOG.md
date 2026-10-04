@@ -2,6 +2,48 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.98.0 — 2026-10-04
+
+### Corrigé
+
+- **⚠️⚠️ Un `402 Payment Required` n'est plus une impasse — et il y avait deux défauts, dont un cachait
+  l'autre.** Signalé par Florian : « de nouveau l'erreur 402, alors qu'il y a du crédit ». Les deux
+  moitiés de la phrase étaient vraies, et c'est tout le problème.
+
+  ⚠️ **« Il y a du crédit » désigne le plafond de la clé, pas de l'argent.** La clé annonçait 48,42 $
+  de marge sous une limite de 70 $ : ce n'est pas un solde, c'est ce qu'elle a le **droit** de
+  dépenser si l'argent existe. `limit_source: openrouter_credits` dit que c'est le **solde du compte**
+  qui est épuisé — et le texte d'OpenRouter conseille de relever la limite de la clé, ce qui ne change
+  rien (elle a été relevée deux fois pour s'en assurer).
+
+  Et le refus **porte sa propre solution** : « vous avez demandé 4096 jetons, vous ne pouvez en
+  financer que 1991 ». La requête est donc refaite pour ce montant.
+
+  **Défaut 1 — le 402 n'atteignait jamais le code qui répare.** `adaptRequest` reprend une requête
+  rejetée pour un champ, et sa porte d'entrée lisait `res.status !== 400` : **seul un 400**. Donc le
+  seul refus qui porte son propre remède était précisément celui qui n'atteignait jamais les remèdes.
+
+  **Défaut 2 — et quand il y arrivait, il faisait l'inverse.** La règle générique retire « tout champ
+  que le serveur nomme », et le message du 402 **contient les mots `max_tokens`** (« requires more
+  credits, **or fewer max_tokens** »). Le plafond était donc **supprimé** et la requête rejouée **sans
+  plafond** : demander une réponse illimitée à l'instant où le serveur demande d'en demander moins.
+  Corriger ce second défaut ne changeait rien tant que le premier tenait.
+
+  Désormais : le plafond est **abaissé** à ce que le fournisseur dit pouvoir financer, jamais
+  supprimé ; la règle du solde passe **avant** la générique pour que celle-ci ne puisse plus
+  l'inverser ; un plafond déjà inférieur n'est pas touché (le refus porte alors sur le prompt) ; et
+  **sous 256 jetons le refus tient**, parce qu'une réponse de 150 jetons est un fragment, et qu'un
+  fragment rendu en silence est **pire que l'erreur** — le lecteur le prend pour l'avis du modèle.
+
+  **Et la réponse dit qu'elle a été raccourcie** : « le fournisseur n'a pas financé une réponse
+  entière, celle-ci est plafonnée à 1 991 jetons ; ajoutez du crédit si elle vous paraît coupée ».
+  C'est la seule phrase qui dit que c'est le **solde**, et non le modèle, qui a décidé où la réponse
+  s'arrêtait.
+
+  **Éprouvé en vrai** sur la clé qui refusait à l'instant : refus, relance automatique à 1 991 jetons,
+  appel d'outil, réponse juste, mention affichée — là où la même requête rendait une impasse une
+  minute plus tôt. Voir [ADR-0037](docs/adr/0037-un-402-qui-dit-ce-qu-il-peut-payer.md).
+
 ## 0.97.0 — 2026-10-04
 
 ### Documentation

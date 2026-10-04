@@ -105,6 +105,15 @@ export interface ChatResult {
   toolCalls: ToolCall[];
   usage: Usage;
   stopReason: "stop" | "length" | "tool_calls" | "error";
+  /**
+   * The answer cap a refusal forced this request down to, when one did.
+   *
+   * Present only when a provider refused the request for its size and said what it could afford —
+   * OpenRouter's 402 names the number — and the request was repeated for that. The answer is real
+   * and may be short; a short answer returned in silence is worse than the refusal, because the user
+   * reads it as what the model thinks.
+   */
+  shortenedTo?: number;
 }
 
 export interface CompletionRequest {
