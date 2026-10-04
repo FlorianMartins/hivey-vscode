@@ -111,6 +111,21 @@ qu'un seul **n'énonce aucun taux** — la colonne affiche « 3 refused — no r
 pourcentage. Absent plutôt que faux. C'est la même règle que partout ailleurs ici, et c'est elle qui
 rend le tableau digne de confiance : il préfère ne rien dire que dire quelque chose d'invérifiable.
 
+## La même mesure, deux fois, ne donne pas le même chiffre
+
+C'est la chose la plus désagréable à admettre sur un banc d'essai, et c'est mesuré ici : **trois
+séries de la même configuration, sur les mêmes tâches, avec le même programme, ont donné 48, 47 et
+50 réussites.** Rien n'avait changé entre elles.
+
+La raison est dans le [chapitre 2](02-le-modele.md) : un modèle de langage ne produit pas deux fois
+la même réponse. Sur 62 tâches, deux ou trois basculent d'un côté ou de l'autre.
+
+La conséquence est sévère et vaut pour tous les chiffres que vous lirez ailleurs : **une différence
+plus petite que cet écart n'est pas un résultat.** Quand un outil annonce « 3 % de mieux », la
+question à poser n'est pas « 3 % de quoi » mais « combien de fois l'avez-vous mesuré ». Le tableau de
+ce projet publie son propre écart dès qu'on lui donne plusieurs séries — et il le **rapporte** au lieu
+d'en faire une moyenne, parce qu'une moyenne cache précisément ce dont le lecteur a besoin.
+
 ## Les règles que ce projet s'impose sur les chiffres
 
 Elles sont inhabituelles et elles valent d'être connues, parce qu'elles sont la raison de faire

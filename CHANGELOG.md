@@ -2,6 +2,46 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.97.0 — 2026-10-04
+
+### Documentation
+
+- **La phase 5 est écrite, et dérivée des chiffres plutôt que d'impressions** — c'est la règle que la
+  phase 4 a imposée en se trompant quatre fois sur cinq. Chaque chantier porte le nombre dont il
+  vient, relevé sur les trois séries complètes des 3 et 4 octobre, ou une lacune qu'un de mes propres
+  ADR avait déclarée dans sa section « ce que ceci ne fait pas ». **Un chantier sans nombre n'entre pas
+  dans cette phase.**
+
+  - **5.1 rendre le banc capable de trancher** — 48, 47 et 50 sur trois séries **identiques** : un
+    chantier qui déplace deux tâches n'est pas jugeable, et plusieurs des suivants en déplacent deux.
+    La répétition devient le défaut, le tableau rend la médiane **avec** son écart, et un effet situé
+    dans l'écart est déclaré non jugeable au lieu d'être accepté au hasard. Ce chantier passe devant
+    tous les autres.
+  - **5.2 une réponse ne peut pas contredire son propre verdict** — **10 des 17** échecs que
+    `qwen3.7-flash` a annoncés comme des réussites sont survenus **après** un rappel de vérification,
+    et **5** avec un échec visible dans la trace que le modèle avait lue. Le produit connaît déjà la
+    contradiction (`verifyTurn`) et la réponse n'en porte rien.
+  - **5.3 vérifier la bonne chose** — les **5 autres** n'ont rien vu échouer : le contrôle lancé
+    n'était pas celui qui décide. ⚠️ **7 des 10 cas sont des tâches IBM i**, dont le contrôle est
+    *structurel* — il n'existe souvent aucune commande à lancer qui le refléterait. C'est donc autant
+    une propriété du banc qu'un défaut du modèle, et c'est dit avant de corriger quoi que ce soit.
+  - **5.4 les compétences offertes ne servent jamais** — `use_skill` appelé **0 fois sur 180 tours**,
+    sur trois configurations. Le chantier 4.2 les a rendues atteignables ; le modèle ne les a jamais
+    demandées. **Offrir n'est pas utiliser.** Décision annoncée d'avance : forcer la compétence sur la
+    famille correspondante, et selon le résultat réparer la **sélection** ou **sortir les 85
+    descriptions du préfixe** — on ne paie pas des jetons à chaque tour pour une capacité que rien
+    n'emploie.
+  - **5.5 la délégation offerte ne sert jamais** — `run_agent` appelé **1 fois sur 180**. Même
+    protocole.
+  - **5.6 `local only` est inutilisable** — **0/56**, dont 51 tâches sans une seule étape d'outil,
+    alors que c'est la configuration dont tout le discours du produit dépend. L'ADR-0026 a rendu
+    l'agent local *possible*, pas *capable*.
+
+- **Le cours gagne un chapitre d'honnêteté sur les bancs d'essai** : « la même mesure, deux fois, ne
+  donne pas le même chiffre », avec les 48/47/50 mesurés ici et ce qu'il faut en conclure — quand un
+  outil annonce « 3 % de mieux », la question n'est pas « 3 % de quoi » mais « combien de fois l'avez-vous
+  mesuré ».
+
 ## 0.96.0 — 2026-10-04
 
 ### Mesuré

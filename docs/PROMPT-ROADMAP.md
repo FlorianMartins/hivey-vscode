@@ -611,6 +611,113 @@ tranche, pas la préférence — et **le résultat est publié dans les deux cas
 ajuster un prompt jusqu'à ce que le banc remonte. Le second est la façon la plus sûre de fabriquer un
 chiffre qui ne veut rien dire.
 
+
+## Phase 5 — Ce que la mesure a montré, et rien d'autre
+
+⚠️ **Cette phase est dérivée du code et des chiffres, pas de ce que je crois du produit.** C'est la
+règle que la phase 4 a imposée en se trompant quatre fois sur cinq. Chaque chantier ci-dessous part
+d'un **nombre relevé** sur les trois séries complètes du 3 et 4 octobre, ou d'une lacune que l'un de
+mes propres ADR a déclarée dans sa section « ce que ceci ne fait pas ».
+
+Elle a aussi une contrainte neuve, et c'est la première chose à régler : **le banc ne peut pas
+trancher ce qu'on lui demande.** Trois séries de la même configuration ont donné 48, 47 et 50. Un
+chantier qui déplace deux tâches n'est donc pas jugeable, et plusieurs des chantiers ci-dessous
+déplacent deux tâches. Le 5.1 existe pour ça et passe devant.
+
+### 5.1 Rendre le banc capable de trancher
+
+**Mesuré** : 48, 47, 50 sur trois séries identiques — un écart de **trois tâches** sans que rien ne
+change. Le tableau publie déjà cet écart quand on lui donne plusieurs séries, ce qui est honnête et
+ne suffit pas : il faut pouvoir **décider**.
+
+À livrer : la répétition devient le défaut, pas une option. Une mesure est **n séries** (3 pour
+commencer), et le tableau rend la médiane **avec** son écart ; un chantier dont l'effet est dans
+l'écart est déclaré non jugeable au lieu d'être accepté ou rejeté au hasard. Le coût est réel — trois
+fois le prix et trois fois le temps — et c'est le prix d'une mesure qui décide. Les séries se lancent
+en parallèle quand le compte le permet, ce qui le ramène au temps d'une seule.
+
+⚠️ Et il faudra regarder **d'où vient l'écart** : trois tâches qui basculent au hasard, ou toujours
+les trois mêmes ? Le second cas est une propriété de ces tâches et se corrige ; le premier est du
+bruit de modèle et ne se corrige pas, il se mesure.
+
+### 5.2 Une réponse ne peut pas contredire son propre verdict
+
+**Mesuré** : sur les 17 échecs que `qwen3.7-flash` a annoncés comme des réussites, **10 sont survenus
+après un rappel de vérification** — et dans **5 d'entre eux la trace de l'agent contient visiblement
+un échec** qu'il a lu avant de conclure. Le rappel le fait lancer un contrôle ; il ne le fait pas
+croire au résultat.
+
+Le produit **connaît** déjà la contradiction : `verifyTurn` rend « le dernier contrôle n'est pas
+passé » pendant que la réponse dit « c'est fait ». Elle sert à escalader et à remplir « À savoir »,
+et la **réponse elle-même** n'en porte rien.
+
+À livrer : quand le verdict du tour contredit ce que la réponse affirme, la réponse le porte — pas un
+avertissement à côté, dans le texte que la personne lit. Mesurer : `claimedDone`, qui existe
+précisément pour ça.
+
+⚠️ Ce n'est pas « faire taire le modèle » : une réponse qui dit « j'ai changé ceci, le contrôle
+échoue encore, voilà où » est **plus** utile que la même sans la seconde moitié.
+
+### 5.3 Vérifier la bonne chose
+
+**Mesuré** : les **5 autres** échecs annoncés comme des réussites n'ont rien vu échouer — le contrôle
+lancé n'était pas celui qui décide. Et **7 des 10 cas sont des tâches IBM i**, dont le contrôle est
+*structurel* : il n'existe souvent aucune commande que le modèle puisse lancer qui refléterait le vrai
+contrôle. C'est donc **autant une propriété du banc qu'un défaut du modèle**, et il faut le dire avant
+de corriger quoi que ce soit.
+
+À dériver avant d'engager : le modèle devine la commande de contrôle d'un dépôt. Il existe déjà
+`hiveyCode.ibmi.testCommand` et les règles de la maison ; il n'existe pas d'endroit où un dépôt
+**déclare** « voici ce qui dit si mon code marche ». Vérifier dans le code si ce manque est réel avant
+d'ajouter un fichier de plus.
+
+Mesurer : la part des échecs où aucun contrôle pertinent n'a tourné.
+
+### 5.4 Les compétences offertes ne servent jamais — décider
+
+**Mesuré** : `use_skill` a été appelé **0 fois sur 180 tours** (56 + 62 + 62), sur trois
+configurations. Le chantier 4.2 a rendu 85 compétences atteignables par le modèle ; il ne les a
+jamais demandées. **Offrir n'est pas utiliser.**
+
+Décision à annoncer **avant** la mesure, comme pour DeepSeek : on force une compétence sur la famille
+qui lui correspond (les tâches IBM i ont chacune la leur) et on compare. Si la compétence forcée fait
+gagner des tâches, le défaut est dans la **sélection** et c'est elle qu'on répare. Si elle n'en fait
+pas gagner, les 85 descriptions sortent du préfixe : on ne paie pas des jetons à chaque tour pour une
+capacité que rien n'emploie. **Le banc tranche, et le résultat est publié dans les deux cas.**
+
+⚠️ Interdit : pousser le modèle vers les compétences par le prompt jusqu'à ce que le chiffre monte.
+C'est ajuster contre son propre banc.
+
+### 5.5 La délégation offerte ne sert jamais — décider
+
+**Mesuré** : `run_agent` a été appelé **1 fois sur 180 tours**. Même forme que 5.4 et même protocole :
+mesurer avec une délégation forcée sur les tâches d'exploration, puis réparer la sélection ou retirer
+l'offre. ⚠️ Et une lacune que l'ADR-0031 a déclarée : un sous-agent ne reçoit **pas** les compétences
+du 4.2 — à trancher ici plutôt qu'à supposer.
+
+### 5.6 `local only` est inutilisable, et c'est la configuration qui porte l'argument
+
+**Mesuré** : **0/56**, dont **51 tâches sans une seule étape d'outil**. C'est la configuration dont
+tout le discours du produit dépend — « votre code ne part pas » — et elle ne fait rien. La correction
+de l'ADR-0026 a rendu l'agent local *possible* ; elle ne l'a pas rendu *capable*.
+
+À livrer : un modèle local qui appelle des outils. `qwen2.5-coder:7b` n'en émet pas par ce runtime ;
+d'autres le font. Tirer un modèle à outils, mesurer, et **changer ce que le README recommande** si le
+chiffre le justifie — recommander un modèle qui ne peut pas travailler est la pire des deux erreurs
+possibles ici.
+
+Mesurer : `never acted`, qui existe pour cette question.
+
+### Ce que la phase 5 s'interdit
+
+- **Ajuster un prompt jusqu'à ce que le banc remonte.** Déjà interdit en phase 4, et deux chantiers
+  ci-dessus en offrent la tentation directe.
+- **Conclure d'une seule série.** L'écart mesuré est de trois tâches ; c'est le 5.1 qui rend le reste
+  jugeable, et rien ne se conclut avant lui.
+- **Écrire un chantier depuis une impression.** Chaque entrée ci-dessus porte le nombre dont elle
+  vient. Un chantier sans nombre n'entre pas dans cette phase.
+
+
 ## Interdits et compte rendu
 
 ### Ce que tu ne fais jamais
