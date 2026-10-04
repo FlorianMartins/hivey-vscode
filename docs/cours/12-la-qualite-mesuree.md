@@ -71,6 +71,10 @@ contrôle a échoué quand même. C'est ce chiffre qui décide si on peut laisse
 un modèle qui échoue bruyamment vous coûte un tour, un modèle qui échoue **en annonçant une
 réussite** coûte la confiance qui rend l'outil utilisable.
 
+Et deux chiffres qui donnent l'échelle, mesurés sur le jeu complet : **le préréglage gratuit réussit
+la moitié des tâches, pour rien** — il ne dit pas que le gratuit suffit, il dit où il s'arrête. Et un
+modèle payant bon marché en réussit près des trois quarts pour **quatre centimes sur 62 tâches**.
+
 **Le même banc, sur un modèle distant moderne, a renversé le résultat** : la grande majorité des
 tâches réussies, aucune tâche sans action, pour environ un dollar et une vingtaine de minutes. Le
 contraste n'est pas un détail : il dit qu'un petit modèle local, aujourd'hui, ne suffit pas pour du

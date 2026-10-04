@@ -50,3 +50,26 @@ test("the terminal records it, so the harness can tell them apart", () => {
   const report = readFileSync("src/core/eval/report.ts", "utf8");
   assert.match(report, /if \(!out\.refused\) out\.passRate = out\.passed \/ outcomes\.length;/);
 });
+
+test("a 402 says WHICH limit refused it, when the provider says so", async () => {
+  // ⚠️ Two sentences contradicted each other for an afternoon. OpenRouter's own message said "adjust
+  // the key's monthly limit" while this client said "this is the account balance, not the API key" —
+  // and the client was right, so the key's limit was raised twice and nothing changed. The structured
+  // field settles it: `openrouter_credits` means the account has no money.
+  const { describeHttpError } = await import("../src/core/providers/openai.js");
+  const body = JSON.stringify({
+    error: {
+      message: "This request requires more credits. To increase, adjust the key's weekly limit",
+      code: 402,
+      metadata: { limit_source: "openrouter_credits" },
+    },
+  });
+  const said = await describeHttpError(new Response(body, { status: 402, statusText: "Payment Required" }), "openrouter");
+  assert.match(said, /the limit that refused this is `openrouter_credits`/);
+  assert.match(said, /only adding credit/);
+
+  // A configured cap is the other case, and it must not be described as an empty account.
+  const capped = JSON.stringify({ error: { message: "over limit", metadata: { limit_source: "key_limit" } } });
+  const other = await describeHttpError(new Response(capped, { status: 402, statusText: "Payment Required" }), "openrouter");
+  assert.match(other, /a configured cap rather than the balance/);
+});

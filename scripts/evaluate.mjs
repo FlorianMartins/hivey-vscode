@@ -435,7 +435,14 @@ async function main() {
 
   console.log(`${queue.length} task(s), up to ${jobs} at a time\n`);
   await Promise.all(
-    Array.from({ length: Math.min(jobs, queue.length) }, async () => {
+    Array.from({ length: Math.min(jobs, queue.length) }, async (_unused, worker) => {
+      // ⚠️ Staggered, because starting every worker at once is what triggered the cascade this
+      // backoff exists to survive. Four agent turns opened in the same instant reserve four lots of
+      // credit before any of them has answered, the provider refuses most of them, and the
+      // concurrency only comes down AFTER the damage — so the first thing a run did was waste its
+      // first four tasks. One second apart is enough: the first turn is under way, and its
+      // reservation is known, before the second asks for one.
+      await wait(worker * 1000);
       for (;;) {
         // Hold back when the concurrency has been reduced under us.
         while (active >= allowed) await wait(250);

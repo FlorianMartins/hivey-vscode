@@ -5,33 +5,21 @@ What each configuration scores on this repository's own evaluation set
 
 > **Read these figures with the following in mind.**
 >
-> - Mesuré sur 56 tâches, avant que le banc n'en compte 62 : les six tâches de la famille « sans vérification » n'y sont pas.
-> - ⚠️ Trois des 56 consignes étaient corrompues au moment de ces séries : les accents graves étaient exécutés par un shell, donc « No `any` and no `as` casts » arrivait au modèle sans son sujet. Corrigé le 2026-10-03 ; ces trois tâches étaient donc plus dures qu'elles ne devraient l'être.
-> - La série de remplacement est bloquée : OpenRouter refuse les requêtes de cette taille faute de marge sous la limite mensuelle de la clé.
+> - ⚠️ Les deux premières lignes (`deepseek-v4.1-flash`, `hivey`) ont été mesurées sur **56** tâches, avant que trois consignes ne soient réparées : les accents graves y étaient exécutés par un shell, donc « No `any` and no `as` casts » arrivait au modèle sans son sujet. Elles ne sont pas comparables aux deux dernières.
+> - Les deux dernières lignes (`hivey/free`, `remote only`) sont mesurées sur les **62** tâches avec les consignes corrigées, sans aucun refus. Ce sont les seules comparables entre elles.
+> - Le préréglage `hivey` n'a pas pu être remesuré : le solde de crédit du compte OpenRouter ne finance plus une requête de cette taille (`limit_source: openrouter_credits`).
 
-Taken 2026-10-03T13:44:56.036Z against `https://openrouter.ai/api/v1` with `deepseek/deepseek-v4.1-flash`, `hivey`.
+Taken 2026-10-04T01:41:16.782Z against `https://openrouter.ai/api/v1` with `deepseek/deepseek-v4.1-flash`, `hivey`, `hivey/free`, `qwen/qwen3.7-flash`.
 
 | configuration | passed | quality | never acted | claimed done | model time | cost |
 | --- | --- | --- | --- | --- | --- | --- |
 | `local only` | — | not measured | — | — | — | — |
 | `local + escalation` | — | not measured | — | — | — | — |
-| `remote only` | — | not measured | — | — | — | — |
-| `hivey/free` | — | not measured | — | — | — | — |
+| `remote only` | 45/62 | 73 % | 0/62 | 17/62 | 1780 s | $0.0428 ($0.0007/task) |
+| `hivey/free` | 32/62 | 52 % | 3/62 | 27/62 | 2997 s | $0.0000 ($0.0000/task) |
 | `hivey` | 50/56 | 89 % | 1/56 | 5/56 | 3918 s | $4.2916 ($0.0766/task) |
 | `hivey/smart` | — | not measured | — | — | — | — |
 | `deepseek-v4.1-flash alone` | 44/56 | 79 % | 1/56 | 11/56 | 2296 s | $0.1357 ($0.0024/task) |
-
-### What the same configuration scored twice
-
-Run to run, on the same tasks and the same build:
-
-- `hivey`: 47/56, 50/56 — a spread of 3 task(s) with nothing changed between runs.
-
-**So a difference smaller than that spread is not a result.** A single run of a configuration
-cannot establish a gap of a few tasks, and a table showing one run per row invites exactly that
-mistake — the reader sees two percentages and concludes something the data does not support.
-Reported rather than averaged: an average hides the spread, and the spread is what tells you what
-the percentage is worth.
 
 ### How to read it
 

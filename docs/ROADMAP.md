@@ -2,7 +2,7 @@
 
 Honnête plutôt que flatteur : ce qui marche, ce qui manque, ce qui n'est pas vérifié.
 
-Ce document décrit l'état à la version **0.95.0**. Les chiffres qu'il annonce — version, tests, tâches d'évaluation — sont
+Ce document décrit l'état à la version **0.96.0**. Les chiffres qu'il annonce — version, tests, tâches d'évaluation — sont
 vérifiés par `npm run check:numbers`, que la CI exécute : ils ne peuvent plus vieillir en silence.
 Il était resté figé à `0.3.0` pendant trente-cinq
 versions, ce qui est sa propre leçon : une feuille de route périmée dit « projet abandonné » à
@@ -43,6 +43,8 @@ externe non exécuté ici est « non vérifié ».
 | 4.5 Capacité de raisonner | fait | **testé** — 4 tests, les 3 premiers retombent si on rétablit l'ancienne expression : le catalogue reconnaît une génération le jour de sa sortie, **chaque modèle `deep` d'un préréglage payant doit pouvoir raisonner**, le repli **ne contient aucun chiffre** (lu dans son source), et la capacité est générée depuis `supported_parameters`. ⚠️ Défaut réel : la regex nommait `gpt-5`, le marché est à `gpt-6` → le contrôle de réflexion était **caché sur le modèle le plus fort du produit**. ADR-0033. Le reste du chantier (choisir le niveau) n'existait pas : traduction déjà juste, capacité binaire |
 | 4.6 DeepSeek v4.1 | **mesuré — abandonné** | **44/56** contre une plage de **47–50** pour le préréglage, et **11 échecs annoncés comme réussites** contre 5–7. Sous toute la plage observée, donc la direction tient malgré le bruit. Décision écrite **avant** la mesure. ⚠️ **33× moins cher** (0,0024 $/tâche contre 0,0766 $) — écrit aussi, parce que ça ne va pas dans le sens de la décision. ADR-0034 |
 | 4.4 — éprouvé | **mesuré — justifié** | 6 tâches « sans vérification » ajoutées (banc 56 → **62**). Sur `qwen3.7-flash` : **0/6 sans le rappel, 4/6 avec**, déclenché exactement 4 fois, chaîne causale visible tâche par tâche. Sur `gpt-6.1-sol-pro` : **jamais déclenché** — il vérifie de lui-même. ⇒ filet pour les **modèles bon marché**, pas pour le banc. ADR-0035 |
+| Qualité mesurée | **4 lignes** | `remote only` (`qwen3.7-flash`) **45/62 pour 0,043 $** · `hivey/free` **32/62 pour 0 $** — les deux sur le jeu complet avec les consignes corrigées, **sans aucun refus**, donc les seules comparables entre elles. `hivey` 50/56 et `deepseek` 44/56 datent d'avant la réparation des consignes et le tableau le dit. ADR-0036 |
+| 4.4 — confirmé à l'échelle | **mesuré** | Rappel déclenché **23/62** (`qwen3.7-flash`), **15/62** (gratuit), **0/56** (`gpt-6.1-sol-pro`). Entre un quart et un tiers des tours d'un modèle bon marché finissent sur un changement non vérifié, aucun chez un modèle fort ⇒ filet pour les modèles bon marché, confirmé hors des 6 tâches construites exprès |
 | ⚠️ Consignes corrompues | **corrigé** | Les consignes passaient par `sh -c` : les accents graves étaient **exécutés**. `` `any` `` disparaissait, `` `open` `` était remplacé par l'aide de `xdg-open`. **3 tâches des 56 d'origine** touchées, donc tous les chiffres publiés les incluaient. Passage en **argv** |
 | ⚠️ Refus du fournisseur | **corrigé** | Un `402` d'OpenRouter (crédit retenu par les requêtes en vol) a frappé **54 tâches sur 62** et le harnais a compté **8/62** — il aurait publié **13 %** comme une qualité. Enregistré comme refus ; un jeu qui en contient n'énonce aucun taux. + concurrence **adaptative** et réserves (`--note`) portées par le tableau |
 | 4.4 — verdict | **non éprouvé** | Le rappel s'est déclenché **0 fois sur 56**, et c'est expliqué par la mesure : **51 tâches ont changé quelque chose, et dans les 51 un contrôle a tourné** → 0 occasion sur 51. Les tâches du banc demandent un résultat vérifiable, donc le modèle contrôle de lui-même ; la population visée (« change ça » sans demander de preuve) n'y est pas. Mécanisme **gardé**, état écrit |
@@ -343,7 +345,7 @@ Trois niveaux, jamais mélangés :
 ### Avant 0.39.0
 
 - Noyau indépendant de l'éditeur : anonymisation, fournisseurs, routeur, budget, complétion, session,
-  carte du dépôt, boucle d'agent. **1176 tests unitaires** plus **43 tests d'intégration dans un vrai
+  carte du dépôt, boucle d'agent. **1177 tests unitaires** plus **43 tests d'intégration dans un vrai
   VS Code**.
 - Barre latérale : conversation, historique, modèles, permissions, configuration ; modes
   discussion / plan / agent ; budget de raisonnement ; contexte explicite.

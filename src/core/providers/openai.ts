@@ -476,10 +476,22 @@ function sleep(ms: number, signal?: AbortSignal): Promise<void> {
 
 export async function describeHttpError(res: Response, provider?: string): Promise<string> {
   let detail = "";
+  /**
+   * Which limit the provider says it hit, when it says so.
+   *
+   * ⚠️ Worth reading, because the alternative is two sentences contradicting each other. On a 402
+   * OpenRouter's own message said "adjust the key's monthly limit" while this client said "this is
+   * the account balance, not the API key" — and the client was right, so the key's limit was raised,
+   * twice, and nothing changed. The structured field says `openrouter_credits`, which is the one
+   * thing neither sentence established.
+   */
+  let limitSource = "";
   try {
     const body = await res.text();
     const json = JSON.parse(body);
     detail = json?.error?.message ?? json?.error ?? json?.message ?? body.slice(0, 300);
+    const source = json?.error?.metadata?.limit_source;
+    if (typeof source === "string" && source) limitSource = source;
   } catch {
     /* body already consumed or not JSON */
   }
@@ -493,7 +505,16 @@ export async function describeHttpError(res: Response, provider?: string): Promi
         res.status === 402
         ? res.headers.get("retry-after")
           ? ` — ${provider ?? "the provider"} is holding credit for requests still in flight, not refusing the key. It was retried and still said no; try again in a moment.`
-          : ` — this is the account balance at ${provider ?? "the provider"}, not the API key. A Hivey preset always bills your OpenRouter account, whichever provider the panel shows.`
+          : limitSource
+            ? // Said by the provider rather than inferred. `openrouter_credits` means the account
+              // has no money; a key or organisation limit means there IS money and something is
+              // capping it. Sending somebody to the wrong one of those costs an afternoon.
+              ` — the limit that refused this is \`${limitSource}\`. ${
+                /credit/i.test(limitSource)
+                  ? `That is the account balance at ${provider ?? "the provider"}: no key setting and no retry changes it, only adding credit.`
+                  : "That is a configured cap rather than the balance — raise it where it is set."
+              } A Hivey preset always bills your OpenRouter account, whichever provider the panel shows.`
+            : ` — this is the account balance at ${provider ?? "the provider"}, not the API key. A Hivey preset always bills your OpenRouter account, whichever provider the panel shows.`
         : res.status === 404
           ? " — check the endpoint URL and that the model exists on it."
           : res.status === 429

@@ -2,6 +2,57 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.96.0 — 2026-10-04
+
+### Mesuré
+
+- **Deux configurations de plus, sur les 62 tâches, sans aucun refus** — et ce sont les deux premières
+  lignes du tableau mesurées avec les consignes corrigées, donc les deux seules comparables entre
+  elles. Voir [ADR-0036](docs/adr/0036-ce-que-le-gratuit-donne.md).
+
+  | configuration | réussi | annoncé fini à tort | coût |
+  |---|---|---|---|
+  | `remote only` — `qwen3.7-flash` | **45/62** (73 %) | 17 | **0,043 $** — 0,0007 $/tâche |
+  | `hivey/free` — `nemotron-3.5-lightning:free` | **32/62** (52 %) | 27 | **0,00 $** |
+
+  **Le gratuit fait la moitié du banc, pour rien.** Et un modèle payant bon marché fait 73 % pour
+  **quatre centimes sur 62 tâches**, là où le préréglage `hivey` fait 89 % à 0,0766 $ la tâche — cent
+  fois plus cher pour seize points. ⚠️ Les deux ne sont pas strictement comparables : la ligne `hivey`
+  date d'avant la réparation de trois consignes. L'ordre de grandeur ne dépend pas de ces trois
+  tâches ; le tableau dit lesquelles sont comparables, ligne par ligne.
+
+- **⚠️⚠️ Le chantier 4.4 est confirmé à l'échelle, et il dit maintenant précisément ce qu'il est.** Le
+  rappel « tu as changé quelque chose et rien n'a vérifié » s'est déclenché **23 fois sur 62** avec
+  `qwen3.7-flash`, **15 fois sur 62** avec le préréglage gratuit, et **0 fois sur 56** avec
+  `gpt-6.1-sol-pro`. L'ADR-0035 l'avait établi sur six tâches construites exprès ; c'est maintenant
+  mesuré sur le banc entier, sans tâche faite pour l'occasion. **Entre un quart et un tiers des tours
+  d'un modèle bon marché se terminent sur un changement que rien n'a vérifié**, et aucun de ceux d'un
+  modèle fort. Ce n'est pas un filet pour le banc : c'est un filet pour les modèles que ce produit
+  existe pour rendre utilisables. Le modèle cher n'en a pas besoin ; c'est celui à quatre centimes qui
+  en vit.
+
+### Corrigé
+
+- ⚠️ **Deux messages se contredisaient sur un `402`, et ça a coûté un détour entier.** OpenRouter
+  disait « ajuste la limite mensuelle de la clé » pendant que ce client disait « c'est le solde du
+  compte, pas la clé ». Le client avait raison — mais les deux phrases se valaient à la lecture, donc
+  le plafond de la clé a été relevé **deux fois** sans effet. OpenRouter renvoie en fait un champ
+  structuré, `limit_source`, que personne ne lisait. Le message dit désormais **lequel** des deux a
+  refusé : `openrouter_credits` → « seul l'ajout de crédit y change quelque chose » ; un plafond
+  configuré → « c'est un plafond, pas le solde ». Envoyer quelqu'un vers le mauvais des deux coûte un
+  après-midi.
+
+- ⚠️ **Le harnais démarrait tous ses ouvriers au même instant**, ce qui déclenchait la cascade de refus
+  que sa propre temporisation existe pour encaisser : quatre tours d'agent ouverts dans la même
+  seconde réservent quatre lots de crédit avant qu'aucun n'ait répondu, le fournisseur refuse, et la
+  concurrence ne redescend qu'**après** les dégâts. Ils démarrent à une seconde d'intervalle.
+
+### Non fait
+
+- **Le préréglage `hivey` n'a pas pu être remesuré.** Le solde de crédit du compte ne finance plus une
+  requête de cette taille sur un modèle à un million de jetons. Il faut du crédit sur le **compte**,
+  pas un plafond de clé plus haut — le tableau le dit dans ses réserves.
+
 ## 0.95.0 — 2026-10-03
 
 ### Corrigé
