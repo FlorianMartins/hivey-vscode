@@ -8,6 +8,8 @@
 
 import { spawn } from "node:child_process";
 import { searchPattern } from "../core/agent/regex.js";
+import { describeSlice, sliceLines } from "../core/fs/slice.js";
+import { findUnique } from "../core/text/findText.js";
 import { readFile, readdir, stat, writeFile } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import type { Tool, ToolResult } from "../core/agent/loop.js";
@@ -138,15 +140,36 @@ export function buildCliTools(opts: CliToolOptions): Tool[] {
   const readFileTool: Tool = {
     schema: {
       name: "read_file",
-      description: "Read a file from the working directory.",
-      parameters: { type: "object", properties: { path: { type: "string" } }, required: ["path"] },
+      description:
+        "Read a file from the working directory. Give `from` and `to` (1-based line numbers) to read " +
+        "part of a large file; the result always says which lines came back and how to read on.",
+      parameters: {
+        type: "object",
+        properties: {
+          path: { type: "string" },
+          from: { type: "number", description: "First line to return, 1-based. Default 1." },
+          to: { type: "number", description: "Last line to return, 1-based and inclusive. Default: the end." },
+        },
+        required: ["path"],
+      },
     },
     approval: () => false,
     async run(args, ctx): Promise<ToolResult> {
       const path = safeResolve(opts, String(args["path"] ?? ""));
       const text = await readFile(path, "utf8");
-      ctx.report(t("read {0}", String(args["path"])));
-      return { content: headToTokens(text, 6000) };
+      // The same range and the same notice as the panel's reader: one behaviour, two surfaces. See
+      // `core/fs/slice.ts` for why truncating in silence sent a real session chasing `sed`.
+      const slice = sliceLines(
+        text,
+        args["from"] === undefined ? undefined : Number(args["from"]),
+        args["to"] === undefined ? undefined : Number(args["to"]),
+      );
+      ctx.report(
+        slice.from === 1 && slice.to === slice.total
+          ? t("read {0}", String(args["path"]))
+          : t("read {0} (lines {1}-{2} of {3})", String(args["path"]), slice.from, slice.to, slice.total),
+      );
+      return { content: slice.text + describeSlice(slice, String(args["path"])) };
     },
   };
 
@@ -261,12 +284,20 @@ export function buildCliTools(opts: CliToolOptions): Tool[] {
       const oldText = String(args["old"] ?? "");
       const newText = String(args["new"] ?? "");
       const text = await readFile(path, "utf8");
-      const at = text.indexOf(oldText);
-      if (at < 0) return { content: "That snippet does not appear in the file. Read it again.", isError: true };
-      if (text.indexOf(oldText, at + 1) >= 0) {
-        return { content: "That snippet appears more than once. Include more surrounding lines.", isError: true };
+      // The same matcher as the panel's editor: `é` written as one code point and as `e` plus a
+      // combining accent are the same text on screen and different strings to `indexOf`. One
+      // behaviour, two surfaces — see `core/text/findText.ts`.
+      const found = findUnique(text, oldText);
+      if ("problem" in found) {
+        return {
+          content:
+            found.problem === "absent"
+              ? "That snippet does not appear in the file. Read it again — use read_file with `from` and `to` if it is long."
+              : "That snippet appears more than once. Include more surrounding lines.",
+          isError: true,
+        };
       }
-      const next = text.slice(0, at) + newText + text.slice(at + oldText.length);
+      const next = text.slice(0, found.start) + newText + text.slice(found.end);
       opts.showDiff(rel, text, next);
       await writeFile(path, next, "utf8");
       ctx.report(t("edited {0}", rel));

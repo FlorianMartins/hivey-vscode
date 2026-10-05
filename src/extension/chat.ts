@@ -4564,6 +4564,44 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     });
   }
 
+  /**
+   * Has this action already been allowed — by a standing rule, or by the auto-approve scope?
+   *
+   * ⚠️⚠️ Extracted because the answer was computed in ONE place and needed in TWO, and the second
+   * place did not ask. `confirmEdit` opened a diff and a notification on every single edit,
+   * unconditionally, with no idea that the user had already said "Always". So the product had two
+   * approval systems that did not know about each other: one that the Always button satisfied, and
+   * one that asked again right behind it.
+   *
+   * That is both of Florian's reports at once — « le mode agent fait du compare au lieu de
+   * modifier » and « il redemande les autorisations après si on clique sur toujours ». Neither was
+   * a bug in the permission store, which was right all along; the second asker simply never
+   * consulted it.
+   */
+  private alreadyAllowed(tool: string, args: Record<string, unknown>): boolean {
+    const decision = this.permissions.decide(tool, args);
+    if (decision === "never") return false;
+    if (decision === "always" || decision === "session") return true;
+    const settings = readSettings();
+    const path = pathArgument(args);
+    return autoApprove(
+      {
+        scope: settings.permissions.autoApprove,
+        allowedPaths: settings.permissions.allowedPaths,
+        allowedCommands: settings.permissions.allowedCommands,
+        deniedPaths: settings.permissions.deniedPaths,
+        deniedCommands: settings.permissions.deniedCommands,
+        blockedGlobs: settings.privacy.blockedGlobs,
+      },
+      {
+        tool,
+        ...(path ? { path, insidePath: isInsideWorkspace(path) } : {}),
+        ...(tool === "run_command" ? { command: String(args["command"] ?? "") } : {}),
+      },
+      matchGlob,
+    ).allow;
+  }
+
   private askApproval(req: { tool: string; description: string; args: Record<string, unknown> }): Promise<boolean> {
     const decision = this.permissions.decide(req.tool, req.args);
 
@@ -4615,7 +4653,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           tool: req.tool,
           description: req.description,
           ...(command ? { command } : {}),
-          choices: ["once", "session", "always", "no"],
+          // ⚠️ Three, not four. Florian: « il faudrait juste le bouton Accept, toujours ou deny, pas
+          // toujours pour la conversation car par défaut toujours c'est uniquement sur la
+          // conversation en cours ». He is describing a menu whose middle two entries were the same
+          // promise worded differently — and the one that said "this conversation" was the one that
+          // appeared not to work, because a SECOND asker ignored it. With that fixed, the remaining
+          // honest distinction is "this time" against "from now on, everywhere, until you change it
+          // in the settings".
+          choices: ["once", "always", "no"],
         },
         (answer) => {
           if (answer === "session" || answer === "always") {
@@ -4812,6 +4857,19 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   }
 
   private async confirmEdit(uri: vscode.Uri, next: string): Promise<boolean> {
+    // ⚠️⚠️ Already allowed means ALREADY ALLOWED. This opened a diff and a notification on every
+    // edit, unconditionally, with no idea that the permission system had already said yes — so
+    // "Always" stopped one asker and left the other one asking, and agent mode showed a comparison
+    // instead of making a change. Reported as both.
+    //
+    // The diff is still the review surface, and it still appears whenever approval is needed. What
+    // it must not do is re-ask a question the user has already answered: a change applied under a
+    // standing permission is visible in the turn's steps and undoable from the checkpoint, which is
+    // what those exist for.
+    if (this.alreadyAllowed("edit_file", { path: uri.fsPath })) {
+      this.snapshot(uri, await readOrEmpty(uri));
+      return true;
+    }
     const original = await readOrEmpty(uri);
     const preview = uri.with({ scheme: "hivey-code-preview", query: Date.now().toString() });
     previewContents.set(preview.toString(), next);

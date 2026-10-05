@@ -2,6 +2,58 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 1.0.0 — 2026-10-05
+
+### Corrigé — le mode agent, pour de bon
+
+Florian a collé le journal de l'agent lui-même, et c'était l'empreinte exacte de défauts dans **ce**
+dépôt :
+
+> « Les outils se contredisent. Les diagnostics de l'éditeur signalent `copierDepuis` à la ligne 6545,
+> alors que `search_text` et `git_diff` ne le voient pas. »
+
+Les diagnostics lisent le **tampon** de l'éditeur ; `search_text` et `git_diff` lisent le **disque**.
+
+- **⚠️⚠️ La sauvegarde après édition ne se faisait pas, et se déclarait réussie.** Le correctif de la
+  0.99.0 cherchait le document par comparaison de chaînes d'URI (`d.uri.toString() === uri.toString()`)
+  — or `openTextDocument` **normalise** ce qu'il renvoie, donc la recherche pouvait échouer sur le
+  document qu'on venait d'éditer. Et `if (!doc?.isDirty) return ""` confondait « rien à enregistrer »
+  avec « je ne l'ai pas trouvé » : **le seul cas que cette fonction existe pour attraper était celui
+  qu'elle rapportait comme normal.** L'appelant passe désormais le document qu'il tient déjà, et une
+  recherche infructueuse est **dite**.
+
+- **⚠️⚠️ `edit_file` échouait sur les accents.** Le modèle l'avait compris et contournait : « Le
+  fichier contient des caractères accentués que ma copie ne reproduit pas à l'identique. Je découpe
+  donc l'édition en petits morceaux sans accents. » C'est de la **normalisation Unicode** : `é` vaut
+  soit un seul point de code, soit `e` suivi d'un accent combinant. Identiques à l'écran, différents
+  pour `indexOf`. La correspondance se fait maintenant sur la forme composée quand la littérale
+  échoue, en remontant aux décalages du texte **d'origine** — et l'unicité survit à la normalisation.
+
+- **⚠️ `edit_file` annonçait des succès qu'il n'avait pas vérifiés.** « deux modifications réussies,
+  mais `elCoord` n'a pas changé ». Il relit maintenant le document et refuse de dire « modifié » si
+  rien n'a bougé. Un outil qui annonce un succès non vérifié envoie le modèle dépenser ses étapes à
+  se méfier de sa propre trace, ce qu'a fait cette session.
+
+- **⚠️⚠️ Deux systèmes d'approbation qui s'ignoraient.** `confirmEdit` ouvrait un diff et une
+  notification à **chaque** édition, sans jamais consulter les autorisations. Donc « toujours »
+  arrêtait un demandeur et laissait l'autre demander — « le mode agent fait du compare au lieu de
+  modifier » et « il redemande les autorisations après si on clique sur toujours » sont **le même
+  défaut**. Le magasin d'autorisations avait toujours raison ; le second demandeur ne le lisait pas.
+
+- **Trois boutons, pas quatre.** « il faudrait juste le bouton Accept, toujours ou deny ». Les deux
+  entrées du milieu promettaient la même chose dite autrement, et celle qui disait « cette
+  conversation » était justement celle qui semblait ne pas marcher. **Accepter · Toujours · Refuser.**
+
+- **`read_file` ne tronque plus en silence.** « read_file coupe le fichier avant la zone utile. »
+  Il prend `from` et `to`, et dit **toujours** quelles lignes sont revenues et l'appel exact pour lire
+  la suite. ⚠️ Un outil qui tronque sans dire comment continuer a dit au modèle que le fichier
+  s'arrête là — d'où le recours à `sed` par `run_command`.
+
+- **Le plafond d'étapes passe de 12 à 30.** « il arrête une tâche en plein milieu ». Douze était
+  calibré sur des tours qui marchent ; un tour qui rencontre un défaut ne dépense pas ses étapes sur
+  la tâche. Trente, c'est environ trois passes de lire–éditer–vérifier sur trois endroits, soit la
+  forme d'un vrai changement. Toujours borné : un modèle qui tourne en rond doit s'arrêter seul.
+
 ## 0.99.2 — 2026-10-05
 
 ### Design — et le verdict sur la 0.99.1

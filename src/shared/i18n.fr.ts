@@ -959,6 +959,7 @@ export const FR: Record<string, string> = {
     "Dicter — il faut un transcripteur. Cliquez pour en configurer un.",
   "Set a transcriber to dictate — the setting is open.":
     "Renseignez un transcripteur pour dicter — le réglage est ouvert.",
+  "read {0} (lines {1}-{2} of {3})": "lu {0} (lignes {1}-{2} sur {3})",
   "The files could not be restored; the conversation is unchanged.": "Les fichiers n’ont pas pu être restaurés ; la conversation est inchangée.",
   "plan: {0}/{1}": "plan : {0}/{1}",
   "{0} file(s) created by that turn are deleted.": "{0} fichier(s) créés par ce tour seront supprimés.",

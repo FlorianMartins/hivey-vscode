@@ -162,7 +162,24 @@ export interface TurnResult {
   truncated: boolean;
 }
 
-const DEFAULT_MAX_STEPS = 12;
+/**
+ * How many tool calls one turn may make.
+ *
+ * ⚠️ Raised from 12, and the number was not the only problem. Reported as « il arrête une tâche en
+ * plein milieu donc les agents et subagent ne fonctionnent pas » — a turn ending with its work half
+ * done, which is the worst outcome an agent has: a repository in a state nobody chose.
+ *
+ * Twelve was calibrated against turns that worked. A turn that hits a defect does not spend its steps
+ * on the task: the session that produced that report spent them re-reading a file, re-checking a diff
+ * and disbelieving its own tools, because an edit was landing in the editor's buffer and not on disk.
+ * Those defects are fixed; the cap still has to leave room for the ordinary case of a long file —
+ * read, search, edit, verify, and again for the next place.
+ *
+ * Not unbounded, for the reason the cap exists: a model going round in circles must stop by itself
+ * rather than be stopped by the person watching it. Thirty is roughly three passes of
+ * read-edit-verify over three places, which is the shape of a real change.
+ */
+const DEFAULT_MAX_STEPS = 30;
 
 /**
  * Below this there is nothing worth caching, and marking it costs money.

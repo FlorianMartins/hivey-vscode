@@ -10,6 +10,8 @@
 // it governs and a new tool cannot forget to have one.
 
 import * as vscode from "vscode";
+import { describeSlice, sliceLines } from "../core/fs/slice.js";
+import { findUnique } from "../core/text/findText.js";
 import { searchPattern } from "../core/agent/regex.js";
 import { t } from "../shared/i18n.js";
 import { parsePlan, planSummary, PLAN_TOOL_DESCRIPTION, type Plan } from "../core/agent/plan.js";
@@ -42,6 +44,8 @@ import { isAbsolutePath, tidyPath, underRoot } from "../core/fs/within.js";
 const FOLD_CASE = process.platform === "win32";
 
 const MAX_READ_TOKENS = 6000;
+/** Characters, not tokens: a line budget has to be cut at a line boundary, which is a character count. */
+const MAX_READ_CHARS = 24_000;
 const MAX_MATCHES = 60;
 
 function root(): vscode.Uri {
@@ -167,10 +171,16 @@ export function buildTools(deps: ToolDeps): Tool[] {
     parallel: () => true,
     schema: {
       name: "read_file",
-      description: "Read a file from the workspace. Returns its text, truncated if very large.",
+      description:
+        "Read a file from the workspace. Give `from` and `to` (1-based line numbers) to read part of " +
+        "a large file; the result always says which lines came back and how to read on.",
       parameters: {
         type: "object",
-        properties: { path: { type: "string", description: "Path relative to the workspace root." } },
+        properties: {
+          path: { type: "string", description: "Path relative to the workspace root." },
+          from: { type: "number", description: "First line to return, 1-based. Default 1." },
+          to: { type: "number", description: "Last line to return, 1-based and inclusive. Default: the end." },
+        },
         required: ["path"],
       },
     },
@@ -178,8 +188,20 @@ export function buildTools(deps: ToolDeps): Tool[] {
     async run(args, ctx): Promise<ToolResult> {
       const uri = resolve(String(args["path"] ?? ""), s());
       const doc = await vscode.workspace.openTextDocument(uri);
-        ctx.report(t("read {0} ({1} lines)", relative(uri), doc.lineCount));
-      return { content: headToTokens(doc.getText(), MAX_READ_TOKENS) };
+      // ⚠️ A range, and a notice that says how to get the rest. This returned the head of the file and
+      // nothing else, so on anything long the model could not reach the part it needed and resorted
+      // to `sed` through run_command — slower, approval-gated, and where a real session started
+      // going wrong. A tool that truncates without saying how to continue has told the model the
+      // file ends there.
+      const from = args["from"] === undefined ? undefined : Number(args["from"]);
+      const to = args["to"] === undefined ? undefined : Number(args["to"]);
+      const slice = sliceLines(doc.getText(), from, to, MAX_READ_CHARS);
+      ctx.report(
+        slice.from === 1 && slice.to === slice.total
+          ? t("read {0} ({1} lines)", relative(uri), doc.lineCount)
+          : t("read {0} (lines {1}-{2} of {3})", relative(uri), slice.from, slice.to, slice.total),
+      );
+      return { content: slice.text + describeSlice(slice, relative(uri)) };
     },
   };
 
@@ -304,17 +326,21 @@ export function buildTools(deps: ToolDeps): Tool[] {
       } catch {
         existed = false;
       }
+      // Held, so the save afterwards acts on the document this tool opened rather than on one found
+      // again by comparing URI strings. See `saveAfterEdit`.
+      let doc: vscode.TextDocument | undefined;
       if (existed) {
-        const doc = await vscode.workspace.openTextDocument(uri);
+        doc = await vscode.workspace.openTextDocument(uri);
         edit.replace(uri, new vscode.Range(0, 0, doc.lineCount, 0), content);
       } else {
+        // `createFile` with contents writes the file itself, so there is nothing to save after it.
         edit.createFile(uri, { contents: new TextEncoder().encode(content), overwrite: false });
       }
       const ok = await vscode.workspace.applyEdit(edit);
       ctx.report(existed ? t("edited {0}", relative(uri)) : t("created {0}", relative(uri)));
       if (!ok) return { content: "The editor refused the edit.", isError: true };
       // Through to disk before anything reads the file. See `saveAfterEdit`.
-      const unsaved = await saveAfterEdit(uri);
+      const unsaved = doc ? await saveAfterEdit(uri, doc) : "";
       // The same report as `edit_file`: writing a whole file is at least as likely to break it as
       // replacing a snippet, and the model has even less reason to suspect it did.
       const problems = await errorsAfterEdit(uri);
@@ -343,22 +369,46 @@ export function buildTools(deps: ToolDeps): Tool[] {
       const newText = String(args["new"] ?? "");
       const doc = await vscode.workspace.openTextDocument(uri);
       const text = doc.getText();
-      const first = text.indexOf(oldText);
-      if (first < 0) return { content: "That snippet does not appear in the file. Read it again.", isError: true };
-      if (text.indexOf(oldText, first + 1) >= 0) {
-        return { content: "That snippet appears more than once. Include more surrounding lines.", isError: true };
+      // ⚠️ Not `indexOf`. A file holding `é` as `e` + a combining accent and a model writing it as a
+      // single code point are the same text on screen and different strings to `indexOf` — so the
+      // tool said "that snippet does not appear in the file" about a snippet plainly in the file. A
+      // real session worked the cause out and began routing around it: « je découpe donc l'édition en
+      // petits morceaux sans accents ». See `core/text/findText.ts`.
+      const found = findUnique(text, oldText);
+      if ("problem" in found) {
+        return {
+          content:
+            found.problem === "absent"
+              ? "That snippet does not appear in the file. Read it again — use read_file with `from` and `to` if it is long."
+              : "That snippet appears more than once. Include more surrounding lines.",
+          isError: true,
+        };
       }
-      const next = text.slice(0, first) + newText + text.slice(first + oldText.length);
+      const first = found.start;
+      const next = text.slice(0, first) + newText + text.slice(found.end);
       if (deps.confirmEdit && !(await deps.confirmEdit(uri, next))) {
         return { content: "The user rejected the change after reviewing the diff.", isError: true };
       }
       const edit = new vscode.WorkspaceEdit();
-      edit.replace(uri, new vscode.Range(doc.positionAt(first), doc.positionAt(first + oldText.length)), newText);
+      // `found.end`, not `first + oldText.length`: when the match came through normalisation the two
+      // differ, and replacing the wrong span leaves half a character behind.
+      edit.replace(uri, new vscode.Range(doc.positionAt(first), doc.positionAt(found.end)), newText);
       const ok = await vscode.workspace.applyEdit(edit);
       ctx.report(t("edited {0}", relative(uri)));
       if (!ok) return { content: "The editor refused the edit.", isError: true };
-      // Through to disk before anything reads the file. See `saveAfterEdit`.
-      const unsaved = await saveAfterEdit(uri);
+      // ⚠️ And CHECK. `applyEdit` returning true has been seen alongside a document that did not
+      // change — reported as « edit_file a annoncé deux modifications réussies, mais elCoord n'a pas
+      // changé ». A tool that reports success it has not verified sends the model to spend its
+      // remaining steps disbelieving its own trace, which is exactly what that session did.
+      if (doc.getText() === text) {
+        return {
+          content: "The editor accepted the edit but the file did not change. Read it again before trying anything else.",
+          isError: true,
+        };
+      }
+      // Through to disk before anything reads the file, with the document this tool already opened —
+      // see `saveAfterEdit` for why looking it up again was not safe.
+      const unsaved = await saveAfterEdit(uri, doc);
       // What the edit did, from the editor rather than from the model's opinion of its own diff.
       const problems = await errorsAfterEdit(uri);
       return { content: `Edited ${relative(uri)}.${problems ? `\n${problems}` : ""}${unsaved}` };
@@ -412,9 +462,40 @@ export function buildTools(deps: ToolDeps): Tool[] {
    * Returns what to tell the model when the save did not happen, so a turn that proceeds on stale
    * bytes at least knows it is doing so.
    */
-  async function saveAfterEdit(uri: vscode.Uri): Promise<string> {
-    const doc = vscode.workspace.textDocuments.find((d) => d.uri.toString() === uri.toString());
-    if (!doc?.isDirty) return "";
+  async function saveAfterEdit(uri: vscode.Uri, known?: vscode.TextDocument): Promise<string> {
+    // ⚠️⚠️ The document the CALLER already opened, not one looked up again.
+    //
+    // This used to re-find it with `textDocuments.find(d => d.uri.toString() === uri.toString())`,
+    // and that had two faults which together produced the worst report of this project so far: an
+    // agent whose own tools contradicted each other. From a real session —
+    //
+    //     « Les outils se contredisent. Les diagnostics de l'éditeur signalent copierDepuis à la
+    //       ligne 6545, alors que search_text et git_diff ne le voient pas. »
+    //
+    // Diagnostics read the editor's BUFFER; `search_text` and `git_diff` read the DISK. The edit was
+    // in one and not the other, so the model spent a dozen steps re-reading, re-checking and
+    // disbelieving itself — and ran out of steps before answering.
+    //
+    //   • A STRING COMPARE OF URIS IS NOT AN IDENTITY TEST. `openTextDocument` normalises what it
+    //     returns — drive-letter case, percent-encoding, a trailing slash — so the comparison can
+    //     fail on the very document that was just edited.
+    //   • AND A FAILED LOOKUP RETURNED SUCCESS. `if (!doc?.isDirty) return ""` reads "nothing to
+    //     save" and also catches "I could not find it", which are opposite facts. The one case this
+    //     function exists to catch was the one it reported as fine.
+    //
+    // So the caller passes the document it holds. The fallback stays for callers that have none, and
+    // it now distinguishes "not open" from "not dirty" instead of merging them into silence.
+    const doc =
+      known ??
+      vscode.workspace.textDocuments.find((d) => d.uri.toString() === uri.toString()) ??
+      // Paths compare more reliably than URI strings: same file, different spelling of the same URI.
+      vscode.workspace.textDocuments.find((d) => d.uri.fsPath === uri.fsPath);
+    if (!doc) {
+      // Said rather than swallowed. A file edited through a document nothing can find is a file whose
+      // change may never reach the disk, and the model has to know that before it runs the tests.
+      return `\nWARNING: ${relative(uri)} was edited but the editor did not hand back a document to save. Verify with git_diff before trusting a command's output.`;
+    }
+    if (!doc.isDirty) return "";
     if (await doc.save()) return "";
     return `\nWARNING: ${relative(uri)} was changed in the editor but could NOT be saved to disk. Commands you run will still read the old file.`;
   }

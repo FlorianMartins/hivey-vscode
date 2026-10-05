@@ -1750,7 +1750,20 @@ suite("Hivey Code", () => {
       );
       const said = JSON.stringify(back);
       assert.equal(/leaves the workspace/.test(said), false, `the resolver refused its own path: ${said}`);
-      assert.ok(reviewed.length, `the change was never put up for review; the tool said ${said}`);
+      // ⚠️ NO review, and that is the fix rather than a regression. This test sets
+      // `permissions.autoApprove: "all"`, and `confirmEdit` used to open a diff and a notification
+      // ANYWAY — unconditionally, with no idea the user had already granted the edit. Two approval
+      // systems that did not know about each other, reported as « le mode agent fait du compare au
+      // lieu de modifier » and « il redemande les autorisations après si on clique sur toujours ».
+      //
+      // The review surface still exists and still appears when approval is actually needed; what it
+      // must not do is re-ask a question already answered. Asserted as an absence, because an
+      // absence is what the user was promised.
+      assert.deepEqual(
+        reviewed,
+        [],
+        `an edit allowed by the standing permission was still put up for review: ${reviewed.join(" | ")}`,
+      );
       assert.equal(doc.getText(), "after\n", `agent mode did not change the file; the tool said ${said}`);
       // ⚠️⚠️ AND ON DISK. This assertion is the one that was missing, and its absence is the whole
       // reason the defect shipped: a `WorkspaceEdit` changes the editor's in-memory document, so
