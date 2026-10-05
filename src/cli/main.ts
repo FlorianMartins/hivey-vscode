@@ -11,6 +11,7 @@
 // environment, so a team can commit a shared configuration without committing a key.
 
 import { createInterface, type Interface } from "node:readline/promises";
+import { DEFAULT_AGENT_STEPS } from "../core/agent/definitions.js";
 import { readFile, writeFile, mkdir, readdir } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, dirname } from "node:path";
@@ -436,7 +437,7 @@ async function main(): Promise<void> {
             model: cfg.model,
             messages: prepared,
             tools: toolsForMode(sub, mode),
-            maxSteps: definition.maxSteps ?? 8,
+            maxSteps: definition.maxSteps ?? DEFAULT_AGENT_STEPS,
             ...(signal ? { signal } : {}),
             approve: async () => yes,
             afterResponse: (text) => vault.restore(text),

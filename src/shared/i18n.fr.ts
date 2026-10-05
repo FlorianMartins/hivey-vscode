@@ -960,7 +960,6 @@ export const FR: Record<string, string> = {
   "Set a transcriber to dictate — the setting is open.":
     "Renseignez un transcripteur pour dicter — le réglage est ouvert.",
   "read {0} (lines {1}-{2} of {3})": "lu {0} (lignes {1}-{2} sur {3})",
-  "Go back to before this question": "Revenir à avant cette question",
   "The files could not be restored; the conversation is unchanged.": "Les fichiers n’ont pas pu être restaurés ; la conversation est inchangée.",
   "plan: {0}/{1}": "plan : {0}/{1}",
   "{0} file(s) created by that turn are deleted.": "{0} fichier(s) créés par ce tour seront supprimés.",
@@ -1063,7 +1062,6 @@ export const FR: Record<string, string> = {
   "Open editors": "Éditeurs ouverts",
   "Problems": "Problèmes",
   "Put the {0} file(s) this turn changed back, and rewind the conversation here": "Remettre les {0} fichier(s) modifiés par ce tour, et rembobiner la conversation ici",
-  "Restore checkpoint": "Restaurer le point de reprise",
   "Runs on this machine: nothing leaves, nothing is billed": "S’exécute sur cette machine : rien ne sort, rien n’est facturé",
   "Terminal selection": "Sélection du terminal",
   "The editor": "L’éditeur",

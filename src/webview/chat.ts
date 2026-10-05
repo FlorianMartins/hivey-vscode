@@ -474,8 +474,23 @@ function renderEntry(entry: UiEntry, state: UiState, deps: ChatDeps): HTMLElemen
     head.append(
       button({
         icon: ICON.restore,
-        title: t("Go back to before this question"),
-        className: "btn icon-only tiny restore-here",
+        // ⚠️ The tooltip carries what the rule's button used to say, because that information decides
+        // whether to press it: a turn whose work a checkpoint cannot hold must say so BEFORE the
+        // click, not in the dialog afterwards. Three promises, and it makes the one it can keep.
+        title: entry.checkpointPartial
+          ? t("Restore {0} file(s) — some changes were too large to record", entry.checkpointFiles ?? 0)
+          : entry.checkpointCommands
+            ? entry.checkpointFiles
+              ? t(
+                  "Restore {0} file(s) — but {1} command(s) also ran, and what they changed stays",
+                  entry.checkpointFiles,
+                  entry.checkpointCommands,
+                )
+              : t("Rewind the conversation — {0} command(s) ran, and what they changed stays", entry.checkpointCommands)
+            : entry.checkpointFiles
+              ? t("Put the {0} file(s) this turn changed back, and rewind the conversation here", entry.checkpointFiles)
+              : t("Rewind the conversation to before this question — that turn changed no file"),
+        className: `btn icon-only tiny restore-here${entry.checkpointPartial || entry.checkpointCommands ? " partial" : ""}`,
         onClick: () => deps.send({ type: "restoreCheckpoint", id: entry.id }),
       }),
     );
@@ -698,37 +713,17 @@ const MARKS: Record<string, string> = {
  * message, because it is the only one that puts files back and something that overwrites the
  * working tree should never be discovered by accident.
  */
-function turnRule(
-  entry: Pick<UiEntry, "id" | "checkpointFiles" | "checkpointPartial" | "checkpointCommands">,
-  deps: ChatDeps,
-  opening = false,
-): HTMLElement {
-  const files = entry.checkpointFiles ?? 0;
-  const commands = entry.checkpointCommands ?? 0;
-  const wrap = el("div", `turn-rule${files ? "" : " bare"}${opening ? " opening" : ""}`);
-  const action = button({
-    icon: ICON.restore,
-    label: t("Restore checkpoint"),
-    className: "btn tiny checkpoint-btn",
-    // Three different promises, and each says which one it is making before it is pressed. A turn
-    // that wrote nothing to disk is still a point to come back to — that is the common case in
-    // chat and plan mode, and refusing it there made the restore point look like an agent feature.
-    title: entry.checkpointPartial
-      ? t("Restore {0} file(s) — some changes were too large to record", files)
-      : // ⚠️ Before the `files` branch: a turn that ran commands cannot promise a clean rollback
-        // whatever else it edited, and this tooltip is where somebody decides whether to trust it.
-        commands
-        ? files
-          ? t("Restore {0} file(s) — but {1} command(s) also ran, and what they changed stays", files, commands)
-          : t("Rewind the conversation — {0} command(s) ran, and what they changed stays", commands)
-        : files
-          ? t("Put the {0} file(s) this turn changed back, and rewind the conversation here", files)
-          : t("Rewind the conversation to before this question — that turn changed no file"),
-    onClick: () => deps.send({ type: "restoreCheckpoint", id: entry.id }),
-  });
-  if (entry.checkpointPartial || commands) action.classList.add("partial");
-  wrap.append(action);
-  return wrap;
+function turnRule(entry: Pick<UiEntry, "id">, _deps: ChatDeps, opening = false): HTMLElement {
+  // ⚠️ A SEPARATOR, and nothing else. It used to carry the restore button, and that button was
+  // reported as invisible above every question — on an installation where this file renders it. The
+  // cause was never found; what was found is that the same action now lives in the question's own
+  // header, where no hover gate or scroll position can hide it.
+  //
+  // Two controls for one action, twenty-four pixels apart, one of which demonstrably fails to reach
+  // the person using it, is worse than one control that works. The line stays because the boundary
+  // between turns is worth drawing; the way back lives on the message.
+  void entry;
+  return el("div", `turn-rule${opening ? " opening" : ""}`);
 }
 
 /**

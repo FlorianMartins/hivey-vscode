@@ -33,6 +33,20 @@ export interface Skill {
   source: string;
 }
 
+/**
+ * How many steps a sub-agent gets when its definition does not say.
+ *
+ * ⚠️ Raised from 8, which was written as a bare literal in BOTH clients and was never revisited when
+ * the main turn's cap moved to 30. A sub-agent is given a narrower task, not an easier one: the
+ * explorer reads three files and searches twice before it can answer at all, and `read_file` now
+ * returns a RANGE, so a long file costs several calls where it used to cost one truncated one.
+ *
+ * Eight steps against that is a sub-agent that reports what it had got to rather than what it was
+ * asked — which is how « les agents et subagent ne fonctionnent pas » looks from the outside. Half
+ * the parent's budget, in one place both clients read.
+ */
+export const DEFAULT_AGENT_STEPS = 15;
+
 export interface AgentDefinition {
   kind: "agent";
   name: string;
@@ -43,7 +57,7 @@ export interface AgentDefinition {
   tools: string[];
   /** A model of its own, when a cheap one is enough or an expensive one is needed. */
   model?: string;
-  /** How many tool round-trips it gets before it has to answer. */
+  /** How many tool round-trips it gets before it has to answer. Defaults to `DEFAULT_AGENT_STEPS`. */
   maxSteps?: number;
   source: string;
 }

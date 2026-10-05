@@ -2,6 +2,39 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 1.0.3 — 2026-10-05
+
+### Simplifié
+
+- **Un seul retour en arrière, celui qui marche.** La règle entre deux tours portait un bouton
+  « Restore checkpoint » que Florian ne voyait au-dessus d'**aucune** question, sur une installation
+  où ce fichier le dessine pourtant. La cause n'a jamais été trouvée — ce qui a été trouvé, c'est que
+  la même action vit maintenant dans l'en-tête de la question, où ni condition de survol ni position
+  de défilement ne peut la cacher.
+
+  ⚠️ Deux contrôles pour une action, à 24 px l'un de l'autre, dont un qui n'atteint
+  démonstrablement pas la personne qui s'en sert, c'est pire qu'un seul qui fonctionne. La règle
+  redevient ce qu'elle disait être : **une séparation**. Et l'infobulle qui disait ce qu'un retour ne
+  pourra PAS annuler — les commandes — a suivi sur le bouton restant, parce que cette information
+  décide du clic et doit arriver avant, pas dans la boîte de dialogue d'après.
+
+### Corrigé
+
+- **Les sous-agents avaient 8 étapes** quand le tour principal est passé à 30, et ce 8 était écrit en
+  dur dans **les deux** clients. Un sous-agent reçoit une tâche plus étroite, pas plus facile :
+  l'explorateur lit trois fichiers et cherche deux fois avant de pouvoir répondre — et `read_file`
+  rend désormais une **plage**, donc un fichier long coûte plusieurs appels là où il en coûtait un
+  tronqué. Huit étapes contre ça produit un sous-agent qui rapporte où il en était plutôt que ce
+  qu'on lui demandait, ce qui est exactement « les agents et subagent ne fonctionnent pas » vu du
+  dehors. **15**, dans une seule constante que les deux clients lisent.
+
+### Nettoyé
+
+- Trois symboles laissés orphelins par les corrections précédentes : `headToTokens` importé et plus
+  employé dans le client terminal, `MAX_READ_TOKENS` remplacé par un budget en caractères, et
+  `compilePattern` dont `searchPattern` fait désormais le travail. ⚠️ Ce dernier n'était plus appelé
+  que par ses propres tests — *du code que seuls ses tests emploient n'est pas du code qui marche*.
+
 ## 1.0.2 — 2026-10-05
 
 ### Corrigé

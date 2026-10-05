@@ -7,6 +7,7 @@
 // it is deliberately the only place that knows about all of them.
 
 import * as vscode from "vscode";
+import { DEFAULT_AGENT_STEPS } from "../core/agent/definitions.js";
 import { changeSize, describeChangeSize } from "../core/text/diff.js";
 import { spawn } from "node:child_process";
 import * as fsp from "node:fs/promises";
@@ -1726,7 +1727,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       model,
       messages: prepared.messages,
       tools,
-      maxSteps: definition.maxSteps ?? 8,
+      maxSteps: definition.maxSteps ?? DEFAULT_AGENT_STEPS,
       ...(run.signal ? { signal: run.signal } : {}),
       approve: (req) => this.askApproval(req),
       beforeRequest: async (msgs) => {

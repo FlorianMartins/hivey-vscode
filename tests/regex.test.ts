@@ -8,10 +8,10 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { compilePattern, escapeLiteral, parsePattern, searchPattern } from "../src/core/agent/regex.js";
+import { escapeLiteral, parsePattern, searchPattern } from "../src/core/agent/regex.js";
 
 test("a leading (?i) becomes the JavaScript i flag", () => {
-  const re = compilePattern("(?i)whs-", "g");
+  const { re } = searchPattern("(?i)whs-", "g");
   assert.equal(re.flags.includes("i"), true);
   assert.equal(re.source, "whs-");
   assert.equal("WHS-7781".match(re)?.[0], "WHS-");
@@ -41,13 +41,13 @@ test("a negated flag is refused, not silently dropped", () => {
   const parsed = parsePattern("(?-i)x", "g");
   assert.equal(parsed.refused, "(?-i)");
   assert.equal(parsed.source, "(?-i)x", "the pattern is left untouched when it cannot be honoured");
-  assert.throws(() => compilePattern("(?-i)x", "g"), /Unsupported inline flag/);
+  assert.throws(() => searchPattern("(?-i)x", "g"), /Unsupported inline flag/);
 });
 
 test("an unknown flag letter is refused rather than guessed", () => {
   // `(?x)` is extended mode: whitespace in the pattern becomes insignificant. Ignoring it would make
   // every space in the pattern match a literal space, which is a different search.
-  assert.throws(() => compilePattern("(?x)a b", "g"), /Unsupported inline flag/);
+  assert.throws(() => searchPattern("(?x)a b", "g"), /Unsupported inline flag/);
 });
 
 test("a group in the middle of the pattern is left alone", () => {

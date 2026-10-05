@@ -43,7 +43,6 @@ import { isAbsolutePath, tidyPath, underRoot } from "../core/fs/within.js";
  */
 const FOLD_CASE = process.platform === "win32";
 
-const MAX_READ_TOKENS = 6000;
 /** Characters, not tokens: a line budget has to be cut at a line boundary, which is a character count. */
 const MAX_READ_CHARS = 24_000;
 const MAX_MATCHES = 60;

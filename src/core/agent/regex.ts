@@ -62,23 +62,6 @@ export function parsePattern(pattern: string, base = ""): ParsedPattern {
   return { source, flags: [..."gimsuy"].filter((f) => wanted.has(f)).join("") };
 }
 
-/**
- * Compile a pattern the way the model meant it.
- *
- * Throws with the original pattern in the message, not the rewritten one: an error that quotes
- * something the model did not write sends it looking for a mistake it did not make.
- */
-export function compilePattern(pattern: string, base = ""): RegExp {
-  const parsed = parsePattern(pattern, base);
-  if (parsed.refused) {
-    throw new Error(
-      `Unsupported inline flag ${parsed.refused} — this searcher cannot change flags partway through a pattern. ` +
-        `Leading (?i), (?m), (?s) and (?u) are accepted.`,
-    );
-  }
-  return new RegExp(parsed.source, parsed.flags);
-}
-
 /** Every regex metacharacter, escaped. */
 export function escapeLiteral(text: string): string {
   return text.replace(/[\\^$.*+?()[\]{}|/]/g, "\\$&");
