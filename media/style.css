@@ -4457,3 +4457,34 @@ pre.code code {
 .transcript {
   padding-top: var(--sp-4);
 }
+
+/* The one control in the message row that does not wait for a pointer.
+ *
+ * ⚠️ Everything in `.entry-actions` sits at `opacity: 0` until the block is hovered — right for copy,
+ * pin and delete, wrong for the way back. This project already wrote the reason, about the rule above
+ * the turn: "visible without hovering, unlike everything else attached to a message, because it is
+ * the only one that puts files back and something that overwrites the working tree should never be
+ * discovered by accident." The reasoning was sound and lived on the wrong control.
+ *
+ * Quiet until hovered, but PRESENT: a shape at the edge of the message that the eye finds when it is
+ * looked for, rather than a control that does not exist until the mouse happens to pass. */
+/* ⚠️ The first version of this put the button inside `.entry-actions` and tried to exempt it with
+   `opacity: 1`. That does nothing: opacity is not inherited, it MULTIPLIES — a child of a parent at
+   zero cannot be opaque. The control lives in the header instead, which has no hover gate at all.
+
+   Quiet, not loud: it sits at the end of the name row, dim until the message is hovered. Present
+   enough to be found when looked for, which is the whole requirement. */
+.entry-head .btn.restore-here {
+  opacity: 0.5;
+  margin-left: auto;
+}
+.entry.user .entry-head .btn.restore-here {
+  /* The question's header is reversed, so "the far end" is the other side. */
+  margin-left: 0;
+  margin-right: auto;
+}
+.entry-block:hover .entry-head .btn.restore-here,
+.entry-head .btn.restore-here:hover,
+.entry-head .btn.restore-here:focus-visible {
+  opacity: 1;
+}

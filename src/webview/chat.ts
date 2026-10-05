@@ -454,6 +454,32 @@ function renderEntry(entry: UiEntry, state: UiState, deps: ChatDeps): HTMLElemen
   // sat between the name and the tags, competing for a row that is already tight at a docked width,
   // and they were read on every turn by nobody. They now appear with the buttons, on hover, at the
   // far end of the row — the last thing on the line, which is where a total goes.
+  // ⚠️⚠️ THE WAY BACK, in the message's own header, where nothing hides it.
+  //
+  // This control has now been "added" three times and seen none of them, and each attempt failed for
+  // a different reason worth writing down:
+  //
+  //   • On the RULE above the turn — which Florian sees above no question at all, so something about
+  //     it does not reach him. It is still drawn; it is simply not the thing to rely on.
+  //   • In `.entry-actions` — which lives at `opacity: 0` until the block is hovered. A fix nobody
+  //     can see without a mouse already on the message.
+  //   • With `opacity: 1` on that button to escape the row — which does nothing at all, because
+  //     OPACITY IS NOT INHERITED, IT MULTIPLIES. A child of a transparent parent cannot be opaque.
+  //     Caught before shipping, unlike the two above.
+  //
+  // The header has no opacity rule and no hover gate, so a control placed here exists whenever the
+  // message does. Which is what the project already says this particular control requires: "something
+  // that overwrites the working tree should never be discovered by accident."
+  if (entry.role === "user") {
+    head.append(
+      button({
+        icon: ICON.restore,
+        title: t("Go back to before this question"),
+        className: "btn icon-only tiny restore-here",
+        onClick: () => deps.send({ type: "restoreCheckpoint", id: entry.id }),
+      }),
+    );
+  }
   if (!entry.included) head.append(el("span", "entry-tag", t("out of context")));
   if (entry.pinned) {
     // A mark, not a word, and never faded.
@@ -491,22 +517,7 @@ function renderEntry(entry: UiEntry, state: UiState, deps: ChatDeps): HTMLElemen
     }),
   );
   if (entry.role === "user") {
-    // ⚠️ The way back, ON the question as well as on the rule above it — and the duplication is the
-    // fix rather than clutter.
-    //
-    // The rule carrying the restore sits at the TOP of its turn, so for the first question of a
-    // conversation it sits at the top of the whole transcript. The panel opens scrolled to the end,
-    // which means that control is above the fold on every conversation longer than one screen. It
-    // was reported as missing three times, and a photograph of a one-exchange conversation settled
-    // it: the button is there, 24px above the first visible pixel. A control reachable only by
-    // scrolling to the very top of a long conversation is a control nobody finds.
     actions.append(
-      button({
-        icon: ICON.restore,
-        title: t("Go back to before this question"),
-        className: "btn icon-only",
-        onClick: () => deps.send({ type: "restoreCheckpoint", id: entry.id }),
-      }),
       button({ icon: ICON.edit, title: t("Edit and resend"), className: "btn icon-only", onClick: () => startEdit(entry, deps) }),
       // Asking the same thing again, unchanged. Distinct from editing: the commonest reason to want
       // another answer is that the first one was poor, not that the question was.

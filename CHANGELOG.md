@@ -2,6 +2,33 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 1.0.2 — 2026-10-05
+
+### Corrigé
+
+- **⚠️⚠️ Le retour en arrière est dans l'en-tête de chaque question, où rien ne le cache.** Florian :
+  « je ne la vois au-dessus d'aucune question », puis « avant ça fonctionnait, je voulais juste
+  ajouter sur le premier message ».
+
+  Ce contrôle a été « ajouté » trois fois sans qu'il en voie un seul, et **chaque tentative a échoué
+  pour une raison différente** :
+
+  1. **Sur la règle au-dessus du tour** — qu'il ne voit au-dessus d'aucune question. Elle est toujours
+     dessinée et visible sur les captures de ce dépôt ; quelque chose l'en empêche chez lui, et je n'ai
+     pas la cause. Ce n'est plus ce sur quoi le produit s'appuie.
+  2. **Dans la rangée d'actions du message** (1.0.1) — qui vit à `opacity: 0` jusqu'au survol. Un
+     correctif que personne ne peut voir sans déjà tenir la souris sur le message.
+  3. **Avec `opacity: 1` sur ce bouton pour l'exempter de la rangée** — ce qui ne fait **rien** :
+     ⚠️ *l'opacité ne s'hérite pas, elle se multiplie.* Un enfant d'un parent transparent ne peut pas
+     être opaque. Attrapé avant livraison, contrairement aux deux précédents.
+
+  L'en-tête d'un message n'a ni règle d'opacité ni condition de survol : un contrôle placé là existe
+  dès que le message existe. C'est d'ailleurs ce que le projet exige explicitement pour celui-ci —
+  *« quelque chose qui réécrit l'arbre de travail ne doit jamais se découvrir par accident »*.
+
+- ⚠️ Et la leçon qui vaut au-delà de ce bouton : **une correction qu'on ne peut pas voir n'est pas une
+  correction.** Trois livraisons ont annoncé un contrôle ajouté ; aucune ne l'avait rendu visible.
+
 ## 1.0.1 — 2026-10-05
 
 ### Corrigé
