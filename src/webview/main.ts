@@ -753,6 +753,11 @@ window.addEventListener("message", (event: MessageEvent<ToPanel>) => {
   switch (m.type) {
     case "state":
       state = m.state;
+      // ⚠️ From the page, on every state. The attribute on `<html>` is written when the HTML is
+      // BUILT, which is once — and a panel that is already open does not rebuild, so the setting
+      // appeared to do nothing. This is the half that cannot fail, and it is also what lets the
+      // appearance change without a reload.
+      document.documentElement.dataset["appearance"] = m.state.appearance ?? "editor";
       // The extension is the authority on whether a turn is running. A panel that believed its own
       // flag could sit on a stop button for the rest of the conversation with nothing behind it.
       setStreaming(m.state.busy);

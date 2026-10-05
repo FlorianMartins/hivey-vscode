@@ -366,6 +366,15 @@ export interface UiState {
    */
   busy: boolean;
   /**
+   * Which palette the panel paints itself with.
+   *
+   * ⚠️ Sent in the state AND written as an attribute on `<html>`, and the redundancy is not an
+   * oversight: the attribute is produced when the HTML is built, which is once, and a webview that
+   * was already open does not rebuild. Applying it from the page on every render is the half that
+   * cannot fail — and it is what makes changing the setting take effect without a reload.
+   */
+  appearance?: "editor" | "hivey";
+  /**
    * Whether anything is configured to turn speech into text.
    *
    * Sent rather than inferred in the panel: the webview cannot read a setting, and a microphone

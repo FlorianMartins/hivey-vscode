@@ -80,6 +80,50 @@ Ouvrez un dossier contenant du code, puis le panneau **Hivey Code** dans la barr
   meilleur usage d'un petit modèle local : le compilateur dit déjà **quoi** et **où**, il ne reste
   qu'à corriger.
 
+## 4 bis. Parler plutôt que taper
+
+Un bouton micro apparaît dans la zone de saisie — mais **seulement si deux conditions sont réunies** :
+que votre éditeur donne un micro au panneau, et que vous ayez dit **où** transcrire. Un bouton qui
+aurait l'air d'écouter sans écouter vous coûterait un paragraphe entier parlé dans le vide.
+
+Pourquoi il faut configurer quelque chose : **un enregistrement de votre voix ne peut pas être
+pseudonymisé** ([chapitre 9](09-la-confidentialite.md)). C'est, avec une image, l'une des deux seules
+choses que l'outil ne sait pas masquer avant de les envoyer. L'envoyer quelque part est donc une
+décision, jamais un défaut.
+
+La voie recommandée est **une commande sur votre machine**. Si vous avez installé un transcripteur
+(whisper.cpp, faster-whisper…), renseignez `hiveyCode.dictation.command` :
+
+```
+whisper-cli -f {file} --no-timestamps --output-txt -
+```
+
+`{file}` est l'endroit où l'enregistrement sera écrit ; le texte imprimé par la commande arrive dans
+la zone de saisie. Rien ne sort de votre machine.
+
+Si vous n'avez pas de transcripteur local, `hiveyCode.dictation.endpoint` accepte une adresse
+compatible OpenAI — et là, le consentement est demandé **à chaque fois, sans « toujours »**. C'est la
+seule permission de ce produit qui ne peut pas être accordée une fois pour toutes.
+
+⚠️ Le texte transcrit **arrive dans la zone de saisie, il n'est jamais envoyé tout seul**. Un
+reconnaisseur se trompe, et une question dictée qui s'enverrait d'elle-même serait une question que
+personne n'a relue. Échap pendant l'enregistrement jette tout : changer d'avis au milieu d'une phrase
+n'est pas une demande de transcription.
+
+## 4 ter. Changer l'apparence
+
+`hiveyCode.appearance` a deux valeurs :
+
+| Valeur | Ce que ça fait |
+|---|---|
+| `editor` (défaut) | Le panneau reprend les couleurs de **votre thème** VS Code. |
+| `hivey` | La palette propre au produit : base bleu-noir profonde, ambre en accent. |
+
+Le défaut n'est pas un hasard. Un panneau ancré à côté de l'arborescence et du terminal qui ignore
+votre thème se lit comme un corps étranger — c'est une décision prise tôt dans le projet. L'apparence
+`hivey` existe parce que l'autre envie est légitime aussi, et un réglage est la seule façon honnête de
+servir les deux sans annuler la première en silence.
+
 ## 5. Si vous voulez brancher un modèle payant
 
 Il faut une **clé d'API** ([chapitre 4](04-comment-on-lui-parle.md)), achetée chez un fournisseur ou

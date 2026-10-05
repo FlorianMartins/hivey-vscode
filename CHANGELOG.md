@@ -2,6 +2,120 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.99.0 — 2026-10-05
+
+### Corrigé — ce que Florian a signalé
+
+- **⚠️⚠️ « Le restore to checkpoint ne semble pas revert le code » — et c'était pire que ça.** Un
+  `WorkspaceEdit` écrit dans le **document en mémoire** de l'éditeur, pas dans le fichier. La
+  restauration remettait l'ancien code à l'écran pendant que chaque fichier sur le disque gardait la
+  version de l'agent. Tout ce qui n'est pas l'éditeur lit le disque : le compilateur, un observateur
+  qui reconstruit une feuille de style, git, la commande suivante. Fermer la fenêtre sans enregistrer
+  perdait la restauration entièrement.
+
+  **Et les édits de l'agent lui-même n'étaient pas enregistrés non plus**, ce qui est plus grave en
+  mode agent : `edit_file` puis `run_command npm test` **notait le modèle sur du code qu'il n'avait
+  pas écrit**. ⚠️⚠️ Le test d'intégration affirmait `doc.getText()` — le **tampon** — et jamais le
+  disque ; c'est exactement pour ça que c'est passé. Il affirme les deux, et il échoue sans le
+  correctif (vérifié). [`ADR-0039`](docs/adr/0039-restaurer-doit-atteindre-le-disque.md).
+
+- **Aucune conversation ne pouvait annuler son premier tour.** Le bouton était accroché à la ligne de
+  séparation **entre** deux tours, et cette ligne n'est pas dessinée au-dessus de la première
+  question. Le retour partait avec elle — alors que le premier tour est celui où l'agent travaille sur
+  un dépôt intact, donc celui qu'on a le plus de raisons d'annuler.
+
+- **Un checkpoint ne tient pas ce qu'une commande a fait, et le disait le contraire.** `prettier
+  --write`, `sed -i`, un build qui régénère une feuille de style réécrivent des fichiers que rien n'a
+  photographiés. La boîte disait « ce tour n'a changé aucun fichier ». Le nombre de commandes est
+  retenu et dit **avant** que le bouton soit pressé.
+
+- **⚠️ `search_text` était uniquement regex.** Un modèle qui cherche où une fonction est appelée tape
+  `total(` : « Unterminated group », et la recherche ne répondait rien. **Cinq motifs sur huit** pris
+  d'une recherche de code ordinaire échouent de la même façon (`cost.usd(`, `?.length`, `C++`,
+  `foo)`), et tous sont évidemment des littéraux. Un motif qui ne compile pas est cherché comme du
+  **texte**, et le résultat le dit — sinon le modèle croit que `total(` est une regex valide. Les
+  drapeaux en ligne (`(?i)`, valides en ripgrep, Go, Rust, Python, PCRE) sont traduits ; un drapeau
+  **nié** reste refusé, JavaScript ne pouvant pas l'exprimer et le retirer appliquerait l'inverse.
+
+- **⚠️ `run_command`, deux causes.** L'intégration du shell avait **3 s** fixes, or le script de VS
+  Code s'exécute dans le démarrage du shell : sur le premier terminal d'une session, derrière
+  oh-my-zsh, un profil PowerShell ou WSL, il arrive trop tard et **toutes** les commandes du reste de
+  la session répondaient « sortie illisible ». Un terminal neuf a 15 s, payées une fois. Et `grep`
+  qui sort en 1 **a répondu** : c'était dessiné comme un échec, rapporté au modèle comme une erreur
+  d'outil, et compté par `verifyTurn` comme un contrôle échoué — trois mauvaises conclusions tirées
+  d'une commande correcte. ⚠️ La frontière est une frontière de **commande**, pas un espace : `npm
+  test` contient le mot `test`, et traiter une suite de tests en échec comme « aucune correspondance »
+  aurait été le pire faux positif possible (attrapé par le test).
+
+- **Le bloc de raisonnement ne suivait pas son propre texte.** `.collapsible-body` est plafonné à
+  260 px avec son propre ascenseur : la page pouvait être parfaitement positionnée pendant que la
+  réflexion grandissait dans une boîte qui ne défilait jamais. Il suit, et s'arrête si le lecteur le
+  remonte lui-même.
+
+- **L'anneau autour de la zone de saisie** n'était posé qu'à la **construction** du composer : il
+  durait donc jusqu'au prochain redessin, et `turnEnd` ne redessinait pas. Il est maintenant appliqué
+  au nœud vivant quand l'état change.
+
+- **⚠️ « Pour 40k token ça coûte 3,60 $ » — l'arithmétique était juste.** 3,60 $ est le coût **cumulé
+  de la conversation**, affiché sans libellé à côté des 40 k de **contexte**. Lus ensemble : 90 $/M,
+  soit 45 fois le prix d'entrée de Sonnet. Le texte visible dit « jusqu'ici ». (Vérifié sur trois
+  requêtes réelles : 7 541+829 jetons → 0,023372 $, exactement `7541×2/1e6 + 829×10/1e6`.)
+
+- **L'ajout d'une clé API se fait en un passage.** L'adresse n'était **jamais demandée** — pour une
+  passerelle, la clé était enregistrée et l'adresse restait à trouver dans les réglages, sans que rien
+  ne le dise. Et rien n'était vérifié, alors que le tableau des fournisseurs porte un `placeholder`
+  dont le commentaire dit qu'il existe « pour qu'un mauvais collage soit visible avant d'être
+  enregistré ». Désormais : adresse préremplie, clé, les deux validées à la frappe, **un GET qui ne
+  coûte aucun jeton** pour prouver que ça marche, et le couple enregistré ensemble ou pas du tout.
+
+### Ajouté
+
+- **Dictée.** Un bouton micro dans la zone de saisie. ⚠️ **Local par défaut et éteint tant qu'il
+  n'est pas configuré** : un enregistrement de voix est l'une des deux seules choses que l'extension
+  ne peut pas pseudonymiser (l'autre étant une image). La voie première est une commande sur votre
+  machine (`hiveyCode.dictation.command`, `{file}` substitué) ; la voie distante existe et demande le
+  consentement **chaque fois, sans « toujours »**. Le texte arrive **dans la zone de saisie**, jamais
+  envoyé : un reconnaisseur se trompe, et une question dictée qui s'envoie seule est une question que
+  personne n'a relue. (Pas la Web Speech API : elle est inerte dans Electron.)
+
+- **Deux apparences.** `hiveyCode.appearance` vaut `editor` (emprunter le thème, par défaut) ou
+  `hivey` (base bleu-noir, ambre en accent). ⚠️⚠️ VS Code n'injecte pas le thème dans une feuille de
+  style mais en **style en ligne** sur l'élément racine, qui bat tous les sélecteurs : la première
+  version a échoué et **la capture est revenue identique au pixel près**. D'où la règle — *une
+  apparence décrite en prose est une apparence que personne ne peut vérifier* — et le script de
+  capture photographie maintenant les deux.
+  [`ADR-0040`](docs/adr/0040-deux-apparences-et-un-style-en-ligne.md).
+
+- **La bascule de langue atteint tout l'extension.** `t()` résolu à l'appel ne suffisait pas : un
+  module qui écrit `export const MODES = [{ label: t("Chat") }]` appelle `t()` **pendant son
+  évaluation**, avant que l'extension ait lu son propre réglage. Les étiquettes de mode, les 20
+  familles de compétences et les ~117 indices restaient dans la langue de l'OS. ⚠️ `modes.ts` portait
+  un commentaire affirmant le contraire de ce que faisait son code. Une limite honnête demeure et est
+  **dite** : la palette de commandes et la page des réglages suivent la langue d'affichage de VS Code,
+  qu'aucune extension ne peut changer.
+
+### Design
+
+- **L'envoi devient plein dès qu'il y a quelque chose à envoyer** — information, pas décoration.
+- **Le rythme vertical entre deux tours** : 44 px de marges empilées disaient trois fois ce que la
+  règle disait déjà.
+- **Une liste d'étapes finie se replie** au-delà de six, avec un résumé qui dit ce qu'il y a dedans.
+  ⚠️ Un tour contenant un **échec** reste déplié.
+- **L'approbation d'une édition dit son ampleur** (`+12 −3`) : entre un correctif de deux lignes et
+  une réécriture de 400, c'est le fait qui décide d'un oui rapide ou d'une lecture attentive.
+
+### Mesuré
+
+- `MUTATING_TOOLS` ignorait `git_stage`, `knowledge_write`, `knowledge_retire` et `arcad_action` — un
+  tour dont le seul changement était de promouvoir du code en production était classé comme n'ayant
+  rien changé. Et le test du mode Plan tournait sur **sept outils synthétiques** sans jamais voir le
+  registre réel de 45 ; deux listes écrites indépendamment sont maintenant croisées.
+- Les jetons d'un **sous-agent** étaient jetés par le client terminal, donc le banc publiait des coûts
+  **sous-estimés**.
+- ⚠️ Un **octet NUL** dans `outcome.ts` rendait le fichier binaire pour `grep`, `file(1)` et `diff`.
+  Trouvé parce qu'une recherche d'un symbole que le fichier exporte ne renvoyait rien. Un garde-fou
+  refuse désormais tout octet de contrôle dans une source.
+
 ## 0.98.2 — 2026-10-04
 
 ### Ajouté

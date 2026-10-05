@@ -38,6 +38,8 @@ export interface Settings {
   };
   /** Speaking instead of typing. Off until configured — see `core/dictation/dictation.ts`. */
   dictation: DictationSettings;
+  /** Whether the panel takes the editor's colours or Hivey's own. See `media/style.css`. */
+  appearance: "editor" | "hivey";
   completion: {
     provider: ProviderId | "off";
     model: string;
@@ -246,6 +248,7 @@ function readSettingsRaw(scope?: vscode.Uri): Settings {
       promptCache: c.get<boolean>("chat.promptCache", false),
       maxOutputTokens: c.get<number>("chat.maxOutputTokens", 8192),
     },
+    appearance: c.get<"editor" | "hivey">("appearance", "editor"),
     dictation: {
       command: c.get<string>("dictation.command", ""),
       endpoint: c.get<string>("dictation.endpoint", ""),

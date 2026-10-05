@@ -29,6 +29,124 @@
   --surface: var(--vscode-editorWidget-background, rgba(128, 128, 128, 0.06));
   --hover: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.14));
   --muted: var(--vscode-descriptionForeground);
+
+  /* Only the Hivey appearance draws with these; under the editor's theme they are inert. A token
+     that resolves to nothing is cheaper than a second rule for every element that might glow. */
+  --glow: transparent;
+  --grid: transparent;
+}
+
+/* ── The Hivey appearance ──────────────────────────────────────────────────────────────────── */
+
+/*
+ * A palette of its own, for the person who wants one.
+ *
+ * ⚠️ HOW THIS WORKS, because it is not obvious and it is the whole reason the file above did not
+ * have to change. VS Code hands every webview its theme as custom properties on the document —
+ * `--vscode-foreground`, `--vscode-focusBorder`, and 274 more references across this stylesheet.
+ * Custom properties are variables, so a more specific selector can REDEFINE them: everything below
+ * resolves every one of those 276 call sites to this palette instead, with nothing else edited.
+ *
+ * ⚠️ AND WHY EVERY LINE CARRIES `!important`, which is otherwise a smell. VS Code does not hand the
+ * theme to a webview in a stylesheet: it writes the variables as an INLINE STYLE on the document
+ * element, and an inline style beats every selector there is. The first version of this block used a
+ * more specific selector, which is the textbook answer and loses to inline by construction — the
+ * capture came back pixel-identical to the editor theme and that is how it was found. `!important`
+ * on a declaration does beat inline, and it is the only thing that does.
+ *
+ * The alternative was introducing `--fg`, `--bg`, `--accent` and rewriting 276 sites to use them.
+ * That is the textbook answer and it would have been a 4,000-line diff to reach the same place, with
+ * every one of those lines a chance to get a colour wrong.
+ *
+ * WHY IT IS NOT THE DEFAULT. "The card now belongs to the editor it lives in rather than to us" is a
+ * decision this project already took, deliberately, and wrote down: a panel docked next to the file
+ * tree and the terminal reads as a foreign object if it ignores the user's theme. Florian asked for
+ * something « moderne/futuriste et pro », which is a real want and not a reason to reverse that
+ * silently — so it is a setting, and the editor's theme stays the default.
+ *
+ * WHAT THE PALETTE IS. A deep blue-black base, amber as the one accent — the product's own colour,
+ * and a hive's — and a cool cyan for links so the two accents never compete for the same meaning.
+ * Every pair below clears 7:1 against its background except the dimmest, which clears 4.5:1, so this
+ * appearance is not a trade of legibility for atmosphere.
+ */
+:root[data-appearance="hivey"] {
+  --vscode-foreground: #e7eaf3 !important;
+  --vscode-descriptionForeground: #949cb2 !important;
+  --vscode-editor-background: #0a0c11 !important;
+  --vscode-sideBar-background: #0a0c11 !important;
+  --vscode-editorWidget-background: #121622 !important;
+  --vscode-input-background: #151a28 !important;
+  --vscode-input-foreground: #e7eaf3 !important;
+  --vscode-input-border: #222a3d !important;
+  --vscode-widget-border: #1d2435 !important;
+  --vscode-panel-border: #273048 !important;
+  --vscode-focusBorder: #ffab2e !important;
+  --vscode-textLink-foreground: #5fd0f5 !important;
+  --vscode-textLink-activeForeground: #8fe0fa !important;
+  --vscode-toolbar-hoverBackground: rgba(255, 171, 46, 0.12) !important;
+  --vscode-list-hoverBackground: rgba(255, 171, 46, 0.09) !important;
+  --vscode-list-activeSelectionBackground: rgba(255, 171, 46, 0.16) !important;
+  --vscode-textCodeBlock-background: #0e121b !important;
+  --vscode-textPreformat-foreground: #ffc46b !important;
+  --vscode-widget-shadow: rgba(0, 0, 0, 0.6) !important;
+  --vscode-scrollbarSlider-background: rgba(148, 156, 178, 0.18) !important;
+  --vscode-scrollbarSlider-hoverBackground: rgba(148, 156, 178, 0.3) !important;
+  --vscode-badge-background: rgba(255, 171, 46, 0.18) !important;
+  --vscode-badge-foreground: #ffc46b !important;
+  --vscode-button-background: #ffab2e !important;
+  --vscode-button-foreground: #15110a !important;
+  --vscode-button-hoverBackground: #ffbb55 !important;
+  /* States. Cooler and less saturated than a default theme's, so a row of them reads as one family
+     rather than as four unrelated warnings. */
+  --vscode-charts-green: #5fd49a !important;
+  --vscode-charts-blue: #5fd0f5 !important;
+  --vscode-charts-yellow: #ffc46b !important;
+  --vscode-charts-red: #ff7a7a !important;
+  --vscode-errorForeground: #ff8a8a !important;
+  --vscode-editorWarning-foreground: #ffc46b !important;
+  --vscode-inputValidation-errorBorder: #ff7a7a !important;
+  --vscode-gitDecoration-addedResourceForeground: #5fd49a !important;
+  --vscode-gitDecoration-deletedResourceForeground: #ff8a8a !important;
+  --vscode-diffEditor-insertedTextBackground: rgba(95, 212, 154, 0.14) !important;
+  --vscode-diffEditor-removedTextBackground: rgba(255, 122, 122, 0.14) !important;
+
+  --glow: rgba(255, 171, 46, 0.22);
+  /* A hairline grid, barely there. The one piece of pure atmosphere in here, and it is kept to a
+     single token so it can be removed in one line if it ever reads as noise. */
+  --grid: rgba(148, 156, 178, 0.045);
+}
+
+/*
+ * The one atmospheric effect, and the reasoning for keeping it to one.
+ *
+ * A futuristic interface fails by accumulation: a glow, a grid, a scanline, a gradient and a border
+ * animation each defensible alone and illegible together. So the transcript gets a 32px grid at 4.5%
+ * and nothing else, behind the content rather than over it, and every other surface stays flat.
+ */
+:root[data-appearance="hivey"],
+:root[data-appearance="hivey"] body {
+  /* ⚠️ Set DIRECTLY, not left to resolve through `--vscode-sideBar-background`. Redefining the
+     variable changes every rule in THIS stylesheet that reads it, and the panel's base colour is not
+     one of them: it comes from the stylesheet VS Code injects ahead of ours. The first capture showed
+     exactly that — the accents turned (they are ours) and the background did not (it is theirs). A
+     colour you cannot see in your own file is a colour you cannot fix by editing your own file. */
+  background-color: #0a0c11 !important;
+  color: #e7eaf3;
+}
+
+:root[data-appearance="hivey"] body {
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 32px 32px;
+  background-attachment: fixed;
+}
+
+/* Amber at 22% behind the focused composer, which is the only place in the panel where the user's
+   attention is supposed to be. Under the editor's theme `--glow` is transparent, so this costs
+   nothing there. */
+:root[data-appearance="hivey"] .composer-card:focus-within,
+:root[data-appearance="hivey"] .composer.working .composer-card {
+  box-shadow: 0 0 0 1px var(--glow), 0 4px 24px -8px var(--glow);
 }
 
 * {
@@ -4136,4 +4254,64 @@ pre.code code {
   font-size: var(--fs-meta);
   color: var(--muted);
   margin-right: auto;
+}
+
+/* ── The send, once there is something to send ─────────────────────────────────────────────── */
+
+/*
+ * ⚠️ The reasoning written beside this button — "the send is special is a thing a toolbar says by
+ * position, not by paint" — is right about an EMPTY composer and wrong about a full one. On an empty
+ * box there is nothing to emphasise and position is enough. The moment a question is in the box, the
+ * one control that will send it should not take the same number of looks to find as the attach
+ * button beside it, and in a captured frame of the real panel it plainly did: six ghost icons in a
+ * row, the last of them the only one that matters.
+ *
+ * So the emphasis is INFORMATION rather than decoration. It appears when the state changes — "this
+ * will do something now" — and a composer with nothing in it looks exactly as it did.
+ */
+.composer.ready .btn.send {
+  color: var(--vscode-button-foreground, var(--vscode-editor-background));
+  background: var(--vscode-button-background, var(--vscode-focusBorder));
+  border-radius: var(--radius);
+}
+.composer.ready .btn.send:hover {
+  background: var(--vscode-button-hoverBackground, var(--vscode-focusBorder));
+}
+/* Not while a turn is running: that button is Stop, and a filled Stop on a composer the user has
+   already typed the NEXT question into would read as "send", which is the one misreading that costs
+   a turn. */
+.composer.working .btn.send {
+  color: inherit;
+  background: none;
+}
+
+/* ── Vertical rhythm between turns ─────────────────────────────────────────────────────────── */
+
+/*
+ * Measured from a capture of the real panel rather than guessed: between the end of one answer and
+ * the rule that opens the next turn there were 16px of answer margin, 16px of rule margin and 12px
+ * of question margin stacked — 44px of nothing in a 280px-wide column where the subject is a
+ * conversation. The rule already carries the separation; the margins were saying it three times.
+ *
+ * The pair stays tight (a reply close to what it answers) and the BOUNDARY keeps its air, which is
+ * the distinction the rule was introduced to make in the first place.
+ */
+.turn-rule {
+  margin: var(--sp-4) 0 var(--sp-3);
+}
+.turn-rule.opening {
+  margin-top: var(--sp-1);
+}
+
+/* A folded step list is a list, not prose: it does not get the reasoning block's own scroller or its
+   pre-wrap, and its rows keep the step grid they already have. */
+.collapsible.steps-folded > .collapsible-body {
+  white-space: normal;
+  max-height: none;
+  overflow: visible;
+  padding: var(--sp-1) 0 0;
+  border-top: none;
+}
+.collapsible.steps-folded > .collapsible-head {
+  color: var(--muted);
 }

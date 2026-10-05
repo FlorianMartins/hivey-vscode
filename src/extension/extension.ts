@@ -143,6 +143,10 @@ export function activate(context: vscode.ExtensionContext): void {
       // The width floor lives in a style attribute on <body>, which is written once when the HTML
       // is built. Without this the setting appears to do nothing until the window is reloaded.
       if (e.affectsConfiguration(`${SECTION}.panel.minWidth`)) chat.reload();
+      // The appearance is an attribute on <html>, written once when the HTML is built — like the
+      // width floor above it, and for the same reason: without this the setting appears to do
+      // nothing until the window is reloaded.
+      if (e.affectsConfiguration(`${SECTION}.appearance`)) chat.reload();
       // What the picker may offer depends on the provider in use and on the addresses configured —
       // see `core/models/offer.ts`. The list was built once and then never rebuilt on either, so
       // choosing the gateway left the picker showing the four hundred rows it had computed while

@@ -163,5 +163,8 @@
   "config.dictation.command": "A command on this machine that transcribes a recording. `{file}` is where the audio is written; the text it prints goes into the composer. Example: `whisper-cli -f {file} --no-timestamps --output-txt -`. Empty means dictation is off — nothing is recorded and nothing is sent.",
   "config.dictation.endpoint": "An OpenAI-compatible `/audio/transcriptions` address, used **only** when no local command is set. A recording of your voice cannot be pseudonymised, so this goes through the same consent card as an image.",
   "config.dictation.model": "The transcription model, for the remote path.",
-  "config.dictation.language": "A language hint for the recogniser, such as `fr`. Empty lets it decide."
+  "config.dictation.language": "A language hint for the recogniser, such as `fr`. Empty lets it decide.",
+  "config.appearance": "How the panel is painted.",
+  "config.appearance.editor": "Take the colours of your VS Code theme, so the panel belongs to the editor it is docked in.",
+  "config.appearance.hivey": "Hivey's own palette: a deep blue-black base with amber as the accent."
 }

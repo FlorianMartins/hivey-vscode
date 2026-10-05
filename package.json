@@ -2,7 +2,7 @@
   "name": "hivey-code",
   "displayName": "Hivey Code",
   "description": "%extension.description%",
-  "version": "0.98.2",
+  "version": "0.99.0",
   "publisher": "hivey",
   "license": "Apache-2.0",
   "repository": {
@@ -1222,6 +1222,19 @@
             "type": "string",
             "default": "",
             "description": "%config.dictation.language%"
+          },
+          "hiveyCode.appearance": {
+            "type": "string",
+            "enum": [
+              "editor",
+              "hivey"
+            ],
+            "enumDescriptions": [
+              "%config.appearance.editor%",
+              "%config.appearance.hivey%"
+            ],
+            "default": "editor",
+            "description": "%config.appearance%"
           }
         }
       }

@@ -7,6 +7,7 @@
 // it is deliberately the only place that knows about all of them.
 
 import * as vscode from "vscode";
+import { changeSize, describeChangeSize } from "../core/text/diff.js";
 import { spawn } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -504,7 +505,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       `script-src 'nonce-${nonce}'`,
     ].join("; ");
     return `<!DOCTYPE html>
-<html lang="${language()}">
+<html lang="${language()}" data-appearance="${readSettings().appearance}">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="${csp}">
@@ -611,6 +612,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       suggestCompact:
         shouldSuggestCompact(contextTokens, budgetTokens, this.session.entries.filter((e) => e.included).length),
       busy: this.turn !== undefined,
+      appearance: s.appearance,
       // Only when there is somewhere to transcribe. See `core/dictation/dictation.ts`.
       ...(dictationMode(s.dictation) === "off" ? {} : { dictation: true }),
       budget: { spentTodayUsd: this.gate.budget.spentToday(), dailyUsd: s.budget.dailyUsd },
@@ -4771,8 +4773,16 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     // DOES rather than on its size alone.
     const second = await this.secondOpinion(relative(uri), original ?? "", next);
 
+    // How big it is, on the question itself. The diff is open in the editor beside this — the size is
+    // not a substitute for reading it, it is what tells somebody whether they need to.
+    const size = describeChangeSize(changeSize(original ?? "", next));
     const answer = await vscode.window.showInformationMessage(
-      [t("Apply the change to {0}?", relative(uri)), ...second.lines].join("\n"),
+      [
+        size
+          ? t("Apply the change to {0}? ({1} lines)", relative(uri), size)
+          : t("Apply the change to {0}?", relative(uri)),
+        ...second.lines,
+      ].join("\n"),
       { modal: second.blocking },
       ...(second.blocking ? [t("Refuse")] : [t("Apply"), t("Refuse")]),
     );

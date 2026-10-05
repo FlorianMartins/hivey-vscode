@@ -171,3 +171,29 @@ export function unifiedDiff(path: string, before: string, after: string, opts: U
 export function changedLines(before: string, after: string): number {
   return diffLines(before, after).filter((c) => c.op !== "same").length;
 }
+
+/**
+ * Lines added and removed, for the question that asks whether to apply a change.
+ *
+ * ⚠️ The approval said "Apply the change to compteur.ts?" and nothing else, and the one fact that
+ * decides a quick yes from a careful read is SCALE: a two-line fix and a four-hundred-line rewrite
+ * asked exactly the same question. The diff is open in the editor beside it — this is not a
+ * substitute for reading it, it is what tells you whether you need to.
+ */
+export function changeSize(before: string, after: string): { added: number; removed: number } {
+  let added = 0;
+  let removed = 0;
+  for (const change of diffLines(before, after)) {
+    if (change.op === "add") added++;
+    else if (change.op === "del") removed++;
+  }
+  return { added, removed };
+}
+
+/** `+12 −3`, or `+12` when nothing was removed. The minus is U+2212, not a hyphen. */
+export function describeChangeSize(size: { added: number; removed: number }): string {
+  const parts: string[] = [];
+  if (size.added) parts.push(`+${size.added}`);
+  if (size.removed) parts.push(`\u2212${size.removed}`);
+  return parts.join(" ");
+}

@@ -953,6 +953,10 @@ export const FR: Record<string, string> = {
     "Le transcripteur a répondu HTTP {0}.",
   "hiveyCode.dictation.endpoint is not an address.":
     "hiveyCode.dictation.endpoint n’est pas une adresse.",
+  "{0} edits": "{0} modifications",
+  "{0} commands": "{0} commandes",
+  "{0} reads": "{0} lectures",
+  "Apply the change to {0}? ({1} lines)": "Appliquer la modification à {0} ? ({1} lignes)",
   "The files could not be restored; the conversation is unchanged.": "Les fichiers n’ont pas pu être restaurés ; la conversation est inchangée.",
   "plan: {0}/{1}": "plan : {0}/{1}",
   "{0} file(s) created by that turn are deleted.": "{0} fichier(s) créés par ce tour seront supprimés.",

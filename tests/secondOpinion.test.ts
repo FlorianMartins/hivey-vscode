@@ -168,7 +168,10 @@ test("it runs before the approval card, and its lines are on it", () => {
   const asked = chat.indexOf("const second = await this.secondOpinion(");
   const card = chat.indexOf('t("Apply the change to {0}?", relative(uri))');
   assert.ok(asked > 0 && asked < card, "the card is shown before the second reader has answered");
-  assert.ok(chat.includes("...second.lines].join("), "the objections are not put on the card");
+  // The PROPERTY, not the formatting: the objections are spread into the message and the message is
+  // joined into one string. Asserting the exact punctuation made this fail the first time a line was
+  // added above it, which teaches people to edit the test rather than to read it.
+  assert.match(chat, /\.\.\.second\.lines,?\s*\]\s*\.join\(/, "the objections are not put on the card");
 });
 
 test("it blocks only when the organisation asks AND there is something to resolve", () => {

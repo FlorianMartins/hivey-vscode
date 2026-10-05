@@ -795,10 +795,52 @@ export function setComposerNote(text: string): void {
   note.textContent = text;
 }
 
+/**
+ * What the agent did, folded once the turn is over.
+ *
+ * ⚠️ A long turn is twelve rows of tool steps sitting above its answer, permanently. While the turn
+ * is running they are the only thing happening and they belong on screen; once it has finished, the
+ * answer is what the reader came for and the steps are evidence to go back to. Captured frames of
+ * the real panel made this plain: a finished agent turn is mostly a list of things that already
+ * worked.
+ *
+ * Folded rather than removed, and the summary says what is inside — a header reading "7 steps" tells
+ * you nothing about whether to open it. "7 steps · 2 commands · 1 edit" does, and ANY FAILED STEP
+ * keeps the list open: a turn with a failure in it is one where the detail is the point, and folding
+ * that away would hide the one thing worth noticing.
+ *
+ * Six is the threshold. Below it the list is shorter than its own summary would be.
+ */
+const FOLD_STEPS_ABOVE = 6;
+
 export function stepList(steps: Array<{ tool: string; summary: string; ok: boolean; call?: string }>): HTMLElement {
-  const list = el("div", "steps");
-  for (const s of steps) list.append(stepRow(s));
-  return list;
+  const failed = steps.some((s) => !s.ok);
+  if (steps.length <= FOLD_STEPS_ABOVE || failed) {
+    const list = el("div", "steps");
+    for (const s of steps) list.append(stepRow(s));
+    return list;
+  }
+  const inner = el("div", "steps");
+  for (const s of steps) inner.append(stepRow(s));
+  const block = collapsible(stepSummary(steps), inner, { open: false });
+  block.classList.add("steps-folded");
+  return block;
+}
+
+/** "9 steps · 3 commands · 1 edit" — what is inside, so the fold can be left shut. */
+export function stepSummary(steps: Array<{ tool: string; ok: boolean }>): string {
+  const count = (names: string[]): number => steps.filter((s) => names.includes(s.tool)).length;
+  const parts = [t("{0} steps", steps.length)];
+  const commands = count(["run_command"]);
+  // Counted by what they DID, not by tool name: `write_file` and `edit_file` are one thing to
+  // somebody deciding whether to open this, and "1 write, 2 edits" is a distinction the reader did
+  // not ask for.
+  const edits = count(["edit_file", "write_file"]);
+  const reads = count(["read_file", "list_files", "search_text"]);
+  if (edits) parts.push(t("{0} edits", edits));
+  if (commands) parts.push(t("{0} commands", commands));
+  if (!edits && !commands && reads) parts.push(t("{0} reads", reads));
+  return parts.join(" · ");
 }
 
 /**
@@ -823,14 +865,17 @@ export function stepRow(s: { tool: string; summary: string; ok: boolean; call?: 
 
 export function collapsible(
   title: string,
-  body: string,
+  // An element as well as text: a folded list of steps is a list, not a paragraph, and building it
+  // as a string would mean losing the per-step markup the rows already have.
+  body: string | HTMLElement,
   opts: { open?: boolean; onToggle?: (open: boolean) => void } = {},
 ): HTMLElement {
   const wrap = el("div", "collapsible");
   const head = el("button", "collapsible-head");
   head.append(icon("chevron", "collapsible-chevron"));
   head.append(el("span", undefined, title));
-  const content = el("div", "collapsible-body", body);
+  const content = el("div", "collapsible-body", typeof body === "string" ? body : undefined);
+  if (typeof body !== "string") content.append(body);
   content.hidden = !opts.open;
   wrap.classList.toggle("open", Boolean(opts.open));
   head.addEventListener("click", () => {
@@ -867,6 +912,24 @@ function startEdit(entry: UiEntry, deps: ChatDeps): void {
 }
 
 // ── Composer ─────────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Whether there is anything to send, said on the composer so the send button can mean something.
+ *
+ * ⚠️ The send control was a ghost icon at the end of a row of six identical ghost icons, and the
+ * reasoning written beside it — "the send is special is a thing a toolbar says by position, not by
+ * paint" — is right about an empty composer and wrong about a full one. On an empty box there is
+ * nothing to emphasise and position is enough; the moment there is a question in the box, the one
+ * control that will send it should not take the same number of looks to find as the attach button.
+ *
+ * So the emphasis is INFORMATION, not decoration: it says "this will do something now". A button
+ * that is always filled teaches nothing and is just louder.
+ */
+function markReady(area: HTMLTextAreaElement): void {
+  area.closest(".composer")?.classList.toggle("ready", area.value.trim().length > 0);
+}
+
+
 
 /**
  * What the user had typed, so a re-render does not throw it away.
@@ -1049,6 +1112,7 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
         : t("Ask a question…");
   area.addEventListener("input", () => {
     autoGrow(area);
+    markReady(area);
     // `#` used to be swallowed and replaced by a file dialog. It now stays in the text and opens
     // the completion list, which is both what Copilot does and what lets `#changes` exist at all:
     // a dialog can only ever offer files.
@@ -1201,8 +1265,12 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
   const offer = state.suggestCompact ? compactOffer(state, deps) : undefined;
   if (offer) wrap.append(offer);
   wrap.append(card, meter);
-  // Size the box to its content on first paint, not only after the first keystroke.
-  requestAnimationFrame(() => autoGrow(area));
+  // Size the box to its content on first paint, not only after the first keystroke — and say
+  // whether there is anything to send, for the same reason: a restored draft is a full composer.
+  requestAnimationFrame(() => {
+    autoGrow(area);
+    markReady(area);
+  });
   return wrap;
 }
 

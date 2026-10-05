@@ -77,6 +77,48 @@ Open a folder containing code, then the **Hivey Code** panel in the right-hand b
   use of a small local model: the compiler already says **what** and **where**, all that is left is the
   fixing.
 
+## 4a. Speaking instead of typing
+
+A microphone button appears in the composer — but **only if two conditions hold**: your editor gives
+the panel a microphone, and you have said **where** to transcribe. A button that looked like it was
+listening and was not would cost you a whole spoken paragraph.
+
+Why something has to be configured: **a recording of your voice cannot be pseudonymised**
+([chapter 9](09-privacy.md)). It is, with an image, one of the only two things the tool cannot mask
+before sending. So sending it anywhere is a decision, never a default.
+
+The recommended path is **a command on your own machine**. If you have a transcriber installed
+(whisper.cpp, faster-whisper…), set `hiveyCode.dictation.command`:
+
+```
+whisper-cli -f {file} --no-timestamps --output-txt -
+```
+
+`{file}` is where the recording will be written; the text the command prints lands in the composer.
+Nothing leaves your machine.
+
+If you have no local transcriber, `hiveyCode.dictation.endpoint` takes an OpenAI-compatible address —
+and there, consent is asked **every time, with no "always"**. It is the one permission in this product
+that cannot be granted once and for all.
+
+⚠️ The transcript **lands in the composer; it is never sent on its own**. A recogniser mis-hears, and
+a dictated question that sent itself would be a question nobody proof-read. Escape while recording
+throws it away: changing your mind mid-sentence is not a request to transcribe.
+
+## 4b. Changing the appearance
+
+`hiveyCode.appearance` has two values:
+
+| Value | What it does |
+|---|---|
+| `editor` (default) | The panel takes the colours of **your** VS Code theme. |
+| `hivey` | The product's own palette: a deep blue-black base with amber as the accent. |
+
+The default is not an accident. A panel docked next to the file tree and the terminal that ignores
+your theme reads as a foreign object — a decision taken early in this project. The `hivey` appearance
+exists because the other want is legitimate too, and a setting is the only honest way to serve both
+without silently reversing the first.
+
 ## 5. If you want to plug in a paid model
 
 You need an **API key** ([chapter 4](04-how-we-talk-to-it.md)), bought from a provider or from a gateway

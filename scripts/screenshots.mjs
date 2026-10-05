@@ -11,7 +11,7 @@
 // image is the real interface; the sentence inside it is a fixture.
 //
 // Usage: node scripts/screenshots.mjs [--locale fr] [--theme "Default Light Modern"]
-//        [--suffix .light] [--out docs/images]
+//        [--suffix .light] [--appearance hivey] [--out docs/images]
 
 import { spawn, spawnSync } from "node:child_process";
 import { createServer } from "node:http";
@@ -267,6 +267,9 @@ const editor = spawn("node", ["dist-integration/runTest.js"], {
     // the default: it leaves whatever the profile had, which is how the README ended up showing a
     // deep-navy theme nobody chose. The name is verified by sampling a pixel, not by reading it.
     HIVEY_CODE_THEME: args.get("theme") ?? "Default Dark Modern",
+    // `editor` (the default) or `hivey`. The point of photographing both is that an appearance
+    // described in prose is an appearance nobody can check.
+    HIVEY_CODE_APPEARANCE: args.get("appearance") ?? "editor",
     HIVEY_CODE_SCREENSHOT_HOLD: String(HOLD),
     HIVEY_CODE_SCREENSHOT_MARKER: marker,
   },

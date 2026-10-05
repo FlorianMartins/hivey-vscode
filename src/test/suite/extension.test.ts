@@ -1943,6 +1943,13 @@ suite("Screenshot", () => {
       // HIVEY_CODE_LOCALE also drives the extension's own language setting, so the screenshots can show
       // the translated interface without installing a VS Code language pack.
       await config.update("language", process.env["HIVEY_CODE_LOCALE"] ?? "auto", vscode.ConfigurationTarget.Global);
+      // Which palette the panel paints itself with, so both appearances can be photographed from the
+      // same sequence rather than described in prose nobody can check.
+      await config.update(
+        "appearance",
+        process.env["HIVEY_CODE_APPEARANCE"] ?? "editor",
+        vscode.ConfigurationTarget.Global,
+      );
       // The pre-send card waits for a click, and nothing clicks in a capture: leaving it on meant
       // the harness hung on the first question and photographed six empty screens while reporting
       // "the editor never announced it". Which was also the proof the card works.
