@@ -4315,3 +4315,17 @@ pre.code code {
 .collapsible.steps-folded > .collapsible-head {
   color: var(--muted);
 }
+
+/* A field's problem, under the field.
+ *
+ * A warning and a refusal look different because they ARE different: "this is probably not what you
+ * meant" and "this cannot be stored" lead to different actions. Colouring both the same teaches
+ * people to ignore the first, which is the one that is usually right. */
+.setup-problem {
+  font-size: var(--fs-meta);
+  color: var(--vscode-editorWarning-foreground, var(--muted));
+  margin: calc(var(--sp-1) * -1) 0 var(--sp-2);
+}
+.setup-problem.fatal {
+  color: var(--vscode-errorForeground);
+}

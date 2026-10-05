@@ -19,7 +19,7 @@ import {
   localCommand,
   transcriptionBody,
 } from "../core/dictation/dictation.js";
-import { normalizeBaseUrl } from "../core/providers/credentials.js";
+import { checkCredentials, normalizeBaseUrl } from "../core/providers/credentials.js";
 import { callSignature, safeArgs } from "../core/agent/callSignature.js";
 import { knowledgeAmbient } from "./knowledge.js";
 import { language, t } from "../shared/i18n.js";
@@ -1278,6 +1278,58 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           await config.update("chat.provider", provider, vscode.ConfigurationTarget.Global);
           await this.refreshSetup();
           void this.loadModels(true);
+          break;
+        }
+
+        case "saveProvider": {
+          // Both, or neither. See the protocol note: two separate saves is two chances to leave half
+          // a configuration behind, and a key stored against no address looks configured.
+          const provider = m.provider as ProviderId;
+          let baseUrl = vendor(provider)?.baseUrl ?? "";
+          if (m.url !== undefined && m.url.trim()) {
+            const checked = checkEndpoint(m.url);
+            if (!checked.url) {
+              void vscode.window.showWarningMessage(checked.problem ?? t("That address cannot be used."));
+              break;
+            }
+            baseUrl = checked.url;
+          }
+          // Checked before anything is written. A credential that is known to work is a different
+          // thing from one that has been written down, and one GET costs no tokens.
+          const check = await vscode.window.withProgress(
+            { location: vscode.ProgressLocation.Notification, title: t("Checking the key against {0}…", baseUrl) },
+            () =>
+              checkCredentials(
+                { wire: vendor(provider)?.wire ?? "openai", label: vendor(provider)?.label ?? provider },
+                baseUrl,
+                m.key,
+                fetch,
+              ),
+          );
+          if (!check.ok) {
+            const anyway = t("Store it anyway");
+            const answer = await vscode.window.showWarningMessage(
+              check.why,
+              { modal: true, detail: t("Nothing has been saved yet.") },
+              anyway,
+            );
+            if (answer !== anyway) break;
+          }
+          const config = vscode.workspace.getConfiguration(SECTION);
+          if (m.url !== undefined && m.url.trim() && baseUrl !== vendor(provider)?.baseUrl) {
+            await config.update(`endpoints.${vendor(provider)?.settingKey ?? provider}`, baseUrl, vscode.ConfigurationTarget.Global);
+          }
+          await this.keys.store(provider as Parameters<Keys["store"]>[0], m.key);
+          // Storing a key is only half the intent: somebody who pastes an OpenRouter key wants to use
+          // OpenRouter, and leaving the provider on `local` makes the key look ignored.
+          await config.update("chat.provider", provider, vscode.ConfigurationTarget.Global);
+          await this.refreshSetup();
+          void this.loadModels(true);
+          void vscode.window.showInformationMessage(
+            check.ok
+              ? t("{0} is ready. {1}", vendor(provider)?.label ?? provider, check.models ? t("{0} models available.", check.models) : t("The key works."))
+              : t("{0} key stored, unverified.", vendor(provider)?.label ?? provider),
+          );
           break;
         }
 

@@ -506,6 +506,15 @@ export type ToExtension =
   | { type: "probeLocal" }
   /** The key never travels back to the panel; it goes straight to the OS keychain. */
   | { type: "saveKey"; provider: string; key: string }
+  /**
+   * The address AND the key, together, checked once.
+   *
+   * ⚠️ The setup screen had two buttons — "Save the address", then "Save the key" — which is the
+   * thing Florian reported: « le gateway qui demande de stocker l'adresse et ensuite de stocker la
+   * clé API plutôt que de remplir les deux champs et valider ». Two saves is also two chances to
+   * leave half a configuration behind, and a stored key pointing at no address looks configured.
+   */
+  | { type: "saveProvider"; provider: string; url?: string; key: string }
   | { type: "clearKey"; provider: string }
   | { type: "setEndpoint"; provider: string; url: string }
   /** Declare a model server on this machine or this network, and probe it. */

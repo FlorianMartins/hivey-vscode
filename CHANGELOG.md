@@ -2,6 +2,25 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.99.1 — 2026-10-05
+
+### Corrigé
+
+- **⚠️ L'autre moitié du parcours de clé, à l'endroit où un nouvel utilisateur le rencontre vraiment.**
+  La 0.99.0 avait réparé le parcours de la **palette de commandes** ; l'**écran d'installation** —
+  celui qu'on voit en premier — avait toujours ses deux boutons séparés, « Enregistrer l'adresse »
+  puis « Enregistrer la clé ». C'est mot pour mot ce que Florian décrivait, et je l'avais corrigé à
+  côté.
+
+  Un seul formulaire, un seul bouton (**Connecter**), les deux champs validés **à la frappe** contre
+  les mêmes règles que l'autre parcours, et une vérification réelle avant d'écrire quoi que ce soit.
+  Deux enregistrements, c'était aussi deux occasions de laisser une demi-configuration derrière soi :
+  une clé rangée face à aucune adresse a l'air configurée jusqu'à la première question.
+
+  ⚠️ Un problème **bloquant** et un **avertissement** ne se ressemblent plus : « ce n'est probablement
+  pas ce que vous vouliez » et « ceci ne peut pas être enregistré » mènent à des gestes différents, et
+  les peindre pareil apprend à ignorer le premier — qui est celui qui a généralement raison.
+
 ## 0.99.0 — 2026-10-05
 
 ### Corrigé — ce que Florian a signalé

@@ -11,6 +11,7 @@
 
 import { button, el, icon, ICON } from "./dom.js";
 import { t } from "../shared/i18n.js";
+import { keyProblem, urlProblem } from "../core/providers/credentials.js";
 import { REMOTE_VENDORS, type Vendor } from "../core/providers/vendors.js";
 import type { ToExtension, UiRuntime, UiState } from "../shared/protocol.js";
 
@@ -353,6 +354,19 @@ function nothingFound(send: (m: ToExtension) => void): HTMLElement {
   return box;
 }
 
+/**
+ * Put a field's problem under it, or take it away.
+ *
+ * A warning and a refusal look different because they ARE different: one is "this is probably not
+ * what you meant" and the other is "this cannot be stored". Colouring both the same teaches people
+ * to ignore the first.
+ */
+function showProblem(host: HTMLElement, problem: { message: string; fatal: boolean } | undefined): void {
+  host.textContent = problem?.message ?? "";
+  host.classList.toggle("fatal", Boolean(problem?.fatal));
+  host.hidden = !problem;
+}
+
 function gatewayCard(gateway: Gateway, state: UiState, send: (m: ToExtension) => void, rerender: () => void): HTMLElement {
   const card = el("section", "setup-card");
   const stored = Boolean(state.setup.hasKey[gateway.id]);
@@ -373,26 +387,32 @@ function gatewayCard(gateway: Gateway, state: UiState, send: (m: ToExtension) =>
 
   card.append(el("p", "setup-card-hint", gatewayHint(gateway.id)));
 
+  // ⚠️ ONE form, one button. This screen had two saves — "Save the address", then "Save the key" —
+  // which is exactly what Florian reported: « le gateway qui demande de stocker l'adresse et ensuite
+  // de stocker la clé API plutôt que de remplir les deux champs et valider ». Two saves is also two
+  // chances to leave half a configuration behind, and a key stored against no address looks
+  // configured until the first question fails.
+  //
+  // Both fields are checked AS THEY ARE TYPED, against the same rules the command-palette flow uses
+  // (`core/providers/credentials.ts`), so a wrong paste is visible before anything is stored rather
+  // than after — which is what the vendor table's `placeholder` was always for.
+  let url: HTMLInputElement | undefined;
+  let urlNote: HTMLElement | undefined;
   if (gateway.needsUrl) {
     const urlField = el("div", "setup-field");
-    const url = el("input", "setup-input");
+    url = el("input", "setup-input");
     url.type = "text";
     url.placeholder = "https://…/v1";
     url.value = draft(gateway.id).url || state.setup.endpoints?.[gateway.id] || "";
     url.spellcheck = false;
-    url.addEventListener("input", () => (draft(gateway.id).url = url.value));
+    urlNote = el("p", "setup-problem");
+    url.addEventListener("input", () => {
+      draft(gateway.id).url = url!.value;
+      showProblem(urlNote!, urlProblem(url!.value, { required: true }));
+      refreshSave();
+    });
     urlField.append(url);
-    urlField.append(
-      button({
-        label: t("Save the address"),
-        className: "btn tiny",
-        onClick: () => {
-          send({ type: "setEndpoint", provider: gateway.id, url: url.value.trim() });
-          rerender();
-        },
-      }),
-    );
-    card.append(urlField);
+    card.append(urlField, urlNote);
   }
 
   const field = el("div", "setup-field");
@@ -402,25 +422,47 @@ function gatewayCard(gateway: Gateway, state: UiState, send: (m: ToExtension) =>
   input.value = draft(gateway.id).key;
   input.autocomplete = "off";
   input.spellcheck = false;
+  const keyNote = el("p", "setup-problem");
   const submit = () => {
     const value = draft(gateway.id).key.trim();
     if (!value) return;
-    send({ type: "saveKey", provider: gateway.id, key: value });
+    send({
+      type: "saveProvider",
+      provider: gateway.id,
+      ...(url ? { url: url.value.trim() } : {}),
+      key: value,
+    });
     // Cleared on both sides: the panel has no reason to go on holding a credential.
     draft(gateway.id).key = "";
     input.value = "";
     rerender();
   };
+  /** Whether the pair can be stored: no FATAL problem on either field, and a key present. */
+  const refreshSave = (): void => {
+    const keyBad = keyProblem({ label: gateway.label, placeholder: gateway.placeholder }, input.value.trim());
+    const urlBad = url ? urlProblem(url.value, { required: true }) : undefined;
+    save.disabled = !input.value.trim() || Boolean(keyBad?.fatal) || Boolean(urlBad?.fatal);
+  };
   input.addEventListener("input", () => {
     draft(gateway.id).key = input.value;
-    save.disabled = !input.value.trim();
+    showProblem(keyNote, input.value.trim() ? keyProblem({ label: gateway.label, placeholder: gateway.placeholder }, input.value.trim()) : undefined);
+    refreshSave();
   });
   input.addEventListener("keydown", (ev) => {
     if (ev.key === "Enter") submit();
   });
-  const save = button({ label: t("Save the key"), className: "btn tiny primary", disabled: !input.value.trim(), onClick: submit });
+  const save = button({
+    // One verb for one action. "Save the key" described half of what the button did even before this
+    // change, since storing a key also switches the provider to it.
+    label: t("Connect"),
+    className: "btn tiny primary",
+    disabled: !input.value.trim(),
+    onClick: submit,
+  });
   field.append(input, save);
-  card.append(field);
+  card.append(field, keyNote);
+  if (url) showProblem(urlNote!, urlProblem(url.value, { required: true }));
+  refreshSave();
 
   const foot = el("div", "setup-links");
   if (gateway.keysUrl) {
