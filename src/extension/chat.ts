@@ -1439,7 +1439,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           break;
 
         case "openSettings":
-          await vscode.commands.executeCommand("workbench.action.openSettings", SECTION);
+          // Filtered to one key when the panel named one. Dropping somebody into forty settings
+          // after telling them to change one is handing them a search task, not an answer.
+          await vscode.commands.executeCommand("workbench.action.openSettings", m.key ?? SECTION);
           break;
         case "approve": {
           const resolve = this.approvals.get(m.id);

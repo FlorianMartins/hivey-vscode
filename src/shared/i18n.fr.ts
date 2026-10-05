@@ -890,7 +890,6 @@ export const FR: Record<string, string> = {
     "Ce tour n’a appelé aucun outil d’édition, il n’y a donc rien à remettre — mais {0} commande(s) ont tourné, et ce qu’elles ont changé reste.",
   "⚠️ {0} command(s) also ran. Whatever they changed is NOT recorded and will NOT be undone.":
     "⚠️ {0} commande(s) ont aussi tourné. Ce qu’elles ont changé n’est PAS enregistré et NE sera PAS annulé.",
-  "{0} so far": "{0} jusqu’ici",
   "What this whole conversation has cost, not this question: every turn re-sends the conversation, so the total grows faster than the number of questions. Today's total is in the cost report.":
     "Ce que cette conversation entière a coûté, et non cette question : chaque tour renvoie la conversation, donc le total grandit plus vite que le nombre de questions. Le total du jour est dans le rapport de coût.",
   "Add {0} — 1 of 2": "Ajouter {0} — 1 sur 2",
@@ -956,6 +955,10 @@ export const FR: Record<string, string> = {
   "{0} reads": "{0} lectures",
   "Apply the change to {0}? ({1} lines)": "Appliquer la modification à {0} ? ({1} lignes)",
   "Connect": "Connecter",
+  "Dictate — needs a transcriber. Click to set one up.":
+    "Dicter — il faut un transcripteur. Cliquez pour en configurer un.",
+  "Set a transcriber to dictate — the setting is open.":
+    "Renseignez un transcripteur pour dicter — le réglage est ouvert.",
   "The files could not be restored; the conversation is unchanged.": "Les fichiers n’ont pas pu être restaurés ; la conversation est inchangée.",
   "plan: {0}/{1}": "plan : {0}/{1}",
   "{0} file(s) created by that turn are deleted.": "{0} fichier(s) créés par ce tour seront supprimés.",

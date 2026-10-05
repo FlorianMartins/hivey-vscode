@@ -4329,3 +4329,116 @@ pre.code code {
 .setup-problem.fatal {
   color: var(--vscode-errorForeground);
 }
+
+/* ── Aeration ──────────────────────────────────────────────────────────────────────────────── */
+
+/*
+ * Florian, after a release whose design changes he could not find: « c'est toujours aussi compliqué
+ * de comprendre les menus, settings, etc et surtout c'est pas suffisamment aéré on ne comprend rien
+ * du tout ».
+ *
+ * He is right, and the previous pass was too timid to show up at all. The measured state: 4px between
+ * controls, 3px of vertical padding inside them, 18px line-height — five controls and a model name
+ * packed into a 280px row with nothing between them. At that density the eye cannot tell where one
+ * control ends and the next begins, so the row reads as one undifferentiated strip of words. No
+ * amount of better labelling fixes that; the spacing has to change first.
+ *
+ * These are deliberately whole steps of the scale, not fractions of one. A change nobody can see is
+ * a change that was not worth making — which is the actual lesson of the previous attempt.
+ */
+
+/* Controls big enough to be controls. 3/6 and an 18px line gave a 24px target; 5/8 and 20px gives
+   30px, which is what the workbench's own toolbar buttons are. */
+.composer-toolbar .btn,
+.composer-footer .btn {
+  padding: 5px var(--sp-3);
+  line-height: 20px;
+}
+
+/* Air between them, and MORE air between the two groups than within one — that difference is what
+   makes a row parse as "these three belong together, those two do not" without a single label. */
+.composer-toolbar {
+  gap: var(--sp-3);
+  /* Wrap rather than truncate. The model name used to shrink to "qwe…" so the row could stay on one
+     line, which trades the only label carrying information nobody can guess for a line of nothing.
+     Two readable rows beat one unreadable one. */
+  flex-wrap: wrap;
+  row-gap: var(--sp-2);
+}
+.composer-toolbar .toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  /* It wraps now, so it must not clip what wrapped. */
+  overflow: visible;
+}
+/* The hairline that says the groups are different kinds of thing: what this message carries on one
+   side, what to do with it on the other. One pixel, at the panel's quietest border colour — a
+   separator that has to be noticed is a separator that is too loud. */
+.composer-toolbar .toolbar-group.end {
+  margin-left: auto;
+  padding-left: var(--sp-3);
+  border-left: 1px solid var(--border);
+}
+
+/* The readings, with room, and the two numbers at opposite ends of the row.
+ *
+ * ⚠️ This is where "40k tokens for $3.60" came from: the context size and the conversation's total
+ * sat side by side and were read as a ratio. The fix is not a word of prose wedged between them
+ * (tried, and « c'est moche et inutile »), it is to stop putting them next to each other. */
+.composer-footer {
+  gap: var(--sp-3);
+  padding: var(--sp-2) 0 0;
+}
+.composer-footer .composer-cost {
+  margin-left: auto;
+  padding-left: var(--sp-3);
+}
+/* The separator dot earned its place when the row was cramped; with real gaps it is one more mark to
+   parse. */
+.composer-footer .composer-sep {
+  display: none;
+}
+
+/* The box itself gets room to breathe around what is typed in it. */
+.composer-card {
+  padding: var(--sp-3);
+}
+
+/* ── The settings screen ───────────────────────────────────────────────────────────────────── */
+
+/* Same diagnosis, same remedy: cards packed edge to edge read as one wall of text. A card is a
+   decision — "which provider", "which model" — and a decision needs a boundary the eye can find. */
+.setup {
+  gap: var(--sp-5);
+  padding: var(--sp-5) var(--sp-4) var(--sp-5);
+}
+.setup-card {
+  padding: var(--sp-4);
+  border-radius: var(--radius-lg);
+}
+.setup-card-head {
+  padding: 0;
+  min-height: 28px;
+}
+.setup-card-title {
+  font-size: var(--fs-body);
+}
+/* The sentence under a heading is the one that says what the card is FOR. It was the same size and
+   nearly the same colour as everything else, so it read as more of the same rather than as the
+   explanation. */
+.setup-card-hint {
+  margin: var(--sp-2) 0 var(--sp-3);
+  line-height: 1.5;
+}
+.setup-field {
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-2);
+}
+.setup-input {
+  padding: 6px var(--sp-3);
+}
+.setup-links {
+  gap: var(--sp-2);
+  margin-top: var(--sp-3);
+}

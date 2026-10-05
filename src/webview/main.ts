@@ -113,11 +113,25 @@ function render(): void {
  *
  * Nothing is captured when the screen changes, because a scroll position in the history list means
  * nothing in a transcript.
+ *
+ * ⚠️ AND IT IS NOT ONLY THE TRANSCRIPT. This looked only at `.transcript`, on the chat screen, so
+ * every OTHER screen jumped back to the top on every rebuild — and the settings screen rebuilds on
+ * each keystroke in a key field. Reported as « quand on déplie un fournisseur pour renseigner la clé
+ * il remonte tout en haut ». The reason the defect survived is that the comment above described a
+ * problem about the transcript, so that is what the code solved.
  */
-function captureScroll(): { top: number; atEnd: boolean } | undefined {
-  const list = document.querySelector(".transcript");
-  if (!list || state?.screen !== "chat") return undefined;
-  return { top: list.scrollTop, atEnd: atBottom(list) };
+function scroller(): HTMLElement | null {
+  // Whichever of the panel's scrolling containers this screen has. One list, because a screen has
+  // exactly one — and naming them here is how a new screen gets this for free.
+  return document.querySelector<HTMLElement>(".transcript, .setup, .history, .models, .screen-scroll");
+}
+
+function captureScroll(): { top: number; atEnd: boolean; screen: string } | undefined {
+  const list = scroller();
+  if (!list || !state) return undefined;
+  // `atEnd` means "follow the end" and is a property of a CONVERSATION, not of a settings page: a
+  // settings screen that happened to be scrolled to its last line must not be pinned there.
+  return { top: list.scrollTop, atEnd: state.screen === "chat" && atBottom(list), screen: state.screen };
 }
 
 /**
@@ -129,14 +143,20 @@ function captureScroll(): { top: number; atEnd: boolean } | undefined {
  * reader is not at the end" against a position nobody chose — and, the rule being what it is, stop
  * following for the rest of the answer. That was one of the two ways the follow died.
  */
-function restoreScroll(place: { top: number; atEnd: boolean } | undefined, preserved = false): void {
+function restoreScroll(place: { top: number; atEnd: boolean; screen: string } | undefined, preserved = false): void {
+  // A screen change throws the position away: where you were in the settings means nothing in a
+  // conversation. Checked against the state AFTER the rebuild, which is the new screen.
+  if (place && state && place.screen !== state.screen) {
+    scroller()?.scrollTo({ top: 0 });
+    return;
+  }
   // At the end, or arriving from another screen: the end is where a conversation is read from.
   if (!place || place.atEnd) {
     scrollToEnd(true);
     return;
   }
   const apply = (): void => {
-    const list = document.querySelector<HTMLElement>(".transcript");
+    const list = scroller();
     if (!list) return;
     list.scrollTop = place.top;
     // The rebuild dropped the button with the old DOM; the reader is still where they were, so it

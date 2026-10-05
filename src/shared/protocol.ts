@@ -496,7 +496,13 @@ export type ToExtension =
   | { type: "removePolicyEntry"; list: PolicyList; value: string }
   | { type: "openEgress" }
   | { type: "openCosts" }
-  | { type: "openSettings" }
+  /**
+   * The settings page. With `key`, filtered to that one setting.
+   *
+   * The filter matters: somebody told "set a transcriber" and dropped into forty settings has been
+   * given a search task, not an answer.
+   */
+  | { type: "openSettings"; key?: string }
   | { type: "approve"; id: string; answer: "once" | "session" | "always" | "no" }
   /** `atCursor` inserts at the caret; without it the selection is replaced. */
   | { type: "insertCode"; code: string; atCursor?: boolean }

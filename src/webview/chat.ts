@@ -720,13 +720,23 @@ function turnRule(
  * Escape cancels, and cancelling throws the recording away without sending it anywhere — somebody
  * who changes their mind mid-sentence has not asked for their voice to be transcribed.
  */
-function micButton(deps: ChatDeps): HTMLElement {
+function micButton(deps: ChatDeps, configured: boolean): HTMLElement {
   const recording = Boolean(activeRecorder);
   const control = button({
     icon: ICON.mic,
-    title: recording ? t("Stop and transcribe (Esc cancels)") : t("Dictate"),
-    className: `btn ghost icon-only mic${recording ? " recording" : ""}`,
+    title: recording
+      ? t("Stop and transcribe (Esc cancels)")
+      : configured
+        ? t("Dictate")
+        : t("Dictate — needs a transcriber. Click to set one up."),
+    className: `btn ghost icon-only mic${recording ? " recording" : ""}${configured ? "" : " unconfigured"}`,
     onClick: () => {
+      // Nothing to transcribe with: say so and open the setting, rather than record into nowhere.
+      if (!configured && !activeRecorder) {
+        deps.send({ type: "openSettings", key: "hiveyCode.dictation.command" });
+        setComposerNote(t("Set a transcriber to dictate — the setting is open."));
+        return;
+      }
       if (activeRecorder) {
         activeRecorder.stop();
         activeRecorder = undefined;
@@ -1162,11 +1172,17 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
   // not the same place at all — and this is the control you reach for while writing the message,
   // not while configuring the conversation.
   const right = el("div", "toolbar-group end");
-  // ⚠️ Only when this host can actually open a microphone AND the user has configured a transcriber.
-  // A button that looks like it is listening and is not is worse than no button at all: somebody
-  // speaks a paragraph into nothing. Capability is asked of the host (`microphonePossible`), and
-  // whether there is anywhere to transcribe comes from the extension.
-  if (state.dictation && microphonePossible()) right.append(micButton(deps));
+  // ⚠️ Shown wherever a microphone CAN work, configured or not — and the earlier rule was wrong.
+  //
+  // It was hidden until a transcriber was configured, on the reasoning that "a button that looks
+  // like it is listening and is not is worse than no button". That reasoning is sound and it was
+  // applied to the wrong thing: it argues against a button that pretends to RECORD, not against one
+  // that offers to set dictation up. Hiding it made the feature undiscoverable — reported as « je ne
+  // vois pas le bouton pour l'enregistrement vocal » by the person who asked for it.
+  //
+  // So the button is always there when the host can record, and when nothing is configured it says
+  // so and offers to configure it, instead of silently doing nothing.
+  if (microphonePossible()) right.append(micButton(deps, Boolean(state.dictation)));
   right.append(toolsButton(state, deps));
   right.append(
     // The same button as its neighbours, carrying a different glyph. `primary` made it a size and a
@@ -1228,7 +1244,10 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
   // a reading, it is a decoration that teaches people to ignore the row it sits in.
   if (state.sessionCostUsd > 0 || state.billed) {
     meter.append(el("span", "composer-sep", "\u2022"));
-    // ⚠️ "so far" is on the VISIBLE text, not only in the tooltip, and that is the whole fix.
+    // ⚠️ The words are gone and the problem is not, so it is solved another way — read this before
+    // putting a suffix back. The ambiguity was never in the word, it was in the ADJACENCY: two
+    // unrelated figures side by side read as a ratio. They are separated by the row's layout now.
+    // (Earlier note kept because the reasoning still holds:)
     // Florian read this row as a rate: « pour 40k token ça coute 3.60$ ce qui me semble un peu
     // excessif avec sonnet 5.5 ». The arithmetic was right — $3.60 is what the CONVERSATION had
     // cost, and the 40 k beside it is the context the NEXT question will send. Two unrelated
@@ -1239,7 +1258,7 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
     // This project already learned this once and fixed it the same way — the bench column called
     // `time` became `model time` rather than gaining a footnote, because a figure whose name invites
     // the wrong reading is a figure that will be misread.
-    const cost = el("span", "composer-cost", t("{0} so far", formatCost(state.sessionCostUsd)));
+    const cost = el("span", "composer-cost", formatCost(state.sessionCostUsd));
     cost.title = t(
       "What this whole conversation has cost, not this question: every turn re-sends the conversation, so the total grows faster than the number of questions. Today's total is in the cost report.",
     );
@@ -1691,6 +1710,10 @@ function approvalButton(state: UiState, deps: ChatDeps): HTMLElement {
 function modeButton(state: UiState, deps: ChatDeps): HTMLElement {
   const current = MODES.find((m) => m.id === state.mode) ?? MODES[2]!;
   const b = button({
+    // The shield is what this panel already uses for "what is allowed" — on the approval card and in
+    // the permissions screen. Reusing it here is what makes the mode button recognisable as the same
+    // subject rather than as a third dropdown.
+    icon: ICON.shield,
     label: current.label,
     trailingIcon: ICON.chevron,
     title: t("Mode: {0}", current.hint),
@@ -1731,6 +1754,9 @@ function modeButton(state: UiState, deps: ChatDeps): HTMLElement {
 
 function modelButton(state: UiState, deps: ChatDeps): HTMLElement {
   const b: HTMLElement = button({
+    // The chip glyph: this is the one control about WHICH MODEL answers, and with three dropdowns in
+    // a row the only thing distinguishing them was the word inside.
+    icon: ICON.chip,
     label: state.modelLabel,
     trailingIcon: ICON.chevron,
     title:
@@ -1942,6 +1968,11 @@ function roundTokens(n: number): number {
 function reasoningButton(state: UiState, deps: ChatDeps): HTMLElement {
   const current = REASONING.find((r) => r.id === state.reasoning) ?? REASONING[0]!;
   const b = button({
+    // ⚠️ A leading glyph, because the closed button shows only its VALUE. "Agent · qwen2.5-coder ·
+    // Direct" gives no clue that the third one is about thinking — reported as « c'est toujours aussi
+    // compliqué de comprendre les menus ». The row wraps now, so the 14px this costs is no longer
+    // taken from the model name.
+    icon: ICON.sparkle,
     label: current.label,
     trailingIcon: ICON.chevron,
     title: t("Reasoning: {0}", current.hint),
