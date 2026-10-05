@@ -253,6 +253,21 @@ for (const step of [[], ["--integration"]]) {
   }
 }
 
+// ⚠️ A run that was interrupted leaves `code.lock` behind, and every later run then fails with
+// "Running extension tests from the command line is currently only supported if no other instance of
+// Code is running" — about an instance that is not running. It cost half a dozen retries before the
+// message was read closely enough to notice it describes a LOCK rather than a process.
+//
+// Removed only when nothing is actually holding it: a live editor must still be respected, or this
+// would turn a clear refusal into two editors fighting over one profile.
+// `pgrep` exits 0 when it finds something and non-zero when it does not, so "nothing is running" is
+// a non-zero status. (The first version of this line read `!spawnSync(...).status === false`, which
+// parses as `(!status) === false` and means the opposite of what it says — written while explaining
+// the fix, which is exactly when a condition goes unread.)
+if (spawnSync("pgrep", ["-f", "vscode-test/vscode"], { stdio: "ignore" }).status !== 0) {
+  rmSync(".vscode-test/user-data/code.lock", { force: true });
+}
+
 const xvfb = spawn("Xvfb", [display, "-screen", "0", "1600x1000x24", "-nolisten", "tcp"], { stdio: "ignore" });
 await new Promise((r) => setTimeout(r, 1500));
 
@@ -317,7 +332,7 @@ function announced() {
 //
 // Two halves of one sequence in two files: when they disagree, the one that waits is the one that
 // looks broken. Adding a screen means announcing it there and naming it here, in the same change.
-const SCREENS = ["conversation", "pendant", "plan", "approbation", "contexte", "passerelle", "setup"];
+const SCREENS = ["premier", "conversation", "pendant", "plan", "approbation", "contexte", "passerelle", "setup"];
 // One hold per screen is not the budget: the fixture drives a real conversation between them, and
 // the frame taken mid-answer waits for a deliberately slow one to finish. Two screens' worth of
 // slack plus a flat minute covers the talking; a deadline that expires mid-run reports every

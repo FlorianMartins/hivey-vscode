@@ -9,7 +9,7 @@
 import { button, closeMenu, el, formatTokens, icon, ICON, menu, menuItem, menuTitle, separator } from "./dom.js";
 import { markdown } from "./markdown.js";
 import { t } from "../shared/i18n.js";
-import { turnBoundary } from "../core/session/checkpoint.js";
+import { transcriptPieces } from "../core/session/checkpoint.js";
 import { REMOTE_VENDORS, vendor } from "../core/providers/vendors.js";
 import { closeModelCombo, isModelComboOpen, openModelCombo } from "./modelCombo.js";
 import { wirePaste } from "./paste.js";
@@ -176,28 +176,21 @@ function transcript(state: UiState, deps: ChatDeps): HTMLElement {
     return list;
   }
   const matches = new Set(state.matches);
-  let first = true;
-  for (const entry of state.session.entries) {
-    if (state.searchQuery && !matches.has(entry.id)) continue;
-    // The answer being written is the live turn's to draw — see `UiEntry.streaming`. Drawing it
-    // here as well would print the answer twice, which is what made the transcript freeze instead:
-    // the earlier fix kept the whole transcript untouched during a turn to avoid the duplicate, and
-    // a frozen transcript hides everything, including the error that says why nothing is happening.
-    if (entry.streaming) continue;
-    // The rule belongs to the transcript, not to either message it separates — it is emitted
-    // between them rather than inside the question, so that a pinned answer's tint and a muted
-    // turn's fade stop at the message and do not swallow the way back out of it.
-    //
-    // ⚠️ Emitted for EVERY question, the first one included. It used to be skipped on the first,
-    // which was right about the line and wrong about everything attached to it: the separator has
-    // nothing to separate at the top of a transcript, but the RESTORE is not a separator. Skipping
-    // it meant no conversation had a way back out of its opening turn — the one turn where the
-    // agent is let loose on an untouched repository, and therefore the one most worth undoing. The
-    // line is dropped on the first turn; the way back is not.
-    const boundary = turnBoundary(entry.role, first);
-    if (boundary?.restore) list.append(turnRule(entry, deps, !boundary.line));
+  // ⚠️ The order comes from `transcriptPieces`, which is tested without a DOM. "The first question
+  // has a restore" was reported as false three times while the code said it was true: the decision
+  // had a test and the LOOP APPLYING IT did not, so nothing could tell whether the renderer called
+  // it, skipped the entry first, or drew the result. This loop now only turns values into nodes.
+  const byId = new Map(state.session.entries.map((e) => [e.id, e]));
+  for (const piece of transcriptPieces(
+    state.session.entries,
+    state.searchQuery ? { visible: (id: string) => matches.has(id) } : {},
+  )) {
+    const entry = byId.get(piece.id)!;
+    if (piece.kind === "rule") {
+      list.append(turnRule(entry, deps, piece.opening));
+      continue;
+    }
     list.append(renderEntry(entry, state, deps));
-    first = false;
   }
   if (state.searchQuery && !matches.size) {
     list.append(el("p", "empty", t("No message contains “{0}”.", state.searchQuery)));
@@ -498,7 +491,22 @@ function renderEntry(entry: UiEntry, state: UiState, deps: ChatDeps): HTMLElemen
     }),
   );
   if (entry.role === "user") {
+    // ⚠️ The way back, ON the question as well as on the rule above it — and the duplication is the
+    // fix rather than clutter.
+    //
+    // The rule carrying the restore sits at the TOP of its turn, so for the first question of a
+    // conversation it sits at the top of the whole transcript. The panel opens scrolled to the end,
+    // which means that control is above the fold on every conversation longer than one screen. It
+    // was reported as missing three times, and a photograph of a one-exchange conversation settled
+    // it: the button is there, 24px above the first visible pixel. A control reachable only by
+    // scrolling to the very top of a long conversation is a control nobody finds.
     actions.append(
+      button({
+        icon: ICON.restore,
+        title: t("Go back to before this question"),
+        className: "btn icon-only",
+        onClick: () => deps.send({ type: "restoreCheckpoint", id: entry.id }),
+      }),
       button({ icon: ICON.edit, title: t("Edit and resend"), className: "btn icon-only", onClick: () => startEdit(entry, deps) }),
       // Asking the same thing again, unchanged. Distinct from editing: the commonest reason to want
       // another answer is that the first one was poor, not that the question was.

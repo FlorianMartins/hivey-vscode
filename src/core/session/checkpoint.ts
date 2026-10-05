@@ -172,3 +172,39 @@ export function turnBoundary(role: "user" | "assistant", isFirst: boolean): { re
   if (role !== "user") return undefined;
   return { restore: true, line: !isFirst };
 }
+
+/** One thing the transcript draws, in order. */
+export type TranscriptPiece =
+  | { kind: "rule"; id: string; opening: boolean }
+  | { kind: "entry"; id: string };
+
+/**
+ * What the transcript emits, as a list, without a DOM.
+ *
+ * ⚠️ This exists because "the first question has a restore" was reported as false THREE times while
+ * the code said it was true. `turnBoundary` had a test and returned `{ restore: true }` for the
+ * opening turn, and that test could not see whether the renderer called it, skipped the entry
+ * first, or drew the result at all. A decision that is tested in isolation and applied in a loop
+ * nothing tests is a decision nobody has checked.
+ *
+ * So the loop's own output is a value. The renderer turns these into nodes and does nothing else.
+ *
+ * @param entries the conversation, in order.
+ * @param opts `visible` filters by search; `streaming` is drawn by the live turn, not here.
+ */
+export function transcriptPieces(
+  entries: Array<{ id: string; role: "user" | "assistant"; streaming?: boolean }>,
+  opts: { visible?: (id: string) => boolean } = {},
+): TranscriptPiece[] {
+  const out: TranscriptPiece[] = [];
+  let first = true;
+  for (const entry of entries) {
+    if (opts.visible && !opts.visible(entry.id)) continue;
+    if (entry.streaming) continue;
+    const boundary = turnBoundary(entry.role, first);
+    if (boundary?.restore) out.push({ kind: "rule", id: entry.id, opening: !boundary.line });
+    out.push({ kind: "entry", id: entry.id });
+    first = false;
+  }
+  return out;
+}

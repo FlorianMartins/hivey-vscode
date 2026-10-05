@@ -2,6 +2,39 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 1.0.1 — 2026-10-05
+
+### Corrigé
+
+- **⚠️⚠️ « Il n'y a toujours pas le restore sur le premier message » — signalé trois fois, et le code
+  disait trois fois qu'il était là.** Il l'était. Une photographie d'une conversation à un seul
+  échange a tranché : le bouton existe, **24 px au-dessus du premier pixel visible**.
+
+  La règle qui porte le retour est dessinée en **haut** de son tour, donc pour la première question
+  elle est en haut de tout le fil — et le panneau s'ouvre défilé **en bas**. Sur n'importe quelle
+  conversation qui dépasse d'un écran, ce contrôle est au-dessus de la ligne de flottaison. Un
+  contrôle qu'on n'atteint qu'en remontant tout en haut d'une longue conversation est un contrôle que
+  personne ne trouve.
+
+  Le retour est donc aussi **sur la question elle-même**, dans sa rangée d'actions, atteignable sans
+  défiler nulle part. La duplication est le correctif, pas de l'encombrement.
+
+- ⚠️ **Et la raison pour laquelle trois corrections n'ont rien corrigé** : `turnBoundary` avait un
+  test qui disait « la première question est restaurable », et ce test ne pouvait pas voir si le
+  rendu l'appelait, sautait l'entrée avant, ou dessinait quoi que ce soit. *Une décision testée
+  isolément et appliquée dans une boucle que rien ne teste est une décision que personne n'a
+  vérifiée.* L'ordre du fil est maintenant une **valeur** (`transcriptPieces`), testée sans DOM, et
+  le rendu ne fait plus que transformer des valeurs en nœuds.
+
+- Le fil gagne de l'air en haut : une première ligne collée au cadre se lit comme coupée, quoi qu'il
+  en soit par ailleurs.
+
+### Mesuré
+
+- La séquence de capture photographie un **premier échange** (`premier`). Toutes les autres images
+  montrent un fil défilé en bas, donc le haut — et le retour du tour d'ouverture — n'avait jamais été
+  sur une photo. C'est cette image, et elle seule, qui a réglé la question.
+
 ## 1.0.0 — 2026-10-05
 
 ### Corrigé — le mode agent, pour de bon

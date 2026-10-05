@@ -4442,3 +4442,18 @@ pre.code code {
   gap: var(--sp-2);
   margin-top: var(--sp-3);
 }
+
+/* Room above the first turn.
+ *
+ * ⚠️ The transcript opens scrolled to its end, and the restore for the FIRST question sits at the
+ * very top of the content. With six pixels of padding, a conversation that overflows by a hair clips
+ * it — which is how a control that exists, and has a test saying it exists, was reported missing
+ * three times. A photograph of a one-exchange conversation showed it 24px above the first visible
+ * pixel.
+ *
+ * The padding is not the whole answer (the restore is now on the question itself too, where it is
+ * reachable without scrolling anywhere), but a transcript whose first line is flush against the frame
+ * reads as cut off whatever else is true. */
+.transcript {
+  padding-top: var(--sp-4);
+}

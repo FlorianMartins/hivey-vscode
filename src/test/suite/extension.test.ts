@@ -2080,6 +2080,12 @@ suite("Screenshot", () => {
       // streaming, the second question was dropped, and the frame came back with one exchange in
       // it and nothing to see.
       await new Promise((r) => setTimeout(r, 12_000));
+      // ⚠️ ONE exchange, photographed before the second question. Every other frame shows a
+      // transcript scrolled to its end, so the TOP of it — and the way back out of the opening turn —
+      // has never been in a picture. Florian reported the first message having no restore twice, and
+      // both times the code said it had one: `turnBoundary` returns `{restore: true}` for it and has
+      // a test. What was missing was a photograph of the only state that settles it.
+      await announce("premier");
       await vscode.commands.executeCommand("hiveyCode.askWith", "And the rounding of the VAT itself?");
       await new Promise((r) => setTimeout(r, 12_000));
       // Pinned, so the photograph carries the answer to "how do I know it is pinned?" — reported

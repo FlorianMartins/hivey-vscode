@@ -17,6 +17,7 @@ import {
   turnBoundary,
   type FileSnapshot,
   restoreIsComplete,
+  transcriptPieces,
 } from "../src/core/session/checkpoint.js";
 
 const WORDS = {
@@ -154,4 +155,63 @@ test("restoreIsComplete is false as soon as anything was left out", () => {
   assert.equal(restoreIsComplete({ id: "1", role: "user" }), true);
   assert.equal(restoreIsComplete({ id: "1", role: "user", checkpointPartial: true }), false);
   assert.equal(restoreIsComplete({ id: "1", role: "user", checkpointCommands: 1 }), false);
+});
+
+test("the transcript draws a restore above the FIRST question", () => {
+  // ⚠️⚠️ The assertion that should have existed three reports ago. `turnBoundary` had a test saying
+  // the opening turn is restorable, and it could not see whether the renderer called it, skipped the
+  // entry first, or drew anything at all. Reported false three times while the code said true.
+  const pieces = transcriptPieces([
+    { id: "q1", role: "user" },
+    { id: "a1", role: "assistant" },
+    { id: "q2", role: "user" },
+    { id: "a2", role: "assistant" },
+  ]);
+  assert.deepEqual(pieces, [
+    { kind: "rule", id: "q1", opening: true },
+    { kind: "entry", id: "q1" },
+    { kind: "entry", id: "a1" },
+    { kind: "rule", id: "q2", opening: false },
+    { kind: "entry", id: "q2" },
+    { kind: "entry", id: "a2" },
+  ]);
+});
+
+test("a conversation of one question still offers its way back", () => {
+  // The state a fresh conversation is in for its entire first turn — and the turn where the agent
+  // works on an untouched repository, so the one most worth undoing.
+  const pieces = transcriptPieces([{ id: "q1", role: "user" }]);
+  assert.deepEqual(pieces, [
+    { kind: "rule", id: "q1", opening: true },
+    { kind: "entry", id: "q1" },
+  ]);
+});
+
+test("the answer being streamed is left to the live turn, and does not consume `first`", () => {
+  // A streaming entry is drawn elsewhere. If skipping it also advanced the "is this the first entry"
+  // flag, the opening question would lose its rule the moment an answer began arriving.
+  const pieces = transcriptPieces([
+    { id: "a0", role: "assistant", streaming: true },
+    { id: "q1", role: "user" },
+  ]);
+  assert.deepEqual(pieces, [
+    { kind: "rule", id: "q1", opening: true },
+    { kind: "entry", id: "q1" },
+  ]);
+});
+
+test("a search that hides the first question makes the next visible one the opening", () => {
+  // Whatever is drawn first is what has nothing above it, so that is where the line is dropped —
+  // otherwise a filtered transcript opens with a rule separating it from nothing.
+  const pieces = transcriptPieces(
+    [
+      { id: "q1", role: "user" },
+      { id: "q2", role: "user" },
+    ],
+    { visible: (id) => id === "q2" },
+  );
+  assert.deepEqual(pieces, [
+    { kind: "rule", id: "q2", opening: true },
+    { kind: "entry", id: "q2" },
+  ]);
 });
