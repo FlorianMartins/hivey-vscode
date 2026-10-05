@@ -166,5 +166,5 @@
   "config.dictation.language": "A language hint for the recogniser, such as `fr`. Empty lets it decide.",
   "config.appearance": "How the panel is painted.",
   "config.appearance.editor": "Take the colours of your VS Code theme, so the panel belongs to the editor it is docked in.",
-  "config.appearance.hivey": "Hivey's own palette: a deep blue-black base with amber as the accent."
+  "config.appearance.hivey": "Hivey's own surfaces and accents: amber on a cool, low-contrast base. The editor still owns the window's background colour, and a light theme keeps the editor's appearance."
 }

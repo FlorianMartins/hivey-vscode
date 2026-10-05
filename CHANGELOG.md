@@ -79,11 +79,15 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
   personne n'a relue. (Pas la Web Speech API : elle est inerte dans Electron.)
 
 - **Deux apparences.** `hiveyCode.appearance` vaut `editor` (emprunter le thème, par défaut) ou
-  `hivey` (base bleu-noir, ambre en accent). ⚠️⚠️ VS Code n'injecte pas le thème dans une feuille de
-  style mais en **style en ligne** sur l'élément racine, qui bat tous les sélecteurs : la première
-  version a échoué et **la capture est revenue identique au pixel près**. D'où la règle — *une
-  apparence décrite en prose est une apparence que personne ne peut vérifier* — et le script de
-  capture photographie maintenant les deux.
+  `hivey` (surfaces et accents propres au produit, ambre sur une base froide). ⚠️⚠️ VS Code n'injecte
+  pas le thème dans une feuille de style mais en **style en ligne** sur l'élément racine, qui bat tous
+  les sélecteurs : la première version a échoué et **la capture est revenue identique au pixel près**.
+  Et même corrigée, la capture suivante a montré la **vraie limite** : le fond du panneau est peint
+  par VS Code **en dehors du document** que l'extension contrôle, donc `hivey` restyle ce que cette
+  feuille dessine **par-dessus la base de l'éditeur**. La promesse a été corrigée partout plutôt que
+  l'effet maquillé, et **un thème clair garde l'apparence de l'éditeur** — une palette sombre sur un
+  fond clair qu'on ne peut pas changer n'est pas un style, c'est un défaut de contraste. D'où la règle
+  — *une apparence décrite en prose est une apparence que personne ne peut vérifier*.
   [`ADR-0040`](docs/adr/0040-deux-apparences-et-un-style-en-ligne.md).
 
 - **La bascule de langue atteint tout l'extension.** `t()` résolu à l'appel ne suffisait pas : un

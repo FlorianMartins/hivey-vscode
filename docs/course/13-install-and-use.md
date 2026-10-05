@@ -112,7 +112,12 @@ throws it away: changing your mind mid-sentence is not a request to transcribe.
 | Value | What it does |
 |---|---|
 | `editor` (default) | The panel takes the colours of **your** VS Code theme. |
-| `hivey` | The product's own palette: a deep blue-black base with amber as the accent. |
+| `hivey` | The product's own surfaces and accents: amber on a cool base. |
+
+⚠️ Two limits, measured from a capture of the real panel rather than asserted: **the window's
+background colour stays the editor's** — VS Code paints it outside the document the extension
+controls — and **a light theme keeps the editor's appearance**, because a palette tuned for a dark
+base laid over a light one is not a style, it is a contrast failure.
 
 The default is not an accident. A panel docked next to the file tree and the terminal that ignores
 your theme reads as a foreign object — a decision taken early in this project. The `hivey` appearance

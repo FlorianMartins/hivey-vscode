@@ -117,7 +117,12 @@ n'est pas une demande de transcription.
 | Valeur | Ce que ça fait |
 |---|---|
 | `editor` (défaut) | Le panneau reprend les couleurs de **votre thème** VS Code. |
-| `hivey` | La palette propre au produit : base bleu-noir profonde, ambre en accent. |
+| `hivey` | Les surfaces et accents propres au produit : ambre sur une base froide. |
+
+⚠️ Deux limites, mesurées sur une capture du vrai panneau plutôt qu'affirmées : **la couleur de fond
+de la fenêtre reste celle de l'éditeur** — VS Code la peint en dehors du document que l'extension
+contrôle — et **un thème clair conserve l'apparence de l'éditeur**, parce qu'une palette réglée pour
+un fond sombre posée sur un fond clair n'est pas un style, c'est un défaut de contraste.
 
 Le défaut n'est pas un hasard. Un panneau ancré à côté de l'arborescence et du terminal qui ignore
 votre thème se lit comme un corps étranger — c'est une décision prise tôt dans le projet. L'apparence

@@ -748,6 +748,30 @@ watchScrolling();
 
 // ── Messages from the extension ──────────────────────────────────────────────────────────────
 
+/**
+ * Paint the panel with Hivey's palette, or with the editor's.
+ *
+ * ⚠️ TWO THINGS MEASURED FROM A CAPTURE, both of which changed what this does.
+ *
+ * First, the attribute belongs here and not only on the `<html>` the extension builds: that HTML is
+ * produced once, and a panel already open does not rebuild it, so changing the setting appeared to do
+ * nothing.
+ *
+ * Second — and this is the honest limit — the panel's BASE BACKGROUND is not painted by our
+ * stylesheet. VS Code paints the webview's own surface outside the document we control, so the Hivey
+ * appearance restyles what this stylesheet draws (surfaces, borders, accents, states) on top of the
+ * editor's base. That was found the only way it could be: the capture came back with the accents
+ * changed and the background identical.
+ *
+ * Which is why a LIGHT theme keeps the editor's appearance whatever the setting says. A palette tuned
+ * for a dark base, laid over a light one we cannot change, is not a style — it is a contrast failure,
+ * and the setting would be a way to make the panel unreadable.
+ */
+function applyAppearance(wanted: "editor" | "hivey"): void {
+  const light = document.body.classList.contains("vscode-light") || document.body.classList.contains("vscode-high-contrast-light");
+  document.documentElement.dataset["appearance"] = wanted === "hivey" && !light ? "hivey" : "editor";
+}
+
 window.addEventListener("message", (event: MessageEvent<ToPanel>) => {
   const m = event.data;
   switch (m.type) {
@@ -757,7 +781,7 @@ window.addEventListener("message", (event: MessageEvent<ToPanel>) => {
       // BUILT, which is once — and a panel that is already open does not rebuild, so the setting
       // appeared to do nothing. This is the half that cannot fail, and it is also what lets the
       // appearance change without a reload.
-      document.documentElement.dataset["appearance"] = m.state.appearance ?? "editor";
+      applyAppearance(m.state.appearance ?? "editor");
       // The extension is the authority on whether a turn is running. A panel that believed its own
       // flag could sit on a stop button for the rest of the conversation with nothing behind it.
       setStreaming(m.state.busy);

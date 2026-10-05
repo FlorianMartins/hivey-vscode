@@ -42,6 +42,18 @@ prose est une apparence que personne ne peut vérifier.* Le script de capture ph
 les deux.
 
 `!important` sur une déclaration bat bien un style en ligne, et c'est la seule chose qui le fasse.
+
+⚠️⚠️ **Et la limite que la capture suivante a révélée, qui vaut d'être écrite parce qu'elle corrige la
+promesse.** Même avec `!important`, le **fond du panneau n'a pas bougé** : VS Code peint la surface du
+webview **en dehors du document** que l'extension contrôle. Aucune CSS de ce dépôt ne l'atteint. Ce que
+l'apparence `hivey` change est donc tout ce que cette feuille dessine — surfaces, bordures, accents,
+états — **par-dessus la base de l'éditeur**. La revendication a été corrigée partout plutôt que
+l'effet maquillé, et c'est la capture qui l'a tranché : accents changés, fond identique.
+
+D'où une conséquence qui n'est pas cosmétique : **un thème clair garde l'apparence de l'éditeur**,
+quel que soit le réglage. Une palette réglée pour un fond sombre, posée sur un fond clair qu'on ne
+peut pas changer, n'est pas un style — c'est un défaut de contraste, et le réglage serait un moyen de
+rendre le panneau illisible.
 C'est pourquoi chaque ligne de ce bloc en porte un, et pourquoi le commentaire au-dessus l'explique :
 sans la raison, quelqu'un le nettoiera.
 

@@ -166,5 +166,5 @@
   "config.dictation.language": "Un indice de langue pour le reconnaisseur, par exemple `fr`. Vide le laisse décider.",
   "config.appearance": "Comment le panneau est peint.",
   "config.appearance.editor": "Reprendre les couleurs de votre thème VS Code, pour que le panneau appartienne à l’éditeur dans lequel il est ancré.",
-  "config.appearance.hivey": "La palette propre à Hivey : une base bleu-noir profonde avec l’ambre en accent."
+  "config.appearance.hivey": "Les surfaces et accents propres à Hivey : ambre sur une base froide et peu contrastée. L’éditeur garde la couleur de fond de la fenêtre, et un thème clair conserve l’apparence de l’éditeur."
 }
