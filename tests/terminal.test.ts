@@ -9,8 +9,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { cleanTerminalOutput, describeOutcome, stripAnsi, tailOutput } from "../src/core/terminal/output.js";
 
-const ESC = "";
-const BEL = "";
+const ESC = "\u001b";
+const BEL = "\u0007";
 
 test("color codes come off, the colored text stays", () => {
   const raw = `${ESC}[31mFAIL${ESC}[0m src/app.test.ts`;

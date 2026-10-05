@@ -112,10 +112,27 @@ export interface StablePromptParts {
   knowledge?: string;
   /** Which skills exist. Not which one is being used. */
   skills?: string;
+  /**
+   * How to deliberate, for a model that has no thinking of its own.
+   *
+   * Stable for the life of a conversation because it is derived from the model and the chosen effort,
+   * neither of which follows the user around. Empty on a model that reasons natively — see
+   * `core/router/thinking.ts`, which is where that decision lives rather than here.
+   */
+  thinking?: string;
 }
 
 export function stablePrompt(parts: StablePromptParts): string {
-  return [parts.mode, parts.workspace, parts.houseRules, parts.knowledge ? `\n${parts.knowledge}\n` : "", parts.skills]
+  return [
+    parts.mode,
+    // Right after the mode: how to think belongs with what you are, and before the repository's own
+    // rules, which may contradict it and should win when they do.
+    parts.thinking ? `\n\n${parts.thinking}\n` : "",
+    parts.workspace,
+    parts.houseRules,
+    parts.knowledge ? `\n${parts.knowledge}\n` : "",
+    parts.skills,
+  ]
     .filter(Boolean)
     .join("");
 }

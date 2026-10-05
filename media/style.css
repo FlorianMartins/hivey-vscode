@@ -3189,6 +3189,14 @@ pre.code code {
   top: 50%;
   border-top: 1px solid var(--border);
 }
+/* The transcript's first question has no previous turn to be separated from, so it gets no line —
+   but it keeps the restore, which is not a separator and was the thing being lost here. */
+.turn-rule.opening {
+  margin-top: var(--sp-2);
+}
+.turn-rule.opening::before {
+  display: none;
+}
 
 .checkpoint-btn {
   position: relative;

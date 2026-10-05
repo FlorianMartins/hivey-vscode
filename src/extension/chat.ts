@@ -103,6 +103,7 @@ import { EgressGate, safeHost, summarize } from "./egress.js";
 import { renderPromptAudit, type PromptAudit } from "../core/audit/prompt.js";
 import { youShouldKnow, type Notice } from "../core/session/notices.js";
 import { MUTATING_TOOLS, VERIFIER_TOOLS } from "../core/router/outcome.js";
+import { effortToSend, promptedThinking, splitThinkingText, thinkingMode, thinkingSplitter } from "../core/router/thinking.js";
 import { planVerdict } from "../core/agent/plan.js";
 import { contextWindow, labelFor, listModels, openFiles, openFileUris, ownModelIds, supportsReasoning } from "./models.js";
 import { servedSetChanged } from "../core/models/watch.js";
@@ -525,6 +526,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       ...(e.usage ? { usage: e.usage } : {}),
       ...(e.checkpoint?.length ? { checkpointFiles: e.checkpoint.length } : {}),
       ...(e.checkpointPartial ? { checkpointPartial: true } : {}),
+      ...(e.checkpointCommands ? { checkpointCommands: e.checkpointCommands } : {}),
       ...(e.plan ? { plan: e.plan } : {}),
       reasoning: e.reasoning,
       steps: e.steps,
@@ -3051,13 +3053,27 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       return;
     }
 
+    const commands = entry.checkpointCommands ?? 0;
+    const words = {
+      files: (n: number) => t("{0} file(s) go back to how they were.", n),
+      created: (n: number) => t("{0} file(s) created by that turn are deleted.", n),
+      partial: t("Some changes were too large to record and will NOT be undone."),
+      // Named, and with the count, because the honest version of this sentence is the whole reason
+      // the count is kept: a restore that silently leaves a formatter's rewrite in place puts the
+      // repository into a state it was never in.
+      commands: (n: number) =>
+        t("⚠️ {0} command(s) also ran. Whatever they changed is NOT recorded and will NOT be undone.", n),
+    };
     const detail = snapshots.length
-      ? describeRestore(snapshots, Boolean(entry.checkpointPartial), {
-          files: (n) => t("{0} file(s) go back to how they were.", n),
-          created: (n) => t("{0} file(s) created by that turn are deleted.", n),
-          partial: t("Some changes were too large to record and will NOT be undone."),
-        })
-      : t("That turn changed no file, so nothing on disk moves.");
+      ? describeRestore(snapshots, Boolean(entry.checkpointPartial), words, commands)
+      : commands
+        ? // The worst case, and the one that used to read "nothing on disk moves": the turn's only
+          // writes came from commands, so there is nothing to put back and plenty that changed.
+          t(
+            "That turn called no edit tool, so there is nothing to put back — but {0} command(s) ran, and whatever they changed stays.",
+            commands,
+          )
+        : t("That turn changed no file, so nothing on disk moves.");
     const go = t("Restore");
     const answer = await vscode.window.showWarningMessage(
       t("Go back to before “{0}”?", entry.text.trim().split("\n")[0]!.slice(0, 60)),
@@ -3097,6 +3113,32 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     if (snapshots.length && !(await vscode.workspace.applyEdit(edit))) {
       void vscode.window.showErrorMessage(t("The files could not be restored; the conversation is unchanged."));
       return;
+    }
+
+    // ⚠️⚠️ AND SAVE. A `WorkspaceEdit` writes to the editor's in-memory documents, not to disk: the
+    // buffers show the old content while every file on disk still holds the agent's version. That
+    // is the defect Florian reported as "le restore to checkpoint ne semble pas revert le code" —
+    // and it is the worst shape a bug can take here, because the screen says it worked. Everything
+    // that reads from disk disagrees: the compiler, a watcher rebuilding a stylesheet, git, the next
+    // shell command. Worse, closing the window without saving loses the restore entirely.
+    //
+    // Saving keeps the undo stack intact, so the promise on the dialog still holds: Ctrl+Z undoes
+    // the rollback, it just needs saving again. The alternative — relying on the user's
+    // `files.refactoring.autoSave` — makes a recovery operation correct only for some settings.
+    const unsaved: string[] = [];
+    for (const snap of snapshots) {
+      if (snap.before === undefined) continue; // Deleted on purpose; there is nothing to save.
+      const uri = vscode.Uri.joinPath(folder!.uri, snap.path);
+      const doc = vscode.workspace.textDocuments.find((d) => d.uri.toString() === uri.toString());
+      if (!doc?.isDirty) continue;
+      if (!(await doc.save())) unsaved.push(snap.path);
+    }
+    if (unsaved.length) {
+      // Named, not counted. "Some files could not be saved" sends somebody looking through the whole
+      // change; the paths say exactly which ones are still showing one thing and holding another.
+      void vscode.window.showWarningMessage(
+        t("Restored in the editor but NOT saved to disk: {0}. Save them, or the files on disk still hold the change.", unsaved.join(", ")),
+      );
     }
 
     const restoredFiles = snapshots.length;
@@ -3527,8 +3569,26 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     });
     // Named rather than inlined, because the card that asks the user to consent has to be able to
     // say how big each of them is. A number nobody can attribute is a number nobody can act on.
+    // ⚠️ The provider's own thinking by default; the prompted kind ONLY where there is none. Asking a
+    // model that reasons natively to also deliberate in the prompt makes it think twice, pay for
+    // both, and spend the answer budget competing with its own reasoning. See `router/thinking.ts`.
+    //
+    // It belongs in the cacheable prefix because it is derived from the model and the chosen effort,
+    // neither of which follows the user around. A model change invalidates the prefix, which costs
+    // nothing: a different model has a different cache anyway.
+    //
+    // ⚠️ Decided from the CONFIGURED model, not the routed one: the prefix is assembled before
+    // `route()` picks an endpoint, and it has to be, because the prompt is part of what the routing
+    // budget is computed from. The same resolution the panel uses to decide whether to show the
+    // reasoning control at all (`reasoningAvailable`), so the control and the prompt cannot disagree.
+    // A mid-turn fallback to a different model therefore keeps this prefix — which is right: the
+    // alternative is rebuilding and re-sending the whole conversation to change one paragraph.
+    const thinkingFor = hiveyModel(settings.chat.model, "everyday");
+    const thinkingHow =
+      thinkingMode(thinkingFor, this.reasoning) === "prompted" ? promptedThinking(this.reasoning) : "";
     const systemPrompt = stablePrompt({
         mode: promptForMode(mode),
+        ...(thinkingHow ? { thinking: thinkingHow } : {}),
         workspace: workspaceNote(),
         houseRules,
         knowledge: learned,
@@ -3797,6 +3857,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       // See `streamingRestorer`.
       const liveText = streamingRestorer((text) => vault.restore(text));
       const liveThought = streamingRestorer((text) => vault.restore(text));
+      // ⚠️ Prompted deliberation arrives in the TEXT channel, because a model with no native thinking
+      // has no other channel to put it in. Without this the user reads the model's working-out as its
+      // answer — the same failure shape as a tool call written into the message. Only built when the
+      // instruction was actually sent: a splitter running on a native-reasoning model would be
+      // scanning every token for delimiters nobody asked for.
+      const splitThinking = thinkingHow ? thinkingSplitter() : undefined;
 
       // One attempt, wrapped so it can be repeated against a different endpoint. See the catch below.
       const attempt = (
@@ -3811,7 +3877,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         tools,
         signal: ctl.signal,
         maxTokens: outputTokens,
-        reasoning: this.reasoning,
+        // Never an effort a model cannot use. The control is hidden when `canReason` is false, but a
+        // stored preference survives a model change — so switching to a plain model went on sending
+        // `effort: "high"` to an endpoint with no idea what to do with it. Hidden is not unsent.
+        reasoning: effortToSend(useModel, this.reasoning),
         // Asked once, when the model stops calling tools: it changed files and ran nothing, so
         // finish it. The cheap middle between telling the user and escalating to a billed model.
         selfCheck: (trace) =>
@@ -3831,8 +3900,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         // screen by then — text from the question the user gave up on, appearing under the next one.
         onDelta: (d) => {
           if (ctl.signal.aborted) return;
-          if (d.text) {
-            streamed += d.text;
+          // Split before anything else sees it, so `streamed` — which becomes the saved answer —
+          // never contains the deliberation.
+          const split = splitThinking && d.text ? splitThinking.push(d.text) : undefined;
+          const deltaText = split ? split.text : d.text;
+          const deltaThought = (d.reasoning ?? "") + (split?.reasoning ?? "");
+          if (deltaText) {
+            streamed += deltaText;
             // Kept on the entry as it arrives, not only at the end. What is on screen during a turn
             // is a live element the next redraw discards; the entry is what survives one. Without
             // this, stopping — which redraws immediately — showed an empty answer under the
@@ -3840,12 +3914,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             answer.text = vault.restore(streamed);
             // Placeholders are resolved as they stream, so the user never reads their own data
             // through a marker — including one the packet boundary cut in two.
-            const shown = liveText.push(d.text);
+            const shown = liveText.push(deltaText);
             if (shown) this.post({ type: "delta", text: shown });
           }
-          if (d.reasoning) {
-            thought += d.reasoning;
-            const shownThought = liveThought.push(d.reasoning);
+          if (deltaThought) {
+            thought += deltaThought;
+            const shownThought = liveThought.push(deltaThought);
             if (shownThought) this.post({ type: "reasoning", text: shownThought });
           }
         },
@@ -3911,6 +3985,22 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         result = await this.runFallback(chain, settings, { provider: providerId, model, why: "" }, attempt, ctl);
       }
 
+      // The splitter's tail, BEFORE the restorers: an unterminated deliberation goes to the reasoning
+      // channel, never to the answer. See `thinkingSplitter().flush`.
+      if (splitThinking) {
+        const tail = splitThinking.flush();
+        if (tail.text) {
+          streamed += tail.text;
+          const shown = liveText.push(tail.text);
+          if (shown && !ctl.signal.aborted) this.post({ type: "delta", text: shown });
+        }
+        if (tail.reasoning) {
+          thought += tail.reasoning;
+          const shownThought = liveThought.push(tail.reasoning);
+          if (shownThought && !ctl.signal.aborted) this.post({ type: "reasoning", text: shownThought });
+        }
+      }
+
       // Whatever the restorers were still holding. Not lost, and not shown raw: a stream that ends
       // mid-marker — a model that stops talking, a turn the user stops — still owes the reader the
       // characters it was waiting on.
@@ -3956,7 +4046,17 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       this.cacheSeen.prompt += result.usage.promptTokens;
       this.cacheSeen.cached += result.usage.cachedTokens;
 
-      answer.text = result.text || streamed;
+      // ⚠️ `result.text` is the provider's RAW reply and still carries the deliberation block; only
+      // `streamed` went through the splitter. Taking the raw field would strip the block from the
+      // screen and then write it back into the saved transcript — visible on reopening, and sent to
+      // the model on the next turn as if it were the answer.
+      if (splitThinking && result.text) {
+        const whole = splitThinkingText(result.text);
+        answer.text = whole.text || streamed;
+        if (whole.reasoning && !thought.includes(whole.reasoning)) thought = whole.reasoning;
+      } else {
+        answer.text = result.text || streamed;
+      }
       if (this.plan) answer.plan = this.plan;
       // "À savoir": what it noticed, what it did not verify, and the state of the tool. Two of the
       // three are derived from facts already in hand rather than asked of the model — a section that
@@ -3989,6 +4089,19 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       };
       if (thought) answer.reasoning = thought;
       if (steps.length) answer.steps = steps;
+
+      // ⚠️ What a command did is NOT in the checkpoint, and the restore dialog has to say so. The
+      // checkpoint is built in `confirmEdit`, so it holds exactly what the edit tools touched; a
+      // command is opaque, and `prettier --write`, `sed -i`, a codemod or a build that regenerates a
+      // stylesheet rewrite files nothing snapshotted. Counted here, at the end of the turn, because
+      // this is where the turn's steps exist and `checkpointFor` is still set.
+      if (this.checkpointFor) {
+        const ran = steps.filter((x) => x.tool === "run_command" && x.ok).length;
+        if (ran) {
+          const entry = this.session.get(this.checkpointFor);
+          if (entry) entry.checkpointCommands = (entry.checkpointCommands ?? 0) + ran;
+        }
+      }
 
       if (!isLocal) {
         const cost = costOf(result.usage, this.priceLookup(model));

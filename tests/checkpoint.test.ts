@@ -14,10 +14,13 @@ import {
   MAX_FILE_BYTES,
   totalBytes,
   trimCheckpoints,
+  turnBoundary,
   type FileSnapshot,
+  restoreIsComplete,
 } from "../src/core/session/checkpoint.js";
 
 const WORDS = {
+  commands: (n: number) => `${n} commands not undone`,
   files: (n: number) => `${n} files back`,
   created: (n: number) => `${n} deleted`,
   partial: "some changes were too large",
@@ -107,4 +110,48 @@ test("the description separates files put back from files deleted", () => {
 test("a partial checkpoint says so before the button is pressed, not after", () => {
   assert.match(describeRestore([{ path: "a", before: "x" }], true, WORDS), /too large/);
   assert.doesNotMatch(describeRestore([{ path: "a", before: "x" }], false, WORDS), /too large/);
+});
+
+test("the transcript's FIRST question still offers a way back", () => {
+  // ⚠️ The defect this pins, reported by Florian: "sur le premier message d'une conversation il n'y
+  // a pas de reverse possible". The transcript drew the restore on the separating line between two
+  // turns, and skipped that line above the first question — correctly, there being nothing above it
+  // to separate. The restore went with it, so no conversation could undo its opening turn: the one
+  // turn where the agent works on an untouched repository, and therefore the one most worth undoing.
+  const opening = turnBoundary("user", true);
+  assert.equal(opening?.restore, true, "the first question must be restorable");
+  assert.equal(opening?.line, false, "and must not draw a line it has nothing to separate from");
+});
+
+test("a later question gets both the line and the way back", () => {
+  assert.deepEqual(turnBoundary("user", false), { restore: true, line: true });
+});
+
+test("an answer starts no turn, so it gets neither", () => {
+  // The boundary belongs to the question. Drawing it on the answer would put a restore between a
+  // question and its own reply, which is not a point the conversation was ever at.
+  assert.equal(turnBoundary("assistant", false), undefined);
+  assert.equal(turnBoundary("assistant", true), undefined);
+});
+
+test("a restore that leaves a command's work behind says so", () => {
+  // ⚠️ The hole a checkpoint cannot cover. It is built in `confirmEdit`, so it holds exactly what
+  // the EDIT TOOLS touched; nothing knows which files `prettier --write`, `sed -i` or a build that
+  // regenerates a stylesheet will rewrite before they run. Restoring puts the tool edits back and
+  // leaves the rest, and the dialog has to say that before the button is pressed, not after.
+  const said = describeRestore([{ path: "a.ts", before: "x" }], false, WORDS, 3);
+  assert.match(said, /1 files back/);
+  assert.match(said, /3 commands not undone/);
+});
+
+test("no commands, no sentence about commands", () => {
+  const said = describeRestore([{ path: "a.ts", before: "x" }], false, WORDS, 0);
+  assert.equal(/commands/.test(said), false);
+});
+
+test("restoreIsComplete is false as soon as anything was left out", () => {
+  // The two holes are different and either one is enough to make a rollback partial.
+  assert.equal(restoreIsComplete({ id: "1", role: "user" }), true);
+  assert.equal(restoreIsComplete({ id: "1", role: "user", checkpointPartial: true }), false);
+  assert.equal(restoreIsComplete({ id: "1", role: "user", checkpointCommands: 1 }), false);
 });

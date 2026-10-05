@@ -67,6 +67,8 @@ export interface UiEntry {
   checkpointFiles?: number;
   /** True when the checkpoint could not hold everything the turn changed. */
   checkpointPartial?: boolean;
+  /** How many commands ran, whose effects no checkpoint holds. The restore says so before it runs. */
+  checkpointCommands?: number;
   /** The to-do list the agent kept while answering this turn. */
   plan?: Plan;
   /**

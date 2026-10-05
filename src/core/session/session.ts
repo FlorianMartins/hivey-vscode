@@ -94,6 +94,14 @@ export interface Entry {
   checkpoint?: FileSnapshot[];
   /** True when the turn changed something too large to hold. Restoring is then incomplete, and says so. */
   checkpointPartial?: boolean;
+  /**
+   * How many shell commands this turn ran.
+   *
+   * ⚠️ A command is the hole a checkpoint cannot cover: nothing knows which files `prettier --write`
+   * or a build will rewrite before it runs, so none of them are snapshotted. Kept so the restore
+   * dialog can say what it will leave behind — see `checkpoint.ts`.
+   */
+  checkpointCommands?: number;
   /** The to-do list the agent kept while answering. Never sent back to the model. */
   plan?: Plan;
   /**

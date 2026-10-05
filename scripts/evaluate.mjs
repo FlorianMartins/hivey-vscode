@@ -309,6 +309,9 @@ async function main() {
     let at;
     let endpoint;
     let partial = false;
+    // Every run's own date. The header used to carry whichever file was read LAST, which above rows
+    // measured days apart is simply false. See `describeWhen`.
+    const span = [];
     for (const one of files) {
       const saved = JSON.parse(await readFile(one, "utf8"));
       // Each run's own label, recorded when it ran. `--as` overrides only when there is one file:
@@ -316,7 +319,10 @@ async function main() {
       const label = files.length === 1 ? override || saved.as : saved.as;
       rows.push(...rowsFromOutcomes(saved.results ?? [], label || undefined));
       models.push(...(saved.models ?? []));
-      at = saved.at;
+      if (saved.at) span.push(saved.at);
+      // The newest, not the last read: with several files the order on the command line is not a
+      // chronology, and `at` is what a single-run table prints.
+      if (saved.at && (!at || saved.at > at)) at = saved.at;
       endpoint = saved.endpoint;
       if (saved.complete === false) partial = true;
     }
@@ -331,6 +337,7 @@ async function main() {
       models: [...new Set(models)],
       taskCount: tasks.length,
       rows,
+      ...(span.length > 1 ? { span } : {}),
       ...(caveats.length ? { caveats } : {}),
     });
     console.log(`written: ${out}${partial ? "  (one of these runs did not finish)" : ""}`);

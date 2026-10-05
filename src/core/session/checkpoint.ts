@@ -81,6 +81,21 @@ export interface CheckpointBearer {
   checkpoint?: FileSnapshot[];
   /** True when something the turn changed could not be held. Restoring is then partial, and says so. */
   checkpointPartial?: boolean;
+  /**
+   * How many shell commands the turn ran.
+   *
+   * ⚠️ Separate from `checkpointPartial` because it is a different, larger hole and it needs its own
+   * sentence. A checkpoint is built in `confirmEdit` — the moment the user approves an edit — so it
+   * holds exactly the files the EDIT TOOLS touched. A command is opaque: `prettier --write`, `sed
+   * -i`, a codemod, a build that regenerates a stylesheet all rewrite files nobody snapshotted,
+   * because nothing knew which files to snapshot before the command ran.
+   *
+   * Restoring then puts back the tool edits and leaves everything the command did in place, and the
+   * dialog used to say "2 file(s) go back to how they were" — or, worse, on a turn whose only writes
+   * came from a command, "that turn changed no file, so nothing on disk moves". Both are false in
+   * the direction that costs work. The count is kept so the dialog can say it.
+   */
+  checkpointCommands?: number;
 }
 
 /**
@@ -120,11 +135,40 @@ export function describeRestore(
     files: (n: number) => string;
     created: (n: number) => string;
     partial: string;
+    commands: (n: number) => string;
   },
+  commands = 0,
 ): string {
   const created = snapshots.filter((s) => s.before === undefined).length;
   const lines = [words.files(snapshots.length - created)];
   if (created) lines.push(words.created(created));
   if (partial) lines.push(words.partial);
+  // Last, and unconditional on there being snapshots: a turn whose only writes came from a command
+  // has no snapshots at all, and that is precisely the case where saying nothing is worst.
+  if (commands > 0) lines.push(words.commands(commands));
   return lines.join(" ");
+}
+
+/** Whether restoring this entry leaves known changes behind. */
+export function restoreIsComplete(entry: CheckpointBearer): boolean {
+  return !entry.checkpointPartial && !entry.checkpointCommands;
+}
+
+/**
+ * What the transcript draws above one entry: the separating line, the way back, or neither.
+ *
+ * This lives here, in tested code, because conflating the two cost every conversation the ability
+ * to undo its own first turn. The transcript used to decide both at once — `if (!first && role ===
+ * "user")` — which is correct for a SEPARATOR and wrong for everything attached to one. The line
+ * has nothing to separate at the top of a transcript; the restore has everything to undo there,
+ * since the opening turn is the one where the agent is let loose on an untouched repository.
+ *
+ * Two decisions, so two fields. A renderer cannot accidentally drop one by dropping the other.
+ *
+ * @param role the entry's role: only a question starts a turn.
+ * @param isFirst whether this is the transcript's first drawn entry.
+ */
+export function turnBoundary(role: "user" | "assistant", isFirst: boolean): { restore: boolean; line: boolean } | undefined {
+  if (role !== "user") return undefined;
+  return { restore: true, line: !isFirst };
 }

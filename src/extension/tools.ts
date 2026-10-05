@@ -10,6 +10,7 @@
 // it governs and a new tool cannot forget to have one.
 
 import * as vscode from "vscode";
+import { compilePattern } from "../core/agent/regex.js";
 import { t } from "../shared/i18n.js";
 import { parsePlan, planSummary, PLAN_TOOL_DESCRIPTION, type Plan } from "../core/agent/plan.js";
 import { NOTE_ASIDE_TOOL, type Notice } from "../core/session/notices.js";
@@ -220,7 +221,9 @@ export function buildTools(deps: ToolDeps): Tool[] {
       const glob = String(args["glob"] ?? "**/*");
       let re: RegExp;
       try {
-        re = new RegExp(pattern, "g");
+        // Same translation as the terminal client's search: one dialect difference, fixed in one
+        // place, or the two surfaces answer the same pattern differently.
+        re = compilePattern(pattern, "g");
       } catch (err) {
         return { content: `Invalid regular expression: ${(err as Error).message}`, isError: true };
       }
@@ -302,11 +305,13 @@ export function buildTools(deps: ToolDeps): Tool[] {
       const ok = await vscode.workspace.applyEdit(edit);
       ctx.report(existed ? t("edited {0}", relative(uri)) : t("created {0}", relative(uri)));
       if (!ok) return { content: "The editor refused the edit.", isError: true };
+      // Through to disk before anything reads the file. See `saveAfterEdit`.
+      const unsaved = await saveAfterEdit(uri);
       // The same report as `edit_file`: writing a whole file is at least as likely to break it as
       // replacing a snippet, and the model has even less reason to suspect it did.
       const problems = await errorsAfterEdit(uri);
       return {
-        content: `Wrote ${relative(uri)} (${content.split("\n").length} lines).${problems ? `\n${problems}` : ""}`,
+        content: `Wrote ${relative(uri)} (${content.split("\n").length} lines).${problems ? `\n${problems}` : ""}${unsaved}`,
         display: { uri: uri.toString() },
       };
     },
@@ -344,9 +349,11 @@ export function buildTools(deps: ToolDeps): Tool[] {
       const ok = await vscode.workspace.applyEdit(edit);
       ctx.report(t("edited {0}", relative(uri)));
       if (!ok) return { content: "The editor refused the edit.", isError: true };
+      // Through to disk before anything reads the file. See `saveAfterEdit`.
+      const unsaved = await saveAfterEdit(uri);
       // What the edit did, from the editor rather than from the model's opinion of its own diff.
       const problems = await errorsAfterEdit(uri);
-      return { content: `Edited ${relative(uri)}.${problems ? `\n${problems}` : ""}` };
+      return { content: `Edited ${relative(uri)}.${problems ? `\n${problems}` : ""}${unsaved}` };
     },
   };
 
@@ -378,6 +385,30 @@ export function buildTools(deps: ToolDeps): Tool[] {
       .filter((d) => d.severity === vscode.DiagnosticSeverity.Error)
       .map((d) => ({ line: d.range.start.line + 1, message: d.message }));
     return editProblems(relative(uri), errors);
+  }
+
+  /**
+   * Write an applied edit through to disk.
+   *
+   * ⚠️⚠️ A `WorkspaceEdit` lands in the editor's in-memory document, not in the file. Without this,
+   * an approved edit leaves the buffer showing the new code while the file on disk still holds the
+   * old — and the very next step of an agent turn reads the DISK: `run_command` running the tests, a
+   * watcher rebuilding a stylesheet, a compiler, git. The agent then grades itself on code it did not
+   * write, "fixes" what was never broken, and compounds. It is the quietest possible failure, because
+   * the screen is right.
+   *
+   * Saving is correct rather than merely convenient here: `confirmEdit` showed the user this exact
+   * content and they pressed Apply. Leaving it unwritten is not a second safety net, it is a
+   * divergence between what the editor shows and what every other tool reads.
+   *
+   * Returns what to tell the model when the save did not happen, so a turn that proceeds on stale
+   * bytes at least knows it is doing so.
+   */
+  async function saveAfterEdit(uri: vscode.Uri): Promise<string> {
+    const doc = vscode.workspace.textDocuments.find((d) => d.uri.toString() === uri.toString());
+    if (!doc?.isDirty) return "";
+    if (await doc.save()) return "";
+    return `\nWARNING: ${relative(uri)} was changed in the editor but could NOT be saved to disk. Commands you run will still read the old file.`;
   }
 
   const runCommand: Tool = {

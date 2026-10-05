@@ -872,7 +872,6 @@ export const FR: Record<string, string> = {
   "Skills": "Compétences",
   "They travel with the repository: commit the folder and your team has them. To send them to somebody outside it, copy them.": "Elles voyagent avec le dépôt : livrez le dossier et votre équipe les a. Pour les envoyer à quelqu’un d’extérieur, copiez-les.",
   "This repository defines no skills yet.": "Ce dépôt ne définit encore aucune compétence.",
-  "What this conversation has cost. Today's total is in the cost report.": "Ce que cette conversation a coûté. Le total du jour est dans le rapport de coûts.",
   "always": "toujours",
   "{0} skill(s) copied. Paste them into .hiveycode/skills/ on the other side.": "{0} compétence(s) copiée(s). Collez-les dans .hiveycode/skills/ de l’autre côté.",
   "{0} skill(s) in .hiveycode/skills/.": "{0} compétence(s) dans .hiveycode/skills/.",
@@ -883,6 +882,19 @@ export const FR: Record<string, string> = {
   "Restore {0} file(s) — some changes were too large to record": "Restaurer {0} fichier(s) — certains changements étaient trop volumineux pour être enregistrés",
   "Restoring needs the folder these files belong to open.": "La restauration exige que le dossier de ces fichiers soit ouvert.",
   "Some changes were too large to record and will NOT be undone.": "Certains changements étaient trop volumineux pour être enregistrés et ne seront PAS annulés.",
+  "Restored in the editor but NOT saved to disk: {0}. Save them, or the files on disk still hold the change.":
+    "Restauré dans l’éditeur mais PAS enregistré sur le disque : {0}. Enregistrez-les, sinon les fichiers sur le disque portent toujours la modification.",
+  "Restore {0} file(s) — but {1} command(s) also ran, and what they changed stays":
+    "Restaurer {0} fichier(s) — mais {1} commande(s) ont aussi tourné, et ce qu’elles ont changé reste",
+  "Rewind the conversation — {0} command(s) ran, and what they changed stays":
+    "Revenir en arrière dans la conversation — {0} commande(s) ont tourné, et ce qu’elles ont changé reste",
+  "That turn called no edit tool, so there is nothing to put back — but {0} command(s) ran, and whatever they changed stays.":
+    "Ce tour n’a appelé aucun outil d’édition, il n’y a donc rien à remettre — mais {0} commande(s) ont tourné, et ce qu’elles ont changé reste.",
+  "⚠️ {0} command(s) also ran. Whatever they changed is NOT recorded and will NOT be undone.":
+    "⚠️ {0} commande(s) ont aussi tourné. Ce qu’elles ont changé n’est PAS enregistré et NE sera PAS annulé.",
+  "{0} so far": "{0} jusqu’ici",
+  "What this whole conversation has cost, not this question: every turn re-sends the conversation, so the total grows faster than the number of questions. Today's total is in the cost report.":
+    "Ce que cette conversation entière a coûté, et non cette question : chaque tour renvoie la conversation, donc le total grandit plus vite que le nombre de questions. Le total du jour est dans le rapport de coût.",
   "The files could not be restored; the conversation is unchanged.": "Les fichiers n’ont pas pu être restaurés ; la conversation est inchangée.",
   "plan: {0}/{1}": "plan : {0}/{1}",
   "{0} file(s) created by that turn are deleted.": "{0} fichier(s) créés par ce tour seront supprimés.",

@@ -8,7 +8,7 @@ import { test } from "node:test";
 import { readdirSync, readFileSync } from "node:fs";
 import assert from "node:assert/strict";
 import { buildReport, emptyTotals, markdownReport, totalsFor, type RunRecord, type TaskOutcome } from "../src/core/eval/report.js";
-import { CONFIGURATIONS, qualityTable, rowsFromOutcomes } from "../src/core/eval/table.js";
+import { CONFIGURATIONS, qualityTable, rowsFromOutcomes, describeWhen } from "../src/core/eval/table.js";
 import { HIVEY_VARIANTS } from "../src/core/router/hivey.js";
 
 function run(over: Partial<RunRecord> = {}): RunRecord {
@@ -318,4 +318,27 @@ test("the table can say what is wrong with its own figures", () => {
   assert.ok(md.indexOf("three prompts were corrupted") < md.indexOf("| configuration |"));
   // And no block at all when there is nothing to warn about.
   assert.ok(!/Read these figures/.test(qualityTable({ taskCount: 56, at: "x", rows })));
+});
+
+test("a table built from runs days apart does not claim one date", () => {
+  // ⚠️ The header carried whichever result file was read last, so a table whose newest row was
+  // measured on the 4th could say "Taken 2026-10-03". Nobody checks a header, which is exactly why
+  // it has to be true: the figures get quoted with that date attached to all of them.
+  const said = describeWhen("2026-10-04T23:26:56Z", [
+    "2026-10-03T13:06:05Z",
+    "2026-10-04T01:01:56Z",
+    "2026-10-04T23:26:56Z",
+  ]);
+  assert.match(said, /Measured over 3 runs between 2026-10-03T13:06:05Z and 2026-10-04T23:26:56Z/);
+  assert.equal(/^Taken /.test(said), false, "a range must not be announced as a single date");
+});
+
+test("one run still says plainly when it was taken", () => {
+  assert.equal(describeWhen("2026-10-04T23:26:56Z", ["2026-10-04T23:26:56Z"]), "Taken 2026-10-04T23:26:56Z");
+  assert.equal(describeWhen("2026-10-04T23:26:56Z"), "Taken 2026-10-04T23:26:56Z");
+});
+
+test("no date recorded is said, not invented", () => {
+  // The project's rule about numbers applies to dates: absent rather than wrong.
+  assert.equal(describeWhen(undefined, []), "Taken (no date recorded)");
 });

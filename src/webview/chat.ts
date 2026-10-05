@@ -9,6 +9,7 @@
 import { button, closeMenu, el, formatTokens, icon, ICON, menu, menuItem, menuTitle, separator } from "./dom.js";
 import { markdown } from "./markdown.js";
 import { t } from "../shared/i18n.js";
+import { turnBoundary } from "../core/session/checkpoint.js";
 import { REMOTE_VENDORS, vendor } from "../core/providers/vendors.js";
 import { closeModelCombo, isModelComboOpen, openModelCombo } from "./modelCombo.js";
 import { wirePaste } from "./paste.js";
@@ -185,7 +186,15 @@ function transcript(state: UiState, deps: ChatDeps): HTMLElement {
     // The rule belongs to the transcript, not to either message it separates — it is emitted
     // between them rather than inside the question, so that a pinned answer's tint and a muted
     // turn's fade stop at the message and do not swallow the way back out of it.
-    if (!first && entry.role === "user") list.append(turnRule(entry, deps));
+    //
+    // ⚠️ Emitted for EVERY question, the first one included. It used to be skipped on the first,
+    // which was right about the line and wrong about everything attached to it: the separator has
+    // nothing to separate at the top of a transcript, but the RESTORE is not a separator. Skipping
+    // it meant no conversation had a way back out of its opening turn — the one turn where the
+    // agent is let loose on an untouched repository, and therefore the one most worth undoing. The
+    // line is dropped on the first turn; the way back is not.
+    const boundary = turnBoundary(entry.role, first);
+    if (boundary?.restore) list.append(turnRule(entry, deps, !boundary.line));
     list.append(renderEntry(entry, state, deps));
     first = false;
   }
@@ -654,20 +663,29 @@ const MARKS: Record<string, string> = {
 /**
  * The line between two turns, and the way back to before the one it introduces.
  *
- * Drawn above every question but the transcript's first, because that is where one exchange ends
- * and the next starts. A transcript is a stack of question-and-answer pairs, and until now nothing
- * said so: every entry was separated from the next by the same amount of space, so a question sat
- * as far from its own answer as from a different turn entirely. The space now goes at the
- * boundary, and the reply is pulled up close to what it answers, so a pair reads as one block.
+ * Drawn above every question. A transcript is a stack of question-and-answer pairs, and until now
+ * nothing said so: every entry was separated from the next by the same amount of space, so a
+ * question sat as far from its own answer as from a different turn entirely. The space now goes at
+ * the boundary, and the reply is pulled up close to what it answers, so a pair reads as one block.
+ *
+ * ⚠️ `opening` is the transcript's first question, and only the LINE is dropped there — there is no
+ * previous turn to separate it from. The restore stays, because it was the one thing this function
+ * carried that had nothing to do with being a separator, and hiding it left every conversation
+ * unable to undo its own opening turn.
  *
  * When the turn changed files the line carries the restore, sitting on it the way the editor's
  * chat marks a restore point — visible without hovering, unlike everything else attached to a
  * message, because it is the only one that puts files back and something that overwrites the
  * working tree should never be discovered by accident.
  */
-function turnRule(entry: Pick<UiEntry, "id" | "checkpointFiles" | "checkpointPartial">, deps: ChatDeps): HTMLElement {
+function turnRule(
+  entry: Pick<UiEntry, "id" | "checkpointFiles" | "checkpointPartial" | "checkpointCommands">,
+  deps: ChatDeps,
+  opening = false,
+): HTMLElement {
   const files = entry.checkpointFiles ?? 0;
-  const wrap = el("div", `turn-rule${files ? "" : " bare"}`);
+  const commands = entry.checkpointCommands ?? 0;
+  const wrap = el("div", `turn-rule${files ? "" : " bare"}${opening ? " opening" : ""}`);
   const action = button({
     icon: ICON.restore,
     label: t("Restore checkpoint"),
@@ -677,12 +695,18 @@ function turnRule(entry: Pick<UiEntry, "id" | "checkpointFiles" | "checkpointPar
     // chat and plan mode, and refusing it there made the restore point look like an agent feature.
     title: entry.checkpointPartial
       ? t("Restore {0} file(s) — some changes were too large to record", files)
-      : files
-        ? t("Put the {0} file(s) this turn changed back, and rewind the conversation here", files)
-        : t("Rewind the conversation to before this question — that turn changed no file"),
+      : // ⚠️ Before the `files` branch: a turn that ran commands cannot promise a clean rollback
+        // whatever else it edited, and this tooltip is where somebody decides whether to trust it.
+        commands
+        ? files
+          ? t("Restore {0} file(s) — but {1} command(s) also ran, and what they changed stays", files, commands)
+          : t("Rewind the conversation — {0} command(s) ran, and what they changed stays", commands)
+        : files
+          ? t("Put the {0} file(s) this turn changed back, and rewind the conversation here", files)
+          : t("Rewind the conversation to before this question — that turn changed no file"),
     onClick: () => deps.send({ type: "restoreCheckpoint", id: entry.id }),
   });
-  if (entry.checkpointPartial) action.classList.add("partial");
+  if (entry.checkpointPartial || commands) action.classList.add("partial");
   wrap.append(action);
   return wrap;
 }
@@ -1051,8 +1075,21 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
   // a reading, it is a decoration that teaches people to ignore the row it sits in.
   if (state.sessionCostUsd > 0 || state.billed) {
     meter.append(el("span", "composer-sep", "\u2022"));
-    const cost = el("span", "composer-cost", formatCost(state.sessionCostUsd));
-    cost.title = t("What this conversation has cost. Today's total is in the cost report.");
+    // ⚠️ "so far" is on the VISIBLE text, not only in the tooltip, and that is the whole fix.
+    // Florian read this row as a rate: « pour 40k token ça coute 3.60$ ce qui me semble un peu
+    // excessif avec sonnet 5.5 ». The arithmetic was right — $3.60 is what the CONVERSATION had
+    // cost, and the 40 k beside it is the context the NEXT question will send. Two unrelated
+    // quantities, adjacent, one of them unlabelled, read as a ratio: 40 k tokens for $3.60 is
+    // $90/M, which is forty-five times Sonnet's input price and rightly alarming.
+    //
+    // A tooltip did say so and a tooltip needs hovering, which nobody does before being alarmed.
+    // This project already learned this once and fixed it the same way — the bench column called
+    // `time` became `model time` rather than gaining a footnote, because a figure whose name invites
+    // the wrong reading is a figure that will be misread.
+    const cost = el("span", "composer-cost", t("{0} so far", formatCost(state.sessionCostUsd)));
+    cost.title = t(
+      "What this whole conversation has cost, not this question: every turn re-sends the conversation, so the total grows faster than the number of questions. Today's total is in the cost report.",
+    );
     meter.append(cost);
   }
   // The day's spend against its cap, shown once it is close enough to matter.

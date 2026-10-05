@@ -7,6 +7,7 @@
 //      terminal), which makes the terminal client the better place to run tests.
 
 import { spawn } from "node:child_process";
+import { compilePattern } from "../core/agent/regex.js";
 import { readFile, readdir, stat, writeFile } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import type { Tool, ToolResult } from "../core/agent/loop.js";
@@ -179,7 +180,9 @@ export function buildCliTools(opts: CliToolOptions): Tool[] {
     async run(args, ctx): Promise<ToolResult> {
       let re: RegExp;
       try {
-        re = new RegExp(String(args["pattern"] ?? ""));
+        // `(?i)` and friends: valid in ripgrep, Go, Rust, Python and PCRE, `Invalid group` in
+        // JavaScript. Translated rather than refused — see `core/agent/regex.ts`.
+        re = compilePattern(String(args["pattern"] ?? ""));
       } catch (err) {
         return { content: `Invalid regular expression: ${(err as Error).message}`, isError: true };
       }

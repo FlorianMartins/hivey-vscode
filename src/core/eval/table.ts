@@ -32,6 +32,8 @@ export interface Measured {
 }
 
 export interface TableInput {
+  /** Every distinct run timestamp behind these rows, when they come from more than one run. */
+  span?: string[];
   /** When the figures were taken, and where from. Absent when nothing was. */
   at?: string;
   endpoint?: string;
@@ -159,6 +161,24 @@ function spread(rows: Measured[]): string[] {
   ];
 }
 
+/**
+ * When these figures were taken, over however many runs they came from.
+ *
+ * A table whose rows are separate runs has no single date. Naming one is wrong in the direction that
+ * matters: a reader quoting the table would attribute every row to a day three of them were not
+ * measured on.
+ *
+ * @param at the run timestamp the caller considers current.
+ * @param span every distinct timestamp the rows came from.
+ */
+export function describeWhen(at?: string, span?: string[]): string {
+  const dates = [...new Set((span ?? []).filter(Boolean))].sort();
+  if (dates.length > 1) {
+    return `Measured over ${dates.length} runs between ${dates[0]} and ${dates[dates.length - 1]}`;
+  }
+  return `Taken ${at ?? dates[0] ?? "(no date recorded)"}`;
+}
+
 /** The table, as the file that gets committed. */
 export function qualityTable(input: TableInput): string {
   const measured = new Map(input.rows.map((r) => [r.configuration, r]));
@@ -206,7 +226,11 @@ export function qualityTable(input: TableInput): string {
     );
   } else {
     lines.push(
-      `Taken ${input.at ?? "(no date recorded)"}${input.endpoint ? ` against \`${input.endpoint}\`` : ""}` +
+      // ⚠️ `at` is ONE date and the rows can come from several runs, days apart — each row is its
+      // own measurement, and the harness let the last file read win. "Taken 3 October" above a row
+      // measured on the 4th is the quietest kind of false statement: nobody checks a header. When
+      // the runs disagree, the header says the range instead of picking one.
+      `${describeWhen(input.at, input.span)}${input.endpoint ? ` against \`${input.endpoint}\`` : ""}` +
         `${input.models?.length ? ` with \`${input.models.join("`, `")}\`` : ""}.`,
       "",
       "| configuration | passed | quality | never acted | claimed done | model time | cost |",

@@ -1743,6 +1743,17 @@ suite("Hivey Code", () => {
       assert.equal(/leaves the workspace/.test(said), false, `the resolver refused its own path: ${said}`);
       assert.ok(reviewed.length, `the change was never put up for review; the tool said ${said}`);
       assert.equal(doc.getText(), "after\n", `agent mode did not change the file; the tool said ${said}`);
+      // ⚠️⚠️ AND ON DISK. This assertion is the one that was missing, and its absence is the whole
+      // reason the defect shipped: a `WorkspaceEdit` changes the editor's in-memory document, so
+      // `doc.getText()` says "after" while the file still holds "before". Everything that is not the
+      // editor reads the file — `run_command` running the tests, a watcher, a compiler, git — so the
+      // agent's very next step grades it on code it did not write.
+      assert.equal(doc.isDirty, false, "the approved edit was left unsaved in the editor");
+      assert.equal(
+        await fs.readFile(target, "utf8"),
+        "after\n",
+        "the editor shows the change but the file on disk does not: the next command would read the old code",
+      );
     } finally {
       (vscode.window as unknown as { showInformationMessage: unknown }).showInformationMessage = realInfo;
       await config.update("chat.provider", before.provider, vscode.ConfigurationTarget.Global);

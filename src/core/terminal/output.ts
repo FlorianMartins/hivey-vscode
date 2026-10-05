@@ -4,7 +4,7 @@
 // the shell's own OSC 633 markers, the prompt it redraws afterwards, and every intermediate frame
 // of a progress bar. Handing that to a model is worse than handing it nothing — several hundred
 // tokens of escape sequences around the twelve characters that matter, and a model that starts
-// quoting `[2K` back at the user.
+// quoting `ESC[2K` back at the user.
 //
 // So this module is the whole difference between "the command was started" and "the tests failed
 // on line 42". It is pure text in, pure text out, and it lives in `core` rather than in the tool

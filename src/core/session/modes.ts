@@ -25,7 +25,7 @@ export const MODES: Array<{ id: Mode; label: string; hint: string }> = [
  * set on themselves — a tool that grants itself read-only status is a tool that can be wrong about
  * it. Adding a tool to this list is a deliberate edit in the file that defines what plan mode means.
  */
-const READ_ONLY = new Set([
+export const PLAN_READ_ONLY = new Set([
   "read_file",
   "list_files",
   "search_text",
@@ -73,7 +73,7 @@ export function toolsForMode(all: Tool[], mode: Mode): Tool[] {
       // Two ways in: a tool that only ever reads, or a tool that can produce a reading-only
       // version of itself. Anything else has no representation in plan mode at all.
       return all.flatMap((tool) => {
-        if (READ_ONLY.has(tool.schema.name)) return [tool];
+        if (PLAN_READ_ONLY.has(tool.schema.name)) return [tool];
         return tool.restrict ? [tool.restrict()] : [];
       });
     case "agent":

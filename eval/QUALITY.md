@@ -5,11 +5,12 @@ What each configuration scores on this repository's own evaluation set
 
 > **Read these figures with the following in mind.**
 >
-> - ⚠️ Les deux premières lignes (`deepseek-v4.1-flash`, `hivey`) ont été mesurées sur **56** tâches, avant que trois consignes ne soient réparées : les accents graves y étaient exécutés par un shell, donc « No `any` and no `as` casts » arrivait au modèle sans son sujet. Elles ne sont pas comparables aux deux dernières.
-> - Les deux dernières lignes (`hivey/free`, `remote only`) sont mesurées sur les **62** tâches avec les consignes corrigées, sans aucun refus. Ce sont les seules comparables entre elles.
-> - Le préréglage `hivey` n'a pas pu être remesuré : le solde de crédit du compte OpenRouter ne finance plus une requête de cette taille (`limit_source: openrouter_credits`).
+> - Les trois premières lignes (`hivey/free`, `remote only`, `hivey`) sont mesurées sur les **62** mêmes tâches, avec les consignes corrigées et **sans aucun refus**. Ce sont les seules comparables entre elles.
+> - ⚠️ La ligne `hivey` a d'abord donné **2/62** — non pas pour une faute du modèle, mais parce que le solde du compte OpenRouter était épuisé (−0,11 $) et que chaque tâche était refusée avant de commencer. Crédit rétabli, la même série donne 55/62. Un refus n'est pas un échec : voir `core/eval/report.ts`.
+> - ⚠️ La dernière ligne (`deepseek-v4.1-flash alone`) a été mesurée sur **56** tâches, avant que trois consignes ne soient réparées, et n'est donc PAS comparable aux trois autres. Elle reste pour la décision qu'elle a servi à prendre (ADR-0034).
+> - Écart constaté entre séries identiques : **48, 47 et 50** réussites sur 56. Une différence plus petite que cet écart n'est pas un résultat.
 
-Taken 2026-10-04T01:41:16.782Z against `https://openrouter.ai/api/v1` with `deepseek/deepseek-v4.1-flash`, `hivey`, `hivey/free`, `qwen/qwen3.7-flash`.
+Taken 2026-10-03T13:14:46.752Z against `https://openrouter.ai/api/v1` with `hivey/free`, `qwen/qwen3.7-flash`, `hivey`, `deepseek/deepseek-v4.1-flash`.
 
 | configuration | passed | quality | never acted | claimed done | model time | cost |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -17,7 +18,7 @@ Taken 2026-10-04T01:41:16.782Z against `https://openrouter.ai/api/v1` with `deep
 | `local + escalation` | — | not measured | — | — | — | — |
 | `remote only` | 45/62 | 73 % | 0/62 | 17/62 | 1780 s | $0.0428 ($0.0007/task) |
 | `hivey/free` | 32/62 | 52 % | 3/62 | 27/62 | 2997 s | $0.0000 ($0.0000/task) |
-| `hivey` | 50/56 | 89 % | 1/56 | 5/56 | 3918 s | $4.2916 ($0.0766/task) |
+| `hivey` | 55/62 | 89 % | 2/62 | 6/62 | 4326 s | $4.5941 ($0.0741/task) |
 | `hivey/smart` | — | not measured | — | — | — | — |
 | `deepseek-v4.1-flash alone` | 44/56 | 79 % | 1/56 | 11/56 | 2296 s | $0.1357 ($0.0024/task) |
 
@@ -47,7 +48,7 @@ To reproduce it, or to measure a configuration that reads *not measured*:
 ```bash
 npm run build
 node scripts/evaluate.mjs \
-  --url https://openrouter.ai/api/v1 --model deepseek/deepseek-v4.1-flash \
+  --url https://openrouter.ai/api/v1 --model hivey/free \
   --as "local only" --table eval/QUALITY.md
 ```
 

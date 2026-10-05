@@ -3,7 +3,8 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { toolsForMode, promptForMode, MODES } from "../src/core/session/modes.js";
+import { toolsForMode, promptForMode, MODES, PLAN_READ_ONLY } from "../src/core/session/modes.js";
+import { MUTATING_TOOLS } from "../src/core/router/outcome.js";
 import { Permissions, MemoryPermissionStore, commandPrefix } from "../src/core/agent/permissions.js";
 import { filterHistory, searchTranscript, excerptAround, normalize, upsertSession } from "../src/core/session/history.js";
 import { Session, type SessionData } from "../src/core/session/session.js";
@@ -356,4 +357,26 @@ test("a conversation renamed by hand keeps its name instead of being re-guessed"
   const s = new Session({ title: "My name", entries: [] });
   s.add({ role: "user", text: "a question whose first line would otherwise become the title" });
   assert.equal(s.title, "My name");
+});
+
+test("no tool that changes something is on the read-only list", () => {
+  // ⚠️ The gap this closes: the plan-mode test above runs on SEVEN synthetic tools, so it has never
+  // seen the real registry — 45 tools, four of which can reach a production system. A writer wrongly
+  // added to READ_ONLY would be caught by nothing.
+  //
+  // Two lists, written for different purposes in different files, that must not overlap:
+  // `READ_ONLY` (what plan mode may offer) and `MUTATING_TOOLS` (what counts as having changed
+  // something). An overlap is a contradiction the project states as its central promise.
+  const overlap = [...MUTATING_TOOLS].filter((name) => PLAN_READ_ONLY.has(name));
+  assert.deepEqual(overlap, [], `plan mode would offer a tool that changes things: ${overlap.join(", ")}`);
+});
+
+test("nothing on the read-only list is named like a writer", () => {
+  // A second, independent check, because the first can only see tools somebody remembered to put in
+  // `MUTATING_TOOLS`. This one needs no list: it reads the names. A false positive here is a tool
+  // that has to be renamed or argued for in this test, which is the right amount of friction for
+  // adding something to the one list plan mode's promise rests on.
+  const writes = /write|commit|stage|retire|delete|remove|create|submit|promote|action|_command$|compile|test$/i;
+  const named = [...PLAN_READ_ONLY].filter((name) => writes.test(name));
+  assert.deepEqual(named, [], `these read-only names look like writers: ${named.join(", ")}`);
 });

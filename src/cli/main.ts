@@ -392,6 +392,9 @@ async function main(): Promise<void> {
     // with steps of its own plan outstanding has declared itself done against its own list.
     let turnPlan: Plan | undefined;
     const turnNotices: Notice[] = [];
+    // What this turn's sub-agents spent. A sub-agent's bill belongs to the answer that ordered it,
+    // not to nobody — see `runSubAgent`.
+    const delegated = { promptTokens: 0, completionTokens: 0, cachedTokens: 0, costUsd: undefined as number | undefined };
 
     // The mode decides the tool set in code: plan mode simply has no tool that writes.
     const tools = toolsForMode(
@@ -408,6 +411,10 @@ async function main(): Promise<void> {
         // request leaves by the same door — a second notion of what is safe to send would be a
         // second answer to the question this product exists to answer.
         runSubAgent: async ({ definition, task, signal }) => {
+          // ⚠️ A sub-agent's tokens are the parent turn's bill. They were thrown away here: this
+          // function ran a whole turn and returned only `answer.text`, so a turn that delegated was
+          // reported — and MEASURED by the bench, which publishes costs — as cheaper than it was.
+          // The panel already got this right (`delegatedCostUsd`); two surfaces, one answer.
           const sub = buildCliTools({
             cwd,
             blockedGlobs: cfg.blockedGlobs,
@@ -435,6 +442,12 @@ async function main(): Promise<void> {
             afterResponse: (text) => vault.restore(text),
             restoreArgs: (text) => vault.restore(text),
           });
+          delegated.promptTokens += answer.usage.promptTokens;
+          delegated.completionTokens += answer.usage.completionTokens;
+          delegated.cachedTokens += answer.usage.cachedTokens;
+          if (typeof answer.usage.costUsd === "number") {
+            delegated.costUsd = (delegated.costUsd ?? 0) + answer.usage.costUsd;
+          }
           return vault.restore(answer.text);
         },
         onNotice: (notice) => turnNotices.push(notice),
@@ -503,13 +516,27 @@ async function main(): Promise<void> {
       // Computed whatever the endpoint is, and reported only when it is known. A local model is
       // not free — it is unpriced — and the two have to stay distinguishable for the evaluation
       // report, which is forbidden to print a figure it did not measure.
-      const cost = costOf(result.usage, prices(cfg.model));
+      // The turn's own usage plus whatever it delegated. `costUsd` is only carried when BOTH halves
+      // reported one: a provider-reported total mixed with an estimate is neither, and `costOf` treats
+      // the presence of `costUsd` as "the provider said so".
+      const wholeUsage = {
+        promptTokens: result.usage.promptTokens + delegated.promptTokens,
+        completionTokens: result.usage.completionTokens + delegated.completionTokens,
+        cachedTokens: result.usage.cachedTokens + delegated.cachedTokens,
+        ...(typeof result.usage.costUsd === "number" && (delegated.promptTokens === 0 || delegated.costUsd !== undefined)
+          ? { costUsd: result.usage.costUsd + (delegated.costUsd ?? 0) }
+          : {}),
+      };
+      const cost = costOf(wholeUsage, prices(cfg.model));
       if (!isLocal) {
         answer.usdCost = cost.usd;
         budget.record(cost.usd);
         console.log(
           C.dim(
-            t("  {0}+{1} tokens", result.usage.promptTokens, result.usage.completionTokens) +
+            // The whole turn, sub-agents included — the same figures the cost beside it is computed
+            // from. Printing the parent's tokens next to the delegated total made one line disagree
+            // with itself.
+            t("  {0}+{1} tokens", wholeUsage.promptTokens, wholeUsage.completionTokens) +
               (cost.known ? ` · $${cost.usd.toFixed(4)}` : ` · ${t("unknown cost")}`),
           ),
         );
@@ -542,7 +569,7 @@ async function main(): Promise<void> {
         console.log(`\n${C.dim(t("To know"))}`);
         for (const n of notices) console.log(C.dim(`  • ${n.text}${n.where ? ` (${n.where})` : ""}`));
       }
-      writeRunRecord(result, Date.now() - startedAt, cfg.model, !isLocal && cost.known ? cost.usd : undefined, unfinished.left.length);
+      writeRunRecord(result, Date.now() - startedAt, cfg.model, !isLocal && cost.known ? cost.usd : undefined, unfinished.left.length, wholeUsage);
     } catch (err) {
       const message = (err as Error).message;
       console.log(C.red(`\n${message}`));
@@ -681,6 +708,8 @@ function writeRunRecord(
   model: string,
   usd: number | undefined,
   planLeft?: number,
+  /** The turn's usage including its sub-agents'. Falls back to the turn's own. */
+  wholeUsage?: { promptTokens: number; completionTokens: number },
 ): void {
   const path = process.env["HIVEY_CODE_RUN_REPORT"];
   if (!path) return;
@@ -689,8 +718,8 @@ function writeRunRecord(
   const record: RunRecord = {
     model,
     steps: result.steps,
-    promptTokens: result.usage.promptTokens,
-    completionTokens: result.usage.completionTokens,
+    promptTokens: wholeUsage?.promptTokens ?? result.usage.promptTokens,
+    completionTokens: wholeUsage?.completionTokens ?? result.usage.completionTokens,
     ...(usd === undefined ? {} : { usd }),
     stoppedBecause: result.stoppedBecause,
     truncated: result.truncated,
