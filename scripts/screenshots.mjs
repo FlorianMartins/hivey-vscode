@@ -309,7 +309,15 @@ function announced() {
 
 // Wait for the harness to name a screen, photograph it once it has settled, and move on. There is
 // no clock here beyond a timeout: the editor decides when it is ready, and says so.
-const SCREENS = ["conversation", "pendant", "plan", "approbation", "contexte", "passerelle", "setup", "picker", "historique", "modeles", "permissions"];
+// ⚠️ EXACTLY the screens the harness announces, and no more. This list carried five names nobody
+// ever produced — `picker`, `historique`, `modeles`, `permissions`, and `setup` until the harness was
+// taught to announce it. Each one costs the full deadline wait and then prints "the editor never
+// announced it", which the comment below correctly says reads like a product fault. It was never
+// seen because every run so far was cut short before reaching the end of the loop.
+//
+// Two halves of one sequence in two files: when they disagree, the one that waits is the one that
+// looks broken. Adding a screen means announcing it there and naming it here, in the same change.
+const SCREENS = ["conversation", "pendant", "plan", "approbation", "contexte", "passerelle", "setup"];
 // One hold per screen is not the budget: the fixture drives a real conversation between them, and
 // the frame taken mid-answer waits for a deliberately slow one to finish. Two screens' worth of
 // slack plus a flat minute covers the talking; a deadline that expires mid-run reports every

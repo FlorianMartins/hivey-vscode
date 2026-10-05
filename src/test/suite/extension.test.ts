@@ -2184,6 +2184,17 @@ suite("Screenshot", () => {
       await new Promise((r) => setTimeout(r, 1500));
       await vscode.commands.executeCommand("hiveyCode.showModels");
       await announce("passerelle");
+
+      // ⚠️ The provider screen, with a card open. It was photographed by NOTHING, and it is the one
+      // Florian singled out — « c'est toujours aussi compliqué de comprendre les menus, settings ».
+      // So it was changed blind, twice, and the scroll-jump it had (every keystroke in a key field
+      // rebuilt the screen and returned it to the top) is exactly the kind of defect a photograph
+      // catches and a unit test cannot: nothing is wrong with the DOM, the reader is just somewhere
+      // else. A screen with no picture of it is a screen nobody checks.
+      await vscode.commands.executeCommand("hiveyCode.setup");
+      await new Promise((r) => setTimeout(r, 1500));
+      // `setup` rather than a new name: the script has been waiting for exactly this one all along.
+      await announce("setup");
       await vscode.workspace
         .getConfiguration(SECTION)
         .update("chat.provider", "local", vscode.ConfigurationTarget.Global);
