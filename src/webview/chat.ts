@@ -13,6 +13,7 @@ import { turnBoundary } from "../core/session/checkpoint.js";
 import { REMOTE_VENDORS, vendor } from "../core/providers/vendors.js";
 import { closeModelCombo, isModelComboOpen, openModelCombo } from "./modelCombo.js";
 import { wirePaste } from "./paste.js";
+import { microphonePossible, startRecording, type Recorder } from "./dictate.js";
 import { focusGateway } from "./setup.js";
 import type { Mode, Reasoning, ToExtension, UiApproval, UiEntry, UiSkill, UiState } from "../shared/protocol.js";
 import { applySuggestion, suggestionsFor, type Suggestion } from "../core/session/mentions.js";
@@ -711,6 +712,89 @@ function turnRule(
   return wrap;
 }
 
+/**
+ * Press to speak, press again to stop.
+ *
+ * A toggle rather than press-and-hold: holding a key down for the length of a sentence is a gesture
+ * that fails on a trackpad, on a touch screen and for anybody who cannot hold two things at once.
+ * Escape cancels, and cancelling throws the recording away without sending it anywhere — somebody
+ * who changes their mind mid-sentence has not asked for their voice to be transcribed.
+ */
+function micButton(deps: ChatDeps): HTMLElement {
+  const recording = Boolean(activeRecorder);
+  const control = button({
+    icon: ICON.mic,
+    title: recording ? t("Stop and transcribe (Esc cancels)") : t("Dictate"),
+    className: `btn ghost icon-only mic${recording ? " recording" : ""}`,
+    onClick: () => {
+      if (activeRecorder) {
+        activeRecorder.stop();
+        activeRecorder = undefined;
+        setComposerNote(t("Transcribing…"));
+        return;
+      }
+      setComposerNote(t("Listening… press again to stop."));
+      void startRecording(
+        (audio, ms) => {
+          activeRecorder = undefined;
+          deps.send({ type: "dictate", audio, ms });
+        },
+        (why) => {
+          activeRecorder = undefined;
+          setComposerNote(why);
+          refreshMic();
+        },
+      ).then((started) => {
+        activeRecorder = started;
+        refreshMic();
+      });
+    },
+  });
+  return control;
+}
+
+/** The recorder in flight, if any. Module scope because the composer is rebuilt under it. */
+let activeRecorder: Recorder | undefined;
+
+/** Redraw just the microphone, without rebuilding the composer under a live recording. */
+function refreshMic(): void {
+  const node = document.querySelector<HTMLElement>(".composer .btn.mic");
+  if (!node) return;
+  node.classList.toggle("recording", Boolean(activeRecorder));
+}
+
+/** Cancel a recording in flight. Called by Escape, and when the panel goes away. */
+export function cancelDictation(): boolean {
+  if (!activeRecorder) return false;
+  activeRecorder.cancel();
+  activeRecorder = undefined;
+  setComposerNote("");
+  refreshMic();
+  return true;
+}
+
+/**
+ * One line under the composer, for what dictation is doing.
+ *
+ * Not a notification and not a transcript entry: it is a state of the control the user just pressed,
+ * so it belongs next to the control. A dialog for "listening" would be a dialog to dismiss while
+ * talking.
+ */
+export function setComposerNote(text: string): void {
+  const host = document.querySelector<HTMLElement>(".composer-footer");
+  if (!host) return;
+  let note = host.querySelector<HTMLElement>(".composer-note");
+  if (!text) {
+    note?.remove();
+    return;
+  }
+  if (!note) {
+    note = el("span", "composer-note");
+    host.prepend(note);
+  }
+  note.textContent = text;
+}
+
 export function stepList(steps: Array<{ tool: string; summary: string; ok: boolean; call?: string }>): HTMLElement {
   const list = el("div", "steps");
   for (const s of steps) list.append(stepRow(s));
@@ -1014,6 +1098,11 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
   // not the same place at all — and this is the control you reach for while writing the message,
   // not while configuring the conversation.
   const right = el("div", "toolbar-group end");
+  // ⚠️ Only when this host can actually open a microphone AND the user has configured a transcriber.
+  // A button that looks like it is listening and is not is worse than no button at all: somebody
+  // speaks a paragraph into nothing. Capability is asked of the host (`microphonePossible`), and
+  // whether there is anywhere to transcribe comes from the extension.
+  if (state.dictation && microphonePossible()) right.append(micButton(deps));
   right.append(toolsButton(state, deps));
   right.append(
     // The same button as its neighbours, carrying a different glyph. `primary` made it a size and a

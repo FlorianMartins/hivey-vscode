@@ -60,6 +60,9 @@ const PATHS = {
   // goes UP, into the conversation above the box you are typing in.
   send: "M8 12.75V4.25M4.25 8 8 4.25 11.75 8",
   stop: "M4 4h8v8H4z",
+  // A capsule on a stand. Drawn in the same 16-unit box and the same open-stroke language as the
+  // rest: a filled mic glyph would read as a different family beside `send` and `attach`.
+  mic: "M8 2.5a1.75 1.75 0 0 1 1.75 1.75v3a1.75 1.75 0 0 1-3.5 0v-3A1.75 1.75 0 0 1 8 2.5ZM4.5 7.25a3.5 3.5 0 0 0 7 0M8 10.75v2.75M6 13.5h4",
   add: "M8 3v10M3 8h10",
   history: "M8 3a5 5 0 1 1-4.9 4M3 3v3h3M8 5.5V8l2 1.5",
   search: "M7 3.2a3.8 3.8 0 1 0 0 7.6 3.8 3.8 0 0 0 0-7.6ZM10 10l3 3",
@@ -171,11 +174,12 @@ export const ICON: Record<
   | "send" | "stop" | "add" | "history" | "search" | "close" | "chevron" | "chevronLeft" | "file"
   | "check" | "cross" | "mute" | "unmute" | "pin" | "edit" | "copy" | "trash" | "settings"
   | "shield" | "attach" | "sparkle" | "bringIn" | "forward" | "restore" | "askAgain" | "compare"
-  | "tools" | "chip" | "more" | "back",
+  | "tools" | "chip" | "more" | "back" | "mic",
   IconName
 > = {
   send: "send",
   stop: "stop",
+  mic: "mic",
   add: "add",
   history: "history",
   search: "search",

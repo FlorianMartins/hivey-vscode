@@ -365,6 +365,13 @@ export interface UiState {
    * the panel self-correcting.
    */
   busy: boolean;
+  /**
+   * Whether anything is configured to turn speech into text.
+   *
+   * Sent rather than inferred in the panel: the webview cannot read a setting, and a microphone
+   * button with nowhere to send the recording is a button that wastes a sentence.
+   */
+  dictation?: boolean;
 }
 
 /** Panel → extension. */
@@ -402,6 +409,14 @@ export type ToExtension =
   | { type: "setProvider"; provider: string }
   /** Put the files back as they were before this question, and rewind the conversation to it. */
   | { type: "restoreCheckpoint"; id: string }
+  /**
+   * A recording to transcribe, as base64.
+   *
+   * Base64 rather than a transferable: `postMessage` from a webview goes through VS Code's own
+   * serialisation, which does not carry an `ArrayBuffer` intact. A few seconds of Opus is tens of
+   * kilobytes, so the third it costs to encode is not worth a second channel.
+   */
+  | { type: "dictate"; audio: string; ms: number }
   /** Carry one message into another conversation, as context there. */
   | { type: "shareEntry"; id: string }
   | { type: "setMode"; mode: Mode }
@@ -516,5 +531,9 @@ export type ToPanel =
   | { type: "openSearch" }
   /** Put text back into the composer — a restored question, ready to be asked differently. */
   | { type: "restoreDraft"; text: string }
+  /** What the recogniser heard, to be put in the composer for the user to read before sending. */
+  | { type: "dictated"; text: string }
+  /** Dictation could not run or heard nothing. Shown in the composer's own row, not as a dialog. */
+  | { type: "dictationFailed"; why: string }
   /** The agent's plan, as it is written. Redrawn in place rather than appended. */
   | { type: "plan"; plan: Plan };

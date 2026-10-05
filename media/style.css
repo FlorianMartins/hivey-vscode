@@ -4096,3 +4096,44 @@ pre.code code {
   font-size: 11px;
   color: var(--vscode-descriptionForeground);
 }
+
+/* ── Dictation ────────────────────────────────────────────────────────────────────────────── */
+
+/* The microphone, and the one state it has.
+ *
+ * `recording` is the only visual state this control needs, and it has to be unmistakable from across
+ * a room: a button that looks like it is listening and is not costs the user a whole spoken
+ * paragraph. So it is the theme's own error colour — not because recording is an error, but because
+ * that is the one hue in every theme that means "this is live and you should notice". */
+.btn.mic.recording {
+  color: var(--vscode-inputValidation-errorBorder, var(--vscode-errorForeground));
+}
+.btn.mic.recording::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  border: 1px solid currentColor;
+  animation: hc-listening 1.4s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes hc-listening {
+  0%, 100% { opacity: 0.25; transform: scale(1); }
+  50% { opacity: 0.9; transform: scale(1.08); }
+}
+/* Someone who switched motion off in the operating system said so about every interface. The ring
+   stays, still, because the state still has to be visible. */
+@media (prefers-reduced-motion: reduce) {
+  .btn.mic.recording::after {
+    animation: none;
+    opacity: 0.7;
+  }
+}
+
+/* "Listening…", "Transcribing…", or why it could not. One line, next to the control it describes:
+   a dialog for "listening" would be a dialog to dismiss while talking. */
+.composer-note {
+  font-size: var(--fs-meta);
+  color: var(--muted);
+  margin-right: auto;
+}

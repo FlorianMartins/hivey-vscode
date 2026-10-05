@@ -6,7 +6,10 @@
 // rendered incrementally is the answer being streamed, because that one has to be.
 
 import { button, closeMenu, el, icon, ICON, menuIsOpen, searchInput } from "./dom.js";
-import { chatScreen, isStreaming, planBlock, reasoningBlock, setStreaming, stepRow, type ChatDeps, captureDraft, restoreDraft } from "./chat.js";
+import { chatScreen, isStreaming, planBlock, reasoningBlock, setStreaming, stepRow, type ChatDeps, captureDraft, restoreDraft,
+  setComposerNote,
+  cancelDictation,
+} from "./chat.js";
 import { atEnd, placeAfterChange, type Viewport } from "../core/ui/scroll.js";
 import { historyScreen } from "./history.js";
 import { modelsScreen } from "./models.js";
@@ -792,6 +795,26 @@ window.addEventListener("message", (event: MessageEvent<ToPanel>) => {
       ensureLive().appendError(m.message);
       setStreaming(false);
       break;
+    case "dictated": {
+      // Into the composer, never sent. A recogniser mis-hears, and a dictated question that sends
+      // itself is a question nobody proof-read — which is also what makes a wrong transcription a
+      // non-event instead of a wasted turn.
+      setComposerNote("");
+      const area = document.querySelector<HTMLTextAreaElement>(".composer-input");
+      if (area) {
+        // Appended to what is already there, with a space: dictating a second sentence after typing
+        // the first is an ordinary thing to do, and replacing the draft would destroy it.
+        const existing = area.value.trimEnd();
+        area.value = existing ? `${existing} ${m.text}` : m.text;
+        area.focus();
+        area.setSelectionRange(area.value.length, area.value.length);
+        area.dispatchEvent(new Event("input"));
+      }
+      break;
+    }
+    case "dictationFailed":
+      setComposerNote(m.why);
+      break;
     case "restoreDraft": {
       // A rewind puts the question back where it was typed. Focused and selected, because the
       // reason to roll back is almost always to ask the same thing differently.
@@ -824,7 +847,12 @@ window.addEventListener("message", (event: MessageEvent<ToPanel>) => {
 document.addEventListener("keydown", (ev) => {
   // The innermost thing first: a menu opened over the search bar closes before the bar does.
   if (ev.key === "Escape") {
-    if (menuIsOpen()) {
+    // A recording in flight is the innermost thing of all, and the one where Escape has to mean
+    // "throw it away": somebody who changes their mind mid-sentence has not asked for their voice to
+    // be transcribed anywhere.
+    if (cancelDictation()) {
+      ev.preventDefault();
+    } else if (menuIsOpen()) {
       closeMenu();
     } else if (searchOpen) {
       closeSearch();

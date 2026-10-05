@@ -911,6 +911,48 @@ export const FR: Record<string, string> = {
   "Change VS Code's language": "Changer la langue de VS Code",
   "The command palette entries and the settings page follow VS Code's own display language, which an extension cannot change.":
     "Les entrées de la palette de commandes et la page des réglages suivent la langue d’affichage de VS Code, qu’une extension ne peut pas changer.",
+  "A recording cannot be pseudonymised, the way a diff can be read before it is sent.":
+    "Un enregistrement ne peut pas être pseudonymisé, comme un diff peut être relu avant d’être envoyé.",
+  "About {0} s of audio, {1} kB.":
+    "Environ {0} s d’audio, {1} ko.",
+  "Could not run the dictation command: {0}":
+    "Impossible de lancer la commande de dictée : {0}",
+  "Dictate":
+    "Dicter",
+  "Dictation is not set up. Set hiveyCode.dictation.command to a transcriber on this machine.":
+    "La dictée n’est pas configurée. Renseignez hiveyCode.dictation.command avec un transcripteur installé sur cette machine.",
+  "Listening… press again to stop.":
+    "Écoute… appuyez à nouveau pour arrêter.",
+  "No microphone was found.":
+    "Aucun micro n’a été trouvé.",
+  "Nothing was heard.":
+    "Rien n’a été entendu.",
+  "Send this recording of your voice to {0}?":
+    "Envoyer cet enregistrement de votre voix à {0} ?",
+  "Stop and transcribe (Esc cancels)":
+    "Arrêter et transcrire (Échap annule)",
+  "That recording is too long. Keep it under a couple of minutes.":
+    "Cet enregistrement est trop long. Restez sous les deux minutes.",
+  "That was too short to transcribe.":
+    "C’était trop court pour être transcrit.",
+  "The dictation command did not finish in time.":
+    "La commande de dictée n’a pas fini à temps.",
+  "The dictation command failed.":
+    "La commande de dictée a échoué.",
+  "The microphone could not be opened: {0}":
+    "Le micro n’a pas pu être ouvert : {0}",
+  "The microphone was refused. Allow it for this window and try again.":
+    "Le micro a été refusé. Autorisez-le pour cette fenêtre et réessayez.",
+  "The recording could not be read.":
+    "L’enregistrement n’a pas pu être lu.",
+  "This editor does not give the panel a microphone.":
+    "Cet éditeur ne donne pas de micro au panneau.",
+  "Transcribing…":
+    "Transcription…",
+  "The transcriber answered HTTP {0}.":
+    "Le transcripteur a répondu HTTP {0}.",
+  "hiveyCode.dictation.endpoint is not an address.":
+    "hiveyCode.dictation.endpoint n’est pas une adresse.",
   "The files could not be restored; the conversation is unchanged.": "Les fichiers n’ont pas pu être restaurés ; la conversation est inchangée.",
   "plan: {0}/{1}": "plan : {0}/{1}",
   "{0} file(s) created by that turn are deleted.": "{0} fichier(s) créés par ce tour seront supprimés.",

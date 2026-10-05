@@ -159,5 +159,9 @@
   "command.routingForget.title": "Oublier ce qui a été appris dans ce dépôt",
   "config.secondOpinion.enabled": "Avant d'appliquer un changement qui touche l'un des réglages dont les autres règles dépendent, un fichier qui configure le comportement de tout le reste, ou un diff trop gros pour avoir été lu, un **second modèle** relit la demande et le diff et dit ce que la demande n'avait pas demandé. Ses objections apparaissent sur la carte d'approbation. **Local uniquement** : si le second lecteur serait un modèle facturé, il n'est pas appelé et la carte le dit. Les objections sont consultatives, sauf si la politique de votre organisation exige qu'elles soient résolues.",
   "command.auditLastPrompt": "Auditer le dernier prompt",
-  "config.notices.enabled": "Afficher une note « À savoir » sous une réponse : ce que l'assistant a remarqué sans qu'on le lui demande, ce qu'il n'a pas vérifié, et l'état de l'outil. Rien n'est jamais modifié par ce biais."
+  "config.notices.enabled": "Afficher une note « À savoir » sous une réponse : ce que l'assistant a remarqué sans qu'on le lui demande, ce qu'il n'a pas vérifié, et l'état de l'outil. Rien n'est jamais modifié par ce biais.",
+  "config.dictation.command": "Une commande sur cette machine qui transcrit un enregistrement. `{file}` est l’endroit où l’audio est écrit ; le texte qu’elle imprime arrive dans la zone de saisie. Exemple : `whisper-cli -f {file} --no-timestamps --output-txt -`. Vide signifie que la dictée est désactivée — rien n’est enregistré et rien n’est envoyé.",
+  "config.dictation.endpoint": "Une adresse `/audio/transcriptions` compatible OpenAI, employée **uniquement** si aucune commande locale n’est définie. Un enregistrement de votre voix ne peut pas être pseudonymisé, il passe donc par la même carte de consentement qu’une image.",
+  "config.dictation.model": "Le modèle de transcription, pour la voie distante.",
+  "config.dictation.language": "Un indice de langue pour le reconnaisseur, par exemple `fr`. Vide le laisse décider."
 }

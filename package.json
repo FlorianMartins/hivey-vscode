@@ -1202,6 +1202,26 @@
             "type": "boolean",
             "default": true,
             "description": "%config.completion.multiline%"
+          },
+          "hiveyCode.dictation.command": {
+            "type": "string",
+            "default": "",
+            "markdownDescription": "%config.dictation.command%"
+          },
+          "hiveyCode.dictation.endpoint": {
+            "type": "string",
+            "default": "",
+            "markdownDescription": "%config.dictation.endpoint%"
+          },
+          "hiveyCode.dictation.model": {
+            "type": "string",
+            "default": "whisper-1",
+            "description": "%config.dictation.model%"
+          },
+          "hiveyCode.dictation.language": {
+            "type": "string",
+            "default": "",
+            "description": "%config.dictation.language%"
           }
         }
       }

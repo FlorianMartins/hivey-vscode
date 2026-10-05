@@ -7,6 +7,18 @@
 // it is deliberately the only place that knows about all of them.
 
 import * as vscode from "vscode";
+import { spawn } from "node:child_process";
+import * as fsp from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import {
+  AUDIO_EXTENSION,
+  cleanTranscript,
+  dictationMode,
+  localCommand,
+  transcriptionBody,
+} from "../core/dictation/dictation.js";
+import { normalizeBaseUrl } from "../core/providers/credentials.js";
 import { callSignature, safeArgs } from "../core/agent/callSignature.js";
 import { knowledgeAmbient } from "./knowledge.js";
 import { language, t } from "../shared/i18n.js";
@@ -599,6 +611,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       suggestCompact:
         shouldSuggestCompact(contextTokens, budgetTokens, this.session.entries.filter((e) => e.included).length),
       busy: this.turn !== undefined,
+      // Only when there is somewhere to transcribe. See `core/dictation/dictation.ts`.
+      ...(dictationMode(s.dictation) === "off" ? {} : { dictation: true }),
       budget: { spentTodayUsd: this.gate.budget.spentToday(), dailyUsd: s.budget.dailyUsd },
       sessionCostUsd: this.session.totalCostUsd(),
       pendingApprovals: this.pendingApprovals,
@@ -1028,6 +1042,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         }
         case "restoreCheckpoint":
           await this.restoreCheckpoint(m.id);
+          break;
+        case "dictate":
+          await this.transcribe(m.audio, m.ms);
           break;
         case "shareEntry":
           await this.shareEntry(m.id);
@@ -3037,6 +3054,136 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this.screen = "chat";
     this.sendState();
     void vscode.window.setStatusBarMessage(t("Attached here. Ask your question."), 4000);
+  }
+
+  /**
+   * Turn a recording into text in the composer.
+   *
+   * Local first, and off until configured: see `core/dictation/dictation.ts` for why a recording of
+   * somebody's voice is not something to send by default. The text lands in the composer rather than
+   * in a sent question — a recogniser mis-hears, and a dictated question that sends itself is a
+   * question nobody proof-read.
+   */
+  private async transcribe(audioBase64: string, ms: number): Promise<void> {
+    const settings = readSettings();
+    const mode = dictationMode(settings.dictation);
+    if (mode === "off") {
+      this.post({
+        type: "dictationFailed",
+        why: t("Dictation is not set up. Set hiveyCode.dictation.command to a transcriber on this machine."),
+      });
+      return;
+    }
+    const audio = Buffer.from(audioBase64, "base64");
+    // Guarded rather than trusted: a stuck recorder can hand over a very large buffer, and the local
+    // path writes it to disk while the remote one would upload it.
+    if (audio.length > 25 * 1024 * 1024) {
+      this.post({ type: "dictationFailed", why: t("That recording is too long. Keep it under a couple of minutes.") });
+      return;
+    }
+    this.log.appendLine(`[dictation] ${mode}, ${Math.round(ms / 100) / 10}s, ${audio.length} bytes`);
+    try {
+      const text = mode === "local" ? await this.transcribeLocally(audio, settings) : await this.transcribeRemotely(audio, settings);
+      const clean = cleanTranscript(text);
+      if (!clean) {
+        // Distinguished from a failure on purpose: the tool worked and there was nothing to hear.
+        this.post({ type: "dictationFailed", why: t("Nothing was heard.") });
+        return;
+      }
+      this.post({ type: "dictated", text: clean });
+    } catch (err) {
+      this.post({ type: "dictationFailed", why: (err as Error).message });
+    }
+  }
+
+  /** Run the user's own transcriber. Nothing leaves the machine. */
+  private async transcribeLocally(audio: Buffer, settings: Settings): Promise<string> {
+    const dir = await fsp.mkdtemp(join(tmpdir(), "hivey-dictation-"));
+    const file = join(dir, `speech.${AUDIO_EXTENSION}`);
+    await fsp.writeFile(file, audio);
+    try {
+      const built = localCommand(settings.dictation.command, file);
+      if ("message" in built) throw new Error(built.message);
+      const [program, ...args] = built.argv;
+      return await new Promise<string>((resolve, reject) => {
+        // argv, no shell: see `localCommand`. A path with a space in it is one argument here and two
+        // to a shell, and a settings box is exactly where such a path gets typed.
+        const child = spawn(program!, args, { cwd: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath });
+        let out = "";
+        let err = "";
+        child.stdout.on("data", (chunk: Buffer) => (out += chunk.toString("utf8")));
+        child.stderr.on("data", (chunk: Buffer) => (err += chunk.toString("utf8")));
+        child.on("error", (e) => reject(new Error(t("Could not run the dictation command: {0}", e.message))));
+        const timer = setTimeout(() => {
+          child.kill();
+          reject(new Error(t("The dictation command did not finish in time.")));
+        }, 120_000);
+        child.on("close", (code) => {
+          clearTimeout(timer);
+          // stderr is where whisper.cpp writes its progress, so it is only interesting when the
+          // command failed AND printed no text.
+          if (code !== 0 && !out.trim()) reject(new Error(err.trim().split("\n").slice(-2).join(" ") || t("The dictation command failed.")));
+          else resolve(out);
+        });
+      });
+    } finally {
+      // The recording is deleted whatever happened. Leaving somebody's voice in a temp directory
+      // because the transcriber crashed is not a failure mode worth having.
+      await fsp.rm(dir, { recursive: true, force: true }).catch(() => undefined);
+    }
+  }
+
+  /**
+   * Transcribe at a configured endpoint, with consent, and in the ledger.
+   *
+   * ⚠️ Asked every time, and never remembered. Everywhere else in this product a consent can be
+   * given "always", because what leaves is code the user chose to attach. This is a recording of
+   * their voice: it cannot be pseudonymised, the user cannot see what is in it the way they can read
+   * a diff, and "always" on a microphone is the one permission this project should not offer.
+   */
+  private async transcribeRemotely(audio: Buffer, settings: Settings): Promise<string> {
+    const endpoint = normalizeBaseUrl(settings.dictation.endpoint);
+    const host = (() => {
+      try {
+        return new URL(endpoint).host;
+      } catch {
+        throw new Error(t("hiveyCode.dictation.endpoint is not an address."));
+      }
+    })();
+    const go = await new Promise<boolean>((resolve) => {
+      this.askInPanel(
+        {
+          id: randomNonce(),
+          tool: "send",
+          description: t("Send this recording of your voice to {0}?", host),
+          choices: ["once", "no"],
+          detail: [
+            t("A recording cannot be pseudonymised, the way a diff can be read before it is sent."),
+            t("About {0} s of audio, {1} kB.", Math.max(1, Math.round(audio.length / 4000)), Math.round(audio.length / 1024)),
+          ],
+        },
+        (answer) => resolve(answer === "once"),
+        () => resolve(false),
+      );
+    });
+    if (!go) throw new Error(t("Not sent."));
+
+    const { body, contentType } = transcriptionBody(audio, {
+      model: settings.dictation.model,
+      ...(settings.dictation.language ? { language: settings.dictation.language } : {}),
+    });
+    // The gateway's key, when one is stored: a self-hosted transcriber usually needs none, and a
+    // missing key is not a reason to refuse — the endpoint will say so if it minds.
+    const key = await Promise.resolve(this.keys.get("openai-compatible" as never)).catch(() => undefined);
+    const res = await fetch(`${endpoint}/audio/transcriptions`, {
+      method: "POST",
+      headers: { "content-type": contentType, ...(key ? { authorization: `Bearer ${key}` } : {}) },
+      // Copied into its own buffer so the typed array handed to `fetch` is backed by a plain
+      // ArrayBuffer, which is what the DOM BodyInit type accepts.
+      body: new Uint8Array(body).buffer as ArrayBuffer,
+    });
+    if (!res.ok) throw new Error(t("The transcriber answered HTTP {0}.", res.status));
+    return await res.text();
   }
 
   private async restoreCheckpoint(id: string): Promise<void> {

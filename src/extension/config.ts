@@ -8,6 +8,7 @@
 //     provider at a public URL gets redaction and consent like any other remote provider.
 
 import { SHIPPED_LIMITS } from "../core/router/budget.js";
+import type { DictationSettings } from "../core/dictation/dictation.js";
 import * as vscode from "vscode";
 import { allowedEndpoint, applyPolicy, featureDisabled } from "../core/policy/policy.js";
 import { policyState } from "./policy.js";
@@ -35,6 +36,8 @@ export interface Settings {
     /** Ask for Anthropic's prompt cache through OpenRouter. Off: it changes the request's shape. */
     promptCache: boolean;
   };
+  /** Speaking instead of typing. Off until configured — see `core/dictation/dictation.ts`. */
+  dictation: DictationSettings;
   completion: {
     provider: ProviderId | "off";
     model: string;
@@ -242,6 +245,12 @@ function readSettingsRaw(scope?: vscode.Uri): Settings {
       model: c.get<string>("chat.model", "qwen2.5-coder:7b"),
       promptCache: c.get<boolean>("chat.promptCache", false),
       maxOutputTokens: c.get<number>("chat.maxOutputTokens", 8192),
+    },
+    dictation: {
+      command: c.get<string>("dictation.command", ""),
+      endpoint: c.get<string>("dictation.endpoint", ""),
+      model: c.get<string>("dictation.model", "whisper-1"),
+      language: c.get<string>("dictation.language", ""),
     },
     completion: {
       provider: c.get<ProviderId | "off">("completion.provider", "local"),

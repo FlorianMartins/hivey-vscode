@@ -159,5 +159,9 @@
   "command.routingForget.title": "Forget what was learned in this repository",
   "config.secondOpinion.enabled": "Before applying a change that touches one of the settings the other rules depend on, a file that configures how everything else behaves, or a diff too big to have been read, a **second model** reads the request and the diff and says what the request did not ask for. Its objections appear on the approval card. **Local only**: if the second reader would be a model that bills, it is not called and the card says so. Objections are advisory unless your organisation's policy requires them to be resolved.",
   "command.auditLastPrompt": "Audit the last prompt",
-  "config.notices.enabled": "Show a “To know” note under an answer: what the assistant noticed but was not asked about, what it did not verify, and the state of the tool. Nothing is ever changed by it."
+  "config.notices.enabled": "Show a “To know” note under an answer: what the assistant noticed but was not asked about, what it did not verify, and the state of the tool. Nothing is ever changed by it.",
+  "config.dictation.command": "A command on this machine that transcribes a recording. `{file}` is where the audio is written; the text it prints goes into the composer. Example: `whisper-cli -f {file} --no-timestamps --output-txt -`. Empty means dictation is off — nothing is recorded and nothing is sent.",
+  "config.dictation.endpoint": "An OpenAI-compatible `/audio/transcriptions` address, used **only** when no local command is set. A recording of your voice cannot be pseudonymised, so this goes through the same consent card as an image.",
+  "config.dictation.model": "The transcription model, for the remote path.",
+  "config.dictation.language": "A language hint for the recogniser, such as `fr`. Empty lets it decide."
 }
