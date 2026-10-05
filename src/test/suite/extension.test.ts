@@ -1734,6 +1734,15 @@ suite("Hivey Code", () => {
       await vscode.commands.executeCommand("hiveyCode.setMode", "agent");
       void vscode.commands.executeCommand("hiveyCode.askWith", "rename before to after");
       for (let i = 0; i < 200 && !doc.getText().includes("after"); i++) await delay(50);
+      // ⚠️ And then for the SAVE, which happens after the buffer changes. Waiting only for the text
+      // made this test a race it lost under load: it observed the edit land in the document and
+      // asserted `isDirty === false` in the same breath, before `saveAfterEdit` had run. The
+      // assertion was right and the wait was wrong — and a flaky test about whether work reaches the
+      // disk is worse than no test, because the next person to see it red will rerun it.
+      //
+      // Still bounded, so a save that never happens fails here rather than hanging: the loop ends and
+      // the assertions below say exactly what was missing.
+      for (let i = 0; i < 100 && doc.isDirty; i++) await delay(50);
       await vscode.commands.executeCommand("hiveyCode.stopAnswer");
 
       const back = (JSON.parse(stub.bodies()[1] ?? "{}").messages ?? []).filter(

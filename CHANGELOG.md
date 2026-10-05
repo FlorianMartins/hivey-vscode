@@ -2,6 +2,53 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 0.99.2 — 2026-10-05
+
+### Design — et le verdict sur la 0.99.1
+
+Florian : « Je ne vois pas les modification d'UI que tu as fait... c'est toujours aussi compliqué de
+comprendre les menus, settings, etc et surtout c'est pas suffisamment aéré on ne comprend rien du
+tout. »
+
+Il a raison, et l'état mesuré dit pourquoi la passe précédente était invisible : **4 px entre les
+contrôles, 3 px de padding vertical, 18 px d'interligne**. Cinq contrôles et un nom de modèle tassés
+dans une colonne de 280 px sans rien entre eux. À cette densité l'œil ne trouve pas où un contrôle
+finit et où le suivant commence : la rangée se lit comme une seule bande de mots. Aucun étiquetage ne
+corrige ça, il faut d'abord bouger l'espacement.
+
+⚠️ Ce sont des pas **entiers** de l'échelle, pas des fractions. *Un changement que personne ne voit
+est un changement qui ne valait pas la peine* — c'est la vraie leçon de la tentative précédente.
+
+- Les contrôles font **30 px de haut**, pas 24 — la taille des barres d'outils de l'éditeur lui-même.
+- La barre d'outils **passe à la ligne** au lieu de tronquer. Le nom du modèle rétrécissait jusqu'à
+  « qwe… » pour tenir sur une ligne : on échangeait la seule étiquette porteuse d'information contre
+  une ligne de rien.
+- **Chaque menu porte le glyphe de son sujet** (bouclier pour ce qui est permis, puce pour le modèle,
+  étincelle pour la réflexion). Fermés, ils n'affichaient que leur **valeur** : « Agent ·
+  qwen2.5-coder · Direct » ne dit pas que le troisième parle de raisonnement.
+- Les cartes de réglages ont un vrai cadre et une vraie marge. Une carte est une **décision**, et une
+  décision a besoin d'un bord que l'œil trouve.
+
+### Corrigé
+
+- **« so far » à côté du prix est retiré**, comme demandé — « c'est moche et inutile ». ⚠️ Mais
+  l'ambiguïté qu'il rapiéçait n'était pas dans le mot, elle était dans l'**adjacence** : la taille du
+  contexte et le total de la conversation se touchaient et se lisaient comme un ratio. Ils sont
+  maintenant aux deux bouts de la rangée — c'est le correctif qui aurait dû venir en premier.
+
+- **Le bouton de dictée est visible.** Il était caché tant qu'aucun transcripteur n'était configuré,
+  au nom de « un bouton qui a l'air d'écouter sans écouter est pire que pas de bouton ». Le
+  raisonnement est juste et appliqué au mauvais objet : il vaut contre un bouton qui prétend
+  **enregistrer**, pas contre un qui propose de configurer la dictée. Le cacher rendait la
+  fonctionnalité introuvable pour la personne qui l'avait demandée. Il ouvre maintenant le réglage,
+  filtré sur la bonne clé.
+
+- **L'écran des réglages ne remonte plus en haut.** `captureScroll` ne regardait que `.transcript`,
+  et uniquement sur l'écran de discussion — donc tous les autres écrans repartaient du haut à chaque
+  redessin, et l'écran des réglages se redessine à **chaque frappe** dans un champ de clé. ⚠️ Le
+  commentaire au-dessus décrivait un problème propre au fil de discussion, et c'est donc ce que le
+  code avait résolu.
+
 ## 0.99.1 — 2026-10-05
 
 ### Corrigé
