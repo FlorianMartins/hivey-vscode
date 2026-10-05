@@ -480,7 +480,29 @@ export function activate(context: vscode.ExtensionContext): void {
         .update("language", picked.id, vscode.ConfigurationTarget.Global);
       applyLanguage();
       chat.reload();
-      void vscode.window.showInformationMessage(t("Language changed. Reopen a panel if a title still shows the old one."));
+      // ⚠️ One honest limit, stated rather than papered over. The command palette entries and the
+      // settings page come from `package.nls.*.json`, which VS CODE resolves from its OWN display
+      // language — an extension cannot override that, for any setting it invents. Everything the
+      // extension draws itself does follow this choice; those two surfaces follow the editor.
+      //
+      // Saying so is the whole point: somebody who picks French, sees the panel turn French and the
+      // command palette stay English concludes the setting is broken. It is not, and the one thing
+      // that would change it is a command the editor owns.
+      const mismatch = picked.id !== "auto" && !vscode.env.language.toLowerCase().startsWith(picked.id);
+      if (!mismatch) {
+        void vscode.window.showInformationMessage(t("Language changed."));
+        return;
+      }
+      const change = t("Change VS Code's language");
+      const answer = await vscode.window.showInformationMessage(
+        t("Hivey Code is now in {0}.", picked.label),
+        {
+          modal: false,
+          detail: t("The command palette entries and the settings page follow VS Code's own display language, which an extension cannot change."),
+        },
+        change,
+      );
+      if (answer === change) await vscode.commands.executeCommand("workbench.action.configureLocale");
     }),
 
     vscode.commands.registerCommand("hiveyCode.openSettings", () =>

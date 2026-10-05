@@ -138,7 +138,7 @@ function card(label: string, value: string): string {
 
 function page(title: string, body: string): string {
   return `<!DOCTYPE html>
-<html lang="fr"><head><meta charset="utf-8">
+<html lang="${language()}"><head><meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline';">
 <title>${escapeHtml(title)}</title>
 <style>

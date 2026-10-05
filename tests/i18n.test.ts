@@ -7,6 +7,8 @@ import assert from "node:assert/strict";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { setLanguage, language, t, translationKeys } from "../src/shared/i18n.js";
+import { MODES } from "../src/core/session/modes.js";
+import { SKILL_GROUPS } from "../src/core/session/skills.js";
 import { FR } from "../src/shared/i18n.fr.js";
 
 test("the language is the primary subtag, whatever the tag looks like", () => {
@@ -126,3 +128,46 @@ function walk(dir: string): string[] {
   }
   return out;
 }
+
+test("a language change rebuilds the labels that were translated at module load", () => {
+  // ⚠️ `t()` resolving at call time is not enough, and that gap is why « quand on selectionne une
+  // langue dans les parametres » left half the extension in the old one. A module that writes
+  // `export const MODES = [{ label: t("Chat") }]` calls `t()` while the module is being EVALUATED —
+  // once, before the extension has read its own `language` setting, because ES modules evaluate
+  // their imports first. `setLanguage("fr")` afterwards changed nothing about those strings.
+  //
+  // Worse, `modes.ts` carried a comment claiming the labels were "read at call time rather than at
+  // module load", directly above code that did the opposite.
+  const before = language();
+  try {
+    setLanguage("en");
+    const english = MODES.find((m) => m.id === "chat")!.hint;
+    setLanguage("fr");
+    const french = MODES.find((m) => m.id === "chat")!.hint;
+    assert.notEqual(french, english, "the mode hints did not follow the language");
+    assert.match(french, /joignez|attachez|Répond/i);
+
+    // And the skill families, which is 20 more labels and the ones a user sees in the composer.
+    const group = SKILL_GROUPS.find((g) => g.id === "general")!;
+    assert.notEqual(group.label, "Any language", "the skill families did not follow the language");
+  } finally {
+    setLanguage(before);
+  }
+});
+
+test("the rebuilt arrays are the same objects, so existing imports see the change", () => {
+  // A rebuilder that REASSIGNED the binding would leave every module that already imported it holding
+  // the old array — the same bug one level in, and invisible, because the test that imports it
+  // directly would pass.
+  const before = language();
+  try {
+    setLanguage("en");
+    const identity = MODES;
+    const length = MODES.length;
+    setLanguage("fr");
+    assert.equal(MODES, identity, "the array was replaced instead of being rebuilt in place");
+    assert.equal(MODES.length, length, "rebuilding must not change how many there are");
+  } finally {
+    setLanguage(before);
+  }
+});

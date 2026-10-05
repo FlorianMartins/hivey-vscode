@@ -14,7 +14,7 @@
 // `action`, which does something to the conversation instead. The action is a plain string rather
 // than a protocol message so that core stays free of the panel's wire format; the webview maps it.
 
-import { t } from "../../shared/i18n.js";
+import { t, onLanguageChange } from "../../shared/i18n.js";
 
 export interface BuiltinSkill {
   /** The invocation, `/` included. */
@@ -105,7 +105,14 @@ export type SkillGroup =
  * Every family must hold at least three skills. A heading with one entry under it is a heading that
  * makes the list longer without making the choice easier.
  */
-export const SKILL_GROUPS: Array<{ id: SkillGroup; label: string; hint: string }> = [
+// ⚠️ Rebuilt on a language change rather than built once: `t()` inside an array literal at module
+// scope runs while the module is being evaluated, which is before the extension has read its own
+// `language` setting. Without this the panel switched language and every one of these labels stayed
+// behind. See `shared/i18n.ts`.
+export const SKILL_GROUPS: Array<{ id: SkillGroup; label: string; hint: string }> = [];
+onLanguageChange(() => {
+  SKILL_GROUPS.length = 0;
+  SKILL_GROUPS.push(
   { id: "general", label: t("Any language"), hint: t("Applies whatever you have open.") },
   { id: "frontend", label: t("HTML & CSS"), hint: t("Markup, styling, accessibility, responsive layout") },
   { id: "javascript", label: t("JavaScript & TypeScript"), hint: t("Types, modules, async, browser performance") },
@@ -129,9 +136,13 @@ export const SKILL_GROUPS: Array<{ id: SkillGroup; label: string; hint: string }
   { id: "dds", label: t("DDS, display & printer files"), hint: t("PF, LF, DSPF, PRTF") },
   { id: "db2i", label: t("Db2 for i"), hint: t("SQL, commitment control, catalogue, journalling") },
   { id: "cl", label: "CL", hint: t("Programs, message handling, parameters") },
-];
+  );
+});
 
-export const BUILTIN_SKILLS: BuiltinSkill[] = [
+export const BUILTIN_SKILLS: BuiltinSkill[] = [];
+onLanguageChange(() => {
+  BUILTIN_SKILLS.length = 0;
+  BUILTIN_SKILLS.push(
   // ── Any language ────────────────────────────────────────────────────────────────────────────
   { group: "general", name: "/compact", hint: t("summarize the conversation and free the context"), action: "compact" },
   {
@@ -852,7 +863,8 @@ export const BUILTIN_SKILLS: BuiltinSkill[] = [
   { group: "db2i", name: "/qsys2", evalTask: "ibmi-sql-db2", hint: t("use the catalogue instead"), prompt: t("Replace this with a QSYS2 or SYSTOOLS service where one exists — object lists, job information, journal entries, IFS objects — rather than a command whose output has to be parsed. Give the query and say what it returns that the command did not."), attach: true },
   { group: "db2i", name: "/commitctl", evalTask: "ibmi-db2-commit", hint: t("review the commitment control"), prompt: t("Review the commitment control here: what is under commit and what is not, where COMMIT and ROLLBACK are issued, what happens on an unhandled error, and whether the activation group scope matches the unit of work.") },
   { group: "rpg", name: "/dbmodern", evalTask: "ibmi-rpg-sql-cursor", hint: t("modernise the data access"), prompt: t("Propose the SQL replacement for these native I/O operations (CHAIN, SETLL, READE): the query, whether a cursor or a single fetch is right, and what changes about record locking and about the record format the program expects. Say where native I/O should stay."), attach: true },
-];
+  );
+});
 
 /**
  * `/compact` cannot be switched off.

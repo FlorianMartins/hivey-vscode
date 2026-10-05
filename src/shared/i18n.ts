@@ -37,10 +37,46 @@ function detect(): string | undefined {
   return undefined;
 }
 
+/**
+ * Structures that were translated once, at module load, and have to be rebuilt when the language
+ * changes.
+ *
+ * ⚠️ This exists because `t()` resolving at call time is NOT enough, and the gap was invisible. A
+ * module that writes `export const MODES = [{ label: t("Chat") }]` calls `t()` while the module is
+ * being evaluated — once, before the extension has read its own `language` setting, because ES
+ * modules evaluate their imports first. `setLanguage("fr")` afterwards changes nothing about an array
+ * whose strings were already produced.
+ *
+ * So the panel switched to French and the mode labels, the skill families and the 100-odd skill hints
+ * stayed in whatever `process.env.LANG` happened to say: « quand on selectionne une langue dans les
+ * parametres que l'extension complete change de langue ».
+ *
+ * A rebuilder mutates its own array IN PLACE, so every module that already imported it sees the new
+ * strings without being changed or re-imported. Registering one is a deliberate edit in the file that
+ * owns the structure, which is the right place to decide that a label is translated.
+ */
+const rebuilders: Array<() => void> = [];
+
+/**
+ * Rebuild this structure whenever the language changes, and once now.
+ *
+ * @param rebuild must mutate in place. Reassigning a module-level binding would leave every existing
+ *   import pointing at the old value, which is the bug this is here to fix, one level further in.
+ */
+export function onLanguageChange(rebuild: () => void): void {
+  rebuilders.push(rebuild);
+  rebuild();
+}
+
 export function setLanguage(tag: string | undefined): Lang {
   // VS Code hands out tags like `fr`, `fr-CA`, `pt-br`; only the primary subtag decides.
   const primary = (tag ?? "en").toLowerCase().split(/[-_.]/)[0];
-  current = primary === "fr" ? "fr" : "en";
+  const next = primary === "fr" ? "fr" : "en";
+  const changed = next !== current;
+  current = next;
+  // Only on a real change: rebuilding on every call would make activation quadratic in the number of
+  // registered structures for no reason, and `applyLanguage()` is called on every settings change.
+  if (changed) for (const rebuild of rebuilders) rebuild();
   return current;
 }
 
