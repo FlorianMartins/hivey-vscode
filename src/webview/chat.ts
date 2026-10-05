@@ -1318,6 +1318,22 @@ function autoGrow(area: HTMLTextAreaElement): void {
 let streaming = false;
 export function setStreaming(value: boolean): void {
   streaming = value;
+  // ⚠️ Applied to the live node as well as kept in the flag, and that redundancy is the fix.
+  //
+  // The turning ring around the composer is `.composer.working`, and the class was only ever set
+  // while BUILDING the composer — so it existed exactly as long as the next rebuild agreed with it.
+  // Any `state` message arriving mid-turn re-renders from `state.busy`, and `turnEnd` did not
+  // re-render at all, so the ring could vanish while the model was still thinking and linger after
+  // it had stopped. Reported as « il ne semble plus y avoir l'animation autour de la zone de saisie
+  // user quand l'IA est en reflexion ».
+  //
+  // Toggling the class here makes the state true of the DOM at the moment it becomes true, whatever
+  // the next render decides. The build-time class stays, for the composer that does not exist yet.
+  const node = document.querySelector<HTMLElement>(".composer");
+  if (!node) return;
+  // `waiting` wins: a turn stopped on an approval is asking a question, not working, and the two
+  // must not animate the same way.
+  node.classList.toggle("working", value && !node.classList.contains("waiting"));
 }
 export function isStreaming(): boolean {
   return streaming;

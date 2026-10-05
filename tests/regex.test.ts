@@ -8,7 +8,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { compilePattern, parsePattern } from "../src/core/agent/regex.js";
+import { compilePattern, escapeLiteral, parsePattern, searchPattern } from "../src/core/agent/regex.js";
 
 test("a leading (?i) becomes the JavaScript i flag", () => {
   const re = compilePattern("(?i)whs-", "g");
@@ -60,4 +60,48 @@ test("a group in the middle of the pattern is left alone", () => {
 
 test("an ordinary pattern is untouched", () => {
   assert.deepEqual(parsePattern("function\\s+\\w+", "g"), { source: "function\\s+\\w+", flags: "g" });
+});
+
+test("a pattern that is not a regex at all is searched as text", () => {
+  // ⚠️ Why « beaucoup de search text ... echouent ». A model looking for a call site types `total(`.
+  // As a regular expression that is `Unterminated group`, so the search failed and answered nothing
+  // — and five of eight patterns taken from ordinary code search fail the same way: `cost.usd(`,
+  // `?.length`, `C++`, `foo)`. Every one of them is obviously a literal.
+  for (const pattern of ["total(", "cost.usd(", "?.length", "C++", "foo)"]) {
+    const found = searchPattern(pattern, "g");
+    assert.equal(found.literal, true, `${pattern} should have fallen back to text`);
+    assert.equal(found.re.test(pattern), true, `${pattern} should match itself`);
+  }
+});
+
+test("a real regular expression is still a regular expression", () => {
+  // The fallback must not swallow the feature: a working pattern keeps its meaning.
+  const found = searchPattern("function\\s+\\w+", "g");
+  assert.equal(found.literal, false);
+  assert.equal(found.re.test("function total"), true);
+  assert.equal(found.re.test("function+total"), false);
+});
+
+test("escapeLiteral neutralises every metacharacter", () => {
+  // Tested directly, because most strings full of metacharacters are PERFECTLY VALID regexes —
+  // `a.b(c)[d]{e}|f*g+h?` compiles — so going through the fallback would not exercise the escaping.
+  const nasty = "a.b(c)[d]{e}|f*g+h?i^j$k\\l/m";
+  const re = new RegExp(escapeLiteral(nasty));
+  assert.equal(re.test(nasty), true, "the escaped pattern must match the text it came from");
+  assert.equal(new RegExp(escapeLiteral("a.c")).test("abc"), false, "the dot must stop being a wildcard");
+  assert.equal(new RegExp(escapeLiteral("a+")).test("aaa"), false, "the plus must stop being a quantifier");
+});
+
+test("an unterminated group falls back and matches itself", () => {
+  // A pattern that genuinely does not compile, with metacharacters in it, through the real path.
+  const found = searchPattern("cost.usd(", "g");
+  assert.equal(found.literal, true);
+  assert.equal(found.re.test("const x = cost.usd(a)"), true);
+  assert.equal(new RegExp(escapeLiteral("cost.usd(")).test("costXusd("), false, "the dot stayed literal");
+});
+
+test("an inline flag is still refused rather than searched for literally", () => {
+  // The one case where falling back would be nonsense: `(?-i)` is not something anybody is looking
+  // for, and the message says exactly what to change.
+  assert.throws(() => searchPattern("(?-i)x", "g"), /Unsupported inline flag/);
 });

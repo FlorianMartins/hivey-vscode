@@ -7,7 +7,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { cleanTerminalOutput, describeOutcome, stripAnsi, tailOutput } from "../src/core/terminal/output.js";
+import { cleanTerminalOutput, describeOutcome, stripAnsi, tailOutput, isStatusAnswer } from "../src/core/terminal/output.js";
 
 const ESC = "\u001b";
 const BEL = "\u0007";
@@ -92,4 +92,41 @@ test("an exit code the shell did not report is stated as unproven, never as succ
   assert.match(describeOutcome({ output: "boom", exitCode: 1 }), /^exit code 1\nboom$/);
   assert.match(describeOutcome({ output: "", exitCode: 0 }), /\(no output\)/);
   assert.match(describeOutcome({ output: "x", timedOut: true }), /timed out/);
+});
+
+test("grep finding nothing is an answer, not a failure", () => {
+  // ⚠️ Part of why « beaucoup de ... run command ... echouent ». `grep` exits 1 when it finds
+  // nothing, which is a perfectly good answer to "is this used anywhere?" — and that drew the step
+  // as a failure, told the model the tool errored, and made `verifyTurn` count a failed check.
+  // Three wrong conclusions from one correct command.
+  assert.equal(isStatusAnswer("grep -r todo src", 1), true);
+  assert.equal(isStatusAnswer("rg --no-heading nothing", 1), true);
+  assert.equal(isStatusAnswer("test -f missing.txt", 1), true);
+  assert.equal(isStatusAnswer("which pytest", 1), true);
+  assert.equal(isStatusAnswer("git diff --quiet", 1), true);
+  assert.equal(isStatusAnswer("npm test && grep ok out.txt", 1), true);
+});
+
+test("a real failure is still a real failure", () => {
+  // The list is short and explicit on purpose: a failed mkdir, cp or install must stay an error, and
+  // naming the exceptions is the only way to be sure of that.
+  assert.equal(isStatusAnswer("npm test", 1), false);
+  assert.equal(isStatusAnswer("mkdir /root/nope", 1), false);
+  assert.equal(isStatusAnswer("tsc --noEmit", 1), false);
+  assert.equal(isStatusAnswer("cargo build", 1), false);
+});
+
+test("exit 2 from grep is a failure, because grep means it that way", () => {
+  // grep uses 2 for an unreadable file or a bad pattern. Treating that as "no match" would hide a
+  // real error behind a reassuring answer — the mistake this function exists to avoid, in the other
+  // direction.
+  assert.equal(isStatusAnswer("grep -r todo src", 2), false);
+  assert.equal(isStatusAnswer("grep -r todo src", 0), false);
+  assert.equal(isStatusAnswer("grep -r todo src", undefined), false);
+});
+
+test("a word that merely contains a command name is not that command", () => {
+  // `ripgrep` is not `rg`, and `latest` is not `test`.
+  assert.equal(isStatusAnswer("./scripts/pretest.sh", 1), false);
+  assert.equal(isStatusAnswer("node mygrep.js", 1), false);
 });

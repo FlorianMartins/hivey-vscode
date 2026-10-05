@@ -428,12 +428,32 @@ class LiveTurn {
       if (!this.thinking) {
         const wrap = reasoningBlock("", { open: true });
         const body = wrap.querySelector<HTMLElement>(".collapsible-body")!;
+        // A reader who scrolls the box up has said where they want to be; one who scrolls it back to
+        // the bottom has said to resume. Tracked on the box rather than guessed from the content,
+        // because "did the user move this" is not answerable from the text that arrived.
+        body.addEventListener("scroll", () => {
+          // A pixel of tolerance: a fractional scrollHeight on a zoomed display never equals the sum.
+          this.followThinking = body.scrollHeight - body.scrollTop - body.clientHeight <= 2;
+        });
         this.thinking = { wrap, body };
         this.body.prepend(wrap);
       }
       this.thinking.body.textContent = (this.thinking.body.textContent ?? "") + chunk;
     });
+    // ⚠️ And the block's OWN scroller, which `following` cannot reach. `.collapsible-body` is capped
+    // at 260px with `overflow-y: auto`, so the page can be perfectly positioned while the reasoning
+    // grows inside a box that never scrolls itself: you read the first screenful and the rest piles
+    // up out of sight. Reported as « on reste bloqué en haut de sa phase de raisonnement au lieu de
+    // defiler avec » — the page was following, the box was not.
+    //
+    // Not when the reader has scrolled it up themselves: someone re-reading an earlier line of the
+    // thinking has said where they want to be, and yanking them back is worse than not following.
+    const body = this.thinking?.body;
+    if (body && this.followThinking) body.scrollTop = body.scrollHeight;
   }
+
+  /** Whether the reasoning box still follows its own tail. False once the reader scrolls it. */
+  private followThinking = true;
 
   /**
    * The plan, redrawn in place.
@@ -744,6 +764,9 @@ window.addEventListener("message", (event: MessageEvent<ToPanel>) => {
     case "turnEnd":
       setStreaming(false);
       live?.finish();
+      // Re-rendered, so the composer returns to rest now rather than whenever the next state
+      // message happens to arrive: the ring used to keep turning after the turn had ended.
+      render();
       refreshJumpButton();
       break;
     case "delta":

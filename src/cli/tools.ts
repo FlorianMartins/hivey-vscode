@@ -7,7 +7,7 @@
 //      terminal), which makes the terminal client the better place to run tests.
 
 import { spawn } from "node:child_process";
-import { compilePattern } from "../core/agent/regex.js";
+import { searchPattern } from "../core/agent/regex.js";
 import { readFile, readdir, stat, writeFile } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import type { Tool, ToolResult } from "../core/agent/loop.js";
@@ -179,10 +179,14 @@ export function buildCliTools(opts: CliToolOptions): Tool[] {
     approval: () => false,
     async run(args, ctx): Promise<ToolResult> {
       let re: RegExp;
+      let literal = false;
       try {
         // `(?i)` and friends: valid in ripgrep, Go, Rust, Python and PCRE, `Invalid group` in
-        // JavaScript. Translated rather than refused — see `core/agent/regex.ts`.
-        re = compilePattern(String(args["pattern"] ?? ""));
+        // JavaScript. And `total(` is not a regular expression at all — it is a model looking for a
+        // call site. Both handled in `core/agent/regex.ts` rather than refused here.
+        const found = searchPattern(String(args["pattern"] ?? ""));
+        re = found.re;
+        literal = found.literal;
       } catch (err) {
         return { content: `Invalid regular expression: ${(err as Error).message}`, isError: true };
       }
@@ -205,7 +209,10 @@ export function buildCliTools(opts: CliToolOptions): Tool[] {
         }
       }
       ctx.report(t("{0} match(es)", hits.length));
-      return { content: hits.join("\n") || "(no match)" };
+      // Said, because the model must not conclude that `total(` is a working regular expression and
+      // build the next pattern on that belief.
+      const note = literal ? "(searched as plain text: that pattern is not a valid regular expression)\n" : "";
+      return { content: note + (hits.join("\n") || "(no match)") };
     },
   };
 

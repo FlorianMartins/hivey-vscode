@@ -15,7 +15,7 @@
 
 import * as vscode from "vscode";
 import { t } from "../shared/i18n.js";
-import { cleanTerminalOutput, describeOutcome } from "../core/terminal/output.js";
+import { cleanTerminalOutput, describeOutcome, isStatusAnswer } from "../core/terminal/output.js";
 
 /** The name is the contract: one terminal, reused, so only the first command waits for the shell. */
 export const TERMINAL_NAME = "Hivey Code";
@@ -27,7 +27,20 @@ export const TERMINAL_NAME = "Hivey Code";
  * terminal means only the first command of a session ever pays this. Three seconds is the value
  * VS Code's own documentation uses in its fallback example.
  */
-const INTEGRATION_TIMEOUT_MS = 3000;
+// How long to wait for the shell to announce itself.
+//
+// ⚠️ This was a flat 3 s and it was the reason « beaucoup de run command ... echouent ». VS Code's
+// integration script runs inside the shell's own startup, so on the FIRST terminal of a session it
+// lands after the user's profile does — and a real profile is not fast: oh-my-zsh, powerlevel10k,
+// nvm, a Windows PowerShell profile, WSL. Miss the window and the command still runs but its output
+// cannot be read, so the model is told "do not assume it succeeded" and can verify nothing. For the
+// whole session, because every later command re-ran the same three-second race.
+//
+// So a terminal this extension just created gets a generous window — paid once, and only when
+// nothing is warm yet — while one that already existed gets a short one, since integration that has
+// not arrived by then is usually a shell that has none.
+const INTEGRATION_TIMEOUT_FRESH_MS = 15_000;
+const INTEGRATION_TIMEOUT_WARM_MS = 3000;
 
 /** Beyond this the log is cut, keeping the end. Tool output is re-sent on every later step. */
 const MAX_OUTPUT_CHARS = 8000;
@@ -54,10 +67,21 @@ export interface RunResult {
  * per command buries the editor under tabs, and shell integration would have to warm up every time,
  * so every command would pay the three-second wait instead of the first one.
  */
-function terminalFor(cwd: string | undefined): vscode.Terminal {
+function terminalFor(cwd: string | undefined): { terminal: vscode.Terminal; fresh: boolean } {
   const existing = vscode.window.terminals.find((term) => term.name === TERMINAL_NAME && term.exitStatus === undefined);
-  return existing ?? vscode.window.createTerminal({ name: TERMINAL_NAME, cwd });
+  if (existing) return { terminal: existing, fresh: false };
+  return { terminal: vscode.window.createTerminal({ name: TERMINAL_NAME, cwd }), fresh: true };
 }
+
+/**
+ * Terminals already found to have no integration.
+ *
+ * So a shell that will never announce itself is not raced again on every command. Keyed by the
+ * terminal object, which is the identity VS Code itself uses, and holding no strong opinion: the
+ * live `terminal.shellIntegration` is still read first, because integration can arrive late and a
+ * remembered "no" must not outlive the truth.
+ */
+const noIntegration = new WeakSet<vscode.Terminal>();
 
 /**
  * Wait for the shell to announce itself, or decide it is not going to.
@@ -102,10 +126,17 @@ export interface RunOptions {
 export async function runCommandInTerminal(opts: RunOptions): Promise<RunResult> {
   const command = opts.command;
   const timeoutMs = Math.min(Math.max(Number(opts.timeoutMs) || DEFAULT_TIMEOUT_MS, 1000), MAX_TIMEOUT_MS);
-  const terminal = terminalFor(opts.cwd);
+  const { terminal, fresh } = terminalFor(opts.cwd);
   terminal.show(true);
 
-  const integration = await waitForShellIntegration(terminal, INTEGRATION_TIMEOUT_MS);
+  // The live property first: integration can arrive at any time, so a remembered "no" is only ever
+  // a reason to skip the WAIT, never a reason to skip the check.
+  const integration =
+    terminal.shellIntegration ??
+    (noIntegration.has(terminal)
+      ? undefined
+      : await waitForShellIntegration(terminal, fresh ? INTEGRATION_TIMEOUT_FRESH_MS : INTEGRATION_TIMEOUT_WARM_MS));
+  if (!integration) noIntegration.add(terminal);
   if (!integration) {
     // The honest branch. The command still runs and the user still sees it; what is missing is the
     // reading, and saying so is what stops the model from inventing a result. This is the whole of
@@ -208,12 +239,16 @@ export async function runCommandInTerminal(opts: RunOptions): Promise<RunResult>
     return { captured: true, isError: true, exitCode: undefined, content: `Cancelled by the user.\n${output}`.trim() };
   }
   const content = describeOutcome({ output, exitCode, timedOut }, MAX_OUTPUT_CHARS);
+  // `grep` exiting 1 found nothing, which is an answer. See `isStatusAnswer`: the step is not drawn
+  // as a failure, the model is not told the tool errored, and `verifyTurn` does not count a check
+  // that failed — three wrong conclusions that used to come from one correct command.
+  const answered = isStatusAnswer(command, exitCode);
   return {
     captured: true,
     // An unknown exit code is not a failure to report to the user, but it is not a success the
     // model may build on either — `describeOutcome` says so in words the model reads.
-    isError: timedOut || (exitCode !== undefined && exitCode !== 0),
+    isError: timedOut || (exitCode !== undefined && exitCode !== 0 && !answered),
     exitCode,
-    content,
+    content: answered ? `${content}\n(exit 1 from this command means "no match" or "not found", not an error.)` : content,
   };
 }

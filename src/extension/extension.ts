@@ -38,7 +38,8 @@ import { McpManager } from "./integrations/mcp.js";
 import { watchInstructions } from "./instructions.js";
 import { createDefinition, definitionUri, DefinitionStore } from "./definitions.js";
 import { ibmiDiagnose, ibmiLibraryList } from "./integrations/ibmi.js";
-import { REMOTE_VENDORS } from "../core/providers/vendors.js";
+import { REMOTE_VENDORS, vendor, type ProviderId } from "../core/providers/vendors.js";
+import { checkCredentials, keyProblem, normalizeBaseUrl, urlProblem } from "../core/providers/credentials.js";
 import { NextEditWatcher } from "./nextEdit.js";
 import { toJsonl, toSyslog, type Chained } from "../core/audit/chain.js";
 
@@ -346,24 +347,103 @@ export function activate(context: vscode.ExtensionContext): void {
       completion.updateStatus(readSettings());
     }),
 
+    /**
+     * Add a provider: the address and the key, in one pass, checked.
+     *
+     * ⚠️ This flow had two faults and Florian named both: « l'ajout d'une nouvelle clé API qui est
+     * bug et pas user friendly par exemple pour le gateway qui demande de stocker l'adresse et
+     * ensuite de stocker la clé API plutôt que de remplir les deux champs et valider ».
+     *
+     *   • IT NEVER ASKED FOR THE ADDRESS. For the one provider whose address is the user's to supply
+     *     — a gateway, Azure, LiteLLM, a corporate proxy — the key was stored and the address had to
+     *     be found afterwards in the settings page, in a different part of the product, with nothing
+     *     saying so. A flow that collects half of what it needs and reports success is worse than
+     *     one that collects none.
+     *
+     *   • NOTHING WAS CHECKED. The vendor table carries a `placeholder` whose own comment says it is
+     *     there "so a wrong paste is visible before it is stored", and no code read it. A key with a
+     *     newline in it was accepted in silence and surfaced later as `401` on an unrelated question.
+     *
+     * Now: address (prefilled with the default, so one Enter accepts it), key, both validated as they
+     * are typed, one GET to prove they work, and the pair stored together or not at all.
+     */
     vscode.commands.registerCommand("hiveyCode.setApiKey", async () => {
       const provider = await vscode.window.showQuickPick(
         [
           ...REMOTE_VENDORS.map((v) => ({ label: v.id, description: v.label, detail: v.hint })),
           { label: "local", description: t("On this machine"), detail: t("A local server that requires a key (rare)") },
         ],
-        { placeHolder: t("Which provider?") },
+        { placeHolder: t("Which provider?"), ignoreFocusOut: true },
       );
       if (!provider) return;
+      const id = provider.label as ProviderId;
+      const vendorInfo = vendor(id);
+      const config = vscode.workspace.getConfiguration(SECTION);
+      const settingKey = vendorInfo?.settingKey ?? "local";
+      const currentUrl = config.get<string>(`endpoints.${settingKey}`) || vendorInfo?.baseUrl || "";
+
+      // Step 1 of 2, prefilled. A standard vendor's default is already right, so this is one Enter;
+      // a gateway's is empty, which is the whole point of asking.
+      const address = await vscode.window.showInputBox({
+        title: t("Add {0} — 1 of 2", vendorInfo?.label ?? id),
+        prompt: t("Address. The default is right unless you use a proxy, a region or a gateway."),
+        value: currentUrl,
+        placeHolder: vendorInfo?.baseUrl || "https://…/v1",
+        ignoreFocusOut: true,
+        validateInput: (value) => {
+          const problem = urlProblem(value, { required: Boolean(vendorInfo?.needsUrl) || !vendorInfo?.baseUrl });
+          if (!problem) return undefined;
+          return problem.fatal
+            ? problem.message
+            : { message: problem.message, severity: vscode.InputBoxValidationSeverity.Warning };
+        },
+      });
+      if (address === undefined) return;
+
+      const baseUrl = normalizeBaseUrl(address) || vendorInfo?.baseUrl || "";
       const key = await vscode.window.showInputBox({
-        prompt: t("Key for {0}. It is stored in the system keychain, never in the settings.", provider.label),
+        title: t("Add {0} — 2 of 2", vendorInfo?.label ?? id),
+        prompt: t("Key for {0}. It is stored in the system keychain, never in the settings.", vendorInfo?.label ?? id),
+        placeHolder: vendorInfo?.placeholder,
         password: true,
         ignoreFocusOut: true,
+        validateInput: (value) => {
+          if (!value) return undefined; // Nothing typed yet is not a mistake.
+          const problem = keyProblem({ label: vendorInfo?.label ?? id, placeholder: vendorInfo?.placeholder ?? "…" }, value);
+          if (!problem) return undefined;
+          return problem.fatal
+            ? problem.message
+            : { message: problem.message, severity: vscode.InputBoxValidationSeverity.Warning };
+        },
       });
       if (!key) return;
-      await keys.store(provider.label as never, key);
+
+      // Checked before being stored, with one GET that costs no tokens. A credential that is known
+      // to work is a different thing from one that has been written down.
+      const check = await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: t("Checking the key against {0}…", baseUrl) },
+        () => checkCredentials({ wire: vendorInfo?.wire ?? "openai", label: vendorInfo?.label ?? id }, baseUrl, key, fetch),
+      );
+      if (!check.ok) {
+        const anyway = t("Store it anyway");
+        const answer = await vscode.window.showWarningMessage(check.why, { modal: true, detail: t("Nothing has been saved yet.") }, anyway);
+        // A key the server rejected outright is not worth storing; an endpoint that could not be
+        // reached might be a VPN that is not up yet, so that one is the user's call.
+        if (answer !== anyway) return;
+      }
+
+      // Both, together. The address first: a stored key pointing at the wrong address is the state
+      // this whole flow exists to prevent.
+      if (baseUrl && baseUrl !== vendorInfo?.baseUrl) {
+        await config.update(`endpoints.${settingKey}`, baseUrl, vscode.ConfigurationTarget.Global);
+      }
+      await keys.store(id as never, key);
       completion.invalidateProvider();
-      void vscode.window.showInformationMessage(t("Hivey Code: {0} key stored in the keychain.", provider.label));
+      void vscode.window.showInformationMessage(
+        check.ok
+          ? t("{0} is ready. {1}", vendorInfo?.label ?? id, check.models ? t("{0} models available.", check.models) : t("The key works."))
+          : t("{0} key stored, unverified.", vendorInfo?.label ?? id),
+      );
     }),
 
     vscode.commands.registerCommand("hiveyCode.exportSession", () => chat.exportSession()),

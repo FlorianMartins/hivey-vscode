@@ -10,7 +10,7 @@
 // it governs and a new tool cannot forget to have one.
 
 import * as vscode from "vscode";
-import { compilePattern } from "../core/agent/regex.js";
+import { searchPattern } from "../core/agent/regex.js";
 import { t } from "../shared/i18n.js";
 import { parsePlan, planSummary, PLAN_TOOL_DESCRIPTION, type Plan } from "../core/agent/plan.js";
 import { NOTE_ASIDE_TOOL, type Notice } from "../core/session/notices.js";
@@ -220,10 +220,14 @@ export function buildTools(deps: ToolDeps): Tool[] {
       const pattern = String(args["pattern"] ?? "");
       const glob = String(args["glob"] ?? "**/*");
       let re: RegExp;
+      let literal = false;
       try {
-        // Same translation as the terminal client's search: one dialect difference, fixed in one
-        // place, or the two surfaces answer the same pattern differently.
-        re = compilePattern(pattern, "g");
+        // Same handling as the terminal client's search: one dialect difference and one "that is not
+        // a regex at all", fixed in one place, or the two surfaces answer the same pattern
+        // differently.
+        const found = searchPattern(pattern, "g");
+        re = found.re;
+        literal = found.literal;
       } catch (err) {
         return { content: `Invalid regular expression: ${(err as Error).message}`, isError: true };
       }
@@ -242,8 +246,12 @@ export function buildTools(deps: ToolDeps): Tool[] {
           /* unreadable file */
         }
       }
-      ctx.report(t("{0} match(es) for /{1}/", out.length, pattern));
-      return { content: out.join("\n") || "(no match)" };
+      ctx.report(
+        literal ? t("{0} match(es) for “{1}”", out.length, pattern) : t("{0} match(es) for /{1}/", out.length, pattern),
+      );
+      // Said, because the model must not take `total(` for a working regular expression.
+      const note = literal ? "(searched as plain text: that pattern is not a valid regular expression)\n" : "";
+      return { content: note + (out.join("\n") || "(no match)") };
     },
   };
 

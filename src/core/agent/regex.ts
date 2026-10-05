@@ -78,3 +78,45 @@ export function compilePattern(pattern: string, base = ""): RegExp {
   }
   return new RegExp(parsed.source, parsed.flags);
 }
+
+/** Every regex metacharacter, escaped. */
+export function escapeLiteral(text: string): string {
+  return text.replace(/[\\^$.*+?()[\]{}|/]/g, "\\$&");
+}
+
+export interface SearchPattern {
+  re: RegExp;
+  /** True when the pattern would not compile and was searched for as plain text instead. */
+  literal: boolean;
+}
+
+/**
+ * Compile a search pattern the way a model means it, which is not always as a regular expression.
+ *
+ * ⚠️ `search_text` was regex-only, and that is why « beaucoup de search text ... echouent ». A model
+ * looking for where a function is called types `total(`. As a regular expression that is
+ * `Unterminated group`, so the call failed and returned nothing useful. The same for `cost.usd(`,
+ * `?.length`, `C++`, `foo)` — five of eight patterns taken from ordinary code search fail to
+ * compile, and every one of them is obviously a literal.
+ *
+ * So a pattern that will not compile is searched for as TEXT rather than refused, and the result says
+ * which happened — the model must not conclude that `total(` is a working regex, or it will build on
+ * that. The one case still refused is an inline flag this searcher cannot honour: there the message
+ * says exactly what to change, and a literal search for `(?-i)` would be nonsense.
+ */
+export function searchPattern(pattern: string, base = ""): SearchPattern {
+  const parsed = parsePattern(pattern, base);
+  if (parsed.refused) {
+    throw new Error(
+      `Unsupported inline flag ${parsed.refused} — this searcher cannot change flags partway through a pattern. ` +
+        `Leading (?i), (?m), (?s) and (?u) are accepted.`,
+    );
+  }
+  try {
+    return { re: new RegExp(parsed.source, parsed.flags), literal: false };
+  } catch {
+    // Escaped from the ORIGINAL pattern, not from `parsed.source`: if the leading group was not a
+    // flag group after all, it is part of what the model was looking for.
+    return { re: new RegExp(escapeLiteral(pattern), base), literal: true };
+  }
+}

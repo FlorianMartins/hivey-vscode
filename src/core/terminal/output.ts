@@ -135,3 +135,41 @@ export function describeOutcome(outcome: CommandOutcome, maxChars = 4000): strin
   const body = tailOutput(outcome.output, maxChars);
   return `${head}\n${body || "(no output)"}`;
 }
+
+/**
+ * Commands whose non-zero exit is an ANSWER rather than a failure.
+ *
+ * ⚠️ Part of why « beaucoup de ... run command ... echouent ». `grep` exits 1 when it finds nothing,
+ * which is a perfectly good answer to "is this used anywhere?" — and the step was drawn as a failure,
+ * the model was told the tool errored, and `verifyTurn` counted a check that had failed. Three
+ * different wrong conclusions from one correct command.
+ *
+ * The same reasoning already exists one layer up, in `router/outcome.ts`, where a non-zero exit only
+ * counts as evidence when the command was plausibly a CHECK — and its comment lists these very
+ * examples. What was missing is that the TOOL still called them errors.
+ *
+ * Deliberately a short, explicit list rather than "anything that is not a build". A failed `mkdir`,
+ * `cp` or `npm install` must stay an error, and the way to be sure of that is to name the exceptions
+ * instead of guessing at the rule.
+ */
+// ⚠️ The boundary is a COMMAND boundary, not whitespace, and that distinction is load-bearing:
+// `npm test` contains the word `test` after a space, so a whitespace boundary made a failing test
+// suite look like "no match" — the most harmful possible false positive, since it is the one case
+// where the model most needs to be told the work is not finished. A command starts at the beginning
+// of the line or after `;`, `&&`, `||`, `|` or `(`.
+const COMMAND_START = "(?:^|[;|(]\\s*|&&\\s*|\\|\\|\\s*)";
+const STATUS_ANSWER = new RegExp(
+  `${COMMAND_START}(?:grep|egrep|fgrep|rg|ag|ack|test|\\[|which|type|hash|cmp|diff|git\\s+grep|git\\s+diff\\s+--(?:quiet|exit-code))\\b`,
+);
+
+/**
+ * Does this exit code mean "no" rather than "something went wrong"?
+ *
+ * Only exit 1, and only for those commands. `grep` uses 2 for a real failure — an unreadable file, a
+ * bad pattern — and conflating the two would hide actual errors behind "no match", which is the
+ * mistake this function exists to avoid making in the other direction.
+ */
+export function isStatusAnswer(command: string, exitCode: number | undefined): boolean {
+  if (exitCode !== 1) return false;
+  return STATUS_ANSWER.test(command);
+}
