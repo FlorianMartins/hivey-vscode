@@ -7,6 +7,9 @@ import {
   BUILTIN_SKILLS,
   DEFAULT_GROUPS,
   detectGroups,
+  familiesInPlay,
+  groupsForPaths,
+  languageIdForPath,
   enabledSkills,
   isSkillEnabled,
   normalizeGroups,
@@ -175,6 +178,94 @@ test("an unrecognized workspace suggests nothing, rather than guessing", () => {
   // The caller reads an empty list as "ask, do not assume".
   assert.deepEqual(detectGroups(["cobol", "fortran"]), []);
   assert.deepEqual(detectGroups([]), []);
+});
+
+test("what is open switches its families ON, not merely suggests them", () => {
+  // The defect this closes: `detectGroups` was computed and then used to tick a box in a wizard, so
+  // somebody editing RPG with default settings got `general` and nothing else while forty IBM i
+  // skills sat switched off. Florian: « la detection automatique des programmes ouverts ne semble pas
+  // faire l'activation et desactivation des skills automatisé ».
+  const { groups, fromOpenFiles } = familiesInPlay(["general"], ["rpgle", "sqlrpgle"], true);
+  assert.ok(groups.includes("rpg"), "an open RPG member did not bring the RPG family in");
+  assert.ok(groups.includes("db2i"), "sqlrpgle implies embedded SQL for i");
+  assert.deepEqual(fromOpenFiles.sort(), ["db2i", "rpg"], "the panel cannot say why a family is lit");
+});
+
+test("a family the user chose survives a day spent in other files", () => {
+  // The rule that makes this safe to do without asking: it ADDS. Dropping a family somebody
+  // deliberately switched on, in order to be helpful, is the version of this nobody keeps enabled.
+  const { groups, fromOpenFiles } = familiesInPlay(["general", "rust"], ["python"], true);
+  assert.ok(groups.includes("rust"), "a chosen family was taken away because today's files differ");
+  assert.ok(groups.includes("python"));
+  assert.deepEqual(fromOpenFiles, ["python"], "only the detected one is attributed to the files");
+});
+
+test("deactivation is what happens when the file is no longer open", () => {
+  // The other half of what was asked for, and the harmless half: a family that was on ONLY because
+  // of a file is gone from the next conversation once that file is not open. Nothing is unset.
+  assert.ok(familiesInPlay(["general"], ["python"], true).groups.includes("python"));
+  assert.ok(!familiesInPlay(["general"], [], true).groups.includes("python"));
+  // Whereas a chosen one stays, with nothing open at all.
+  assert.ok(familiesInPlay(["general", "python"], [], true).groups.includes("python"));
+});
+
+test("switching the automation off leaves the chosen families exactly as they are", () => {
+  const { groups, fromOpenFiles } = familiesInPlay(["general"], ["rpgle", "python"], false);
+  assert.deepEqual(groups, ["general"]);
+  assert.deepEqual(fromOpenFiles, [], "nothing may be attributed to the files when nothing was read");
+});
+
+// ── Detection without an editor ──────────────────────────────────────────────────────────────────
+
+test("a caller with only paths reaches the same families", () => {
+  // The terminal has no editor to ask, and the evaluation harness drives the terminal: without this
+  // every figure in eval/QUALITY.md was measured with `general` alone, on a bench where 22 of the 62
+  // tasks are IBM i tasks whose skill families were switched off.
+  assert.deepEqual(groupsForPaths(["CUST001.rpgle"]), ["rpg"]);
+  assert.deepEqual(groupsForPaths(["ORDERS.sqlrpgle"]).sort(), ["db2i", "rpg"]);
+  assert.ok(groupsForPaths(["CUSTDSP.dspf"]).includes("dds"));
+  assert.ok(groupsForPaths(["BLDLIB.clle"]).includes("cl"));
+  assert.deepEqual(groupsForPaths(["src/app.tsx", "src/app.css"]).sort(), ["frontend", "javascript"]);
+  assert.deepEqual(groupsForPaths(["Dockerfile"]), ["devops"]);
+  assert.deepEqual(groupsForPaths(["notes.txt", "LICENSE"]), [], "an unknown extension may not guess");
+});
+
+test("every language the extension map produces is one detectGroups knows", () => {
+  // The two halves are written separately and would drift apart in silence: an extension that maps to
+  // a language no family keys on looks handled and detects nothing. That is the worst of the three
+  // possible states, because it reads as support.
+  const samples = [
+    "a.html", "a.htm", "a.css", "a.scss", "a.less", "a.vue", "a.svelte",
+    "a.js", "a.jsx", "a.mjs", "a.cjs", "a.ts", "a.tsx", "a.mts", "a.cts",
+    "a.py", "a.java", "a.kt", "a.groovy", "a.cs", "a.fs", "a.vb",
+    "a.c", "a.h", "a.cpp", "a.cc", "a.cxx", "a.hpp", "a.m", "a.mm",
+    "a.go", "a.rs", "a.dart", "a.sql", "a.pls",
+    "a.tf", "a.yaml", "a.yml", "a.sh", "a.bash",
+    "a.rpgle", "a.rpg", "a.sqlrpgle", "a.rpgleinc",
+    "a.pf", "a.lf", "a.dspf", "a.prtf", "a.clle", "a.cl", "a.cmd",
+    "Dockerfile", "Makefile",
+  ];
+  const orphans: string[] = [];
+  for (const path of samples) {
+    const id = languageIdForPath(path);
+    assert.ok(id, `${path} is not in the extension map`);
+    if (!detectGroups([id!]).length) orphans.push(`${path} -> ${id}`);
+  }
+  assert.deepEqual(orphans, [], `these map to a language no family keys on:\n${orphans.join("\n")}`);
+});
+
+test("every family keyed on an extension is reachable from a path", () => {
+  // The other direction. `detectGroups` knows eighteen families; the ones a file name can imply must
+  // actually be implied by one, or a skill family exists that nothing but a settings page can switch on.
+  const reachable = new Set(
+    groupsForPaths([
+      "a.css", "a.ts", "a.py", "a.java", "a.cs", "a.cpp", "a.go", "a.rs", "a.dart", "a.sql",
+      "Dockerfile", "a.rpgle", "a.dspf", "a.sqlrpgle", "a.clle",
+    ]),
+  );
+  for (const g of ["frontend", "javascript", "python", "java", "dotnet", "cpp", "go", "rust", "flutter", "data", "devops", "rpg", "dds", "db2i", "cl"]) {
+    assert.ok(reachable.has(g as never), `the ${g} family cannot be reached from any file name`);
+  }
 });
 
 test("every family holds at least three skills", () => {

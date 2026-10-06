@@ -876,7 +876,12 @@ onLanguageChange(() => {
  */
 export const ALWAYS_ON = new Set(["/compact"]);
 
-/** The families in play by default: the ones that apply whatever you have open, and nothing else. */
+/**
+ * The families in play when nothing has been chosen and nothing is open.
+ *
+ * `general` alone. What the open files imply is added on top by `familiesInPlay`, which is where the
+ * phrase "the ones that apply whatever you have open" actually became true.
+ */
 export const DEFAULT_GROUPS: SkillGroup[] = ["general"];
 
 /**
@@ -963,6 +968,86 @@ export function detectGroups(languageIds: string[]): SkillGroup[] {
   if (has("db2", "sqlrpgle")) found.push("db2i");
   if (has("cl", "clle", "cmd")) found.push("cl");
   return found;
+}
+
+/**
+ * The editor language id a path would be opened as.
+ *
+ * ⚠️ This exists because `detectGroups` speaks the editor's vocabulary — `typescriptreact`,
+ * `sqlrpgle`, `dds.dspf` — and the terminal has only paths. Without it the terminal could not detect
+ * anything at all, and the consequence was not small: the evaluation harness drives the terminal, so
+ * every figure in `eval/QUALITY.md` was measured with `general` alone. Twenty-two of the sixty-two
+ * tasks are IBM i tasks, and the RPG, DDS, CL and Db2 for i skill families — written for exactly
+ * those tasks — were switched off while the bench ran.
+ *
+ * Only the extensions the families actually key on. A map of every extension in existence would be a
+ * list nobody maintains; this one has a test that keeps it aligned with `detectGroups`.
+ */
+const LANGUAGE_BY_EXTENSION: Record<string, string> = {
+  html: "html", htm: "html", css: "css", scss: "scss", less: "less", vue: "vue", svelte: "svelte",
+  js: "javascript", jsx: "javascriptreact", mjs: "javascript", cjs: "javascript",
+  ts: "typescript", tsx: "typescriptreact", mts: "typescript", cts: "typescript",
+  py: "python", java: "java", kt: "kotlin", groovy: "groovy",
+  cs: "csharp", fs: "fsharp", vb: "vb",
+  c: "c", h: "c", cpp: "cpp", cc: "cpp", cxx: "cpp", hpp: "cpp", m: "objective-c", mm: "objective-cpp",
+  go: "go", rs: "rust", dart: "dart",
+  sql: "sql", pls: "plsql",
+  tf: "terraform", yaml: "yaml", yml: "yaml", sh: "shellscript", bash: "shellscript",
+  rpgle: "rpgle", rpg: "rpg", sqlrpgle: "sqlrpgle", rpgleinc: "rpgle",
+  pf: "dds.pf", lf: "dds.lf", dspf: "dds.dspf", prtf: "dds.prtf",
+  clle: "clle", cl: "cl", cmd: "cmd",
+};
+
+export function languageIdForPath(path: string): string | undefined {
+  const name = path.split(/[\\/]/).pop() ?? "";
+  if (/^dockerfile$/i.test(name)) return "dockerfile";
+  if (/^makefile$/i.test(name)) return "makefile";
+  const ext = name.includes(".") ? name.slice(name.lastIndexOf(".") + 1).toLowerCase() : "";
+  return LANGUAGE_BY_EXTENSION[ext];
+}
+
+/** The families a set of PATHS implies, for a caller that has no editor to ask. */
+export function groupsForPaths(paths: string[]): SkillGroup[] {
+  return detectGroups(paths.map((p) => languageIdForPath(p)).filter((id): id is string => Boolean(id)));
+}
+
+/**
+ * The families in play for a conversation: what was chosen, plus what the open files imply.
+ *
+ * ⚠️ `detectGroups` existed for a long time and did almost nothing with its answer — it pre-ticked a
+ * box in a wizard most people never open. So somebody editing RPG with the default settings got
+ * `general` and nothing else: forty IBM i skills, every one backed by an evaluation task, sat
+ * switched off while the model guessed. Florian, reading a session full of mistakes: « la detection
+ * automatique des programmes ouverts ne semble pas faire l'activation et desactivation des skills
+ * automatisé non plus, ce qui expliqierai pourquoi il créé autant d'erreur ». The detection was
+ * right; nothing acted on it. The comment in `config.ts` even claimed families "default to the ones
+ * that apply whatever is open", which is what the code should have done and did not.
+ *
+ * Two rules make this safe to do automatically:
+ *
+ * **It only ever adds.** A family the user chose is never dropped because today's files do not imply
+ * it — turning off a skill somebody deliberately asked for, in order to be helpful, is the version
+ * of this feature nobody would keep switched on. Deactivation still happens, and it is the
+ * harmless kind: a family that was on ONLY because a file was open is gone from the next
+ * conversation once that file is not.
+ *
+ * **It is decided once per conversation, not per turn.** This list goes into the cacheable prefix
+ * (see `core/prompts.ts`): a prefix that changed every time the user clicked a different tab would
+ * invalidate the whole cache on every turn, which costs far more than the skills are worth. "Which
+ * skills exist" is a fact about this conversation, and that is the only reason it may live there.
+ *
+ * `fromOpenFiles` is what the panel needs to say WHY a family is lit up, because a setting that
+ * turns itself on without saying so is indistinguishable from a bug.
+ */
+export function familiesInPlay(
+  chosen: SkillGroup[],
+  openLanguages: string[],
+  auto: boolean,
+): { groups: SkillGroup[]; fromOpenFiles: SkillGroup[] } {
+  if (!auto) return { groups: normalizeGroups(chosen), fromOpenFiles: [] };
+  const detected = detectGroups(openLanguages);
+  const fromOpenFiles = detected.filter((g) => !chosen.includes(g));
+  return { groups: normalizeGroups([...chosen, ...detected]), fromOpenFiles };
 }
 
 /**

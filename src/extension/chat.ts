@@ -58,7 +58,7 @@ import {
   ALWAYS_ON,
   BUILTIN_SKILLS,
   builtinSkillsForModel,
-  detectGroups,
+  familiesInPlay,
   isSkillEnabled,
   normalizeGroups,
   SKILL_GROUPS,
@@ -1984,7 +1984,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private skillsCache: UiSkill[] = [];
 
   private uiSkills(): UiSkill[] {
-    const policy = readSettings().skills;
+    // The families in play, not merely the chosen ones: a skill the open files switched on has to be
+    // in this list, or the model is offered a skill the person cannot see and cannot type.
+    const policy = { ...readSettings().skills, groups: this.familiesFor().groups };
     // Only the families in play. A picker listing seventy skills of which sixty belong to languages
     // this project does not contain is a picker nobody reads to the end.
     // A skill whose machinery is switched off is not offered: `/remember` with no knowledge base
@@ -2016,9 +2018,42 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    * question is asked, never assumed, and answering it costs nothing because nothing is sent
    * anywhere to compute it.
    */
+  /**
+   * The families in play for THIS conversation, decided once and then held.
+   *
+   * ⚠️ Memoised on the conversation's id on purpose, and the reason is the bill rather than tidiness.
+   * This list is part of the cacheable prefix (`core/prompts.ts`): a prompt cache matches on a
+   * prefix and misses on everything after the first byte that differs, so a skills list that changed
+   * when the user clicked a different editor tab would throw away the whole prefix — repository map
+   * included — on every turn. "Which skills exist" is allowed to live there precisely because it is
+   * a fact about the conversation and not about the cursor.
+   *
+   * Which also means the automation's effect is felt at the START of a conversation. That is the
+   * behaviour to describe, not a limitation to hide: open the files you are working on, then ask.
+   */
+  private familiesFor(): { groups: SkillGroup[]; fromOpenFiles: SkillGroup[] } {
+    const settings = readSettings();
+    if (this.families?.session !== this.session.id) {
+      const { fromOpenFiles } = familiesInPlay(
+        settings.skills.groups,
+        openFiles().map((f) => f.language),
+        settings.skills.auto,
+      );
+      this.families = { session: this.session.id, fromOpenFiles };
+    }
+    // Only the DETECTED half is frozen, because that is the half nobody asked for. The chosen list is
+    // read fresh every time: the composer's skills button writes it, and a choice the user has just
+    // made deliberately should take effect on the next message rather than the next conversation.
+    const { fromOpenFiles } = this.families;
+    return { groups: normalizeGroups([...settings.skills.groups, ...fromOpenFiles]), fromOpenFiles };
+  }
+
+  private families: { session: string; fromOpenFiles: SkillGroup[] } | undefined;
+
   private uiSkillGroups(): UiSkillGroup[] {
-    const active = new Set(readSettings().skills.groups);
-    const suggested = new Set(detectGroups(openFiles().map((f) => f.language)));
+    const { groups, fromOpenFiles } = this.familiesFor();
+    const active = new Set(groups);
+    const suggested = new Set(fromOpenFiles);
     return SKILL_GROUPS.map((g) => ({
       id: g.id,
       label: g.label,
@@ -2819,7 +2854,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const skills = this.uiSkills();
     const found = await this.definitions.load();
 
-    const activeFamilies = settings.skills.groups.filter((g) => g !== "general").length;
+    const activeFamilies = this.familiesFor().groups.filter((g) => g !== "general").length;
     const skillsOn = skills.filter((sk) => sk.enabled).length;
     const agentsOn = found.agents.filter((a) => !settings.agents.disabled.includes(a.name)).length;
 
@@ -2890,11 +2925,16 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const config = vscode.workspace.getConfiguration(SECTION);
 
     if (chosen.id === "families") {
+      const auto = this.familiesFor().fromOpenFiles;
       const picked = await vscode.window.showQuickPick(
         SKILL_GROUPS.filter((g) => g.id !== "general").map((g) => ({
           label: g.label,
           description: t("{0} skills", BUILTIN_SKILLS.filter((sk) => sk.group === g.id).length),
-          detail: g.hint,
+          // ⚠️ Ticked from the CHOSEN list alone. A family the open files switched on is already in
+          // play, and pre-ticking it here would quietly write it into the setting the moment somebody
+          // pressed Enter on an unrelated row — turning a thing that lapses on its own into a
+          // permanent choice they never made. It is said instead.
+          detail: auto.includes(g.id) ? `${g.hint} · ${t("already on, from the files you have open")}` : g.hint,
           id: g.id,
           picked: settings.skills.groups.includes(g.id),
         })),
@@ -3770,10 +3810,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     // whole catalogue is eighty-five, a typical setup enables a fraction of it, and a skill that
     // is off must not be described either — the model would announce something the user cannot
     // invoke.
-      const offeredBuiltins = builtinSkillsForModel(
+    // `familiesFor()` and not the raw setting: the families the open files imply are in play too, and
+    // they are the reason forty IBM i skills now reach a conversation about an RPG member without
+    // anybody having opened a settings page first.
+    const familiesNow = this.familiesFor().groups;
+    const offeredBuiltins = builtinSkillsForModel(
       BUILTIN_SKILLS.filter(
-        (sk) =>
-          settings.skills.groups.includes(sk.group) && isSkillEnabled(sk.name, settings.skills.disabled),
+        (sk) => familiesNow.includes(sk.group) && isSkillEnabled(sk.name, settings.skills.disabled),
       ),
     );
     const modelSkills = [

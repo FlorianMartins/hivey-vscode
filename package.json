@@ -752,6 +752,11 @@
         "title": "%config.section.skills%",
         "order": 3,
         "properties": {
+          "hiveyCode.skills.auto": {
+            "type": "boolean",
+            "default": true,
+            "markdownDescription": "%config.skills.auto%"
+          },
           "hiveyCode.skills.groups": {
             "type": "array",
             "default": [

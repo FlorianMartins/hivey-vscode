@@ -27,7 +27,13 @@ import { catalogueWindow } from "../core/router/window.js";
 import { contextBudget, repoMapBudget } from "../core/context/budget.js";
 import { isProviderRefusal, refusalKind } from "../core/providers/refusal.js";
 import { BUILTIN_AGENTS, parseDefinition, type AgentDefinition } from "../core/agent/definitions.js";
-import { BUILTIN_SKILLS, builtinSkillsForModel } from "../core/session/skills.js";
+import {
+  BUILTIN_SKILLS,
+  builtinSkillsForModel,
+  groupsForPaths,
+  normalizeGroups,
+  type SkillGroup,
+} from "../core/session/skills.js";
 import { skillsPrompt } from "../core/agent/definitions.js";
 import { isLocalEndpoint, redactMessages, Vault, streamingRestorer } from "../core/redaction/index.js";
 import type { RedactionLevel } from "../core/redaction/types.js";
@@ -189,8 +195,18 @@ async function main(): Promise<void> {
   // precedence the panel uses — a team that wrote an agent with that name meant theirs.
   const cliAgents = await loadCliAgents(cwd);
 
+  // ⚠️ `["general"]` was the whole story here, and the evaluation harness drives this client: every
+  // figure in `eval/QUALITY.md` was therefore measured with the RPG, DDS, CL and Db2 for i families
+  // switched OFF, on a bench where twenty-two of the sixty-two tasks are IBM i tasks. The skills were
+  // written for those tasks and never reached them. The panel detects from the files the editor has
+  // open; the terminal has no editor, so it detects from the files that are THERE — the same
+  // question, asked of the only thing it can see.
+  //
+  // An explicit `skillGroups` in the configuration still wins, because somebody who wrote a list
+  // meant that list.
+  const detectedGroups = cfg.skillGroups ?? ["general", ...groupsForPaths(await sourcePaths(cwd))];
   const cliSkills = builtinSkillsForModel(
-    BUILTIN_SKILLS.filter((sk) => (cfg.skillGroups ?? ["general"]).includes(sk.group)),
+    BUILTIN_SKILLS.filter((sk) => normalizeGroups(detectedGroups as SkillGroup[]).includes(sk.group)),
   );
 
   const budget = new Budget(store, cfg.budget);
@@ -613,6 +629,36 @@ async function loadCliAgents(cwd: string): Promise<AgentDefinition[]> {
   }
   const taken = new Set(own.map((a) => a.name));
   return [...own, ...BUILTIN_AGENTS.filter((a) => !taken.has(a.name))];
+}
+
+/**
+ * The paths in the tree, names only.
+ *
+ * Deliberately not `repoMap`'s walk, which reads every file: this question is answered by the
+ * extension alone, so reading contents to answer it would be paying for the expensive version of a
+ * cheap fact. Capped, because the answer stops changing long before the walk does — a tree with two
+ * thousand files has already said what it is made of.
+ */
+async function sourcePaths(cwd: string): Promise<string[]> {
+  const { readdir } = await import("node:fs/promises");
+  const skip = new Set([".git", "node_modules", "dist", "build", "out", "target", ".venv", "__pycache__", ".next"]);
+  const found: string[] = [];
+  async function walk(dir: string): Promise<void> {
+    if (found.length > 2000) return;
+    let entries;
+    try {
+      entries = await readdir(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      if (e.name.startsWith(".") || skip.has(e.name)) continue;
+      if (e.isDirectory()) await walk(join(dir, e.name));
+      else found.push(e.name);
+    }
+  }
+  await walk(cwd);
+  return found;
 }
 
 async function repoMap(cwd: string, budgetTokens: number): Promise<string | undefined> {

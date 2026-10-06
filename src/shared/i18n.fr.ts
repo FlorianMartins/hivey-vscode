@@ -1318,6 +1318,7 @@ export const FR: Record<string, string> = {
   "What Hivey Code may reach for": "Ce que Hivey Code peut mobiliser",
   "What can I do for you?": "Que puis-je faire pour vous ?",
   "What can we plan together?": "Que pouvons-nous planifier ensemble ?",
+  "already on, from the files you have open": "déjà active, d'après les fichiers que vous avez ouverts",
   "Which areas is this conversation about?": "De quels domaines relève cette conversation ?",
   "Which languages and subjects this conversation is about": "Les langages et sujets dont relève cette conversation",
   "Which sub-agents may be dispatched?": "Quels sous-agents peuvent être sollicités ?",

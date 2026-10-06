@@ -371,6 +371,15 @@ guarantee. In plan mode the sub-agent above gets `read_file` and nothing else, q
 it does goes through the same approval dialogs and the same egress gate as anything else — being
 called by a sub-agent is not a way around a question.
 
+**Areas switch themselves on from the files you have open.** A workspace of RPG members brings the RPG
+and Db2 for i areas in without being asked, which is the difference between forty skills existing and
+forty skills being reachable; before this, somebody editing RPG on default settings got the general
+area and nothing else. It only ever ADDS — an area you chose stays on whatever you are editing today,
+and one that was on only because of an open file is simply gone from your next conversation. Decided
+once per conversation rather than per turn, because that list is part of the cacheable prefix and a
+prefix that followed your cursor would be re-paid for on every message. `hiveyCode.skills.auto` turns
+it off.
+
 **Skills and sub-agents** under the composer opens the same menu that lists them: areas, skills,
 sub-agents, and — under a rule, because making one is the same thought as choosing one — **New
 skill…**, **New sub-agent…** and **Share with the team**. Either writes a working example and opens
@@ -519,7 +528,7 @@ Those documents are currently written in French; translations are welcome.
 ## Development
 
 ```bash
-npm test                   # builds the bundles, then 1308 tests (node:test)
+npm test                   # builds the bundles, then 1316 tests (node:test)
 npm run test:integration   # loads the extension into a real VS Code (43 tests, headless)
 npm run eval:verify        # every evaluation task must fail before a model touches it
 node scripts/screenshots.mjs  # retakes the README's images from that same editor

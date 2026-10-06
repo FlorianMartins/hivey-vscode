@@ -106,4 +106,29 @@ Et là où une tâche ne pouvait pas être écrite honnêtement — parce qu'ell
 — la compétence **le déclare** au lieu de prétendre à une couverture. C'est moins flatteur et c'est
 la seule version utilisable par quelqu'un qui doit décider s'il peut s'y fier.
 
+Ces compétences sont rangées en **familles** (RPG, DDS, CL, Db2 for i, et une quinzaine d'autres pour
+les langages du reste du monde), et une famille éteinte ne met rien dans le `/`. Jusqu'à la version
+1.3.0 il fallait aller la cocher soi-même, ce que presque personne ne faisait : quelqu'un qui ouvrait
+un membre RPG obtenait la famille générale et rien d'autre, donc les 41 compétences écrites pour lui
+restaient éteintes pendant que le modèle devinait. Elles s'allument maintenant **d'après les fichiers
+que vous avez ouverts**.
+
+Deux détails qui en disent plus que la fonctionnalité :
+
+- L'automatisme ne fait qu'**ajouter**. Une famille que vous avez cochée reste allumée même un jour où
+  vous n'ouvrez aucun fichier de ce type. Éteindre quelque chose que quelqu'un a demandé, pour lui
+  rendre service, est la version de cette fonction que personne ne garderait active.
+- Il est décidé **une fois par conversation**. La liste des compétences fait partie de la portion du
+  texte d'instructions que le fournisseur garde en cache et facture moins cher ([chapitre
+  6](06-le-contexte.md)) ; or un cache se compare depuis le début, et un seul caractère qui change
+  invalide tout ce qui suit. Une liste qui se mettrait à jour à chaque clic sur un onglet ferait donc
+  repayer le préfixe entier à chaque message — la façon la plus chère possible d'être serviable.
+
+Le même défaut touchait le banc de mesure du [chapitre 12](12-la-qualite-mesuree.md), et il y était
+invisible : le banc pilote la version terminal, qui n'a pas d'éditeur à interroger, et qui offrait donc
+la famille générale seule. **Tous les chiffres publiés ont été mesurés avec ces familles éteintes**, sur
+un banc dont 22 des 62 tâches sont des tâches IBM i. Le tableau le dit maintenant en haut, et — c'est
+le point — **les chiffres n'ont pas été retouchés**. Savoir si la correction les améliore demande de
+refaire la mesure, pas de l'estimer.
+
 [← Chapitre précédent](10-le-cout.md) · [Sommaire](README.md) · [Chapitre suivant →](12-la-qualite-mesuree.md)

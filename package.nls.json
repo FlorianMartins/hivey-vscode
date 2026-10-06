@@ -99,6 +99,7 @@
   "command.setLanguage.title": "Language of the panel",
   "config.agents.disabled": "Sub-agents that may not be dispatched, by name. Toggled from the skills button in the composer, alongside the skills.",
   "config.skills.groups": "Which families of skills are in play: `general`, `frontend`, `javascript`, `python`, `java`, `dotnet`, `cpp`, `go`, `rust`, `flutter`, `data`, `devops`, `design`, `security`, `rpg`, `dds`, `db2i`, `cl`. Families are **opt-in** and only `general` is on to begin with, so the `/` list holds what you chose rather than everything that exists. Set from the new-conversation screen or the composer's skills button.",
+  "config.skills.auto": "Let the files you have open switch a family on by themselves. A workspace of RPG members brings the RPG and Db2 for i families in without being asked, which is the difference between forty skills that exist and forty skills that are reachable. It only ever ADDS: a family you chose stays on whatever you are editing today, and one that was on only because of an open file is simply gone from your next conversation. Decided once per conversation rather than per turn, because this list sits in the cacheable prefix and a prefix that followed your cursor would be re-paid for on every message.",
   "submenu.newConversation.label": "New conversation",
   "command.newSpecialisedSession.title": "Specialized conversation",
   "config.section.general": "General",

@@ -100,4 +100,28 @@ And where a task could not be written honestly — because it requires a live pa
 **declares it** instead of claiming coverage. That is less flattering and it is the only version usable
 by somebody who has to decide whether they can rely on it.
 
+Those skills are filed into **families** (RPG, DDS, CL, Db2 for i, and fifteen or so more for the rest
+of the world's languages), and a family that is off puts nothing in the `/` list. Until version 1.3.0
+you had to go and tick it yourself, which almost nobody did: somebody opening an RPG member got the
+general family and nothing else, so the 41 skills written for them stayed switched off while the model
+guessed. They now switch on **according to the files you have open**.
+
+Two details say more than the feature does:
+
+- The automation only ever **adds**. A family you ticked stays on even on a day when you open no file
+  of that kind. Switching off something somebody asked for, in order to be helpful, is the version of
+  this feature nobody would keep enabled.
+- It is decided **once per conversation**. The skills list is part of the portion of the instruction
+  text the provider keeps in a cache and bills less for ([chapter 6](06-the-context.md)); a cache is
+  compared from the beginning, and a single character that differs invalidates everything after it. A
+  list that updated itself every time you clicked a tab would therefore make you re-pay for the whole
+  prefix on every message — the most expensive possible way to be helpful.
+
+The same defect reached the bench in [chapter 12](12-measured-quality.md), and there it was invisible:
+the bench drives the terminal version, which has no editor to ask, and which therefore offered the
+general family alone. **Every published figure was measured with those families switched off**, on a
+bench where 22 of the 62 tasks are IBM i tasks. The table now says so at the top and — this is the
+point — **the figures were not retouched**. Finding out whether the fix improves them means running
+the measurement again, not estimating it.
+
 [← Previous chapter](10-the-cost.md) · [Contents](README.md) · [Next chapter →](12-measured-quality.md)

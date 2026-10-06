@@ -104,8 +104,11 @@ export interface Settings {
      */
     writableLibraries: string[];
   };
-  /** Which families are in play, and which individual skills are off inside them. */
-  skills: SkillPolicy;
+  /**
+   * Which families are in play, which individual skills are off inside them, and whether the open
+   * files are allowed to bring a family in by themselves.
+   */
+  skills: SkillPolicy & { auto: boolean };
   /** Which sub-agents the user has switched off, by name. */
   agents: { disabled: string[] };
   panel: { minWidth: number };
@@ -314,11 +317,14 @@ function readSettingsRaw(scope?: vscode.Uri): Settings {
       writableLibraries: c.get<string[]>("ibmi.writableLibraries", []),
     },
     skills: {
-      // Families are opt-in and default to the ones that apply whatever is open. Everything else
-      // arrives switched off, which is the difference between offering a choice and pre-answering
-      // it. Individual skills inside an active family stay opt-OUT — see `SkillPolicy`.
+      // What was CHOSEN. What is in play is this plus what the open files imply — `familiesInPlay`,
+      // once per conversation. Until it existed this comment claimed families "default to the ones
+      // that apply whatever is open", which described the intention and not the code: the default
+      // was `general` alone no matter what was on screen. Individual skills inside an active family
+      // stay opt-OUT — see `SkillPolicy`.
       groups: c.get<SkillGroup[]>("skills.groups", DEFAULT_GROUPS),
       disabled: c.get<string[]>("skills.disabled", []),
+      auto: c.get<boolean>("skills.auto", true),
     },
     agents: { disabled: c.get<string[]>("agents.disabled", []) },
     panel: { minWidth: c.get<number>("panel.minWidth", 260) },

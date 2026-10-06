@@ -22,6 +22,30 @@ Taken 2026-10-03T13:14:46.752Z against `https://openrouter.ai/api/v1` with `hive
 | `hivey/smart` | — | not measured | — | — | — | — |
 | `deepseek-v4.1-flash alone` | 44/56 | 79 % | 1/56 | 11/56 | 2296 s | $0.1357 ($0.0024/task) |
 
+### ⚠️ Every line above was measured with the skill families switched off
+
+Not a caveat about precision — a condition that was never intended and was found on 2026-10-06, after
+these figures were published. The terminal, which the harness drives, offered `general` skills alone
+and nothing else: `cfg.skillGroups ?? ["general"]`, with no caller anywhere that sets `skillGroups`.
+
+**Twenty-two of these sixty-two tasks are IBM i tasks.** The RPG, DDS, CL and Db2 for i skill
+families — written for those tasks, every skill backed by one of them — were switched off while the
+bench ran. So were `frontend`, `javascript`, `python` and the rest on the tasks that would have used
+them.
+
+What that means for the numbers above, stated exactly:
+
+- They are **real measurements of a real configuration**, and that configuration is the one a user got
+  by default on the terminal. Nothing here is invalidated as a record of what happened.
+- They are **not** a measurement of what this product offers now. The terminal detects its families
+  from the files in the tree as of this version, and the panel from the files the editor has open.
+- Whether that **raises** these scores is **not measured**, and no figure here will be adjusted to
+  guess at it. A skills list is not free: it costs prefix tokens on every turn, and a model given
+  forty extra names can also be distracted by them. The direction is plausible; it is not a result.
+
+The next run replaces these lines rather than being compared with them, and the configuration column
+will say which side of this change it was measured on.
+
 ### How to read it
 
 **never acted** is how many of those tasks the model finished without taking a single tool

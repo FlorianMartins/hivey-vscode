@@ -49,6 +49,51 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Ajouté
 
+- **⚠️⚠️ Les fichiers ouverts activent leurs familles de compétences tout seuls.** Florian : « la
+  detection automatique des programmes ouverts ne semble pas faire l'activation et desactivation des
+  skills automatisé non plus, ce qui expliqierai pourquoi il créé autant d'erreur, tu peux verifier ce
+  point s'il te plait ? ». Vérifié, et c'était vrai — **et pire que ça**.
+
+  `detectGroups` existait depuis longtemps et ne faisait presque rien de sa réponse : il **pré-cochait
+  une case** dans un assistant que la plupart des gens n'ouvrent jamais. Quelqu'un qui édite du RPG
+  avec les réglages par défaut obtenait donc `general` et rien d'autre — quarante compétences IBM i,
+  chacune adossée à une tâche d'évaluation, restaient éteintes pendant que le modèle devinait. Le
+  commentaire du réglage affirmait même que les familles « default to the ones that apply whatever is
+  open » : c'était l'intention, pas le code.
+
+  Deux règles rendent l'automatisme sûr :
+  - **il n'ajoute jamais que.** Une famille que vous avez choisie n'est pas retirée parce que les
+    fichiers du jour ne l'impliquent pas — éteindre une compétence que quelqu'un a demandée, pour lui
+    rendre service, c'est la version de cette fonction que personne ne laisserait allumée. La
+    désactivation existe bien, et c'est la version inoffensive : une famille qui n'était là **que**
+    pour un fichier ouvert a disparu de la conversation suivante ;
+  - **il est décidé une fois par conversation, pas à chaque tour.** Cette liste est dans le préfixe mis
+    en cache : un préfixe qui changerait à chaque fois qu'on clique sur un autre onglet serait **repayé
+    en entier à chaque message**, carte du dépôt comprise. Ce serait la façon la plus chère possible
+    d'être serviable. L'automatisme se sent donc au **début** d'une conversation — ouvrez ce sur quoi
+    vous travaillez, puis demandez.
+
+  Réglage `hiveyCode.skills.auto` pour l'éteindre. Et le menu des familles **dit** celles qui sont déjà
+  actives grâce aux fichiers ouverts au lieu de les pré-cocher : les pré-cocher les écrirait dans le
+  réglage dès qu'on valide une ligne sans rapport, transformant une chose qui s'éteint toute seule en
+  un choix permanent que personne n'a fait.
+
+- **⚠️⚠️ Le même défaut touchait le banc d'évaluation, et il y était invisible.** Le banc pilote le
+  **terminal**, et le terminal n'a pas d'éditeur à interroger : il lisait `cfg.skillGroups ?? ["general"]`
+  et **aucun appelant ne renseigne `skillGroups`**. Donc **tous les chiffres de `eval/QUALITY.md` ont
+  été mesurés les familles éteintes** — sur un banc où **22 des 62 tâches sont des tâches IBM i**, dont
+  les familles RPG, DDS, CL et Db2 for i existaient précisément pour elles.
+
+  Le terminal détecte maintenant depuis les fichiers **présents** dans l'arbre, ce qui est la même
+  question posée à la seule chose qu'il puisse voir (`groupsForPaths`, `languageIdForPath`).
+
+  Ce qui n'a **pas** été fait : toucher aux chiffres. Ils restent la mesure réelle d'une configuration
+  réelle — celle que le terminal servait par défaut. Savoir si la correction les **améliore** n'est
+  **pas mesuré**, et aucune case ne sera ajustée pour le deviner : une liste de compétences n'est pas
+  gratuite, elle coûte des jetons de préfixe à chaque tour, et un modèle à qui l'on donne quarante noms
+  de plus peut aussi s'y perdre. La direction est plausible ; ce n'est pas un résultat. `QUALITY.md` le
+  dit en haut de son tableau.
+
 - **⚠️ Un résultat tronqué le dit.** La leçon que `read_file` avait déjà coûtée, appliquée partout où
   elle s'applique. `search_text` et `list_files` ont exactement la même forme : un plafond, appliqué
   en silence. Une recherche qui rend soixante occurrences sur deux cents sans le dire a affirmé au

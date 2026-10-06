@@ -47,14 +47,38 @@ test("the prompt carries names and one line, never the instructions", () => {
   assert.match(prompt, /call `use_skill`/);
 });
 
-test("the panel offers only what the user switched on", () => {
+test("the panel offers what is in play, and nothing that is off", () => {
   // A skill that is off must not be described either: the model would announce something the user
   // cannot invoke. Read from the source, because this is a claim about a filter at a call site.
+  //
+  // ⚠️ The filter used to read `settings.skills.groups` — the CHOSEN families — and that was the
+  // defect: somebody editing RPG with default settings got `general` and nothing else, so forty IBM i
+  // skills were offered to nobody. It reads `familiesFor()` now, which is chosen ∪ implied by the
+  // open files. Both halves are asserted, the second negatively, so a revert to the raw setting is
+  // caught rather than silently losing the automation again.
   const chat = readFileSync("src/extension/chat.ts", "utf8");
-  assert.match(chat, /settings\.skills\.groups\.includes\(sk\.group\)/);
+  assert.match(chat, /const familiesNow = this\.familiesFor\(\)\.groups;/);
+  assert.match(chat, /familiesNow\.includes\(sk\.group\)/);
+  assert.ok(
+    !/settings\.skills\.groups\.includes\(sk\.group\)/.test(chat),
+    "the turn is back on the chosen families alone, so what the open files imply reaches nothing",
+  );
   assert.match(chat, /isSkillEnabled\(sk\.name, settings\.skills\.disabled\)/);
   // And a repository skill of the same name wins, because the team that wrote one meant theirs.
   assert.match(chat, /!definitions\.skills\.some\(\(sk\) => skillInvocation\(sk\.name\) === b\.name\)/);
+});
+
+test("the detected families are decided once per conversation, not per turn", () => {
+  // The whole reason this may live in the prompt at all. The skills list is part of the cacheable
+  // prefix, and a prompt cache matches on a prefix: one byte that differs costs the entire prefix,
+  // repository map included, on every single turn. A skills list that followed the user's editor tab
+  // would therefore be the most expensive possible way to be helpful. Memoised on the conversation's
+  // id, which is the thing that is allowed to change it.
+  const chat = readFileSync("src/extension/chat.ts", "utf8");
+  assert.match(chat, /this\.families\?\.session !== this\.session\.id/);
+  // And only the DETECTED half is frozen: a family the user ticks mid-conversation takes effect at
+  // once, because that one they asked for.
+  assert.match(chat, /normalizeGroups\(\[\.\.\.settings\.skills\.groups, \.\.\.fromOpenFiles\]\)/);
 });
 
 test("the terminal offers them too, so the harness can measure them", () => {
