@@ -1327,6 +1327,15 @@ export const FR: Record<string, string> = {
     "Le haut de gamme : l'échelle d'Anthropic, son modèle phare sur le travail difficile et son petit modèle sur les corvées.",
   "Dictation needs a transcriber. The simplest way on any machine is a Groq key — its free tier is 2,000 transcriptions a day without a card — which this borrows automatically once it is your provider. A key for OpenAI is borrowed the same way. Or point hiveyCode.dictation.command at a transcriber on this machine, which sends nothing anywhere. OpenRouter and local model servers do not transcribe.":
     "La dictée a besoin d'un transcripteur. Le plus simple, sur n'importe quelle machine, est une clé Groq — son palier gratuit offre 2 000 transcriptions par jour sans carte bancaire — qui est empruntée automatiquement dès qu'elle est votre fournisseur. Une clé OpenAI l'est de la même façon. Sinon, pointez hiveyCode.dictation.command vers un transcripteur présent sur cette machine, ce qui n'envoie rien nulle part. OpenRouter et les serveurs de modèles locaux ne transcrivent pas.",
+  "Dictation needs a transcriber, and none was installed.": "La dictée a besoin d'un transcripteur, et aucun n'a été installé.",
+  "Downloaded from github.com and huggingface.co — the only addresses this extension fetches without being told to.":
+    "Téléchargé depuis github.com et huggingface.co — les seules adresses que cette extension va chercher sans qu'on le lui ait demandé.",
+  "Install a transcriber on this machine? ({0} MB, once)": "Installer un transcripteur sur cette machine ? ({0} Mo, une seule fois)",
+  "Model: {0} — {1}": "Modèle : {0} — {1}",
+  "The transcriber could not be installed: {0}": "Le transcripteur n'a pas pu être installé : {0}",
+  "The transcriber is not installed.": "Le transcripteur n'est pas installé.",
+  "Your voice is then turned into words here, by whisper.cpp. Nothing is sent anywhere, ever, and it costs nothing.":
+    "Votre voix est alors transformée en mots ici même, par whisper.cpp. Rien n'est envoyé nulle part, jamais, et cela ne coûte rien.",
   "Which areas is this conversation about?": "De quels domaines relève cette conversation ?",
   "Which languages and subjects this conversation is about": "Les langages et sujets dont relève cette conversation",
   "Which sub-agents may be dispatched?": "Quels sous-agents peuvent être sollicités ?",

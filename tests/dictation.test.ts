@@ -16,7 +16,7 @@ import {
   transcriptionModel,
 } from "../src/core/dictation/dictation.js";
 
-const OFF = { command: "", endpoint: "", model: "whisper-1", language: "" };
+const OFF = { command: "", endpoint: "", model: "whisper-1", language: "", localModel: "tiny.en" };
 
 test("dictation is off until it is configured", () => {
   // Nothing happens, and nothing is sent anywhere, on a fresh install. The project's rule about not
@@ -109,7 +109,7 @@ test("⚠️ a provider is borrowed only when it is KNOWN to transcribe", () => 
   // one. But borrowing an address that does not answer `/audio/transcriptions` gives a microphone
   // that records your voice, sends it, and fails. That is worse than one that says it needs setting
   // up, because it fails AFTER you have spoken.
-  const bare = { command: "", endpoint: "", model: "", language: "" };
+  const bare = { command: "", endpoint: "", model: "", language: "", localModel: "tiny.en" };
   assert.equal(dictationMode(bare, "openai"), "remote");
   assert.equal(dictationMode(bare, "groq"), "remote");
   // ⚠️ OpenRouter is the instructive absence: the provider most people here have a key for, and it
@@ -124,7 +124,7 @@ test("what is configured always beats what is borrowed", () => {
   // Somebody who has set an endpoint has said where their voice goes, and a provider that happens to
   // transcribe must not quietly override that. The local command beats both, which is the privacy
   // stance this file already states.
-  const withEndpoint = { command: "", endpoint: "https://example.test/v1", model: "", language: "" };
+  const withEndpoint = { command: "", endpoint: "https://example.test/v1", model: "", language: "", localModel: "tiny.en" };
   assert.equal(transcriptionEndpoint(withEndpoint, { provider: "openai", baseUrl: "https://api.openai.test/v1" }), "https://example.test/v1");
   assert.equal(dictationMode({ ...withEndpoint, command: "whisper {file}" }, "openai"), "local");
 });
@@ -132,11 +132,26 @@ test("what is configured always beats what is borrowed", () => {
 test("⚠️ the transcriber is named by the house it is asked of", () => {
   // `whisper-1` is OpenAI's NAME for it, not the model's. Sending that to Groq is a 404 on a request
   // that already carries your voice — which is the one failure mode this file is arranged to avoid.
-  const bare = { command: "", endpoint: "", model: "", language: "" };
+  const bare = { command: "", endpoint: "", model: "", language: "", localModel: "tiny.en" };
   assert.equal(transcriptionModel(bare, "openai"), "whisper-1");
   assert.equal(transcriptionModel(bare, "groq"), "whisper-large-v3-turbo");
   // A model the user typed wins: they may have a fine-tune, or a gateway with its own names.
   assert.equal(transcriptionModel({ ...bare, model: "my-own" }, "groq"), "my-own");
   // And an unknown house gets the name most endpoints answer to, rather than nothing at all.
   assert.equal(transcriptionModel(bare, "somebody-else"), "whisper-1");
+});
+
+test("⚠️ a transcriber on this machine beats every service", () => {
+  // The same reasoning that already puts a configured command first, extended to the one this
+  // extension installs itself: somebody who has a transcriber here has the means to keep their voice
+  // here, and nothing should quietly prefer the network because it is faster or because a key happens
+  // to be lying around.
+  const bare = { command: "", endpoint: "", model: "", language: "", localModel: "tiny.en" };
+  assert.equal(dictationMode(bare, "openai", true), "whisper");
+  assert.equal(dictationMode({ ...bare, endpoint: "https://a.test/v1" }, "openai", true), "whisper");
+  // A command the user configured still wins over both: they said exactly what should run.
+  assert.equal(dictationMode({ ...bare, command: "whisper {file}" }, "openai", true), "local");
+  // And without it installed, nothing changes about what came before.
+  assert.equal(dictationMode(bare, "openai", false), "remote");
+  assert.equal(dictationMode(bare, "openrouter", false), "off");
 });

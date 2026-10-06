@@ -770,7 +770,7 @@ function turnRule(entry: UiEntry, deps: ChatDeps, opening = false): HTMLElement 
  * Escape cancels, and cancelling throws the recording away without sending it anywhere — somebody
  * who changes their mind mid-sentence has not asked for their voice to be transcribed.
  */
-function micButton(deps: ChatDeps, configured: boolean): HTMLElement {
+function micButton(deps: ChatDeps, configured: boolean, wav = false): HTMLElement {
   const recording = Boolean(activeRecorder);
   const control = button({
     icon: ICON.mic,
@@ -804,6 +804,10 @@ function micButton(deps: ChatDeps, configured: boolean): HTMLElement {
           setComposerNote(why);
           refreshMic();
         },
+        // WAV when the words will be made here: whisper.cpp reads WAV, FLAC and MP3 and not the
+        // Opus every recorder produces. Decided before the recording starts, because deciding
+        // afterwards would mean losing the sentence that was just spoken.
+        wav,
       ).then((started) => {
         activeRecorder = started;
         refreshMic();
@@ -1255,7 +1259,7 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
   // So the button is always there when the host can record, and when nothing is configured it says
   // so and offers to configure it, instead of silently doing nothing.
   right.append(toolsButton(state, deps));
-  if (microphonePossible()) right.append(micButton(deps, Boolean(state.dictation)));
+  if (microphonePossible()) right.append(micButton(deps, Boolean(state.dictation), Boolean(state.dictationWav)));
   right.append(
     // The same button as its neighbours, carrying a different glyph. `primary` made it a size and a
     // weight of its own at the end of a row of six identical controls, and "the send is special"

@@ -402,6 +402,16 @@ export interface UiState {
    */
   dictation?: boolean;
   /**
+   * Record a WAV rather than WebM, because the transcriber runs here.
+   *
+   * ⚠️ whisper.cpp decodes WAV, FLAC and MP3 — not the Opus-in-WebM every `MediaRecorder` produces.
+   * The services accept both, which is why nothing had ever had to carry this distinction. It is also
+   * true when NOTHING is installed yet but something can be: the recording is made before the
+   * question "shall I install one?" is answered, and recording the wrong format would mean losing the
+   * sentence somebody just spoke.
+   */
+  dictationWav?: boolean;
+  /**
    * The width below which the panel stops rearranging itself and scrolls sideways instead.
    *
    * ⚠️⚠️ Sent in the state because it CANNOT be written as a style attribute, and for a whole release
@@ -594,5 +604,13 @@ export type ToPanel =
   | { type: "dictated"; text: string }
   /** Dictation could not run or heard nothing. Shown in the composer's own row, not as a dialog. */
   | { type: "dictationFailed"; why: string }
+  /**
+   * What a long, one-off install is doing.
+   *
+   * ⚠️ Because it is 85 MB over somebody's home connection, and a spinner that cannot move is
+   * indistinguishable from a hang. The message carries the megabytes so far, which is the only number
+   * that proves anything is still happening.
+   */
+  | { type: "dictationProgress"; what: string }
   /** The agent's plan, as it is written. Redrawn in place rather than appended. */
   | { type: "plan"; plan: Plan };

@@ -2,6 +2,46 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 1.8.0 — 2026-10-06
+
+### Ajouté
+
+- **⚠️⚠️ UN WHISPER LOCAL : la dictée sans compte, sans clé et sans réseau après la première fois.**
+  « oui construis le Whisper local ». Trois autres réponses avaient été écartées **par la mesure** :
+  l'API vocale de VS Code est *proposée* et réservée à ses propres extensions, le reconnaisseur du
+  navigateur répond `not-allowed` dans un panneau, et les systèmes n'exposent leur dictée à une
+  commande que sous Windows — où le moteur scriptable est l'ancien. Ce qui reste et qui marche
+  pareil partout, c'est un modèle qui tourne sur la machine.
+
+  Au premier appui sur le micro sans rien de configuré, le panneau **demande** : *installer un
+  transcripteur sur cette machine ? (85 Mo, une seule fois)*, en disant d'où il vient. Après quoi
+  votre voix devient des mots **ici**, gratuitement, et rien ne part nulle part.
+
+  - **Rien n'est une dépendance npm** : une archive est récupérée et un programme est exécuté. Le
+    lecteur `tar` a été écrit à la main, comme le lecteur ZIP, le rendu markdown, le diff et le client
+    MCP avant lui.
+  - **Le build est épinglé**, jamais « latest » : une mesure doit être reproductible et un rapport de
+    bogue aussi. « Ça ne transcrit plus » a une réponse quand tout le monde a le même binaire.
+  - **Le local passe avant tout service**, y compris une clé déjà configurée — c'est la même règle de
+    confidentialité qui faisait déjà gagner une commande configurée.
+  - **macOS n'a pas de binaire prêt à l'emploi** et c'est dit, pas contourné : le projet publie un
+    `xcframework` à embarquer dans une application, pas un programme. `brew install whisper-cpp` suffit,
+    et la même détection le trouve ensuite.
+
+  ⚠️⚠️ **Deux prémisses fausses de ma part, attrapées en exécutant et non en lisant :**
+  1. *« une release de binaires compilés ne contient pas de liens symboliques »*. Si : `libwhisper.so.1`
+     pointe vers `libwhisper.so.1.9.5`. Les ignorer donnait une installation propre qui mourait à
+     l'exécution sur `cannot open shared object file`. Ils sont désormais **matérialisés en copies** —
+     jamais suivis, ce qui est la plus vieille faille d'extraction d'archive qui soit.
+  2. *le format audio*. whisper.cpp décode du WAV, du FLAC et du MP3 — **pas** l'Opus dans WebM que
+     produit tout `MediaRecorder`. Les services l'acceptaient, donc personne en amont n'avait jamais eu
+     à s'en soucier. Le panneau enregistre maintenant un **WAV 16 kHz mono** quand les mots seront
+     fabriqués ici, et l'encodeur WAV tient en quarante-quatre octets d'en-tête, donc il est écrit ici
+     plutôt qu'importé.
+
+  **Vérifié de bout en bout sur cette machine** : téléchargement, extraction, exécution, et la phrase
+  de l'échantillon transcrite correctement. Pas raisonné — exécuté.
+
 ## 1.7.1 — 2026-10-06
 
 ### Ajouté

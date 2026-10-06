@@ -11,6 +11,7 @@
 // and is not is worse than no button: the user speaks a paragraph into nothing.
 
 import { t } from "../shared/i18n.js";
+import { encodeWav, SPEECH_SAMPLE_RATE } from "../core/dictation/wav.js";
 
 export interface Recorder {
   stop: () => void;
@@ -35,6 +36,14 @@ export function microphonePossible(): boolean {
 export async function startRecording(
   onDone: (audio: string, ms: number) => void,
   onError: (why: string) => void,
+  /**
+   * Record a WAV instead of WebM.
+   *
+   * ⚠️ For the transcriber that runs on this machine, which decodes WAV, FLAC and MP3 — and not the
+   * Opus-in-WebM every `MediaRecorder` produces. The remote services accept the WebM happily, which
+   * is why nothing had ever had to care until something local tried to read it.
+   */
+  wav = false,
 ): Promise<Recorder | undefined> {
   if (!microphonePossible()) {
     onError(t("This editor does not give the panel a microphone."));
@@ -57,9 +66,12 @@ export async function startRecording(
     return undefined;
   }
 
-  const chunks: Blob[] = [];
   const started = Date.now();
   let cancelled = false;
+
+  if (wav) return recordWav(stream, started, onDone, onError, () => cancelled, (c) => (cancelled = c));
+
+  const chunks: Blob[] = [];
   // Opus in WebM is what every Chromium `MediaRecorder` produces, and what every transcriber accepts.
   // The type is offered rather than demanded: a host that disagrees records in its own default
   // instead of refusing, and the transcriber sniffs the container anyway.
@@ -98,6 +110,66 @@ export async function startRecording(
       cancelled = true;
       if (recorder.state !== "inactive") recorder.stop();
       else for (const track of stream.getTracks()) track.stop();
+    },
+  };
+}
+
+/**
+ * The same recording, as a WAV.
+ *
+ * `ScriptProcessorNode` is deprecated in favour of `AudioWorklet`, and is used anyway: a worklet is a
+ * separate script file, which means another resource for the panel's CSP to allow and another file to
+ * ship, for a node that exists in every browser this extension can run in. When it stops existing,
+ * this is the one place that changes.
+ *
+ * The context is asked for 16 kHz, which is the rate speech models want, and the file states the rate
+ * it actually got — a host that refuses the request gives something else, and a WAV that lies about
+ * its rate is a recording played at the wrong speed.
+ */
+function recordWav(
+  stream: MediaStream,
+  started: number,
+  onDone: (audio: string, ms: number) => void,
+  onError: (why: string) => void,
+  cancelled: () => boolean,
+  setCancelled: (c: boolean) => void,
+): Recorder {
+  const ctx = new AudioContext({ sampleRate: SPEECH_SAMPLE_RATE });
+  const source = ctx.createMediaStreamSource(stream);
+  const node = ctx.createScriptProcessor(4096, 1, 1);
+  const chunks: Float32Array[] = [];
+  node.onaudioprocess = (event) => {
+    // Copied, not kept: the event's buffer is reused by the next callback, so holding a reference
+    // records the same fraction of a second over and over.
+    chunks.push(new Float32Array(event.inputBuffer.getChannelData(0)));
+  };
+  source.connect(node);
+  // Connected to the output because a `ScriptProcessorNode` that reaches nothing is never pulled, and
+  // therefore never fires. Nothing is audible: it writes no output samples.
+  node.connect(ctx.destination);
+
+  const finish = () => {
+    node.disconnect();
+    source.disconnect();
+    void ctx.close();
+    for (const track of stream.getTracks()) track.stop();
+    if (cancelled()) return;
+    const ms = Date.now() - started;
+    if (ms < 400 || !chunks.length) {
+      onError(t("That was too short to transcribe."));
+      return;
+    }
+    const bytes = encodeWav(chunks, ctx.sampleRate);
+    let binary = "";
+    for (const b of bytes) binary += String.fromCharCode(b);
+    onDone(btoa(binary), ms);
+  };
+
+  return {
+    stop: finish,
+    cancel: () => {
+      setCancelled(true);
+      finish();
     },
   };
 }

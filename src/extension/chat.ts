@@ -116,6 +116,8 @@ import type {
   UiState,
   UiApproval,
 } from "../shared/protocol.js";
+import { installWhisper, installedWhisper, runWhisper } from "./whisper.js";
+import { modelFor, whisperAsset } from "../core/dictation/local.js";
 import { SECTION, endpointFor, providerFor, readSettings, routerConfig, type Keys, type Settings, writeTarget } from "./config.js";
 import { EgressGate, safeHost, summarize } from "./egress.js";
 import { renderPromptAudit, type PromptAudit } from "../core/audit/prompt.js";
@@ -628,7 +630,17 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       appearance: s.appearance,
       panelMinWidth: Math.max(0, Math.round(s.panel.minWidth)),
       // Only when there is somewhere to transcribe. See `core/dictation/dictation.ts`.
-      ...(dictationMode(s.dictation, s.chat.provider) === "off" ? {} : { dictation: true }),
+      ...(() => {
+        const here = Boolean(installedWhisper(this.ctx.globalStorageUri.fsPath, process.platform, s.dictation.localModel));
+        const mode = dictationMode(s.dictation, s.chat.provider, here);
+        const offerable = Boolean(whisperAsset({ platform: process.platform, arch: process.arch }));
+        return {
+          // The button exists wherever dictation can be MADE to work, not only where it already does:
+          // the one thing it can always do is offer to install a transcriber.
+          ...(mode === "off" && !offerable ? {} : { dictation: true }),
+          ...(mode === "whisper" || (mode === "off" && offerable) ? { dictationWav: true } : {}),
+        };
+      })(),
       budget: { spentTodayUsd: this.gate.budget.spentToday(), dailyUsd: s.budget.dailyUsd },
       sessionCostUsd: this.session.totalCostUsd(),
       pendingApprovals: this.pendingApprovals,
@@ -3176,7 +3188,48 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    */
   private async transcribe(audioBase64: string, ms: number): Promise<void> {
     const settings = readSettings();
-    const mode = dictationMode(settings.dictation, settings.chat.provider);
+    const storage = this.ctx.globalStorageUri.fsPath;
+    let mode = dictationMode(
+      settings.dictation,
+      settings.chat.provider,
+      Boolean(installedWhisper(storage, process.platform, settings.dictation.localModel)),
+    );
+    // ⚠️ Nothing configured, but something OFFERABLE. The three answers ruled out by measurement —
+    // VS Code's proposed speech API, the browser's recogniser, the operating systems' own dictation —
+    // left one that works the same everywhere: a model on this machine. So instead of refusing, this
+    // asks, says the size, and installs. Asked for: « oui construis le Whisper local ».
+    if (mode === "off" && whisperAsset({ platform: process.platform, arch: process.arch })) {
+      const model = modelFor(settings.dictation.localModel);
+      const go = await new Promise<boolean>((resolve) => {
+        this.askInPanel(
+          {
+            id: randomNonce(),
+            tool: "run_command",
+            description: t("Install a transcriber on this machine? ({0} MB, once)", model.mb + 10),
+            choices: ["once", "no"],
+            detail: [
+              t("Your voice is then turned into words here, by whisper.cpp. Nothing is sent anywhere, ever, and it costs nothing."),
+              t("Downloaded from github.com and huggingface.co — the only addresses this extension fetches without being told to."),
+              t("Model: {0} — {1}", model.id, model.hint),
+            ],
+          },
+          (answer) => resolve(answer === "once"),
+        );
+      });
+      if (!go) {
+        this.post({ type: "dictationFailed", why: t("Dictation needs a transcriber, and none was installed.") });
+        return;
+      }
+      try {
+        await installWhisper(storage, process.platform, process.arch, settings.dictation.localModel, (what) =>
+          this.post({ type: "dictationProgress", what }),
+        );
+        mode = "whisper";
+      } catch (err) {
+        this.post({ type: "dictationFailed", why: t("The transcriber could not be installed: {0}", (err as Error).message) });
+        return;
+      }
+    }
     if (mode === "off") {
       this.post({
         type: "dictationFailed",
@@ -3198,7 +3251,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     }
     this.log.appendLine(`[dictation] ${mode}, ${Math.round(ms / 100) / 10}s, ${audio.length} bytes`);
     try {
-      const text = mode === "local" ? await this.transcribeLocally(audio, settings) : await this.transcribeRemotely(audio, settings);
+      const text =
+        mode === "local"
+          ? await this.transcribeLocally(audio, settings)
+          : mode === "whisper"
+            ? await this.transcribeHere(audio, settings)
+            : await this.transcribeRemotely(audio, settings);
       const clean = cleanTranscript(text);
       if (!clean) {
         // Distinguished from a failure on purpose: the tool worked and there was nothing to hear.
@@ -3256,6 +3314,30 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    * their voice: it cannot be pseudonymised, the user cannot see what is in it the way they can read
    * a diff, and "always" on a microphone is the one permission this project should not offer.
    */
+  /**
+   * Transcribe with the model this extension installed.
+   *
+   * ⚠️ The recording is a WAV here and WebM everywhere else, because whisper.cpp decodes WAV, FLAC and
+   * MP3 and not Opus. The panel is told which to record by `dictationLocal` in the state — a
+   * difference the remote services never forced anybody to notice, since they accept both.
+   *
+   * The file is written to a temporary directory and removed whatever happens. A recording of
+   * somebody's voice left on disk after it has been turned into words is a thing nobody asked for.
+   */
+  private async transcribeHere(audio: Buffer, settings: Settings): Promise<string> {
+    const storage = this.ctx.globalStorageUri.fsPath;
+    const where = installedWhisper(storage, process.platform, settings.dictation.localModel);
+    if (!where) throw new Error(t("The transcriber is not installed."));
+    const dir = await fsp.mkdtemp(join(tmpdir(), "hivey-dictation-"));
+    const wav = join(dir, "voice.wav");
+    try {
+      await fsp.writeFile(wav, audio);
+      return await runWhisper(where, wav, settings.dictation.language);
+    } finally {
+      await fsp.rm(dir, { recursive: true, force: true });
+    }
+  }
+
   private async transcribeRemotely(audio: Buffer, settings: Settings): Promise<string> {
     // The configured endpoint, or the chat provider's when it is one known to transcribe. See
     // `transcriptionEndpoint`: nothing is borrowed on a guess.

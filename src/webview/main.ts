@@ -862,6 +862,11 @@ window.addEventListener("message", (event: MessageEvent<ToPanel>) => {
       }
       break;
     }
+    // ⚠️ A one-off install of 85 MB over a home connection. A note that cannot change is
+    // indistinguishable from a hang, and somebody who has just spoken a sentence is watching it.
+    case "dictationProgress":
+      setComposerNote(m.what);
+      break;
     case "dictationFailed":
       setComposerNote(m.why);
       break;

@@ -21,7 +21,14 @@
 //     arrives as text the user can edit, which is also what makes a wrong transcription a
 //     non-event rather than a wasted turn.
 
-export type DictationMode = "off" | "local" | "remote";
+/**
+ * Where a recording is turned into words.
+ *
+ * `local` is a command the user configured; `whisper` is the one this extension installs itself;
+ * `remote` is a service. The two local ones are kept apart because only one of them is something the
+ * extension can offer to set up, and the message when there is nothing has to know the difference.
+ */
+export type DictationMode = "off" | "local" | "whisper" | "remote";
 
 export interface DictationSettings {
   /** A command on this machine. `{file}` is where the recording is written. */
@@ -31,6 +38,13 @@ export interface DictationSettings {
   model: string;
   /** A BCP-47 hint for the recogniser, or empty to let it decide. */
   language: string;
+  /**
+   * Which model the transcriber on this machine uses — see `core/dictation/local.ts`.
+   *
+   * Separate from `model`, which names the one a SERVICE is asked for. They are different catalogues
+   * with different names, and one setting for both would have to be wrong for one of them.
+   */
+  localModel: string;
 }
 
 /**
@@ -87,8 +101,18 @@ export function transcriptionModel(settings: DictationSettings, chatProvider?: s
  * known to transcribe. That is the difference between "it just works" and "it fails later": every
  * other provider still has to be told, because being told is better than being recorded for nothing.
  */
-export function dictationMode(settings: DictationSettings, chatProvider?: string): DictationMode {
+export function dictationMode(
+  settings: DictationSettings,
+  chatProvider?: string,
+  /** True when this extension's own transcriber is already installed on this machine. */
+  hasWhisper = false,
+): DictationMode {
   if (settings.command.trim()) return "local";
+  // ⚠️ BEFORE any service, and that order is the privacy stance made operational — the same reasoning
+  // that already puts a configured command first. Somebody who has a transcriber on their machine has
+  // the means to keep their voice on it, and nothing should quietly prefer the network because it is
+  // faster or because a key happens to be lying around.
+  if (hasWhisper) return "whisper";
   if (settings.endpoint.trim()) return "remote";
   if (chatProvider && CAN_TRANSCRIBE.has(chatProvider)) return "remote";
   return "off";
