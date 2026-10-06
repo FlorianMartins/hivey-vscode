@@ -7,6 +7,8 @@
 // it is deliberately the only place that knows about all of them.
 
 import * as vscode from "vscode";
+import { discardChanges, dirtyPaths } from "./integrations/git.js";
+import { planGitRestore } from "../core/session/gitRestore.js";
 import { DEFAULT_AGENT_STEPS } from "../core/agent/definitions.js";
 import { changeSize, describeChangeSize } from "../core/text/diff.js";
 import { spawn } from "node:child_process";
@@ -277,7 +279,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    * saving money.
    */
   private budgetTokensFor(s: Settings): number {
-    return contextBudget(s.context.maxTokens, this.modelWindow(s));
+    // The answer budget is passed in, because the reserve has to hold whatever this user actually
+    // asks the model to write back: somebody who raised `chat.maxOutputTokens` has made the reply
+    // bigger, and a reserve computed from a default would be short by exactly that much.
+    return contextBudget(s.context.maxTokens, this.modelWindow(s), s.chat.maxOutputTokens);
   }
 
   /**
@@ -3252,12 +3257,18 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     // wrong direction, which costs nothing on disk and everything in context.
     const snapshots = entry.checkpoint ?? [];
     const folder = vscode.workspace.workspaceFolders?.[0];
-    if (snapshots.length && !folder) {
+    if ((snapshots.length || entry.dirtyBefore?.length) && !folder) {
       void vscode.window.showWarningMessage(t("Restoring needs the folder these files belong to open."));
       return;
     }
 
     const commands = entry.checkpointCommands ?? 0;
+    // ⚠️ What git can put back that the checkpoint cannot: files a COMMAND rewrote. Computed here
+    // rather than remembered, because "dirty now" is only knowable now — and `dirtyBefore`, recorded
+    // when the turn started, is what separates the turn's changes from the user's own.
+    const viaGit = entry.dirtyBefore
+      ? planGitRestore(entry.dirtyBefore, dirtyPaths(), snapshots.map((snap) => join(folder?.uri.fsPath ?? "", snap.path)))
+      : { restorable: [], keptBecauseYours: [] };
     const words = {
       files: (n: number) => t("{0} file(s) go back to how they were.", n),
       created: (n: number) => t("{0} file(s) created by that turn are deleted.", n),
@@ -3266,7 +3277,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       // the count is kept: a restore that silently leaves a formatter's rewrite in place puts the
       // repository into a state it was never in.
       commands: (n: number) =>
-        t("⚠️ {0} command(s) also ran. Whatever they changed is NOT recorded and will NOT be undone.", n),
+        viaGit.restorable.length
+          ? t("{0} command(s) also ran; git puts their {1} file(s) back.", n, viaGit.restorable.length)
+          : t("⚠️ {0} command(s) also ran. Whatever they changed is NOT recorded and will NOT be undone.", n),
     };
     const detail = snapshots.length
       ? describeRestore(snapshots, Boolean(entry.checkpointPartial), words, commands)
@@ -3283,7 +3296,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             "That turn called no edit tool, so there is nothing to put back — but {0} command(s) ran, and whatever they changed stays. Use git to review or undo those.",
             commands,
           )
-        : t("That turn changed no file, so nothing on disk moves.");
+        : viaGit.restorable.length
+          ? t("That turn called no edit tool, but git can put back {0} file(s) it changed.", viaGit.restorable.length)
+          : t("That turn changed no file, so nothing on disk moves.");
     const go = t("Restore");
     const answer = await vscode.window.showWarningMessage(
       t("Go back to before “{0}”?", entry.text.trim().split("\n")[0]!.slice(0, 60)),
@@ -3298,6 +3313,18 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       go,
     );
     if (answer !== go) return;
+
+    // ⚠️ Git first, then the snapshots. The two never touch the same file — `planGitRestore` removes
+    // anything the checkpoint holds — but the order matters anyway: a failed `clean` must not leave
+    // the snapshots applied and the commands' work in place, which would be a state the repository
+    // was never in.
+    if (viaGit.restorable.length) {
+      const failed = await discardChanges(viaGit.restorable);
+      if (failed) {
+        void vscode.window.showErrorMessage(t("Git could not put those files back: {0}", failed));
+        return;
+      }
+    }
 
     const edit = new vscode.WorkspaceEdit();
     for (const snap of snapshots) {
@@ -3351,7 +3378,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       );
     }
 
-    const restoredFiles = snapshots.length;
+    const restoredFiles = snapshots.length + viaGit.restorable.length;
     // The question comes back to the composer. Restoring is a rewind, not a deletion: the thing you
     // most often want next is the same question, asked differently.
     const text = this.session.rewindTo(id);
@@ -3652,6 +3679,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     // away, and threading an id through all of them would put a checkpoint concern in files that
     // have nothing to do with checkpoints.
     this.checkpointFor = [...this.session.entries].reverse().find((e) => e.role === "user")?.id;
+    // ⚠️ What was already yours before this turn. A checkpoint holds only what the edit tools wrote;
+    // a command rewrites files nothing snapshotted, and git holds THEIR previous state — but only for
+    // files that were clean when the turn began. Recorded here, once, because afterwards there is no
+    // way to tell our changes from the user's. See `core/session/gitRestore.ts`.
+    if (this.checkpointFor && mode === "agent") {
+      const entry = this.session.get(this.checkpointFor);
+      if (entry && !entry.dirtyBefore) entry.dirtyBefore = dirtyPaths();
+    }
     this.plan = undefined;
     this.delegatedCostUsd = 0;
     this.turn?.abort();
@@ -4653,6 +4688,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
     const id = randomNonce();
     const command = req.tool === "run_command" ? String(req.args["command"] ?? "") : undefined;
+    // ⚠️ The size of the change, on the card that decides it. The diff editor used to carry this and
+    // no longer opens — so the one fact that separates a two-line fix from a four-hundred-line
+    // rewrite has to be here, before the answer, rather than discovered afterwards.
+    const edited =
+      req.tool === "edit_file"
+        ? describeChangeSize(changeSize(String(req.args["old"] ?? ""), String(req.args["new"] ?? "")))
+        : "";
     return new Promise<boolean>((resolve) => {
       this.askInPanel(
         {

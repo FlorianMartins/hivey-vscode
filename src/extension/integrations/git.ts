@@ -44,6 +44,12 @@ interface GitRepository {
   add(paths: string[]): Promise<void>;
   commit(message: string, opts?: { all?: boolean }): Promise<void>;
   createBranch(name: string, checkout: boolean, ref?: string): Promise<void>;
+  /**
+   * Discard working-tree changes for these paths — which, for a file that was unmodified when a turn
+   * began, is exactly that file's state before the turn. Declared here with the rest: there is no
+   * types package for this API, and this is the method the checkpoint's git half rests on.
+   */
+  clean(paths: string[]): Promise<void>;
 }
 
 interface GitApi {
@@ -351,4 +357,39 @@ export function buildGitTools(): Tool[] {
   };
 
   return [status, diff, log, branches, blame, show, stage, commit, branch];
+}
+
+/**
+ * Paths with working-tree or index changes right now, absolute.
+ *
+ * Both lists, because the Git extension reports them separately and a staged file edited again is in
+ * both — `planGitRestore` de-duplicates. Empty when there is no repository, which is also the answer
+ * for "git cannot help here".
+ */
+export function dirtyPaths(): string[] {
+  const api = gitApi();
+  const folder = vscode.workspace.workspaceFolders?.[0];
+  const repo = api && folder ? api.getRepository(folder.uri) : undefined;
+  if (!repo) return [];
+  return [...repo.state.workingTreeChanges, ...repo.state.indexChanges].map((c) => c.uri.fsPath);
+}
+
+/**
+ * Put these paths back to their last committed state.
+ *
+ * Returns what it could not do rather than throwing: a restore that half worked has to say which
+ * half, and the caller is already mid-dialog with the user.
+ */
+export async function discardChanges(paths: string[]): Promise<string | undefined> {
+  if (!paths.length) return undefined;
+  const api = gitApi();
+  const folder = vscode.workspace.workspaceFolders?.[0];
+  const repo = api && folder ? api.getRepository(folder.uri) : undefined;
+  if (!repo) return t("No git repository here, so those files cannot be put back.");
+  try {
+    await repo.clean(paths);
+    return undefined;
+  } catch (err) {
+    return (err as Error).message;
+  }
 }

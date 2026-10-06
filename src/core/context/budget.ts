@@ -21,17 +21,28 @@
 export const CONTEXT_FLOOR_TOKENS = 8000;
 
 /**
- * As far as the derivation will go on its own.
+ * What the window must keep back for the answer and for the steps after the first.
  *
- * Not a technical limit — it is a spending one. At the shipped caps a prompt this size on the
- * dearest model the product routes to is still well inside the per-request cap, so the derivation
- * cannot by itself produce a question the budget has to ask about. Anyone who wants more sets
- * `hiveyCode.context.maxTokens` and owns the consequence.
+ * ⚠️⚠️ THIS REPLACED A 32,000-TOKEN CEILING, and the reason that ceiling existed is worth keeping in
+ * view: it was never technical, it was about money. "An unbounded budget on a million-token window
+ * would turn every question into a bill."
+ *
+ * That argument is sound and it was being made in the wrong place. The product already has caps that
+ * watch spending — `budget.perRequestUsd`, `budget.dailyUsd`, `budget.perRequestTokens` — and those
+ * ASK before sending. The context ceiling did the same job by silently withholding the model's own
+ * window, which is the version the user cannot see, cannot answer, and cannot weigh. Florian asked
+ * for the obvious thing: « j'aimerais que par défaut la fenêtre de contexte soit sur la valeur la
+ * plus élevée du modèle sélectionné (si le modèle propose 1M, prendre le 1M plutôt que 64k) ».
+ *
+ * So the money question moves entirely to the caps that ask it out loud, and the budget becomes what
+ * it should always have been: the window, less what the turn still needs.
+ *
+ * The reserve is not a preference. A prompt filling the whole window leaves nothing for the reply,
+ * and in agent mode nothing for the tool results of the steps that follow — the turn would truncate
+ * on its first answer. A fifth of the window, and never less than room for three answers.
  */
-export const CONTEXT_CEILING_TOKENS = 32_000;
-
-/** Of the model's window. The rest is the answer, and the tool results of the steps that follow. */
-const SHARE_OF_WINDOW = 0.4;
+export const RESERVE_SHARE = 0.2;
+export const RESERVE_ANSWERS = 3;
 
 /**
  * The budget for this turn.
@@ -41,11 +52,16 @@ const SHARE_OF_WINDOW = 0.4;
  *   types 4000 into a setting called "max tokens" means 4000.
  * @param modelWindow the selected model's own context window, 0 when it is not known.
  */
-export function contextBudget(configured: number | undefined, modelWindow: number): number {
+export function contextBudget(
+  configured: number | undefined,
+  modelWindow: number,
+  answerTokens = 4000,
+): number {
   if (typeof configured === "number" && configured > 0) return configured;
   if (!Number.isFinite(modelWindow) || modelWindow <= 0) return CONTEXT_FLOOR_TOKENS;
-  const share = Math.floor(modelWindow * SHARE_OF_WINDOW);
-  return Math.min(CONTEXT_CEILING_TOKENS, Math.max(CONTEXT_FLOOR_TOKENS, share));
+  const reserve = Math.max(Math.floor(modelWindow * RESERVE_SHARE), answerTokens * RESERVE_ANSWERS);
+  // A small window can be mostly reserve; the floor is what keeps such a model usable at all.
+  return Math.max(CONTEXT_FLOOR_TOKENS, modelWindow - reserve);
 }
 
 /**

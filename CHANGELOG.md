@@ -2,6 +2,41 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 1.2.0 — 2026-10-06
+
+### Ajouté
+
+- **⚠️⚠️ Le retour en arrière remet aussi ce qu'une COMMANDE a changé.** Florian : « il faudrait qu'il
+  fasse un flash du ou des programmes avant la modification pour y revenir par la suite ».
+
+  Le cliché qu'il demande **existe déjà, et il n'est pas de nous** : un arbre de travail git **est**
+  l'état précédent du fichier, tenu par un outil fait pour ça. Un fichier qui était **propre** quand le
+  tour a commencé et qui est modifié maintenant a été changé par le tour, et git en détient la version
+  exacte. Au démarrage d'un tour d'agent, la liste des fichiers déjà modifiés est retenue ; à la
+  restauration, tout ce qui est devenu sale depuis est remis par l'extension Git de l'éditeur — sans
+  shell, sans copie du dépôt, sans nouveau format.
+
+  Trois choses qu'il **refuse** de toucher, et chacune pour une raison :
+  - **un fichier que vous aviez déjà modifié** avant le tour — jeter vos modifications pour annuler
+    les nôtres est le seul résultat pire que de ne pas annuler les nôtres ;
+  - **un fichier que le checkpoint tient déjà** — deux mécanismes qui se disputent un fichier, c'est
+    l'un des deux qui gagne par accident ;
+  - **un fichier non suivi** — git n'a aucun état précédent pour ce qu'il n'a jamais vu, et la boîte
+    de dialogue doit le dire plutôt que laisser croire que le tour a été annulé.
+
+- **⚠️ La fenêtre de contexte prend par défaut tout ce que le modèle offre.** « si le modèle propose
+  1M, prendre le 1M plutôt que 64k ». Le plafond de 32 000 jetons qui l'en empêchait n'était **pas
+  technique**, il était financier : *« un budget sans limite sur une fenêtre d'un million transforme
+  chaque question en facture »*. L'argument est juste et il était fait au mauvais endroit — les
+  plafonds de dépense existent déjà et, eux, **demandent** avant d'envoyer. Le plafond de contexte
+  faisait le même travail en retenant la fenêtre du modèle **en silence**, c'est-à-dire dans la version
+  que l'utilisateur ne voit pas, ne peut pas arbitrer et ne peut pas peser.
+
+  Le budget est désormais *la fenêtre, moins ce dont le tour a encore besoin* — une réserve d'un
+  cinquième, et jamais moins que la place de trois réponses. Ce n'est pas une préférence : un prompt
+  qui remplit toute la fenêtre ne laisse rien pour la réponse, ni pour les résultats d'outils des
+  étapes suivantes. Un modèle d'un million donne maintenant plus de 700 000 jetons de contexte.
+
 ## 1.1.0 — 2026-10-06
 
 ### Corrigé — pourquoi le mode agent faisait tant d'erreurs

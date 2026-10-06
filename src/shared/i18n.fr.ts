@@ -959,6 +959,13 @@ export const FR: Record<string, string> = {
   "{0} lines": "{0} lignes",
   "Refused by the reviewer: {0}": "Refusé par le relecteur : {0}",
   "Apply": "Appliquer",
+  "Git could not put those files back: {0}": "Git n’a pas pu remettre ces fichiers : {0}",
+  "No git repository here, so those files cannot be put back.":
+    "Aucun dépôt git ici, ces fichiers ne peuvent donc pas être remis.",
+  "That turn called no edit tool, but git can put back {0} file(s) it changed.":
+    "Ce tour n’a appelé aucun outil d’édition, mais git peut remettre {0} fichier(s) qu’il a changés.",
+  "{0} command(s) also ran; git puts their {1} file(s) back.":
+    "{0} commande(s) ont aussi tourné ; git remet leurs {1} fichier(s).",
   "The files could not be restored; the conversation is unchanged.": "Les fichiers n’ont pas pu être restaurés ; la conversation est inchangée.",
   "plan: {0}/{1}": "plan : {0}/{1}",
   "{0} file(s) created by that turn are deleted.": "{0} fichier(s) créés par ce tour seront supprimés.",

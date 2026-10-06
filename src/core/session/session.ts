@@ -102,6 +102,15 @@ export interface Entry {
    * dialog can say what it will leave behind — see `checkpoint.ts`.
    */
   checkpointCommands?: number;
+  /**
+   * Files that already had uncommitted changes when this turn started.
+   *
+   * ⚠️ Recorded so a restore can tell OUR changes from the user's. A file that was clean here and is
+   * dirty now was changed by the turn, and git holds its previous state exactly; a file that was
+   * already dirty holds the user's own work, and discarding it to undo ours is the one outcome worse
+   * than not undoing ours. See `core/session/gitRestore.ts`.
+   */
+  dirtyBefore?: string[];
   /** The to-do list the agent kept while answering. Never sent back to the model. */
   plan?: Plan;
   /**
