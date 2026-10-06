@@ -2,6 +2,27 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 1.14.0 — 2026-10-06
+
+### Ajouté
+
+- **⚠️ ffmpeg est proposé aussi à ceux dont le transcripteur est déjà installé.** « si il est déjà
+  installé il ne propose pas d'installer le ffmpeg ». L'offre ne vivait que sur la carte
+  d'installation, donc quelqu'un qui avait configuré la dictée la semaine dernière ne la voyait jamais
+  — et ce sont précisément les gens pour qui elle compte, puisque ce que ffmpeg apporte est **de
+  pouvoir choisir son micro** quand la machine en a plusieurs et **le bord qui suit la voix**.
+
+  ⚠️⚠️ **Demandé UNE SEULE FOIS.** Une question qui revient à chaque appui sur un bouton n'est pas une
+  proposition, c'est du harcèlement — et la façon honnête de refuser quelque chose, c'est que le refus
+  tienne. La réponse est retenue ; la commande et le réglage restent disponibles pour qui change d'avis.
+
+- **« Hivey Code : choisir un micro » entre dans le menu `...` du panneau.** ⚠️ Et c'est une palette
+  native plutôt qu'une liste déroulante de réglages ou une page de configuration, pour une raison qui
+  n'est pas une préférence : **la liste des micros est dynamique**, alors qu'une énumération de réglage
+  doit être figée dans le manifeste. C'est aussi le geste que VS Code emploie lui-même pour tout ce qui
+  varie — choisir un profil, changer de langage. Une page de configuration n'aurait rien ajouté qu'une
+  surface de plus à maintenir.
+
 ## 1.13.1 — 2026-10-06
 
 ### Modifié

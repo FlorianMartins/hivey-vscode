@@ -552,7 +552,7 @@ no entry, so a translation cannot silently rot.
 
 ## Status
 
-`1.13.1` — used every day by its author. [`docs/ROADMAP.md`](docs/ROADMAP.md) is the honest version:
+`1.14.0` — used every day by its author. [`docs/ROADMAP.md`](docs/ROADMAP.md) is the honest version:
 what is tested, what was only checked by hand, and what is written but has never run in the
 conditions it was written for. That last list is not empty and it is named.
 

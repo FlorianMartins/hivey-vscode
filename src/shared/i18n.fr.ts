@@ -1364,6 +1364,16 @@ export const FR: Record<string, string> = {
   "With ffmpeg as well ({0}), you can choose which microphone to use and the box follows your voice while you speak. {1} can do neither.":
     "Avec ffmpeg en plus ({0}), vous pouvez choisir quel micro utiliser et la boîte suit votre voix pendant que vous parlez. {1} ne sait faire ni l'un ni l'autre.",
   "Model + config": "Modèle + config",
+  "Dictation already works. This is what it gains: you can choose which microphone to use when the machine has several, and the box follows your voice while you speak.":
+    "La dictée fonctionne déjà. Voici ce qu'elle y gagne : vous pouvez choisir quel micro utiliser quand la machine en a plusieurs, et la boîte suit votre voix pendant que vous parlez.",
+  "Install ffmpeg as well? {0}": "Installer ffmpeg en plus ? {0}",
+  "Install it": "L'installer",
+  "Installing ffmpeg…": "Installation de ffmpeg…",
+  "It runs in a terminal, where you can see it. This is asked once; `Hivey Code: Choose a microphone` stays available either way.":
+    "Cela s'exécute dans un terminal, sous vos yeux. La question n'est posée qu'une fois ; « Hivey Code : choisir un micro » reste disponible dans les deux cas.",
+  "Left as it is.": "Laissé en l'état.",
+  "{0}, which is what records today, can do neither — it takes whatever Windows calls the default input and writes its file only when you stop.":
+    "{0}, qui enregistre aujourd'hui, ne sait faire ni l'un ni l'autre — il prend ce que Windows appelle l'entrée par défaut et n'écrit son fichier qu'à l'arrêt.",
   "Which areas is this conversation about?": "De quels domaines relève cette conversation ?",
   "Which languages and subjects this conversation is about": "Les langages et sujets dont relève cette conversation",
   "Which sub-agents may be dispatched?": "Quels sous-agents peuvent être sollicités ?",

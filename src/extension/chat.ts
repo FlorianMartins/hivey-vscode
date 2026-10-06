@@ -3285,6 +3285,55 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  /**
+   * Offer ffmpeg to somebody whose transcriber is already in place.
+   *
+   * ⚠️ Because the offer used to live on the install card and nowhere else: « si il est déjà installé
+   * il ne propose pas d'installer le ffmpeg ». Somebody who set dictation up last week, or who already
+   * had a transcriber, never saw it — and they are exactly the people for whom it matters, since what
+   * ffmpeg buys is choosing a microphone when the machine has several and an edge that follows the
+   * voice.
+   *
+   * ⚠️⚠️ ASKED ONCE. A question that returns every time somebody presses a button is not an offer, it
+   * is nagging, and the honest way to refuse something is for the refusal to stick. The answer is
+   * remembered; the command and the setting stay available for anybody who changes their mind.
+   */
+  private async offerBetterRecorder(): Promise<"installed" | "no"> {
+    const KEY = "dictation.recorderOffered";
+    if (this.ctx.globalState.get<boolean>(KEY)) return "no";
+    const current = findRecorder(process.platform);
+    // Nothing to gain: either it can already choose a device and stream, or there is nothing to
+    // install on this platform.
+    if (!current || current.devices || !recorderAdvice(process.platform)) return "no";
+    const go = await new Promise<boolean>((resolve) => {
+      this.askInPanel(
+        {
+          id: randomNonce(),
+          tool: "run_command",
+          description: t("Install ffmpeg as well? {0}", recorderAdvice(process.platform)),
+          choices: ["once", "no"],
+          labels: { once: t("Install it"), no: t("Not now") },
+          done: { once: t("Installing ffmpeg…"), no: t("Left as it is.") },
+          detail: [
+            t("Dictation already works. This is what it gains: you can choose which microphone to use when the machine has several, and the box follows your voice while you speak."),
+            t("{0}, which is what records today, can do neither — it takes whatever Windows calls the default input and writes its file only when you stop.", current.program),
+            t("It runs in a terminal, where you can see it. This is asked once; `Hivey Code: Choose a microphone` stays available either way."),
+          ],
+        },
+        (answer) => resolve(answer === "once"),
+      );
+    });
+    // Remembered either way: a yes needs no second asking, and a no that came back tomorrow would be
+    // a question somebody has already answered.
+    await this.ctx.globalState.update(KEY, true);
+    if (!go) return "no";
+    const term = vscode.window.createTerminal({ name: "Hivey Code — ffmpeg" });
+    term.show(true);
+    term.sendText(recorderAdvice(process.platform));
+    this.post({ type: "dictationFailed", why: t("Installing — press the microphone again once the terminal has finished.") });
+    return "installed";
+  }
+
   /** The recording in progress, if any. One at a time: a second microphone is a second voice. */
   private recording:
     | { stop: () => Promise<string>; cancel: () => void; dir: string; started: number; level: ReturnType<typeof setInterval> }
@@ -3313,6 +3362,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       this.post({ type: "dictationFailed", why: t("Ready. Press the microphone to speak.") });
       return;
     }
+    // The transcriber is there. The RECORDER may still be the one that cannot choose a microphone or
+    // report a voice — asked once, and only when there is something to gain.
+    if ((await this.offerBetterRecorder()) === "installed") return;
     const settings = readSettings();
     const dir = await fsp.mkdtemp(join(tmpdir(), "hivey-dictation-"));
     const wav = join(dir, "voice.wav");
