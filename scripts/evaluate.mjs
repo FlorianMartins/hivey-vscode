@@ -133,13 +133,17 @@ async function checkout(task, { withSolution = false } = {}) {
  * minutes something is wrong with the check, and no endpoint's speed can change that.
  */
 const CHECK_TIMEOUT_MS = 180_000;
+// ⚠️ And NOT `task.timeoutMs`, which these two used to reach for. That field is the budget for the
+// AGENT's attempt; a check is a test command on a prepared fixture. The two were the same number in
+// every task file, so the conflation cost nothing and stayed invisible — right up until one of them
+// became adjustable.
 
 async function verifyTasks(tasks) {
   let broken = 0;
   for (const task of tasks) {
     const dir = await checkout(task);
     try {
-      const result = await sh(task.check, dir, task.timeoutMs ?? CHECK_TIMEOUT_MS);
+      const result = await sh(task.check, dir, CHECK_TIMEOUT_MS);
       if (result.code === 0) {
         broken++;
         console.log(`✗ ${task.id}: the check PASSES on the untouched fixture, so this task measures nothing`);
@@ -180,7 +184,7 @@ async function verifySolutions(tasks) {
     }
     const dir = await checkout(task, { withSolution: true });
     try {
-      const result = await sh(task.check, dir, task.timeoutMs ?? CHECK_TIMEOUT_MS);
+      const result = await sh(task.check, dir, CHECK_TIMEOUT_MS);
       if (result.code === 0) {
         console.log(`✓ ${task.id}: passes on the reference solution`);
       } else {
@@ -220,7 +224,7 @@ async function runTask(task, model, endpoint, timeoutMs) {
       // it passes through `sh -c`. See `sh`.
       ["node", CLI, "--yes", task.prompt],
       dir,
-      task.timeoutMs ?? timeoutMs,
+      timeoutMs,
       {
         HIVEY_CODE_RUN_REPORT: reportFile,
         // Per child rather than on `process.env`, which is what made the loop below sequential by
@@ -399,6 +403,16 @@ async function main() {
   // failures. A measurement whose clock cannot be adjusted to the endpoint being measured produces a
   // number about the endpoint's throughput and calls it quality. The default is unchanged, so every
   // figure already published still means what it said.
+  // ⚠️⚠️ And it OVERRIDES the per-task value when it is given, which is the whole difference between a
+  // flag and a decoration. Every task file carries `"timeoutMs": 180000`, so the first version of this
+  // — `task.timeoutMs ?? timeoutMs` — could never change anything: a run recorded a 600-second clock
+  // in its header and went on killing tasks at 180. A flag the data silently overrules is not a flag,
+  // which is the same defect as a style the document's policy silently discards, found twice in a day.
+  //
+  // Absent, nothing changes: the task's own figure wins, then the default. A per-task value is a
+  // budget somebody wrote for that task; the flag is the operator saying the endpoint is slow today,
+  // and the operator is the only one who can see that.
+  const timeoutGiven = args.includes("--timeout");
   const timeoutMs = Math.max(1000, (Number(flag("timeout", "180")) || 180) * 1000);
 
   if (!endpoint || !models.length) {
@@ -491,7 +505,7 @@ async function main() {
         active += 1;
         let result;
         try {
-          result = await runTask(item.task, item.model, endpoint, timeoutMs);
+          result = await runTask(item.task, item.model, endpoint, timeoutGiven ? timeoutMs : (item.task.timeoutMs ?? timeoutMs));
         } finally {
           active -= 1;
         }

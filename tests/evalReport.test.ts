@@ -282,6 +282,29 @@ test("a task the clock killed is counted, and too many of them withdraw the rate
   assert.equal(t.passRate, 0.5, "one timeout is a failure, not a reason to withdraw the measurement");
 });
 
+test("⚠️ the --timeout flag overrules the figure written in every task file", () => {
+  // The flag shipped unable to do anything. Every task file carries `"timeoutMs": 180000`, and the
+  // harness read `task.timeoutMs ?? timeoutMs` — so a run launched with `--timeout 600` recorded a
+  // 600-second clock in its header and went on killing tasks at 180. A flag the data silently
+  // overrules is not a flag; it is the same shape of defect as a style a document's own policy
+  // silently discards, which this repository also shipped today.
+  //
+  // Read from the source, because this is a claim about which of two values wins at a call site.
+  const harness = readFileSync("scripts/evaluate.mjs", "utf8");
+  assert.match(
+    harness,
+    /timeoutGiven \? timeoutMs : \(item\.task\.timeoutMs \?\? timeoutMs\)/,
+    "the operator's explicit clock no longer wins over the figure stored in the task",
+  );
+  assert.match(harness, /const timeoutGiven = args\.includes\("--timeout"\)/);
+  // And the two clocks stay apart: a check is a test command on a prepared fixture, and no endpoint's
+  // speed changes how long that may take.
+  assert.ok(
+    !/sh\(task\.check, dir, task\.timeoutMs/.test(harness),
+    "the check is timed by the agent's budget again, which is a different question",
+  );
+});
+
 test("the table refuses a rate once timeouts pass the bench's own noise", () => {
   // The threshold is not picked: ADR-0034 measured this bench's noise at three tasks (48, 47, 50 on
   // three identical series) and ruled that a difference under three tasks is not a result. A set
