@@ -2,6 +2,37 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 1.7.1 — 2026-10-06
+
+### Ajouté
+
+- **⚠️ La dictée a enfin une réponse valable sur les trois systèmes : Groq.** « quelle serait meilleure
+  solution pour le micro du coup ? il faut que ce soit disponible pour tous les OS. le mode speech de
+  VSCode n'est pas du tout exploitable ? » — deux questions, deux vérifications plutôt que deux
+  opinions :
+
+  **1. Le mode vocal de VS Code est hors de portée.** Son API stable — les 18 963 lignes de
+  `@types/vscode` — ne contient **aucune** occurrence de `speech`, `dictation` ni `voice`. La surface
+  existe (`ExtHostSpeech`, `MainThreadSpeechProvider`), elle est *proposée* : réservée aux extensions
+  de Microsoft. Ses commandes vocales sont par ailleurs attachées à son propre chat.
+
+  **2. La reconnaissance vocale du navigateur ne répond pas.** Mesurée, pas supposée : un sondage posé
+  dans le panneau rapporte `SpeechRecognition error=not-allowed`, alors que `mediaDevices` fonctionne
+  — c'est pourquoi l'enregistrement, lui, marche déjà. ⚠️ Et le sondage lui-même a d'abord été
+  invisible, parce qu'il posait son style avec `setAttribute("style", …)` : **le défaut corrigé le
+  matin même**, reproduit à l'identique quelques heures plus tard.
+
+  **La réponse est donc un service, et il en existe un qui coûte zéro :** le point d'accès de Groq est
+  compatible OpenAI, tourne whisper-large-v3-turbo, et son palier gratuit offre **2 000 transcriptions
+  par jour sans carte bancaire**. Multi-OS par construction. Il rejoint OpenAI et Azure parmi les
+  fournisseurs **empruntés automatiquement** : si c'est déjà votre fournisseur de modèles, le micro
+  fonctionne sans un réglage de plus.
+
+  ⚠️ Et le nom du transcripteur suit la maison : `whisper-1` est le nom **d'OpenAI**, pas celui du
+  modèle. L'envoyer à Groq est un 404 sur une requête qui porte déjà votre voix — précisément l'échec
+  que tout ce fichier est agencé pour éviter. Le réglage par défaut devient vide et chaque fournisseur
+  reçoit le nom qu'il emploie.
+
 ## 1.7.0 — 2026-10-06
 
 ### Modifié

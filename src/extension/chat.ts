@@ -20,6 +20,7 @@ import {
   cleanTranscript,
   dictationMode,
   transcriptionEndpoint,
+  transcriptionModel,
   localCommand,
   transcriptionBody,
 } from "../core/dictation/dictation.js";
@@ -3183,7 +3184,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         // about. And it no longer pretends the editor could do this for us: VS Code's own speech is a
         // proposed API, available to its own extensions and to nobody else.
         why: t(
-          "Dictation needs a transcriber. Either set hiveyCode.dictation.command to one on this machine — whisper.cpp, for instance — or hiveyCode.dictation.endpoint to a service. A key for OpenAI is borrowed automatically; OpenRouter and local servers do not transcribe.",
+          "Dictation needs a transcriber. The simplest way on any machine is a Groq key — its free tier is 2,000 transcriptions a day without a card — which this borrows automatically once it is your provider. A key for OpenAI is borrowed the same way. Or point hiveyCode.dictation.command at a transcriber on this machine, which sends nothing anywhere. OpenRouter and local model servers do not transcribe.",
         ),
       });
       return;
@@ -3290,7 +3291,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     if (!go) throw new Error(t("Not sent."));
 
     const { body, contentType } = transcriptionBody(audio, {
-      model: settings.dictation.model,
+      model: transcriptionModel(settings.dictation, settings.chat.provider),
       ...(settings.dictation.language ? { language: settings.dictation.language } : {}),
     });
     // The gateway's key, when one is stored: a self-hosted transcriber usually needs none, and a

@@ -46,7 +46,35 @@ export interface DictationSettings {
  * offers no transcription endpoint at all. Local servers are absent for the same reason — Ollama and
  * LM Studio serve text, and the audio models they can run are not reached this way.
  */
-const CAN_TRANSCRIBE = new Set(["openai", "azure"]);
+const CAN_TRANSCRIBE = new Set(["openai", "azure", "groq"]);
+
+/**
+ * Which model each house calls its transcriber.
+ *
+ * ⚠️ Because `whisper-1` is OpenAI's NAME for it, not the model's. Sending that name to Groq is a 404
+ * on a request that already carries your voice — the exact failure this whole file is arranged to
+ * avoid. A single default could only ever be right for one provider.
+ *
+ * Groq is the one worth knowing about: its OpenAI-compatible transcription endpoint runs
+ * whisper-large-v3-turbo, and its free tier is two thousand requests a day without a card. That is as
+ * close to "it just works, on any machine, for nothing" as this gets without downloading a model.
+ */
+const TRANSCRIBER: Record<string, string> = {
+  openai: "whisper-1",
+  azure: "whisper-1",
+  groq: "whisper-large-v3-turbo",
+};
+
+/**
+ * The model to ask for, given what is configured and where the audio is going.
+ *
+ * A model the user typed always wins: they may have a fine-tune, or a gateway with its own names.
+ */
+export function transcriptionModel(settings: DictationSettings, chatProvider?: string): string {
+  const chosen = settings.model.trim();
+  if (chosen) return chosen;
+  return (chatProvider && TRANSCRIBER[chatProvider]) || "whisper-1";
+}
 
 /**
  * Which path a dictation takes.

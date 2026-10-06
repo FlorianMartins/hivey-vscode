@@ -1,6 +1,6 @@
 # Understanding Hivey Code — the course
 
-**Up to date for version 1.7.0.**
+**Up to date for version 1.7.1.**
 
 This course explains what Hivey Code is, what every technology it uses is for, and how they fit
 together — **without assuming you can program**. If you don't know what a "token", an "API" or a

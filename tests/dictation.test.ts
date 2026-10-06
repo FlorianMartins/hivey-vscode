@@ -12,6 +12,8 @@ import {
   dictationMode,
   localCommand,
   transcriptionBody,
+  transcriptionEndpoint,
+  transcriptionModel,
 } from "../src/core/dictation/dictation.js";
 
 const OFF = { command: "", endpoint: "", model: "whisper-1", language: "" };
@@ -97,4 +99,44 @@ test("silence produces nothing, not a question made of a placeholder", () => {
   assert.equal(cleanTranscript("   \n  "), "");
   // A real bracketed phrase is kept: only the recognisers' own placeholders go.
   assert.equal(cleanTranscript("[important] revois ce fichier"), "[important] revois ce fichier");
+});
+
+// ── Where a recording may go, and under whose name ───────────────────────────────────────────────
+
+test("⚠️ a provider is borrowed only when it is KNOWN to transcribe", () => {
+  // The request was « il faudrait que ce soit aussi simple d'utilsiation qu'un service cloud comme
+  // google mic » — so dictation should not make you configure a second service when you already have
+  // one. But borrowing an address that does not answer `/audio/transcriptions` gives a microphone
+  // that records your voice, sends it, and fails. That is worse than one that says it needs setting
+  // up, because it fails AFTER you have spoken.
+  const bare = { command: "", endpoint: "", model: "", language: "" };
+  assert.equal(dictationMode(bare, "openai"), "remote");
+  assert.equal(dictationMode(bare, "groq"), "remote");
+  // ⚠️ OpenRouter is the instructive absence: the provider most people here have a key for, and it
+  // offers no transcription endpoint at all. Local servers serve text.
+  assert.equal(dictationMode(bare, "openrouter"), "off");
+  assert.equal(dictationMode(bare, "local"), "off");
+  assert.equal(dictationMode(bare, "anthropic"), "off");
+  assert.equal(dictationMode(bare), "off", "with no provider at all there is nothing to borrow");
+});
+
+test("what is configured always beats what is borrowed", () => {
+  // Somebody who has set an endpoint has said where their voice goes, and a provider that happens to
+  // transcribe must not quietly override that. The local command beats both, which is the privacy
+  // stance this file already states.
+  const withEndpoint = { command: "", endpoint: "https://example.test/v1", model: "", language: "" };
+  assert.equal(transcriptionEndpoint(withEndpoint, { provider: "openai", baseUrl: "https://api.openai.test/v1" }), "https://example.test/v1");
+  assert.equal(dictationMode({ ...withEndpoint, command: "whisper {file}" }, "openai"), "local");
+});
+
+test("⚠️ the transcriber is named by the house it is asked of", () => {
+  // `whisper-1` is OpenAI's NAME for it, not the model's. Sending that to Groq is a 404 on a request
+  // that already carries your voice — which is the one failure mode this file is arranged to avoid.
+  const bare = { command: "", endpoint: "", model: "", language: "" };
+  assert.equal(transcriptionModel(bare, "openai"), "whisper-1");
+  assert.equal(transcriptionModel(bare, "groq"), "whisper-large-v3-turbo");
+  // A model the user typed wins: they may have a fine-tune, or a gateway with its own names.
+  assert.equal(transcriptionModel({ ...bare, model: "my-own" }, "groq"), "my-own");
+  // And an unknown house gets the name most endpoints answer to, rather than nothing at all.
+  assert.equal(transcriptionModel(bare, "somebody-else"), "whisper-1");
 });

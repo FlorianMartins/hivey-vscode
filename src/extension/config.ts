@@ -255,7 +255,7 @@ function readSettingsRaw(scope?: vscode.Uri): Settings {
     dictation: {
       command: c.get<string>("dictation.command", ""),
       endpoint: c.get<string>("dictation.endpoint", ""),
-      model: c.get<string>("dictation.model", "whisper-1"),
+      model: c.get<string>("dictation.model", ""),
       language: c.get<string>("dictation.language", ""),
     },
     completion: {

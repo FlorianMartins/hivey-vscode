@@ -1321,12 +1321,12 @@ export const FR: Record<string, string> = {
   "No rule yet — anything that changes is asked.": "Aucune règle pour l'instant — tout ce qui modifie est demandé.",
   "Revoke what this conversation granted": "Révoquer ce que cette conversation a accordé",
   "Your rules": "Vos règles",
-  "Dictation needs a transcriber. Either set hiveyCode.dictation.command to one on this machine — whisper.cpp, for instance — or hiveyCode.dictation.endpoint to a service. A key for OpenAI is borrowed automatically; OpenRouter and local servers do not transcribe.":
-    "La dictée a besoin d'un transcripteur. Renseignez soit hiveyCode.dictation.command avec un transcripteur présent sur cette machine — whisper.cpp par exemple — soit hiveyCode.dictation.endpoint avec un service. Une clé OpenAI est empruntée automatiquement ; OpenRouter et les serveurs locaux ne transcrivent pas.",
   "A strong model where you feel it, a cheap one for the plumbing. The middle of the three.":
     "Un modèle fort là où ça se sent, un modèle bon marché pour la plomberie. Celui du milieu.",
   "The premium one: Anthropic's own ladder, its flagship on hard work and its small model on chores.":
     "Le haut de gamme : l'échelle d'Anthropic, son modèle phare sur le travail difficile et son petit modèle sur les corvées.",
+  "Dictation needs a transcriber. The simplest way on any machine is a Groq key — its free tier is 2,000 transcriptions a day without a card — which this borrows automatically once it is your provider. A key for OpenAI is borrowed the same way. Or point hiveyCode.dictation.command at a transcriber on this machine, which sends nothing anywhere. OpenRouter and local model servers do not transcribe.":
+    "La dictée a besoin d'un transcripteur. Le plus simple, sur n'importe quelle machine, est une clé Groq — son palier gratuit offre 2 000 transcriptions par jour sans carte bancaire — qui est empruntée automatiquement dès qu'elle est votre fournisseur. Une clé OpenAI l'est de la même façon. Sinon, pointez hiveyCode.dictation.command vers un transcripteur présent sur cette machine, ce qui n'envoie rien nulle part. OpenRouter et les serveurs de modèles locaux ne transcrivent pas.",
   "Which areas is this conversation about?": "De quels domaines relève cette conversation ?",
   "Which languages and subjects this conversation is about": "Les langages et sujets dont relève cette conversation",
   "Which sub-agents may be dispatched?": "Quels sous-agents peuvent être sollicités ?",
