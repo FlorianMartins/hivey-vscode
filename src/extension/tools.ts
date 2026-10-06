@@ -354,11 +354,22 @@ export function buildTools(deps: ToolDeps): Tool[] {
     schema: {
       name: "edit_file",
       description:
-        "Replace an exact snippet in a file. `old` must appear exactly once. This is the preferred way to change existing code: it is reviewable and it cannot silently rewrite the rest of the file.",
+        "Replace an exact snippet in a file. `old` must appear exactly once. Omit `new`, or pass an " +
+        "empty string, to DELETE the snippet. This is the preferred way to change existing code: it " +
+        "is reviewable and it cannot silently rewrite the rest of the file.",
       parameters: {
         type: "object",
-        properties: { path: { type: "string" }, old: { type: "string" }, new: { type: "string" } },
-        required: ["path", "old", "new"],
+        properties: {
+          path: { type: "string" },
+          old: { type: "string" },
+          // ⚠️ NOT required, and the difference is a feature the tool did not have. Deleting a snippet
+          // means replacing it with nothing — and with `new` required, a model doing that either sends
+          // `""` and meets a provider that drops empty arguments, or omits the field and fails schema
+          // validation. Reported from a real session in the model's own words: « Le paramètre `new`
+          // vide est refusé. » It shelled out to Node to delete two lines.
+          new: { type: "string", description: "The replacement. Omit it, or pass \"\", to delete the snippet." },
+        },
+        required: ["path", "old"],
       },
     },
     approval: (args) => t("edit {0}", String(args["path"])),

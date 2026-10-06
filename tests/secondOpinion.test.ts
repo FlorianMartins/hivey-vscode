@@ -163,15 +163,22 @@ test("the second reader is local only, and the card says so when there is none",
   assert.match(chat, /providerFor\(settings, this\.keys, "local"\)/);
 });
 
-test("it runs before the approval card, and its lines are on it", () => {
+test("it runs before the edit lands, and a blocking objection stops it", () => {
+  // ⚠️ This test used to pin the reader's position relative to a NOTIFICATION that asked the user to
+  // apply the change. That notification is gone: the approval already happened on the panel's card,
+  // and asking a second time was the "compare instead of modify" people kept reporting.
+  //
+  // What has to stay true is not where the reader sits relative to a dialog, but that it runs before
+  // the edit is let through and that a blocking verdict refuses it. A reader whose objection arrives
+  // after the write is a reader that has reviewed history.
   const chat = readFileSync(join("src", "extension", "chat.ts"), "utf8");
   const asked = chat.indexOf("const second = await this.secondOpinion(");
-  const card = chat.indexOf('t("Apply the change to {0}?", relative(uri))');
-  assert.ok(asked > 0 && asked < card, "the card is shown before the second reader has answered");
-  // The PROPERTY, not the formatting: the objections are spread into the message and the message is
-  // joined into one string. Asserting the exact punctuation made this fail the first time a line was
-  // added above it, which teaches people to edit the test rather than to read it.
-  assert.match(chat, /\.\.\.second\.lines,?\s*\]\s*\.join\(/, "the objections are not put on the card");
+  const blocked = chat.indexOf("if (second.blocking)", asked);
+  const allowed = chat.indexOf("return true;", asked);
+  assert.ok(asked > 0, "the second reader is not called");
+  assert.ok(blocked > asked && blocked < allowed, "a blocking verdict must be checked before the edit is allowed");
+  // And its objections reach the turn even when they do not block, where the person reading it is.
+  assert.match(chat, /second\.lines\.length/, "non-blocking objections are dropped on the floor");
 });
 
 test("it blocks only when the organisation asks AND there is something to resolve", () => {

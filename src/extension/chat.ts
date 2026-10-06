@@ -3273,8 +3273,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       : commands
         ? // The worst case, and the one that used to read "nothing on disk moves": the turn's only
           // writes came from commands, so there is nothing to put back and plenty that changed.
+          //
+          // ⚠️ It names the remedy, because the message without one reads as "this feature is
+          // broken". Reported that way: « il ouvre une fenêtre qui dit qu'il ne peut pas modifier et
+          // restore les modifications ». The turn in question had written its files through `node -e`
+          // — because `edit_file` was failing on Windows line endings — so the checkpoint truthfully
+          // held nothing. Both halves are worth saying: what this cannot undo, and what can.
           t(
-            "That turn called no edit tool, so there is nothing to put back — but {0} command(s) ran, and whatever they changed stays.",
+            "That turn called no edit tool, so there is nothing to put back — but {0} command(s) ran, and whatever they changed stays. Use git to review or undo those.",
             commands,
           )
         : t("That turn changed no file, so nothing on disk moves.");
@@ -4654,6 +4660,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           tool: req.tool,
           description: req.description,
           ...(command ? { command } : {}),
+          ...(edited ? { detail: [t("{0} lines", edited)] } : {}),
           // ⚠️ Three, not four. Florian: « il faudrait juste le bouton Accept, toujours ou deny, pas
           // toujours pour la conversation car par défaut toujours c'est uniquement sur la
           // conversation en cours ». He is describing a menu whose middle two entries were the same
@@ -4857,53 +4864,47 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     else if (result.kind !== "already") entry.checkpointPartial = true;
   }
 
+  /**
+   * Record the file's prior state, and let the edit through.
+   *
+   * ⚠️⚠️ THIS NO LONGER ASKS, and that is the fix Florian asked for three times: « le mode agent ne
+   * devrait même pas faire de diff », « il continue de faire les diff au lieu de modifier ».
+   *
+   * The approval already happened. `askApproval` put a card in the panel, named the file, and took
+   * the answer — Accept, Always or Deny. This function then opened a diff EDITOR TAB, stealing the
+   * tab the user was working in, and asked the same question again in a notification. Two askers for
+   * one decision, which is also why "Always" never seemed to take: it satisfied the first and the
+   * second carried on asking.
+   *
+   * What replaces the diff is not nothing: the approval card now carries the change's size, the step
+   * list names every file touched, the checkpoint puts them back, and the editor's own undo is
+   * unaffected. What is gone is being shown a comparison instead of being given a change.
+   *
+   * The second reader survives, because it is not an approval: it answers "does this diff do
+   * something the request did not ask for", and when it says yes about a dangerous file it still
+   * stops the edit. See `core/review/second.ts`.
+   */
   private async confirmEdit(uri: vscode.Uri, next: string): Promise<boolean> {
-    // ⚠️⚠️ Already allowed means ALREADY ALLOWED. This opened a diff and a notification on every
-    // edit, unconditionally, with no idea that the permission system had already said yes — so
-    // "Always" stopped one asker and left the other one asking, and agent mode showed a comparison
-    // instead of making a change. Reported as both.
-    //
-    // The diff is still the review surface, and it still appears whenever approval is needed. What
-    // it must not do is re-ask a question the user has already answered: a change applied under a
-    // standing permission is visible in the turn's steps and undoable from the checkpoint, which is
-    // what those exist for.
-    if (this.alreadyAllowed("edit_file", { path: uri.fsPath })) {
-      this.snapshot(uri, await readOrEmpty(uri));
-      return true;
-    }
     const original = await readOrEmpty(uri);
-    const preview = uri.with({ scheme: "hivey-code-preview", query: Date.now().toString() });
-    previewContents.set(preview.toString(), next);
-    await vscode.commands.executeCommand(
-      "vscode.diff",
-      original === undefined ? vscode.Uri.parse("untitled:nouveau") : uri,
-      preview,
-      t("{0} — proposed by Hivey Code", relative(uri)),
-      { preview: true },
-    );
-    // A second reader, before the dangerous ones. See `core/review/second.ts`: the changes where
-    // approving without reading costs the most are the SMALL ones, so this fires on what the diff
-    // DOES rather than on its size alone.
     const second = await this.secondOpinion(relative(uri), original ?? "", next);
-
-    // How big it is, on the question itself. The diff is open in the editor beside this — the size is
-    // not a substitute for reading it, it is what tells somebody whether they need to.
-    const size = describeChangeSize(changeSize(original ?? "", next));
-    const answer = await vscode.window.showInformationMessage(
-      [
-        size
-          ? t("Apply the change to {0}? ({1} lines)", relative(uri), size)
-          : t("Apply the change to {0}?", relative(uri)),
-        ...second.lines,
-      ].join("\n"),
-      { modal: second.blocking },
-      ...(second.blocking ? [t("Refuse")] : [t("Apply"), t("Refuse")]),
-    );
-    previewContents.delete(preview.toString());
-    const apply = answer === t("Apply");
-    if (apply) this.snapshot(uri, original);
-    return apply;
+    if (second.blocking) {
+      // Not a dialog: the turn is running and the model is the one that has to hear this.
+      this.post({
+        type: "status",
+        text: [t("Refused by the reviewer: {0}", relative(uri)), ...second.lines].join(" — "),
+        tool: "edit_file",
+        ok: false,
+      });
+      return false;
+    }
+    // Objections that do not block are still worth saying, once, where the turn is being read.
+    if (second.lines.length) {
+      this.post({ type: "status", text: second.lines.join(" — "), tool: "edit_file", ok: true });
+    }
+    this.snapshot(uri, original);
+    return true;
   }
+
 
   /**
    * What a second model says about this diff, when the diff is one of the dangerous ones.

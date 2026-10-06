@@ -67,8 +67,6 @@ export const FR: Record<string, string> = {
   "Answered in the conversation": "Répondu dans la conversation",
   "Answering… go to the end of the conversation": "Réponse en cours… aller à la fin de la conversation",
   "Answers from what you attach. No access to the repository.": "Répond avec ce que vous joignez. Aucun accès au dépôt.",
-  "Apply": "Appliquer",
-  "Apply the change to {0}?": "Appliquer la modification de {0} ?",
   "Approval requested": "Autorisation demandée",
   "Ask something else…": "Demander autre chose…",
   "Asking the partition…": "Interrogation de la partition…",
@@ -432,7 +430,6 @@ export const FR: Record<string, string> = {
   "{0} · ~{1} tokens": "{0} · ~{1} jetons",
   "{0} — allowed by a rule": "{0} — autorisé par une règle",
   "{0} — nothing selected, the current line is used": "{0} — rien de sélectionné, la ligne courante est utilisée",
-  "{0} — proposed by Hivey Code": "{0} — proposition de Hivey Code",
   "{0} — refused by a rule": "{0} — refusé par une règle",
   "{0} ↔ proposal": "{0} ↔ proposition",
   "{0}% of the context budget — click to change it": "{0} % du budget de contexte — cliquez pour le changer",
@@ -886,8 +883,8 @@ export const FR: Record<string, string> = {
     "Restaurer {0} fichier(s) — mais {1} commande(s) ont aussi tourné, et ce qu’elles ont changé reste",
   "Rewind the conversation — {0} command(s) ran, and what they changed stays":
     "Revenir en arrière dans la conversation — {0} commande(s) ont tourné, et ce qu’elles ont changé reste",
-  "That turn called no edit tool, so there is nothing to put back — but {0} command(s) ran, and whatever they changed stays.":
-    "Ce tour n’a appelé aucun outil d’édition, il n’y a donc rien à remettre — mais {0} commande(s) ont tourné, et ce qu’elles ont changé reste.",
+  "That turn called no edit tool, so there is nothing to put back — but {0} command(s) ran, and whatever they changed stays. Use git to review or undo those.":
+    "Ce tour n’a appelé aucun outil d’édition, il n’y a donc rien à remettre — mais {0} commande(s) ont tourné, et ce qu’elles ont changé reste. Employez git pour les revoir ou les annuler.",
   "⚠️ {0} command(s) also ran. Whatever they changed is NOT recorded and will NOT be undone.":
     "⚠️ {0} commande(s) ont aussi tourné. Ce qu’elles ont changé n’est PAS enregistré et NE sera PAS annulé.",
   "What this whole conversation has cost, not this question: every turn re-sends the conversation, so the total grows faster than the number of questions. Today's total is in the cost report.":
@@ -953,13 +950,15 @@ export const FR: Record<string, string> = {
   "{0} edits": "{0} modifications",
   "{0} commands": "{0} commandes",
   "{0} reads": "{0} lectures",
-  "Apply the change to {0}? ({1} lines)": "Appliquer la modification à {0} ? ({1} lignes)",
   "Connect": "Connecter",
   "Dictate — needs a transcriber. Click to set one up.":
     "Dicter — il faut un transcripteur. Cliquez pour en configurer un.",
   "Set a transcriber to dictate — the setting is open.":
     "Renseignez un transcripteur pour dicter — le réglage est ouvert.",
   "read {0} (lines {1}-{2} of {3})": "lu {0} (lignes {1}-{2} sur {3})",
+  "{0} lines": "{0} lignes",
+  "Refused by the reviewer: {0}": "Refusé par le relecteur : {0}",
+  "Apply": "Appliquer",
   "The files could not be restored; the conversation is unchanged.": "Les fichiers n’ont pas pu être restaurés ; la conversation est inchangée.",
   "plan: {0}/{1}": "plan : {0}/{1}",
   "{0} file(s) created by that turn are deleted.": "{0} fichier(s) créés par ce tour seront supprimés.",

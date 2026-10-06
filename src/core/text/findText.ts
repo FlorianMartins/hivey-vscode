@@ -40,6 +40,21 @@ function normalizeWithMap(text: string): { norm: string; map: number[] } {
   let norm = "";
   const map: number[] = [];
   for (let i = 0; i < text.length; ) {
+    // ⚠️ LINE ENDINGS FIRST, and this is the other half of the same defect. A file saved on Windows
+    // holds `\r\n`; a model writes `\n`. They are the same text on screen and different strings to
+    // `indexOf`, so EVERY multi-line edit failed on a Windows checkout — and the model worked it out
+    // on its own, in a real session: « Le premier edit multi-ligne échoue sans doute à cause des fins
+    // de ligne Windows. Je refais la modification sur une seule ligne. » It was writing worse edits
+    // to route around a bug.
+    //
+    // Both characters map back to where the pair began, so a replacement spans the `\r` as well as
+    // the `\n` and cannot leave a stray carriage return behind.
+    if (text[i] === "\r") {
+      norm += "\n";
+      map.push(i);
+      i += text[i + 1] === "\n" ? 2 : 1;
+      continue;
+    }
     // ⚠️ A CLUSTER, not a code point. NFC composition works on a SEQUENCE — `e` followed by a
     // combining acute becomes `é` only when the two are normalised together. The first version of
     // this normalised each code point on its own, which composes nothing at all and left the map
@@ -66,6 +81,16 @@ function normalizeWithMap(text: string): { norm: string; map: number[] } {
 
 /** A combining mark: what attaches to the character before it. */
 const COMBINING = /\p{M}/u;
+
+/**
+ * The snippet in the same shape `normalizeWithMap` produces: composed, and `\n` only.
+ *
+ * It has no map because nothing is replaced inside the snippet — only its length is needed, and that
+ * length is measured in the normalised form on both sides.
+ */
+function normalizeNeedle(needle: string): string {
+  return needle.replace(/\r\n?/g, "\n").normalize("NFC");
+}
 
 /** How many times `needle` occurs in `hay`, stopping at two: nobody needs the third. */
 function occurrences(hay: string, needle: string): number {
@@ -96,9 +121,9 @@ export function findUnique(text: string, needle: string): FindResult {
   }
   if (direct > 1) return { problem: "ambiguous", count: direct };
 
-  // Nothing literal. Try again with both sides composed.
+  // Nothing literal. Try again with both sides composed AND with one kind of line ending.
   const { norm, map } = normalizeWithMap(text);
-  const needleNorm = needle.normalize("NFC");
+  const needleNorm = normalizeNeedle(needle);
   const viaNorm = occurrences(norm, needleNorm);
   if (viaNorm === 0) return { problem: "absent" };
   if (viaNorm > 1) return { problem: "ambiguous", count: viaNorm };

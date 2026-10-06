@@ -2,6 +2,46 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 1.1.0 — 2026-10-06
+
+### Corrigé — pourquoi le mode agent faisait tant d'erreurs
+
+Florian a collé le rapport complet d'une session sur un vrai projet. Six appels `edit_file` y échouent
+avec « That snippet does not appear in the file », et le modèle **diagnostique les causes lui-même**
+avant de les contourner. Les contournements étaient le symptôme, pas le problème.
+
+- **⚠️⚠️ `edit_file` échouait sur les fins de ligne Windows.** Dans ses mots : « Le premier edit
+  multi-ligne échoue sans doute à cause des fins de ligne Windows. Je refais la modification sur une
+  seule ligne. » Il écrivait de **moins bonnes** éditions pour esquiver un bug. Un fichier enregistré
+  sous Windows contient `\r\n`, un modèle écrit `\n` : identiques à l'écran, différents pour
+  `indexOf`, donc **toute** édition multi-ligne échouait sur un dépôt Windows. La correspondance se
+  fait maintenant aussi sur les fins de ligne unifiées, et la zone remplacée couvre bien le `\r`
+  — sinon un retour chariot orphelin reste derrière.
+
+- **⚠️ Supprimer du texte était impossible.** « Le paramètre `new` vide est refusé. » Pour supprimer,
+  on remplace par rien — et avec `new` **obligatoire**, un modèle envoie soit `""` et rencontre un
+  fournisseur qui jette les arguments vides, soit omet le champ et échoue à la validation. Dans la
+  session, il a fini par supprimer deux lignes avec `node -e`. `new` est désormais **facultatif**, et
+  l'omettre supprime.
+
+- **⚠️⚠️ Le mode agent ne montre plus de comparaison — demandé trois fois.** « le mode agent ne
+  devrait même pas faire de diff ». L'approbation avait **déjà** eu lieu sur la carte du panneau, puis
+  `confirmEdit` ouvrait un **onglet de diff** — volant l'onglet en cours — et reposait la même
+  question dans une notification. Deux demandeurs pour une décision, ce qui explique aussi pourquoi
+  « Toujours » semblait ne pas prendre : il satisfaisait le premier, le second continuait de demander.
+
+  Ce qui remplace le diff n'est pas rien : la carte porte désormais **l'ampleur** du changement
+  (`+12 −3`), la liste des étapes nomme chaque fichier, le checkpoint les remet, et l'annulation de
+  l'éditeur est intacte. Le second relecteur survit, parce qu'il n'est pas une approbation : il répond
+  à « ce diff fait-il quelque chose que la demande n'a pas demandé », et il bloque encore.
+
+- **Le retour en arrière du premier message disait qu'il ne pouvait rien faire — et c'était vrai.**
+  « il ouvre une fenêtre qui dit qu'il ne peut pas modifier et restore les modifications. » Le tour en
+  question avait écrit ses fichiers par `node -e`, **parce que `edit_file` échouait** : rien ne sait
+  quels fichiers une commande va toucher avant qu'elle tourne, donc le checkpoint ne tenait
+  effectivement rien. Les deux causes ci-dessus réparent la cause ; le message, lui, **nomme
+  désormais le remède** (git) au lieu de s'arrêter au constat.
+
 ## 1.0.4 — 2026-10-06
 
 ### Corrigé

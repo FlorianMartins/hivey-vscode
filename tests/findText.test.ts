@@ -86,3 +86,40 @@ test("an exact match wins over a normalised one", () => {
   assert.equal(found.normalized, false);
   assert.equal(found.start, 0, "the literal occurrence is the one at the top");
 });
+
+test("a multi-line snippet matches a file saved on Windows", () => {
+  // ⚠️⚠️ The other half of the same defect, and the one that made agent mode look broken on a real
+  // project. A Windows checkout holds `\r\n`; a model writes `\n`. Identical on screen, different to
+  // `indexOf` — so EVERY multi-line edit failed, and the model worked the cause out and began routing
+  // around it: « Le premier edit multi-ligne échoue sans doute à cause des fins de ligne Windows. Je
+  // refais la modification sur une seule ligne. » It was writing worse edits to dodge a bug.
+  const windows = "function a() {\r\n  return 1;\r\n}\r\n";
+  const found = findUnique(windows, "function a() {\n  return 1;\n}");
+  assert.ok("start" in found, "a LF snippet must find its CRLF original");
+  assert.equal(found.normalized, true);
+  // And the span must cover the \r as well, or a replacement leaves a stray carriage return behind.
+  assert.equal(windows.slice(found.start, found.end), "function a() {\r\n  return 1;\r\n}");
+});
+
+test("and the other way round: a CRLF snippet in an LF file", () => {
+  const unix = "function a() {\n  return 1;\n}\n";
+  const found = findUnique(unix, "function a() {\r\n  return 1;\r\n}");
+  assert.ok("start" in found);
+  assert.equal(unix.slice(found.start, found.end), "function a() {\n  return 1;\n}");
+});
+
+test("accents and Windows line endings together", () => {
+  // Both normalisations in one match, which is the case a French codebase on Windows actually is.
+  const file = `const nom = "${NFD}";\r\nconst autre = 2;\r\n`;
+  const found = findUnique(file, `const nom = "${NFC}";\nconst autre = 2;`);
+  assert.ok("start" in found);
+  assert.equal(file.slice(found.start, found.end), `const nom = "${NFD}";\r\nconst autre = 2;`);
+});
+
+test("a lone carriage return is a line ending too", () => {
+  // Rare, but a file converted by an old tool has them, and half a match is worse than none.
+  const old = "a\rb\rc";
+  const found = findUnique(old, "a\nb");
+  assert.ok("start" in found);
+  assert.equal(old.slice(found.start, found.end), "a\rb");
+});
