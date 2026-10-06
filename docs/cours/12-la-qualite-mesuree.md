@@ -141,6 +141,55 @@ confiance au tableau :
   mesures différentes, et ne survivrait pas à la première question de la réunion où on la citerait.
   Le fichier écrit à la place **ce qu'il faudrait** pour en ajouter une honnêtement.
 
+## Une suite rouge n'avertit de rien
+
+Il faut une notion pour la suite : l'**intégration continue**. À chaque fois que du code est envoyé
+sur le dépôt, un ordinateur loué à l'heure récupère le projet, l'installe à neuf et exécute tous les
+tests — sur plusieurs systèmes (Linux, Windows) et plusieurs versions du langage. L'intérêt est de ne
+pas dépendre de « ça marche sur ma machine », qui est une phrase et pas une preuve.
+
+Le 2026-10-06, Florian a posé une question très simple : « le CI workflow a toujours plein d'erreurs
+cest normal ? » Il avait raison de la poser. Tous les envois de la semaine étaient **rouges**, pendant
+que les 1 308 tests passaient en local.
+
+Il y avait trois causes, et aucune ne venait du produit :
+
+1. Un test de réseau démarrait un serveur sur l'adresse `127.0.0.1` — la façon d'écrire « cette
+   machine » en ancienne notation — et s'y connectait par le nom `localhost`. Sur l'ordinateur loué,
+   ce nom désigne d'abord l'adresse en **nouvelle** notation, `::1`. Le serveur était debout ; le
+   client frappait à l'autre porte.
+2. Un test vérifiait qu'une commande enfermée dans un **conteneur** (une boîte étanche, voir le
+   [chapitre 5](05-les-trois-modes-et-les-outils.md)) ne pouvait pas atteindre Internet. Il demandait
+   d'abord à l'outil de conteneurs s'il répondait. Il répondait. Mais sur la machine Windows cet outil
+   ne sait manipuler que des boîtes Windows, et la boîte demandée était une boîte Linux. « L'outil
+   répond » et « l'outil peut faire ce qu'on va lui demander » sont deux faits différents.
+3. Certains tests lisent le code du projet et vérifient qu'une phrase y figure. Or les fichiers texte
+   marquent la fin d'une ligne par un caractère invisible, et ce caractère **n'est pas le même** sous
+   Windows et sous Linux. L'outil de versions, par défaut, le remplace en récupérant le projet sur
+   Windows. Le test cherchait une phrase écrite sur deux lignes, et les deux lignes n'étaient plus
+   séparées par ce qu'il attendait. Le test avait raison, le code avait raison, et la récupération du
+   projet s'était interposée entre les deux.
+
+Les trois sont réparés. Mais la leçon n'est aucune des trois, et c'est pour elle que ce passage
+existe : **le vrai défaut était que la suite était rouge en permanence**. Un signal d'alarme qui sonne
+tous les jours n'est plus un signal d'alarme. Les cinq échecs attendus et la vraie régression auraient
+eu exactement la même apparence — du rouge — et c'est dans cet état qu'un défaut réel traverse sans
+être vu. Le coût d'un test qui échoue pour une mauvaise raison n'est pas ce test : c'est **tous les
+autres**, qui perdent leur pouvoir d'avertir.
+
+Trois choses en découlent, et elles sont plus générales que ce projet :
+
+- **Un échec « connu » doit être réparé ou retiré, jamais toléré.** Toléré, il apprend à l'équipe à ne
+  plus regarder.
+- **Quand une version récente passe et une ancienne échoue, la récente n'a pas raison.** Ici, la
+  version récente du langage réessayait toute seule sur l'autre adresse, sans rien dire : elle
+  **masquait** le défaut. Tester plusieurs versions ne sert à rien si l'on explique chaque désaccord
+  par l'âge de la plus vieille.
+- **« Je ne sais pas » est une troisième réponse, et il faut la dire.** Sur la machine Windows, la
+  boîte Linux ne peut pas être essayée du tout : le test est maintenant *ignoré en annonçant pourquoi*,
+  au lieu de passer comme s'il avait vérifié quelque chose. Un « je ne sais pas » silencieux se lit
+  comme un oui.
+
 ## Et ce cours, dans tout ça
 
 Ce cours est lui-même tenu par un contrôle. L'index déclare la version du projet pour laquelle il est

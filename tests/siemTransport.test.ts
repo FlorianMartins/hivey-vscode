@@ -14,6 +14,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { lookup } from "node:dns/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createServer, type TLSSocket } from "node:tls";
@@ -85,7 +86,15 @@ async function collector(options: {
   if (options.hangUp === "before-handshake") {
     server.on("connection", (raw) => raw.destroy());
   }
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  // ⚠️ Listen where the name the tests use actually points, not where loopback is spelled in v4.
+  // Every test here connects to "localhost" — on purpose, because the certificate carries
+  // `DNS:localhost` and verifying that name is half of what these tests assert. Binding to
+  // 127.0.0.1 while the client resolves "localhost" to ::1 cost five red tests on the Node 18
+  // runner and nothing anywhere else: Node 20 added Happy Eyeballs (`autoSelectFamily`) by
+  // default, so it quietly retried over IPv4 and the mismatch stayed invisible. The CI failure
+  // read `connect ECONNREFUSED ::1:35751` — the collector was up, on the other stack.
+  const { address } = await lookup("localhost");
+  await new Promise<void>((resolve) => server.listen(0, address, resolve));
   return {
     port: (server.address() as AddressInfo).port,
     received: () => Buffer.concat(chunks).toString("utf8"),

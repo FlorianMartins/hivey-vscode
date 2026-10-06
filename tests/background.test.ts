@@ -151,18 +151,30 @@ test("the diff is against the branch point, which is what a reader wants", () =>
 
 // ── Against the real engine ──────────────────────────────────────────────────────────────────────
 
-test("the container really has no network, and really sees only the worktree", () => {
+test("the container really has no network, and really sees only the worktree", (t) => {
   // The argv is checked above; this checks that what it describes is what happens. If docker is
   // missing the test FAILS rather than skipping: the claim "a background command cannot reach the
   // network" is the one thing here nobody should take on trust.
-  let engine: string;
+  const engine = "docker";
+  let daemonOs: string;
   try {
-    execFileSync("docker", ["version", "--format", "{{.Server.Version}}"], { stdio: "pipe" });
-    engine = "docker";
+    daemonOs = execFileSync("docker", ["version", "--format", "{{.Server.Os}}"], { encoding: "utf8", stdio: "pipe" }).trim();
   } catch (err) {
     throw new Error(
       `this test checks the sandbox against a real container engine and could not reach one: ${(err as Error).message}`,
     );
+  }
+
+  // ⚠️ "Docker answers" and "Docker can run this sandbox" are two different facts, and conflating
+  // them kept CI red for weeks. The Windows runner has a daemon — it is in Windows-container mode,
+  // so `alpine:latest` has no matching manifest and the run dies on `no matching manifest for
+  // windows(10.0.26100)/amd64`. That is not the sandbox failing; it is this machine being unable to
+  // say anything about it. The guarantee is still enforced without mercy on every Linux daemon,
+  // which is every ubuntu job and every developer machine. Skipping here is the third answer —
+  // "cannot tell" — and it is named rather than dressed up as a pass.
+  if (daemonOs !== "linux") {
+    t.skip(`the docker daemon runs ${daemonOs} containers, so the Linux sandbox cannot be exercised here`);
+    return;
   }
 
   const worktree = mkdtempSync(join(tmpdir(), "hivey-sandbox-"));

@@ -133,6 +133,53 @@ They are unusual and worth knowing, because they are the reason to trust the tab
   would not survive the first question at the meeting where it was quoted. The file writes instead **what
   it would take** to add one honestly.
 
+## A red suite warns of nothing
+
+One more notion is needed: **continuous integration**. Every time code is sent to the repository, a
+computer rented by the hour fetches the project, installs it from scratch and runs every test — on
+several operating systems (Linux, Windows) and several versions of the language. The point is not to
+depend on "it works on my machine", which is a sentence rather than a proof.
+
+On 2026-10-06, Florian asked a very simple question: "the CI workflow still has lots of errors, is
+that normal?" He was right to ask. Every push that week was **red**, while all 1,308 tests passed
+locally.
+
+There were three causes, and not one of them came from the product:
+
+1. A network test started a server on the address `127.0.0.1` — how you write "this machine" in the
+   old notation — and connected to it by the name `localhost`. On the rented computer, that name
+   points first at the address in the **new** notation, `::1`. The server was up; the client was
+   knocking at the other door.
+2. A test checked that a command locked inside a **container** (a sealed box, see
+   [chapter 5](05-the-three-modes-and-tools.md)) could not reach the internet. It first asked the
+   container tool whether it answered. It answered. But on the Windows machine that tool can only
+   handle Windows boxes, and the box being asked for was a Linux one. "The tool answers" and "the tool
+   can do what we are about to ask of it" are two different facts.
+3. Some tests read the project's own code and check that a sentence appears in it. Text files mark the
+   end of a line with an invisible character, and that character is **not the same** on Windows and on
+   Linux. The version-control tool, by default, substitutes it when fetching the project on Windows.
+   The test was looking for a sentence written across two lines, and the two lines were no longer
+   separated by what it expected. The test was right, the code was right, and fetching the project had
+   come between them.
+
+All three are fixed. But the lesson is none of the three, and it is the reason this passage exists:
+**the real defect was that the suite was permanently red.** An alarm that goes off every day is no
+longer an alarm. The five expected failures and a genuine regression would have looked exactly the
+same — red — and that is the state in which a real defect goes through unseen. The cost of a test
+failing for a bad reason is not that test: it is **all the others**, which lose their power to warn.
+
+Three things follow, and they are more general than this project:
+
+- **A "known" failure must be fixed or removed, never tolerated.** Tolerated, it teaches the team to
+  stop looking.
+- **When a recent version passes and an older one fails, the recent one is not right.** Here, the
+  recent version of the language quietly retried on the other address by itself: it was **hiding** the
+  defect. Testing several versions is worthless if every disagreement is explained away by the age of
+  the oldest one.
+- **"I don't know" is a third answer, and it has to be said out loud.** On the Windows machine the
+  Linux box cannot be tried at all: the test is now *skipped while announcing why*, instead of passing
+  as though it had verified something. A silent "I don't know" reads as a yes.
+
 ## And this course, in all that
 
 This course is itself held by a check. The index declares the version of the project it is current for,

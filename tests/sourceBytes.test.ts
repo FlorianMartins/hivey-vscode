@@ -75,3 +75,33 @@ test("every source file is valid UTF-8", () => {
   }
   assert.deepEqual(offenders, [], offenders.join("\n"));
 });
+
+test("the checkout holds LF, and .gitattributes is what makes that true everywhere", () => {
+  // ⚠️ The third way a byte got past everything, and the longest-lived: CI's Windows job was red for
+  // weeks on code that was correct. `tests/notices.test.ts` asserts that the aside tool tells the
+  // model `DO NOT fix what you report here`, and the instruction is split over two source lines, so
+  // the regex spans a `\n`. Git's default on Windows, `core.autocrlf=true`, rewrites every LF to
+  // CRLF on checkout — so the file the test read held `\r\n` and the match could not succeed. The
+  // test was right, the source was right, and the checkout had changed the bytes between them.
+  //
+  // The fix is `* text=auto eol=lf` in `.gitattributes`, which overrides `core.autocrlf` for every
+  // clone on every platform. Nothing in the suite would notice if it were deleted, which is what
+  // this test is for — and it is for the *effect*, not just the declaration: on a Windows runner the
+  // second assertion is the one that fires.
+  const attributes = readFileSync(".gitattributes", "utf8");
+  assert.match(
+    attributes,
+    /^\* text=auto eol=lf$/m,
+    "the LF pin is gone from .gitattributes — a Windows checkout will rewrite every source file",
+  );
+
+  const files = [...sourceFiles("src"), ...sourceFiles("tests"), ...sourceFiles("scripts")];
+  const withCr = files.filter((file) => readFileSync(file).includes(0x0d));
+  assert.deepEqual(
+    withCr,
+    [],
+    `${withCr.join("\n")}\n\nThese files hold a carriage return. Either the LF pin is not in effect ` +
+      `(check \`git config core.autocrlf\` and .gitattributes) or a CRLF file was committed. ` +
+      `An assertion that spans a line break cannot match either way.`,
+  );
+});

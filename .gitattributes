@@ -1,0 +1,20 @@
+# Line endings are part of this repository's contents, not a local preference.
+#
+# ⚠️ Several tests read the project's own source and assert on it — that a tool carries a given
+# instruction, that the terminal delegates its budget to the shared rule — and some of those
+# assertions span a line break. On a Windows checkout with the default `core.autocrlf=true`, git
+# rewrote every LF to CRLF on the way out, so a regex written as `…you " +\n\s+"report here` could
+# not match a file that now held `\r\n`. CI went red on the Windows job alone, for weeks, on code
+# that was correct — the checkout had changed the bytes under the test.
+#
+# `eol=lf` is stronger than a preference: it overrides `core.autocrlf` for everyone, so the working
+# tree holds what the repository holds on every platform. `tests/sourceBytes.test.ts` guards the
+# file so this cannot be dropped again without a test saying so.
+#
+# This says nothing about files the *user* edits: those arrive with whatever endings they have, and
+# `src/core/text/findText.ts` is what makes `edit_file` match them either way.
+* text=auto eol=lf
+
+# Binary: never translated, never diffed as text.
+*.png binary
+*.svg text eol=lf
