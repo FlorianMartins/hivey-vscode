@@ -3212,17 +3212,45 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const argv = configured ?? (found ? [found.program, ...found.args(wav)] : undefined);
     if (!argv) {
       await fsp.rm(dir, { recursive: true, force: true });
+      // ⚠️ OFFER TO INSTALL IT, rather than hand somebody a command to copy. « si il faut installer un
+      // widget on ne peut pas faire en sorte que quand on clique sur le micro qu'il demande un
+      // approuval pour faire la commande dans le terminal pour installer ? » — and it is the right
+      // shape: this extension already asks before it runs anything, so an install is the same
+      // question it asks every day, with a card that says exactly what will run.
+      //
+      // In a TERMINAL rather than silently: an install prints what it is doing, asks its own
+      // questions sometimes, and takes a while. Somebody watching it is somebody who can stop it.
+      const advice = recorderAdvice(process.platform);
+      const go = await new Promise<boolean>((resolve) => {
+        this.askInPanel(
+          {
+            id: randomNonce(),
+            tool: "run_command",
+            description: t("Install a recorder? {0}", advice),
+            choices: ["once", "no"],
+            detail: [
+              t("Nothing on this machine can record, and the panel is not allowed a microphone of its own — the editor withholds that from every extension."),
+              t("It runs in a terminal, where you can see it. Press the microphone again when it has finished."),
+            ],
+          },
+          (answer) => resolve(answer === "once"),
+        );
+      });
+      if (go) {
+        const term = vscode.window.createTerminal({ name: "Hivey Code — recorder" });
+        term.show(true);
+        term.sendText(advice);
+      }
       this.post({
         type: "dictationFailed",
-        why: t(
-          "No recorder was found on this machine, and the panel is not allowed a microphone of its own. Install one — {0} — or set hiveyCode.dictation.recordCommand to whatever records a WAV here, with {file} for the file.",
-          recorderAdvice(process.platform),
-        ),
+        why: go
+          ? t("Installing — press the microphone again once the terminal has finished.")
+          : t("Nothing here can record. Set hiveyCode.dictation.recordCommand to a command that writes a WAV, with {file} for the file."),
       });
       return;
     }
     try {
-      const run = startRecording(argv, wav);
+      const run = startRecording(argv, wav, configured ? "signal" : (found?.stop ?? "signal"));
       this.recording = { ...run, dir, started: Date.now() };
       this.post({ type: "dictationProgress", what: t("Listening… press again to stop.") });
     } catch (err) {

@@ -2,6 +2,30 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 1.9.1 — 2026-10-06
+
+### Ajouté
+
+- **⚠️ Windows enregistre avec ce que Windows a déjà — rien à installer.** « je suis sur Windows et
+  j'ai ce message ». Windows est le seul système qui ne livre aucun enregistreur en ligne de commande,
+  et « installe ffmpeg avant de pouvoir parler » n'était pas le cahier des charges. `winmm` fait partie
+  de Windows depuis trente ans et PowerShell sait l'appeler : le recours intégré ouvre un périphérique
+  `waveaudio`, enregistre en 16 kHz mono, et sauvegarde.
+
+  ⚠️ Il est arrêté par **une ligne sur son entrée standard, jamais par un signal** — c'est pour cela
+  que chaque enregistreur déclare désormais comment on l'arrête. Son fichier est produit par un `save`
+  explicite, et un processus tué ne l'atteint jamais : l'enregistrement serait perdu exactement au
+  moment où l'on vient de finir de parler. Les autres outils, eux, referment leur en-tête WAV sur
+  SIGINT — c'est pourquoi on les arrête ainsi.
+
+- **Le micro propose d'installer ce qui manque, au lieu de donner une commande à recopier.** « si il
+  faut installer un widget on ne peut pas faire en sorte que quand on clique sur le micro qu'il demande
+  un approuval pour faire la commande dans le terminal pour installer ? » — et c'est la bonne forme :
+  cette extension demande déjà avant d'exécuter quoi que ce soit, donc une installation est la même
+  question qu'elle pose tous les jours, avec une carte qui dit exactement ce qui va s'exécuter. **Dans
+  un terminal**, pas en silence : une installation affiche ce qu'elle fait, pose parfois ses propres
+  questions, et prend du temps — quelqu'un qui la regarde est quelqu'un qui peut l'arrêter.
+
 ## 1.9.0 — 2026-10-06
 
 ### Corrigé

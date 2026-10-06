@@ -185,6 +185,9 @@ import { howToRecord, recordArgv, recorders, type Recorder } from "../core/dicta
 export function findRecorder(platform: string): Recorder | undefined {
   const look = platform === "win32" ? "where" : "which";
   return recorders(platform).find((r) => {
+    // `builtin` is part of the system: PowerShell on Windows is not something to look for, and
+    // looking anyway would mean a machine with an unusual PATH could not dictate at all.
+    if (r.builtin) return true;
     try {
       return spawnSync(look, [r.program], { stdio: "ignore" }).status === 0;
     } catch {
@@ -211,20 +214,26 @@ export interface Recording {
  * these tools finalises its WAV header on SIGINT and leaves a truncated, unreadable file on SIGKILL.
  * The header holds the sample count, so a file that was never closed says it is empty.
  */
-export function startRecording(argv: string[], wav: string): Recording {
+export function startRecording(argv: string[], wav: string, how: "signal" | "stdin" = "signal"): Recording {
   const [program, ...args] = argv;
-  const child = spawn(program!, args, { stdio: ["ignore", "ignore", "pipe"] });
+  // stdin is a pipe whatever the recorder, because the Windows one is stopped by a line on it.
+  const child = spawn(program!, args, { stdio: ["pipe", "ignore", "pipe"] });
   let why = "";
   child.stderr?.on("data", (d: Buffer) => (why += d.toString("utf8")));
   const ended = new Promise<void>((resolve) => child.on("close", () => resolve()));
   return {
     stop: async () => {
-      child.kill("SIGINT");
+      // ⚠️ A line, not a signal, for the recorder that has to SAVE. The Windows one writes its file
+      // with an explicit `mciSendString('save …')`, and a process that has been killed never reaches
+      // it — the recording would be lost at exactly the moment somebody finished speaking.
+      if (how === "stdin") child.stdin?.end("\n");
+      else child.kill("SIGINT");
       await Promise.race([ended, new Promise((r) => setTimeout(r, 4000))]);
       if (!existsSync(wav)) throw new Error(why.trim().split("\n").slice(-2).join(" ") || "the recorder wrote nothing");
       return wav;
     },
     cancel: () => {
+      // Killed outright: there is nothing to save, and the file is removed either way.
       child.kill("SIGINT");
       void ended.then(() => rm(wav, { force: true }));
     },

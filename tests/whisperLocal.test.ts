@@ -19,7 +19,7 @@ import {
   whisperUrl,
 } from "../src/core/dictation/local.js";
 import { readTar } from "../src/core/archive/tar.js";
-import { howToRecord, recordArgv, recorders } from "../src/core/dictation/capture.js";
+import { howToRecord, recordArgv, recorders, windowsRecorderScript } from "../src/core/dictation/capture.js";
 import { gzipSync } from "node:zlib";
 import { encodeWav, SPEECH_SAMPLE_RATE, WAV_HEADER_BYTES } from "../src/core/dictation/wav.js";
 
@@ -224,4 +224,37 @@ test("a recording command the user wrote is split the way a shell would, without
   // it would be a transcription of silence. Refused rather than run.
   assert.equal(recordArgv("rec -q", "/tmp/v.wav"), undefined);
   assert.equal(recordArgv("   ", "/tmp/v.wav"), undefined);
+});
+
+test("⚠️ Windows records with what Windows already has", () => {
+  // Reported from a real machine: « je suis sur Windows et j'ai ce message ». Windows is the one
+  // platform that ships no command-line recorder, and "install ffmpeg before you may speak" is not
+  // the brief. `winmm` has been part of every Windows for thirty years, and PowerShell can call it.
+  const [first] = recorders("win32");
+  assert.equal(first!.program, "powershell");
+  assert.equal(first!.builtin, true, "it would be looked for on PATH, and a thin PATH would silence it");
+  const script = first!.args("C:\\t\\v.wav").join(" ");
+  assert.match(script, /winmm\.dll/);
+  assert.match(script, /samplespersec 16000/, "a speech model reads 16 kHz");
+  assert.match(script, /channels 1/);
+  assert.ok(script.includes('save hv "C:\\t\\v.wav"'), "it never says where to save");
+});
+
+test("⚠️ the Windows recorder is stopped by a LINE, never by a signal", () => {
+  // Its file is produced by an explicit `save`, and a process that has been killed never reaches it —
+  // the recording would be lost at exactly the moment somebody finished speaking. Every other
+  // recorder finalises its own header on SIGINT, so they are stopped that way.
+  assert.equal(recorders("win32")[0]!.stop, "stdin");
+  assert.match(recorders("win32")[0]!.args("x").join(" "), /ReadLine/);
+  for (const platform of ["linux", "darwin"]) {
+    for (const r of recorders(platform)) {
+      assert.equal(r.stop, "signal", `${platform}/${r.program} would need a different stop`);
+    }
+  }
+});
+
+test("a path with a quote in it cannot end the PowerShell string", () => {
+  // A temporary path has no quote in it today. A path is not the place to find that out.
+  const script = windowsRecorderScript("C:\\a'b\\v.wav");
+  assert.ok(script.includes(`save hv "C:\\a''b\\v.wav"`), script.slice(-120));
 });

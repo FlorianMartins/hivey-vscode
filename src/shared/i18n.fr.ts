@@ -1334,10 +1334,17 @@ export const FR: Record<string, string> = {
     "Votre voix est alors transformée en mots ici même, par whisper.cpp. Rien n'est envoyé nulle part, jamais, et cela ne coûte rien.",
   "VS Code does not give an extension's panel the microphone — the editor decides this, and there is no setting for it. Dictation has to record outside the panel; see hiveyCode.dictation.":
     "VS Code n'accorde pas le micro au panneau d'une extension — c'est l'éditeur qui en décide, et aucun réglage ne l'ouvre. La dictée doit enregistrer hors du panneau ; voir hiveyCode.dictation.",
-  "No recorder was found on this machine, and the panel is not allowed a microphone of its own. Install one — {0} — or set hiveyCode.dictation.recordCommand to whatever records a WAV here, with {file} for the file.":
-    "Aucun enregistreur n'a été trouvé sur cette machine, et le panneau n'a pas droit à son propre micro. Installez-en un — {0} — ou renseignez hiveyCode.dictation.recordCommand avec ce qui enregistre un WAV ici, en écrivant {file} pour le fichier.",
   "The recorder could not be started: {0}": "L'enregistreur n'a pas pu démarrer : {0}",
   "The recording failed: {0}": "L'enregistrement a échoué : {0}",
+  "Install a recorder? {0}": "Installer un enregistreur ? {0}",
+  "Installing — press the microphone again once the terminal has finished.":
+    "Installation en cours — réappuyez sur le micro quand le terminal aura fini.",
+  "It runs in a terminal, where you can see it. Press the microphone again when it has finished.":
+    "Cela s'exécute dans un terminal, sous vos yeux. Réappuyez sur le micro quand ce sera terminé.",
+  "Nothing here can record. Set hiveyCode.dictation.recordCommand to a command that writes a WAV, with {file} for the file.":
+    "Rien ici ne sait enregistrer. Renseignez hiveyCode.dictation.recordCommand avec une commande qui écrit un WAV, en mettant {file} pour le fichier.",
+  "Nothing on this machine can record, and the panel is not allowed a microphone of its own — the editor withholds that from every extension.":
+    "Rien sur cette machine ne sait enregistrer, et le panneau n'a pas droit à son propre micro — l'éditeur le refuse à toutes les extensions.",
   "Which areas is this conversation about?": "De quels domaines relève cette conversation ?",
   "Which languages and subjects this conversation is about": "Les langages et sujets dont relève cette conversation",
   "Which sub-agents may be dispatched?": "Quels sous-agents peuvent être sollicités ?",
