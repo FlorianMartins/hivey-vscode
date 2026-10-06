@@ -173,23 +173,55 @@ function modelRow(model: UiModel, send: (m: ToExtension) => void): HTMLElement {
   if (model.local) {
     stats.append(stat(t("free"), t("local")));
   } else {
-    stats.append(stat(formatPrice(model.inUsd), t("input")));
-    stats.append(stat(formatPrice(model.outUsd), t("output")));
+    // ⚠️ A span for a preset, not one role's figure. This row showed the price of the model that
+    // answers an ORDINARY turn and called it the preset's price, which made Hivey Smart and Hivey Pro
+    // read as identical — their two everyday models charge the same $2/M to read. The span is a claim
+    // the preset can keep; the tooltip below carries the four roles.
+    stats.append(stat(span(model, "inUsd"), t("input")));
+    stats.append(stat(span(model, "outUsd"), t("output")));
     if (model.cachedInUsd) stats.append(stat(formatPrice(model.cachedInUsd), t("cache")));
   }
   row.append(stats);
 
-  // A preset has four prices, and the row can show one. It shows the ordinary turn's — the one met
-  // most often — and says so here rather than letting the figure be read as the whole bill.
   const preset = HIVEY_VARIANTS.find((v) => v.id === model.id);
   row.title = preset
-    ? `${preset.hint}\n${t("The figures are those of an ordinary turn; a chore costs less and a hard question more.")}`
+    ? [
+        preset.hint,
+        "",
+        // Every role, named, with its price — and where a dearer preset reaches the model a cheaper one
+        // already uses, which is the fact that explains why two presets can cost the same at both ends.
+        ...(model.roles ?? []).map((r) => {
+          const price = r.inUsd || r.outUsd ? t("{0} in · {1} out", formatPrice(r.inUsd), formatPrice(r.outUsd)) : t("free");
+          return `${r.role}: ${r.model} (${price})${r.sameAsCheaper ? ` — ${t("the same model {0} already uses", r.sameAsCheaper)}` : ""}`;
+        }),
+        ...((model.roles ?? []).some((r) => r.sameAsCheaper)
+          ? ["", t("Where a role is shared, the dearer preset had nothing better to buy that day.")]
+          : []),
+        // The window is the smallest of the four, because that is the one you can rely on everywhere.
+        t("The context shown is the smallest of its roles — the window you can count on whatever it is doing."),
+      ].join("\n")
     : model.local
       ? t("Served by a local endpoint: no cost, and nothing leaves.")
       : t("Input {0} $/M · output {1} $/M", model.inUsd, model.outUsd) +
         (model.cachedInUsd ? t(" · cached {0} $/M", model.cachedInUsd) : "");
   row.addEventListener("click", () => send({ type: "setModel", model: model.id, provider: model.provider }));
   return row;
+}
+
+/**
+ * One price, or the two ends of a preset's.
+ *
+ * A preset routes four roles to four models, so a single figure is at best one quarter of the answer.
+ * When all four agree there is nothing to span and the plain figure is the honest one.
+ */
+function span(model: UiModel, which: "inUsd" | "outUsd"): string {
+  const roles = model.roles ?? [];
+  if (roles.length) {
+    const low = Math.min(...roles.map((r) => r[which]));
+    const high = Math.max(...roles.map((r) => r[which]));
+    if (high > low) return `${formatPrice(low)}–${formatPrice(high)}`;
+  }
+  return formatPrice(model[which]);
 }
 
 function stat(value: string, label: string): HTMLElement {

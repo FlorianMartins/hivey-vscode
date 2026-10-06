@@ -3356,6 +3356,23 @@ pre.code code {
      word each so that the line holds. */
   flex-wrap: nowrap;
 }
+/* The model name is the one label in this row that cannot be guessed from its icon, and it is also
+   the only one of unbounded length — a vendor can ship `qwen3.7-flash-thinking-preview` tomorrow. So
+   it is the thing that gives up characters when the row runs out, and its neighbours never do: a
+   provider reduced to "Open…" or an approval scope reduced to "Au…" is a control nobody can read,
+   whereas a model reduced to "qwen3.7-fla…" is still the model you chose. */
+.composer-footer .btn.model {
+  min-width: 0;
+}
+.composer-footer .btn.model .lbl {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.composer-footer .btn.provider,
+.composer-footer .btn.approval-scope {
+  flex: 0 0 auto;
+}
 /* The same weight as everything beside it.
  *
  * This button was drawn at the full foreground when remote and in green when local, in a row where

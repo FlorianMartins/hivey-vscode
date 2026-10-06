@@ -802,6 +802,7 @@ window.addEventListener("message", (event: MessageEvent<ToPanel>) => {
       // appeared to do nothing. This is the half that cannot fail, and it is also what lets the
       // appearance change without a reload.
       applyAppearance(m.state.appearance ?? "editor");
+      applyMinWidth(m.state.panelMinWidth);
       // The extension is the authority on whether a turn is running. A panel that believed its own
       // flag could sit on a stop button for the rest of the conversation with nothing behind it.
       setStreaming(m.state.busy);
@@ -926,9 +927,45 @@ document.addEventListener("keydown", (ev) => {
  * the user's, via their editor settings), so it is measured rather than assumed: a constant that is
  * right on this machine is wrong on the next one, and silently.
  */
+/**
+ * The floor below which the panel scrolls sideways rather than rearranging itself.
+ *
+ * ⚠️⚠️ Applied as a style PROPERTY, from script, and the distinction is the entire bug. This used to be
+ * `<body style="min-width:…px">` in the HTML the extension builds — and `style-src` without
+ * `'unsafe-inline'` forbids exactly that, while this panel's CSP has no `'unsafe-inline'` on purpose
+ * because a model's output is rendered in this document. The floor was therefore declared in the one
+ * place the document's own policy guarantees will be discarded, and it was discarded, for a release:
+ * « on peut la reduire au maximum sans quelle se bloque alors que j'ai demandé un bloquage de largeur
+ * minimum ». No test could see it, because the markup was exactly right.
+ *
+ * The same policy does NOT block assigning a property on `element.style`. It does block `cssText` and
+ * `setAttribute("style", …)`, which are the attribute by another name — so neither may be used here,
+ * and a guard in `tests/panelFocus.test.ts` refuses them.
+ *
+ * ⚠️ This is a floor on the CONTENT, not a lock on the side bar. VS Code offers an extension no way to
+ * set a minimum width for a view (microsoft/vscode#182201 is still open), so what this buys is that
+ * the layout stops shrinking and the panel scrolls sideways instead of silently reflowing into
+ * something unusable. Nothing in an extension can stop the divider being dragged.
+ */
+function applyMinWidth(px: number | undefined): void {
+  // Zero is a deliberate value — "let it shrink as far as it likes" — and `undefined` is an older
+  // extension host that does not send it. They must not collapse into each other.
+  if (px === undefined) return;
+  document.body.style.minWidth = `${Math.max(0, Math.round(px))}px`;
+}
+
 function publishScrollbarWidth(): void {
   const probe = document.createElement("div");
-  probe.style.cssText = "position:absolute;visibility:hidden;overflow-y:scroll;width:60px;height:60px";
+  // ⚠️ Property by property, not `cssText`. `cssText` is the style attribute under another name and
+  // this document's CSP forbids it, so the probe used to be a plain `<div>` of no particular size:
+  // `offsetWidth - clientWidth` was 0 - 0, the gutter was published as `0px`, and the defect this
+  // function exists to fix — the composer sitting a scrollbar's width wider than every answer above
+  // it — was never actually fixed. Two of these in one file, found by looking for the first.
+  probe.style.position = "absolute";
+  probe.style.visibility = "hidden";
+  probe.style.overflowY = "scroll";
+  probe.style.width = "60px";
+  probe.style.height = "60px";
   document.body.append(probe);
   const width = probe.offsetWidth - probe.clientWidth;
   probe.remove();

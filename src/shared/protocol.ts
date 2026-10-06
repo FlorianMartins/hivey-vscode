@@ -133,6 +133,26 @@ export interface UiModel {
   baseUrl?: string;
   /** True when the model is currently selected for the chat role. */
   current?: boolean;
+  /**
+   * For a Hivey preset only: what it routes to, role by role.
+   *
+   * ⚠️ A preset is not a model, and pricing it as one is what made two of them look identical: the row
+   * showed the price of its `everyday` role and called that the preset's price. « comment ça se fait
+   * que les modeles Hivey pro et Hivey smart sortent le meme prix ? ». Four roles, four models, four
+   * prices — so the interface shows a span and names what differs, instead of picking one and hoping.
+   *
+   * `sameAsCheaper` names the cheaper preset that already reaches this model for this role. Not a
+   * defect: it means the strongest current model was inside the cheaper preset's budget, so the dearer
+   * one had nothing better to buy. Unsaid, it reads as the presets being decorative.
+   */
+  roles?: Array<{
+    role: string;
+    model: string;
+    inUsd: number;
+    outUsd: number;
+    context: number;
+    sameAsCheaper?: string;
+  }>;
 }
 
 export interface UiPermissionRule {
@@ -381,6 +401,21 @@ export interface UiState {
    * button with nowhere to send the recording is a button that wastes a sentence.
    */
   dictation?: boolean;
+  /**
+   * The width below which the panel stops rearranging itself and scrolls sideways instead.
+   *
+   * ⚠️⚠️ Sent in the state because it CANNOT be written as a style attribute, and for a whole release
+   * it was. `<body style="min-width:260px">` is exactly what `style-src` without `'unsafe-inline'`
+   * forbids — and this panel's CSP has no `'unsafe-inline'`, deliberately, because a model's output is
+   * rendered here. So the floor was declared in the one place the document's own security policy
+   * guarantees will be discarded, and dragging the side bar narrow went on doing nothing at all. It
+   * was reported as « on peut la reduire au maximum sans quelle se bloque alors que j'ai demandé un
+   * bloquage de largeur minimum », twice.
+   *
+   * Setting a style PROPERTY from script is not blocked by the same policy — only the attribute, and
+   * `cssText` and `setAttribute("style", …)` with it. So the value travels and the page applies it.
+   */
+  panelMinWidth?: number;
 }
 
 /** Panel → extension. */

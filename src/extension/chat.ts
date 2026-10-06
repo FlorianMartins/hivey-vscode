@@ -519,11 +519,16 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 <link rel="stylesheet" href="${uri("style.css")}">
 <title>Hivey Code</title>
 </head>
-<!-- The floor below which the panel scrolls sideways instead of rearranging itself. Dragging the
-     side bar narrow otherwise reflows every toolbar, and a layout that moves while you resize is a
-     layout nobody trusts. Set through a style attribute rather than the stylesheet because the
-     value is a setting, and the stylesheet is static. -->
-<body style="min-width:${Math.max(0, Math.round(readSettings().panel.minWidth))}px">
+<!-- ⚠️⚠️ NO style ATTRIBUTE HERE, and that is the fix rather than an omission.
+     The floor below which the panel scrolls sideways instead of rearranging itself used to be written
+     as a min-width style attribute on this very element — which is precisely what style-src without
+     'unsafe-inline' forbids, and the CSP above has no 'unsafe-inline' on purpose, because a model's
+     output is rendered in this document. So the floor was declared in the one place this document's
+     own security policy guarantees will be thrown away, and for a whole release dragging the side bar
+     narrow did nothing: reported twice, and invisible to every test because the markup was exactly
+     right. It travels in the state now (panelMinWidth) and the page applies it as a style PROPERTY,
+     which the same policy allows. See src/webview/main.ts. -->
+<body>
 <div id="app"></div>
 <script nonce="${nonce}" src="${uri("webview.js")}"></script>
 </body>
@@ -619,6 +624,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         shouldSuggestCompact(contextTokens, budgetTokens, this.session.entries.filter((e) => e.included).length),
       busy: this.turn !== undefined,
       appearance: s.appearance,
+      panelMinWidth: Math.max(0, Math.round(s.panel.minWidth)),
       // Only when there is somewhere to transcribe. See `core/dictation/dictation.ts`.
       ...(dictationMode(s.dictation) === "off" ? {} : { dictation: true }),
       budget: { spentTodayUsd: this.gate.budget.spentToday(), dailyUsd: s.budget.dailyUsd },

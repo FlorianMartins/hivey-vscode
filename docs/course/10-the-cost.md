@@ -93,6 +93,44 @@ and not models:
 renamings, and it shows: the measurement table in [chapter 12](12-measured-quality.md) publishes the
 **identifiers**, so without this column a reader cannot connect a promise to its measured result.
 
+
+### ⚠️ Why two presets can show the same price
+
+Asked about the interface: "how come Hivey Pro and Hivey Smart come out at the same price? Smart is
+supposed to use the best models." It is an excellent question, and it exposed a dishonest way of
+showing a figure.
+
+The row showed the price of the model that answers an **ordinary** question and presented it as the
+preset's price. The reasoning was defensible — a row cannot carry four prices — and the result was
+not: Smart's and Pro's two "ordinary" models charge exactly the same **to read**, so the badge made
+them identical.
+
+Here is what the two presets actually did that day:
+
+| role | Hivey Smart | Hivey Pro |
+|---|---|---|
+| chore | the same small model | the same small model |
+| **ordinary** | **$2 to read, $6 to write** | **$2 to read, $10 to write** |
+| deep | the same large model | the same large model |
+| completion | the same code model | the same code model |
+
+**No single number can separate those two rows.** They share three roles out of four, the same input
+price everywhere, and the same ceiling on hard work. What differs fits in one sentence: *Pro pays for
+the large model even on an ordinary question.*
+
+Three lessons, and the third matters most:
+
+1. **A price cut in half is not a price.** Reading and writing do not cost the same, and two models
+   can meet on one while differing twofold on the other.
+2. **A preset is not a model.** Reducing it to one of its four roles answers a different question from
+   the one being asked. The interface now shows a span, the price of the **dearest** role (a price must
+   never quote the cheap tier and bill the expensive one) and the context window of the **smallest**
+   one (that is the window you can rely on).
+3. ⚠️ **When a dear preset lands on a cheaper preset's model, say so.** It is not a cheat: it means the
+   best model of the moment was already inside the cheaper budget, so the dearer one had nothing better
+   to buy. The generated file had recorded it from the start. As long as the interface did not say it,
+   the only available reading was "these presets are decorative".
+
 Each one assigns a model to each of the four roles (chore, everyday, deep, completion). And the
 essential point: **no model name is hard-coded in the project**. A file generated every day chooses, by
 rule, from the real catalogue — budget, capability, vendor family, recency. When a vendor ships a

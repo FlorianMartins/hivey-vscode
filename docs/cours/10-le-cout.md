@@ -100,6 +100,45 @@ C'est un héritage de deux renommages, et c'est visible : le tableau de mesures 
 [chapitre 12](12-la-qualite-mesuree.md) publie les **identifiants**, donc sans cette colonne un
 lecteur ne peut pas relier une promesse à son résultat mesuré.
 
+
+### ⚠️ Pourquoi deux préréglages peuvent afficher le même prix
+
+Question posée sur l'interface : « comment ça se fait que les modeles Hivey pro et Hivey smart sortent
+le meme prix ? le smart est censé utiliser les meilleurs modeles ». C'est une excellente question et
+elle a mis au jour une façon malhonnête de présenter un chiffre.
+
+La ligne affichait le prix du modèle qui répond à une question **ordinaire**, et le présentait comme
+le prix du préréglage. Le raisonnement était défendable — une ligne ne peut pas porter quatre prix —
+et le résultat ne l'était pas : les deux modèles « ordinaires » de Smart et de Pro coûtent exactement
+la même chose **en lecture**, donc la pastille les rendait identiques.
+
+Voici ce que les deux préréglages faisaient réellement ce jour-là :
+
+| rôle | Hivey Smart | Hivey Pro |
+|---|---|---|
+| corvée | le même petit modèle | le même petit modèle |
+| **ordinaire** | **2 $ en lecture, 6 $ en écriture** | **2 $ en lecture, 10 $ en écriture** |
+| approfondi | le même grand modèle | le même grand modèle |
+| complétion | le même modèle de code | le même modèle de code |
+
+**Aucun nombre unique ne peut séparer ces deux lignes.** Ils partagent trois rôles sur quatre, le même
+prix d'entrée partout, et le même plafond sur le travail difficile. Ce qui diffère tient en une
+phrase : *Pro paie le grand modèle même pour une question ordinaire*.
+
+Trois leçons, et la troisième est la plus importante :
+
+1. **Un prix réduit à sa moitié n'est pas un prix.** Lire et écrire ne coûtent pas la même chose, et
+   deux modèles peuvent se rejoindre sur l'un et diverger du simple au double sur l'autre.
+2. **Un préréglage n'est pas un modèle.** Le réduire à l'un de ses quatre rôles revient à répondre à
+   une autre question que celle posée. L'interface affiche désormais une fourchette, le prix du rôle
+   **le plus cher** (un prix ne doit jamais annoncer le tarif bon marché et facturer le cher) et la
+   fenêtre de contexte du rôle **le plus petit** (c'est celle sur laquelle on peut compter).
+3. ⚠️ **Quand un préréglage cher tombe sur le modèle d'un préréglage moins cher, il faut le dire.** Ce
+   n'est pas une tricherie : cela signifie que le meilleur modèle du moment tenait déjà dans le budget
+   le moins cher, donc le plus cher n'avait rien de mieux à acheter. Le fichier généré le notait depuis
+   le début. Tant que l'interface ne le disait pas, la seule lecture possible était « ces préréglages
+   sont décoratifs ».
+
 Chacun attribue un modèle à chacun des quatre rôles (corvée, courant, approfondi, complétion). Et le
 point essentiel : **aucun nom de modèle n'est écrit en dur dans le projet**. Un fichier généré chaque
 jour choisit, par règle, depuis le catalogue réel — budget, capacité, famille d'éditeur, récence.

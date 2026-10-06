@@ -18,7 +18,7 @@ import type { UiModel } from "../shared/protocol.js";
 import { endpointFor, providerFor, type Keys, type Settings } from "./config.js";
 import { DIRECT_VENDORS, type ProviderId } from "../core/providers/vendors.js";
 import { shortModelName } from "../core/models/names.js";
-import { hiveyLabel, hiveyModel, HIVEY_VARIANTS, isHivey } from "../core/router/hivey.js";
+import { hiveyLabel, hiveyModel, hiveyRoles, HIVEY_VARIANTS, isHivey } from "../core/router/hivey.js";
 
 /**
  * The generated catalogue, indexed by id — for the rows that describe a model without listing it.
@@ -136,25 +136,53 @@ export async function listModels(settings: Settings, keys: Keys, current: string
   //    budget is an easier question than choosing among four hundred models, and it is the question
   //    most people actually want to answer.
   //
-  //    The figures shown are the ones of the model that answers an ORDINARY turn — the row cannot
-  //    carry four prices, and that is the one a user meets most often. What it must never do is
-  //    quote the cheap tier and bill the expensive one, so it quotes the middle and the hint says
-  //    the rest.
+  //    ⚠️⚠️ The figures used to be those of the model answering an ORDINARY turn, on the reasoning that
+  //    "the row cannot carry four prices, and that is the one a user meets most often". The reasoning
+  //    was sound and the result was indefensible: Hivey Smart and Hivey Pro came out at the SAME
+  //    price, because their two everyday models happen to charge the same $2/M to read. Reported as
+  //    « comment ça se fait que les modeles Hivey pro et Hivey smart sortent le meme prix ? le smart
+  //    est censé utiliser les meilleurs modeles ».
+  //
+  //    The row now carries what is TRUE of the whole preset rather than one quarter of it:
+  //      • `inUsd`/`outUsd` — the DEAREST role, because that is what the preset can cost you and a
+  //        price must never quote the cheap tier and bill the expensive one;
+  //      • `context` — the SMALLEST role, because that is the window you can rely on everywhere, and
+  //        it is also the figure that separates the two presets honestly (Smart drops to 500 k on an
+  //        everyday turn; Pro does not);
+  //      • `roles` — all four, so the panel can show a span and name what actually differs.
   const priced = catalogue();
   for (const variant of HIVEY_VARIANTS) {
+    const roles = hiveyRoles(variant.id).map((r) => {
+      const p = priced.get(r.model);
+      return {
+        role: r.role,
+        model: r.model,
+        inUsd: p?.inUsd ?? 0,
+        outUsd: p?.outUsd ?? 0,
+        context: p?.context ?? 0,
+        ...(r.sameAsCheaper ? { sameAsCheaper: r.sameAsCheaper } : {}),
+      };
+    });
+    // A role the catalogue has never heard of reports a window of 0, and a minimum taken over a 0 is
+    // 0 — which reads as "unknown" on a preset where three roles are perfectly well known. Unknown
+    // windows are left out of the minimum rather than allowed to swallow it.
+    const windows = roles.map((r) => r.context).filter((c) => c > 0);
     const everyday = priced.get(hiveyModel(variant.id, "everyday"));
     out.push({
       id: variant.id,
       name: variant.label,
       vendor: "hivey",
-      context: everyday?.context ?? 0,
-      inUsd: everyday?.inUsd ?? 0,
-      outUsd: everyday?.outUsd ?? 0,
+      context: windows.length ? Math.min(...windows) : 0,
+      inUsd: Math.max(...roles.map((r) => r.inUsd)),
+      outUsd: Math.max(...roles.map((r) => r.outUsd)),
+      // The cache price is the one figure that only makes sense per model, and the prefix of a
+      // conversation is written by the role that answers it. The everyday one is the honest default.
       cachedInUsd: everyday?.cachedInUsd ?? 0,
       provider: "openrouter",
       local: false,
       loopback: false,
       current: variant.id === current,
+      roles,
     });
     seen.add(variant.id);
   }

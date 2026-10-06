@@ -122,6 +122,13 @@ const PATHS = {
   // tried here read as "settings page" (a gear) or as "magic" (a wand), and this one reads as
   // "adjust what is on".
   tools: "M2 5.5h2.5M7.5 5.5H14M2 10.5h6.5M11.5 10.5H14M7.5 5.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 1 1 3 0M11.5 10.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 1 1 3 0",
+  // A cloud: where the answer comes FROM.
+  //
+  // ⚠️ Added the day the provider and the model became neighbours in the same row. Both had carried
+  // `chip`, which cost nothing while they sat in different rows and became unreadable the moment they
+  // did not: two identical glyphs side by side say "these are the same kind of thing", and "which
+  // service" and "which model" are the two choices people most need to keep apart here.
+  cloud: "M4.8 12.5h6.4a2.7 2.7 0 0 0 .3-5.4 3.8 3.8 0 0 0-7.2-.8 2.8 2.8 0 0 0 .5 6.2Z",
   // A small chip: the model, and where it runs.
   chip: "M5.5 5.5h5v5h-5zM3 6.5h2.5M3 9.5h2.5M10.5 6.5H13M10.5 9.5H13M6.5 3v2.5M9.5 3v2.5M6.5 10.5V13M9.5 10.5V13",
   more: "M4 8a1 1 0 1 0 0-.01M8 8a1 1 0 1 0 0-.01M12 8a1 1 0 1 0 0-.01",
@@ -174,7 +181,7 @@ export const ICON: Record<
   | "send" | "stop" | "add" | "history" | "search" | "close" | "chevron" | "chevronLeft" | "file"
   | "check" | "cross" | "mute" | "unmute" | "pin" | "edit" | "copy" | "trash" | "settings"
   | "shield" | "attach" | "sparkle" | "bringIn" | "forward" | "restore" | "askAgain" | "compare"
-  | "tools" | "chip" | "more" | "back" | "mic",
+  | "tools" | "chip" | "cloud" | "more" | "back" | "mic",
   IconName
 > = {
   send: "send",
@@ -207,6 +214,7 @@ export const ICON: Record<
   compare: "compare",
   tools: "tools",
   chip: "chip",
+  cloud: "cloud",
   more: "more",
 };
 

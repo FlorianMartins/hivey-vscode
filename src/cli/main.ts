@@ -179,9 +179,6 @@ async function main(): Promise<void> {
 
   const store = new FileSpendStore(join(homedir(), ".hiveycode", "spend.json"));
   store.load();
-    // The built-in skills the configuration switched on, in the shape the model is offered. The
-  // terminal has no settings UI, so the groups come from `.hiveycode.json` and default to the
-  // general family — enough to be useful, bounded enough not to spend the context on a catalogue.
   // What this model actually holds, through the same rule the panel uses — a share of the window,
   // with a floor and a ceiling, and a configured figure winning when there is one.
   //

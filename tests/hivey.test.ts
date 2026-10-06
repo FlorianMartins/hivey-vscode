@@ -12,6 +12,8 @@ import {
   hiveyLabel,
   hiveyModel,
   hiveyModels,
+  hiveyRoles,
+  HIVEY_ROLES,
   hiveyRole,
   hiveyVariant,
   HIVEY_VARIANTS,
@@ -116,4 +118,73 @@ test("a preset is named by its name, and knows every model it can reach", () => 
   const reachable = hiveyModels("hivey");
   assert.ok(reachable.length >= 2, "a preset that reaches one model is not a routing");
   assert.ok(reachable.every((id) => GENERATED_PRICES[id]));
+});
+
+// ── What a preset costs, and why two of them can cost the same ────────────────────────────────────
+
+test("a preset answers for all four of its roles, not just the ordinary one", () => {
+  // The defect, as an assertion. The panel priced a preset by its `everyday` role and presented that
+  // as the preset's price — so Hivey Smart and Hivey Pro came out identical, because their two
+  // everyday models happen to charge the same to read. « comment ça se fait que les modeles Hivey pro
+  // et Hivey smart sortent le meme prix ? le smart est censé utiliser les meilleurs modeles ».
+  for (const variant of ["hivey/free", "hivey", "hivey/smart"]) {
+    const roles = hiveyRoles(variant);
+    assert.equal(roles.length, HIVEY_ROLES.length, `${variant} does not answer for every role`);
+    assert.deepEqual(
+      roles.map((r) => r.role),
+      HIVEY_ROLES,
+      "the roles are reported in the catalogue's own order, so two presets can be read side by side",
+    );
+    for (const r of roles) {
+      assert.ok(!r.model.startsWith("hivey"), `${variant}/${r.role} resolves to a preset id, which no provider knows`);
+    }
+  }
+});
+
+test("a dearer preset says when it reaches the model a cheaper one already uses", () => {
+  // ⚠️ This is the fact that ANSWERS the question, and it was computed and never shown. A dearer
+  // preset landing on the cheaper one's model is not a defect: the strongest current model was already
+  // inside the cheaper budget, so the dearer one had nothing better to buy. Unsaid, the presets read
+  // as decorative — which is exactly how they were read.
+  const free = hiveyRoles("hivey/free");
+  assert.ok(
+    free.every((r) => !r.sameAsCheaper),
+    "the cheapest preset cannot share with a cheaper one; there is none",
+  );
+
+  // On today's generated table the two paid presets share three roles out of four. That is a fact
+  // about one afternoon's catalogue and may change, so what is asserted is the RELATION, not the
+  // count: wherever two presets resolve to the same model for a role, the dearer one says so.
+  for (const variant of ["hivey", "hivey/smart"]) {
+    for (const r of hiveyRoles(variant)) {
+      const cheaperIds = ["hivey/free", "hivey"].slice(0, ["hivey/free", "hivey", "hivey/smart"].indexOf(variant));
+      const twin = cheaperIds.find((other) => hiveyModel(other, r.role) === r.model);
+      assert.equal(
+        r.sameAsCheaper,
+        twin,
+        `${variant}/${r.role} shares with ${twin ?? "nobody"} and the row does not say the same`,
+      );
+    }
+  }
+});
+
+test("the panel prices a preset by its dearest role and sizes it by its smallest", () => {
+  // Two different rules for two different promises, and reading the source because this is a claim
+  // about a call site. A price must never quote the cheap tier and bill the expensive one, so it is
+  // the DEAREST role; a context window is something you rely on while working, so it is the SMALLEST.
+  // The smallest is also what separates these two presets honestly — Smart drops to 500 k on an
+  // everyday turn and Pro does not, which no price was ever going to show.
+  const { readFileSync } = require("node:fs") as typeof import("node:fs");
+  const models = readFileSync("src/extension/models.ts", "utf8");
+  assert.match(models, /inUsd: Math\.max\(\.\.\.roles\.map\(\(r\) => r\.inUsd\)\)/);
+  assert.match(models, /outUsd: Math\.max\(\.\.\.roles\.map\(\(r\) => r\.outUsd\)\)/);
+  assert.match(models, /context: windows\.length \? Math\.min\(\.\.\.windows\) : 0/);
+  // ⚠️ And an unknown window may not swallow the minimum: a role the catalogue has never heard of
+  // reports 0, and a minimum over a 0 is 0 — which reads as "unknown" on a preset where three roles
+  // are perfectly well known.
+  assert.match(models, /\.filter\(\(c\) => c > 0\)/);
+  assert.ok(
+    !/context: everyday\?\.context/.test(models),
+    "the preset is sized by one of its four roles again",
+  );
 });

@@ -116,3 +116,40 @@ export function hiveyModels(model: string): string[] {
   const table = HIVEY_ROUTING[hiveyVariant(model)] ?? {};
   return [...new Set(Object.values(table))];
 }
+
+export const HIVEY_ROLES: HiveyRole[] = ["chore", "everyday", "deep", "completion"];
+
+/**
+ * What a preset routes to, role by role — and which of those a cheaper preset already reached.
+ *
+ * ⚠️ This exists because the panel priced a preset by ONE of its four roles, the `everyday` one, and
+ * presented that figure as the preset's price. Reported as « comment ça se fait que les modeles Hivey
+ * pro et Hivey smart sortent le meme prix ? le smart est censé utiliser les meilleurs modeles ». The
+ * figures were not wrong; the question they answered was not the one being asked.
+ *
+ * And the honest answer is that no single number separates those two presets, because on today's
+ * catalogue they genuinely cost the same at both ends: the same cheap model for chores, the same
+ * strong model for deep work, and the same $2/M input on everything in between. What differs is the
+ * OUTPUT price of one role, and which model answers an ordinary question. A row that reduces that to
+ * one figure cannot help but look like a defect — so the interface stops reducing it.
+ *
+ * `sameAsCheaper` is the fact that explains the rest: a dearer preset reaching for the model a cheaper
+ * one already uses is not a bug (the generated file says so too, in `HIVEY_OVERLAPS`), it means the
+ * strongest current model was already inside the cheaper preset's budget and the dearer one had
+ * nothing better to buy. Said out loud, it is useful. Left unsaid, it reads as the presets being fake.
+ *
+ * Derived from the routing table rather than parsed out of `HIVEY_OVERLAPS`, whose entries are prose
+ * meant for a human reading the generated file.
+ */
+export function hiveyRoles(
+  model: string,
+): Array<{ role: HiveyRole; model: string; sameAsCheaper?: HiveyVariant }> {
+  const variant = hiveyVariant(model);
+  // The declaration order of HIVEY_VARIANTS is cheapest first, which is what "cheaper" means here.
+  const cheaper = HIVEY_VARIANTS.map((v) => v.id).slice(0, HIVEY_VARIANTS.findIndex((v) => v.id === variant));
+  return HIVEY_ROLES.map((role) => {
+    const resolved = hiveyModel(variant, role);
+    const twin = cheaper.find((other) => hiveyModel(other, role) === resolved);
+    return twin ? { role, model: resolved, sameAsCheaper: twin } : { role, model: resolved };
+  });
+}

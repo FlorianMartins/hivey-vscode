@@ -1174,10 +1174,17 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
   // separate buttons for about an hour, and the cost was immediate and measurable — the model name
   // collapsed to "qwe…" because every icon in this row is width the one label carrying real
   // information does not have. Copilot has one configure affordance for the same reason.
-  // Order: what to attach, what it may do, which model, how hard it thinks — then the skills.
-  // Skills sit last because they are the one control that changes what `/` offers rather than what
-  // this message does, and because that is where the user asked for it.
-  left.append(contextButton(state, deps), modeButton(state, deps), modelButton(state, deps));
+  // ⚠️ The MODEL is not here any more. Asked for directly: « le choix du modele tu peux le sortir de la
+  // zone de saisie user au niveau du choix du mode de reponse (local, openrouter, fournisseurs ou
+  // gateway) et du bouton approuval […] pour un rendu plus propre et homogene ». And it is the right
+  // cut, not just a tidier one: which service answers, which model answers and what it may do without
+  // asking are three settings of the CONVERSATION, so they belong together outside the box — while
+  // what to attach, which mode and how hard to think are about THIS message. The box held one control
+  // from the other group, and that is why the row never looked settled.
+  //
+  // It also buys back the width the row was short of: three controls plus the send survive a narrow
+  // panel where four did not.
+  left.append(contextButton(state, deps), modeButton(state, deps));
   if (state.reasoningAvailable) left.append(reasoningButton(state, deps));
   bar.append(left);
 
@@ -1213,10 +1220,15 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
   // it still read as part of the field you type into, which is exactly what it should not be: it is
   // a reading about the conversation, not a control of the message.
   const meter = el("div", "composer-footer");
-  // What the session runs on, and how much of it runs without asking. Both belong OUTSIDE the box:
-  // they are settings for the conversation, not parts of the message being written, and inside the
-  // border they read as controls of the text. The editor's own chat makes the same split.
-  meter.append(providerButton(state, deps), approvalButton(state, deps));
+  // What the session runs on, which model answers, and how much of it runs without asking. All three
+  // belong OUTSIDE the box: they are settings for the conversation, not parts of the message being
+  // written, and inside the border they read as controls of the text.
+  //
+  // The order is the one that was asked for and it is also the order of the question: WHERE the answer
+  // comes from, WHICH model gives it, WHAT it may do without asking. « en terme d'ordre pour les
+  // boutons du composer-footer je veux en premier le mode comme cest actuellement, ensuite le modeles
+  // et ensuite approuvals ».
+  meter.append(providerButton(state, deps), modelButton(state, deps), approvalButton(state, deps));
   meter.append(el("div", "spacer"));
   if (waiting) {
     meter.append(el("span", "composer-waiting", t("Waiting for your answer above")));
@@ -1628,7 +1640,10 @@ function missingFor(id: string, state: UiState): string {
 function providerButton(state: UiState, deps: ChatDeps): HTMLElement {
   const current = PROVIDERS.find((p) => p.id === state.provider) ?? PROVIDERS[0]!;
   const b = button({
-    icon: ICON.chip,
+    // A cloud, not a chip. The chip belongs to the model, which is now this button's neighbour, and
+    // two identical glyphs side by side say "these are the same kind of thing" about the two choices
+    // people most need to keep apart: which service, and which model.
+    icon: ICON.cloud,
     label: state.remote ? current.short : t("Local"),
     trailingIcon: ICON.chevron,
     title: state.remote
@@ -1778,7 +1793,9 @@ function modelButton(state: UiState, deps: ChatDeps): HTMLElement {
       (state.remote
         ? t("Remote model — it is billed, and what you send is pseudonymized first.")
         : t("Local model — nothing leaves this machine.")),
-    className: `btn ghost model${state.remote ? " remote" : " local"}`,
+    // `tiny`, like the two controls it now sits between. Without it this button was a size of its own
+    // in a row of small ones, which reads as an error rather than as emphasis.
+    className: `btn ghost tiny model${state.remote ? " remote" : " local"}`,
     onClick: () => {
       closeMenu();
       if (isModelComboOpen()) closeModelCombo();

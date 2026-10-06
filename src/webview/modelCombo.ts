@@ -83,12 +83,55 @@ function tierLabel(tier: PriceTier): string {
 
 const TIERS: PriceTier[] = ["free", "cheap", "affordable", "moderate", "expensive"];
 
-/** `$3.00/M`, or the word that says the question does not arise. */
+function usd(value: number): string {
+  return `$${value >= 1 ? value.toFixed(2) : value.toFixed(3)}`;
+}
+
+/**
+ * `$3.00/M`, a span for a preset, or the word that says the question does not arise.
+ *
+ * ⚠️ A preset gets a SPAN, because it is four models and a single figure made two different presets
+ * read as identical: « comment ça se fait que les modeles Hivey pro et Hivey smart sortent le meme
+ * prix ? ». The span is still the input price — that is all this badge has room for — but it is now a
+ * claim the preset can keep, rather than one role's figure standing in for four.
+ */
 function priceBadge(model: UiModel): string {
   if (model.local) return t("local");
   if (!model.inUsd && !model.outUsd) return t("free");
-  const value = model.inUsd;
-  return `$${value >= 1 ? value.toFixed(2) : value.toFixed(3)}/M`;
+  if (model.roles?.length) {
+    const low = Math.min(...model.roles.map((r) => r.inUsd));
+    const high = Math.max(...model.roles.map((r) => r.inUsd));
+    if (high > low) return `${usd(low)}–${usd(high)}/M`;
+  }
+  return `${usd(model.inUsd)}/M`;
+}
+
+/**
+ * What a preset is, in one line a row can hold: the model that answers an ordinary question.
+ *
+ * That is the role the two paid presets differ on, and therefore the only thing worth the space. The
+ * detail used to be `model.id` — the literal string `hivey/smart` under a label reading "Hivey Pro",
+ * which told a reader nothing they could not see.
+ */
+function presetDetail(model: UiModel): string | undefined {
+  const everyday = model.roles?.find((r) => r.role === "everyday");
+  return everyday ? t("{0} on an ordinary question", everyday.model) : undefined;
+}
+
+/** Every role, its model and its price — and where a cheaper preset already goes. */
+function presetTitle(model: UiModel): string {
+  const lines = (model.roles ?? []).map((r) => {
+    const price = r.inUsd || r.outUsd ? t("{0} in · {1} out", usd(r.inUsd), usd(r.outUsd)) : t("free");
+    const shared = r.sameAsCheaper ? ` — ${t("the same model {0} already uses", r.sameAsCheaper)}` : "";
+    return `${r.role}: ${r.model} (${price})${shared}`;
+  });
+  // ⚠️ Said rather than hidden. A dearer preset reaching for the model a cheaper one already uses is
+  // not a defect — it means the strongest current model was already inside the cheaper budget, so the
+  // dearer one had nothing better to buy. Unsaid, the two presets read as decorative.
+  if ((model.roles ?? []).some((r) => r.sameAsCheaper)) {
+    lines.push("", t("Where a role is shared, the dearer preset had nothing better to buy that day."));
+  }
+  return lines.join("\n");
 }
 
 function toItems(state: UiState): ComboItem[] {
@@ -97,7 +140,7 @@ function toItems(state: UiState): ComboItem[] {
     return {
       value: `${model.provider}|${model.id}`,
       label: model.name || model.id,
-      detail: model.id,
+      detail: (model.roles?.length ? presetDetail(model) : undefined) ?? model.id,
       provider: model.provider,
       vendor,
       tier: model.local ? "free" : priceTier(model.inUsd, model.outUsd),
@@ -349,7 +392,9 @@ export function openModelCombo(anchor: HTMLElement, state: UiState, send: (m: To
       ? item.model.loopback === false
         ? t("Served by {0} on your network: nothing leaves it, nothing is billed.", item.model.server ?? item.model.baseUrl ?? "")
         : t("Served on your machine by {0}: nothing leaves, nothing is billed.", item.model.server ?? "")
-      : t("Input {0} $/M · output {1} $/M", item.model.inUsd, item.model.outUsd);
+      : item.model.roles?.length
+        ? presetTitle(item.model)
+        : t("Input {0} $/M · output {1} $/M", item.model.inUsd, item.model.outUsd);
     node.addEventListener("mousedown", (ev) => {
       ev.preventDefault();
       pick(item);

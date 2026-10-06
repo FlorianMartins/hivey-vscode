@@ -2,6 +2,82 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 1.4.0 — 2026-10-06
+
+### Corrigé
+
+- **⚠️⚠️ La largeur minimum du panneau n'avait JAMAIS pris effet — sa propre politique de sécurité la
+  jetait.** Florian, pour la deuxième fois : « la second side bar a droite n'est toujours pas bloquée…
+  on peu la reduire au maximum sans quelle se bloque alors que j'ai demandé un bloquage de largeur
+  minimum ».
+
+  Le plancher était écrit `<body style="min-width:…px">`. Or la CSP de ce panneau déclare
+  `style-src` **sans** `'unsafe-inline'` — délibérément, parce que la sortie d'un modèle est rendue
+  dans ce document — et c'est exactement ce qu'interdit cette directive. **Le plancher était donc
+  déclaré au seul endroit où la politique du document garantit qu'il sera jeté.** Le balisage était
+  parfaitement correct, aucun test ne pouvait le voir, et le réglage n'a rien fait pendant toute une
+  version.
+
+  La valeur voyage maintenant dans l'état et la page l'applique comme **propriété** de style, ce que la
+  même politique autorise. Un test refuse désormais `style="…"`, `cssText` et
+  `setAttribute("style", …)` dans tout ce qui compose ce panneau.
+
+  **⚠️ Et un deuxième style mort est tombé avec le premier** : la mesure de la largeur de l'ascenseur
+  posait sa sonde avec `cssText`, donc la sonde n'avait aucune taille, le calcul rendait `0px` — et le
+  défaut qu'elle existe pour corriger (le composer plus large d'un ascenseur que tout le texte
+  au-dessus) n'avait jamais été corrigé. Trouvé en cherchant le premier.
+
+  **⚠️ Ce que cela ne fait pas, dit clairement** : c'est un plancher sur le **contenu**, pas un verrou
+  sur la barre. VS Code n'offre à une extension **aucun moyen** de fixer une largeur minimum à une vue
+  — [microsoft/vscode#182201](https://github.com/microsoft/vscode/issues/182201) est toujours ouverte.
+  Ce que l'on gagne : en dessous du plancher la mise en page cesse de se réorganiser et le panneau
+  défile latéralement, au lieu de se replier en silence vers quelque chose d'illisible. Rien, dans une
+  extension, ne peut empêcher de tirer la poignée.
+
+- **⚠️⚠️ Hivey Smart et Hivey Pro affichaient le même prix.** Florian : « comment ça se fait que les
+  modeles Hivey pro et Hivey smart sortent le meme prix ? le smart est censé utiliser les meilleurs
+  modeles ».
+
+  Parce que la ligne affichait le prix du modèle qui répond à un tour **ordinaire** et le présentait
+  comme le prix du préréglage. Le raisonnement d'origine était défendable — « la ligne ne peut pas
+  porter quatre prix » — et le résultat était indéfendable : les deux modèles *everyday* coûtent
+  exactement **2 $/M en lecture**, donc la pastille les rendait identiques.
+
+  Et la réponse honnête est qu'**aucun nombre unique ne sépare ces deux préréglages** : sur le
+  catalogue du jour ils partagent le modèle bon marché des corvées, le modèle fort du travail
+  difficile, et le même prix d'entrée partout. Ce qui diffère est le prix de **sortie** d'un seul rôle
+  (6 $ contre 10 $) et quel modèle répond à une question ordinaire. L'interface cesse donc de réduire
+  un préréglage à un prix :
+
+  - la pastille montre une **fourchette** (`$0.03–2/M`) au lieu d'un quart de la réponse ;
+  - le prix affiché est celui du rôle **le plus cher** — un prix ne doit jamais annoncer le tarif bon
+    marché et facturer le cher ;
+  - le contexte affiché est celui du rôle **le plus petit**, parce que c'est la fenêtre sur laquelle on
+    peut compter — et c'est aussi ce qui sépare *honnêtement* les deux préréglages (Smart retombe à
+    500 k sur un tour ordinaire, Pro non) ;
+  - l'infobulle nomme **les quatre rôles, leurs modèles et leurs prix**, et **dit** quand un préréglage
+    plus cher tombe sur le modèle qu'un moins cher utilise déjà. Ce n'est pas un défaut — cela veut
+    dire que le meilleur modèle du moment tenait déjà dans le budget le moins cher. Le fichier généré
+    le savait depuis toujours (`HIVEY_OVERLAPS`) ; l'interface ne l'avait jamais dit, et tu ne
+    pouvais donc lire ces deux lignes que comme deux préréglages décoratifs.
+
+### Modifié
+
+- **Le choix du modèle sort de la zone de saisie.** Demandé : « le choix du modele tu peux le sortir de
+  la zone de saisie user au niveau du choix du mode de reponse […] et du bouton approuval », puis « en
+  premier le mode comme cest actuellement, ensuite le modeles et ensuite approuvals ». La rangée sous
+  le composer est donc **fournisseur → modèle → approbations**, qui est aussi l'ordre de la question :
+  *d'où* vient la réponse, *quel* modèle la donne, *ce qu'il peut faire* sans demander.
+
+  Ce n'est pas qu'un rangement : ces trois-là sont des réglages de la **conversation**, tandis que la
+  pièce jointe, le mode et l'effort de réflexion concernent **ce message-ci**. La boîte contenait un
+  bouton de l'autre groupe, et c'est pour ça que la rangée n'a jamais eu l'air posée. Au passage, elle
+  rend la largeur dont la barre du composer manquait.
+
+  Le fournisseur prend une icône de **nuage** : il portait la même puce que le modèle, ce qui ne
+  coûtait rien tant qu'ils étaient dans deux rangées différentes et devenait illisible dès qu'ils sont
+  devenus voisins.
+
 ## 1.3.0 — 2026-10-06
 
 ### Corrigé

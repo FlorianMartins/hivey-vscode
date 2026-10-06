@@ -6,7 +6,6 @@
 
 export const FR: Record<string, string> = {
   "Not models: each sends a kind of work — a question, an agent turn, a completion, a chore — to the model that suits it.": "Pas des modèles : chacun envoie un type de travail — une question, un tour d’agent, une complétion, une corvée — au modèle qui lui convient.",
-  "The figures are those of an ordinary turn; a chore costs less and a hard question more.": "Les chiffres sont ceux d’un tour ordinaire ; une corvée coûte moins, une question difficile davantage.",
   "Hivey": "Hivey",
   "Free endpoints only. Costs nothing, and is rate-limited like everything free.": "Uniquement des points d’accès gratuits. Ne coûte rien, et est limité en débit comme tout ce qui est gratuit.",
   "A strong model where you feel it, a cheap one for the plumbing.": "Un modèle solide là où ça se voit, un modèle bon marché pour la tuyauterie.",
@@ -1319,6 +1318,13 @@ export const FR: Record<string, string> = {
   "What can I do for you?": "Que puis-je faire pour vous ?",
   "What can we plan together?": "Que pouvons-nous planifier ensemble ?",
   "already on, from the files you have open": "déjà active, d'après les fichiers que vous avez ouverts",
+  "The context shown is the smallest of its roles — the window you can count on whatever it is doing.":
+    "Le contexte affiché est le plus petit de ses rôles — la fenêtre sur laquelle vous pouvez compter quoi qu'il fasse.",
+  "Where a role is shared, the dearer preset had nothing better to buy that day.":
+    "Là où un rôle est partagé, le préréglage le plus cher n'avait rien de mieux à acheter ce jour-là.",
+  "the same model {0} already uses": "le même modèle que celui déjà utilisé par {0}",
+  "{0} in · {1} out": "{0} en entrée · {1} en sortie",
+  "{0} on an ordinary question": "{0} sur une question ordinaire",
   "Which areas is this conversation about?": "De quels domaines relève cette conversation ?",
   "Which languages and subjects this conversation is about": "Les langages et sujets dont relève cette conversation",
   "Which sub-agents may be dispatched?": "Quels sous-agents peuvent être sollicités ?",
