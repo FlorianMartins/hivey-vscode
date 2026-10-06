@@ -226,6 +226,18 @@ body {
   cursor: pointer;
   white-space: nowrap;
   max-width: 100%;
+  /* ⚠️ Every control in this panel changed state in a single frame: a chip went from invisible edge
+   * to outlined the instant the pointer crossed it, which is what makes an interface feel like a
+   * form rather than like the editor's own chat. 120 ms is the editor's own figure for this, and it
+   * is short enough that nobody waits for it and long enough that the eye follows the change instead
+   * of being surprised by it.
+   *
+   * Only colour and the edge — never size or position. A control that MOVES under the pointer is a
+   * control you miss, and that is a regression dressed as polish. */
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
 }
 .btn:hover:not(:disabled) {
   background: var(--hover);
@@ -290,6 +302,33 @@ body {
   padding: 2px var(--sp-2);
   color: var(--muted);
   border-color: var(--border);
+}
+/* ⚠️ `ghost` means "no outline until you reach for it", and `tiny` was quietly putting one back: the
+ * two rules have the same specificity, so the later one won and every `ghost tiny` control carried a
+ * border it had asked not to have. That is what the row under the composer looked like — three boxed
+ * chips in a panel whose every other surface is borderless. Asked for directly: « concernant le choix
+ * du modele tu peux supprimer les borders pour que ce soit homogene avec le theme du reste de la
+ * sidebar ».
+ *
+ * The outline is not removed, it is MOVED to hover and focus, which is where it answers a question
+ * somebody is actually asking ("is this a control?"). Resting, the panel reads as one surface. This
+ * is how the editor's own chat draws the same row.
+ *
+ * Scoped to `ghost` on purpose: `btn tiny`, `btn tiny primary` and `btn tiny danger` are not ghosts
+ * and keep their edges. */
+.btn.ghost.tiny,
+.composer-toolbar .btn.ghost {
+  border-color: transparent;
+}
+/* ⚠️ And it stays transparent on hover. The first attempt brought the outline back under the pointer,
+ * which only moved the noise rather than removing it — a row of chips that grows edges as you sweep
+ * across it is busier than one that always had them. What answers "is this a control?" is the
+ * background tint `.btn:hover` already paints, which is what the editor's own chat uses and nothing
+ * else. The outline is kept for `:focus-visible` alone, where it is the only thing a keyboard user
+ * has. */
+.btn.ghost.tiny:focus-visible,
+.composer-toolbar .btn.ghost:focus-visible {
+  border-color: var(--vscode-focusBorder);
 }
 .btn.tiny:hover {
   color: var(--vscode-foreground);
@@ -1098,9 +1137,17 @@ pre.code {
  * button painted over the send button. A floor that cannot be met is not a floor, it is an
    overlap. `overflow: hidden` on the group makes that failure impossible rather than merely
    unlikely. */
+/* The model is the one label here that can grow without limit — a vendor can ship
+ * `qwen3.7-flash-thinking-preview` tomorrow — so it is the one that gives up characters when the row
+ * runs out. Its neighbours are one short word each and would say nothing truncated. */
 .composer-toolbar .btn.model {
   flex: 0 1 auto;
   min-width: 7ch;
+}
+.composer-toolbar .btn.model .lbl {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .composer-toolbar .toolbar-group {
   overflow: hidden;
@@ -1114,11 +1161,7 @@ pre.code {
 .composer-toolbar .btn.mode {
   flex: 0 0 auto;
 }
-.composer-toolbar .btn.model .lbl {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+
 .composer-tokens {
   font-size: var(--fs-meta);
   color: var(--muted);
@@ -2677,6 +2720,15 @@ pre.code {
 }
 /* Motion is a preference, and someone who has switched it off in the operating system has said so
    about every interface, not only about this one. The ring stays, still, as a plain accent. */
+/* Somebody who has asked their system for less motion has asked for it here too. The transitions
+ * above are the only ones added for feel rather than for information, so they are the ones that go
+ * — the panel keeps every state it had, it simply arrives at them at once. */
+@media (prefers-reduced-motion: reduce) {
+  .btn {
+    transition: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .composer.working .composer-card::before {
     animation: none;
@@ -3307,8 +3359,9 @@ pre.code code {
   top: 50%;
   border-top: 1px solid var(--border);
 }
-/* The transcript's first question has no previous turn to be separated from, so it gets no line —
-   but it keeps the restore, which is not a separator and was the thing being lost here. */
+/* The transcript's first question has no previous turn to be separated from, so it gets no line and
+   no label: its way back lives in its own header, which is the one place a turn with no bar above it
+   can carry one. */
 .turn-rule.opening {
   margin-top: var(--sp-2);
 }
@@ -3316,26 +3369,47 @@ pre.code code {
   display: none;
 }
 
-.checkpoint-btn {
+/* The way back, sitting ON the line between two turns.
+ *
+ * ⚠️ This class was `.checkpoint-btn` and styled nothing for a while: the button it dressed had been
+ * moved into the message header, and the rules stayed behind. Dead CSS is worse than none — it reads
+ * as the live styling of whatever you are looking at.
+ *
+ * No border in the resting state, which is the request: « supprimer les borders pour que ce soit
+ * homogene avec le theme du reste de la sidebar ». What makes the label readable over the rule is
+ * the panel's own background breaking the line behind it, not an outline around it. The border
+ * appears on hover, where it means "this is a button" at the moment that answer is wanted. */
+.turn-restore {
   position: relative;
   z-index: 1;
+  gap: var(--sp-1);
   padding: 2px var(--sp-3);
   border-radius: 999px;
-  border: 1px solid var(--border-strong);
-  /* Sits ON the line: the panel's own background is what breaks the rule behind the label. */
+  border: 1px solid transparent;
+  /* The panel's own background is what breaks the rule behind the label. */
   background: var(--vscode-sideBar-background, var(--vscode-editor-background));
   color: var(--muted);
   font-size: var(--fs-meta);
 }
-.checkpoint-btn:hover {
+.turn-restore .ico {
+  /* Smaller than the word beside it: the glyph is the hint, the label is the control. */
+  width: 12px;
+  height: 12px;
+  opacity: 0.8;
+}
+.turn-restore:hover {
   color: var(--vscode-foreground);
   background: var(--hover);
+}
+.turn-restore:focus-visible {
   border-color: var(--vscode-focusBorder);
 }
 /* A partial checkpoint cannot put everything back, and says so before it is pressed rather than
    afterwards. */
-.checkpoint-btn.partial {
+.turn-restore.partial {
   color: var(--vscode-editorWarning-foreground, var(--muted));
+}
+.turn-restore.partial:hover {
   border-style: dashed;
 }
 
@@ -3356,19 +3430,9 @@ pre.code code {
      word each so that the line holds. */
   flex-wrap: nowrap;
 }
-/* The model name is the one label in this row that cannot be guessed from its icon, and it is also
-   the only one of unbounded length — a vendor can ship `qwen3.7-flash-thinking-preview` tomorrow. So
-   it is the thing that gives up characters when the row runs out, and its neighbours never do: a
-   provider reduced to "Open…" or an approval scope reduced to "Au…" is a control nobody can read,
-   whereas a model reduced to "qwen3.7-fla…" is still the model you chose. */
-.composer-footer .btn.model {
-  min-width: 0;
-}
-.composer-footer .btn.model .lbl {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+/* Two controls and two readings on one line, and neither control may shrink: a provider reduced to
+   "Open…" or an approval scope reduced to "Au…" is a control nobody can read. They are one short word
+   each, so the line holds. */
 .composer-footer .btn.provider,
 .composer-footer .btn.approval-scope {
   flex: 0 0 auto;

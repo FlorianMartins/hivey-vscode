@@ -176,7 +176,13 @@ export function turnBoundary(role: "user" | "assistant", isFirst: boolean): { re
 /** One thing the transcript draws, in order. */
 export type TranscriptPiece =
   | { kind: "rule"; id: string; opening: boolean }
-  | { kind: "entry"; id: string };
+  /**
+   * `first` is the opening question of the conversation, and it is here rather than recomputed in
+   * the renderer for the reason this whole function exists: the way back is drawn in two different
+   * places depending on it, and a renderer that worked out "am I the first?" by itself would be the
+   * untested loop all over again.
+   */
+  | { kind: "entry"; id: string; first: boolean };
 
 /**
  * What the transcript emits, as a list, without a DOM.
@@ -203,7 +209,7 @@ export function transcriptPieces(
     if (entry.streaming) continue;
     const boundary = turnBoundary(entry.role, first);
     if (boundary?.restore) out.push({ kind: "rule", id: entry.id, opening: !boundary.line });
-    out.push({ kind: "entry", id: entry.id });
+    out.push({ kind: "entry", id: entry.id, first });
     first = false;
   }
   return out;

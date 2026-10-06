@@ -56,26 +56,38 @@ test("reasoning arrives through the scroll-follow, like the answer does", () => 
   assert.match(method, /following\(/, "thinking is appended outside the follow, so the panel stays on the previous answer");
 });
 
-test("the conversation's settings sit outside the box, in the order of the question", () => {
-  // ⚠️ Asked for directly, twice, and the second message fixed the order: « le choix du modele tu peux
-  // le sortir de la zone de saisie user au niveau du choix du mode de reponse […] et du bouton
-  // approuval » then « en premier le mode comme cest actuellement, ensuite le modeles et ensuite
-  // approuvals ». It is also the right cut rather than merely a tidier one: which service answers,
-  // which model answers and what may run without asking are settings of the CONVERSATION, while what
-  // to attach, which mode and how hard to think are about THIS message. The box held one control from
-  // the other group, which is why the row never looked settled.
+test("the composer row is the editor's own chat row, in its order", () => {
+  // ⚠️ Asked for, and it REPLACES an earlier arrangement from this same session: the model had been
+  // moved out of the box to sit with the provider and the approval scope. « reprend egalement les
+  // positions de boutons de l'onglet chat de github copilot qui est propre », and the editor puts the
+  // model picker in the chat input field beside the mode. Confirmed before moving anything, because
+  // the two instructions contradict each other and undoing somebody's explicit choice in silence is
+  // worse than either layout.
   //
-  // Asserted as an ORDER, because an order is exactly what was asked for and nothing else in the
-  // suite would notice it being shuffled by a later edit.
+  // The reason it is the better row and not merely the requested one: which mode answers and which
+  // model answers are one decision asked twice, and splitting them across two rows is what made this
+  // row never look settled.
   const source = readFileSync("src/webview/chat.ts", "utf8");
   assert.match(
     source,
-    /meter\.append\(providerButton\(state, deps\), modelButton\(state, deps\), approvalButton\(state, deps\)\)/,
-    "where / which model / what it may do is the order of the question, and the row no longer says it",
+    /left\.append\(contextButton\(state, deps\), modeButton\(state, deps\), modelButton\(state, deps\)\)/,
+    "attach, mode and model are no longer one run at the head of the row",
+  );
+  assert.match(source, /left\.append\(toolsButton\(state, deps\)\)/, "skills left the settings group again");
+  // The far end acts on the message; it does not configure the answer. Anything else landing here is
+  // the drift this test exists to catch.
+  assert.ok(
+    !/right\.append\(toolsButton/.test(source),
+    "skills is back beside the send, where it reads as a seventh unrelated icon",
+  );
+  assert.match(
+    source,
+    /meter\.append\(providerButton\(state, deps\), approvalButton\(state, deps\)\)/,
+    "the row under the box is no longer where the answer comes from and what it may do",
   );
   assert.ok(
-    !/left\.append\([^)]*modelButton/.test(source),
-    "the model picker is back inside the composer, which is the group it does not belong to",
+    !/meter\.append\([^)]*modelButton/.test(source),
+    "the model is in two places, so the panel can show two different answers to one question",
   );
 });
 
@@ -151,4 +163,27 @@ test("the minimum width reaches the page, and says what it cannot do", () => {
   // Zero means "let it shrink" and undefined means "an older host did not send it". Collapsing the two
   // would make a deliberate 0 indistinguishable from no answer at all.
   assert.match(main, /if \(px === undefined\) return;/);
+});
+
+test("the way back is labelled on the bar, and only the opening question carries it in its header", () => {
+  // ⚠️ Asked for by name: « je preferais le texte "Restore Checkpoint" sur la barre comme avec Github
+  // copilot, tu peux remettre comme c'était […] et garder le bouton uniquement sur le premier
+  // message ». Both halves matter and they are not interchangeable — the opening question has no bar
+  // above it, because there is no boundary to draw before the first thing in a conversation, so it is
+  // the one turn that needs the control somewhere else.
+  const source = readFileSync("src/webview/chat.ts", "utf8");
+  assert.match(source, /label: t\("Restore Checkpoint"\)/, "the bar lost its label again");
+  assert.match(source, /if \(entry\.role === "user" && first\) \{/, "every question carries the header icon again");
+  // The renderer must take `first` from the tested value rather than work it out again: a decision
+  // tested in isolation and applied in a loop nothing tests is a decision nobody has checked, which
+  // is the exact history of this control.
+  assert.match(source, /renderEntry\(entry, state, deps, piece\.first\)/);
+  // One sentence, written once. It is now offered from two places and it is the part that decides
+  // whether to press — two copies of a promise drift, and the copy nobody looks at is the one that does.
+  assert.match(source, /function restoreTitle\(entry: UiEntry\): string/);
+  assert.equal(
+    (source.match(/some changes were too large to record/g) ?? []).length,
+    1,
+    "the promise is written twice again, so the two places can disagree about what restoring does",
+  );
 });

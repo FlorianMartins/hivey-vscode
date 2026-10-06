@@ -169,12 +169,17 @@ test("the transcript draws a restore above the FIRST question", () => {
   ]);
   assert.deepEqual(pieces, [
     { kind: "rule", id: "q1", opening: true },
-    { kind: "entry", id: "q1" },
-    { kind: "entry", id: "a1" },
+    { kind: "entry", id: "q1", first: true },
+    { kind: "entry", id: "a1", first: false },
     { kind: "rule", id: "q2", opening: false },
-    { kind: "entry", id: "q2" },
-    { kind: "entry", id: "a2" },
+    { kind: "entry", id: "q2", first: false },
+    { kind: "entry", id: "a2", first: false },
   ]);
+  // ⚠️ `first` decides WHERE the way back is drawn, and the two places are not interchangeable: the
+  // opening question has no bar above it to put a label on, so it carries an icon in its own header,
+  // and every other turn carries the words "Restore Checkpoint" on its bar. Asked for in exactly
+  // those terms. Computing "am I the first?" in the renderer instead would be the untested loop this
+  // whole function exists to replace.
 });
 
 test("a conversation of one question still offers its way back", () => {
@@ -183,7 +188,7 @@ test("a conversation of one question still offers its way back", () => {
   const pieces = transcriptPieces([{ id: "q1", role: "user" }]);
   assert.deepEqual(pieces, [
     { kind: "rule", id: "q1", opening: true },
-    { kind: "entry", id: "q1" },
+    { kind: "entry", id: "q1", first: true },
   ]);
 });
 
@@ -196,7 +201,9 @@ test("the answer being streamed is left to the live turn, and does not consume `
   ]);
   assert.deepEqual(pieces, [
     { kind: "rule", id: "q1", opening: true },
-    { kind: "entry", id: "q1" },
+    // And it is still the FIRST, so it still carries the header control. A streaming answer that
+    // consumed the flag would leave the opening question with no way back at all.
+    { kind: "entry", id: "q1", first: true },
   ]);
 });
 
@@ -212,6 +219,6 @@ test("a search that hides the first question makes the next visible one the open
   );
   assert.deepEqual(pieces, [
     { kind: "rule", id: "q2", opening: true },
-    { kind: "entry", id: "q2" },
+    { kind: "entry", id: "q2", first: true },
   ]);
 });

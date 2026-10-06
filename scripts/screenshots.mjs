@@ -289,6 +289,9 @@ const editor = spawn("node", ["dist-integration/runTest.js"], {
     // panel makes the content overflow, which is visible, where the floor itself is not. Unset, the
     // setting is left alone and the capture is the ordinary one.
     ...(args.get("min-width") ? { HIVEY_CODE_MIN_WIDTH: args.get("min-width") } : {}),
+    // `--width-probe` adds two frames around five calls to the editor's own "make this view bigger",
+    // to find out whether an extension can widen its panel at all. See the probe in the suite.
+    ...(args.has("width-probe") ? { HIVEY_CODE_WIDTH_PROBE: "1" } : {}),
     HIVEY_CODE_SCREENSHOT_HOLD: String(HOLD),
     HIVEY_CODE_SCREENSHOT_MARKER: marker,
   },
@@ -336,7 +339,19 @@ function announced() {
 //
 // Two halves of one sequence in two files: when they disagree, the one that waits is the one that
 // looks broken. Adding a screen means announcing it there and naming it here, in the same change.
-const SCREENS = ["premier", "conversation", "pendant", "plan", "approbation", "contexte", "passerelle", "setup"];
+const SCREENS = [
+  "premier",
+  "conversation",
+  // Only when probing: two frames around the editor's own "make this view bigger", to find out
+  // whether an extension can widen its panel at all. The suite announces them in the same place.
+  ...(args.has("width-probe") ? ["width-before", "width-after"] : []),
+  "pendant",
+  "plan",
+  "approbation",
+  "contexte",
+  "passerelle",
+  "setup",
+];
 // One hold per screen is not the budget: the fixture drives a real conversation between them, and
 // the frame taken mid-answer waits for a deliberately slow one to finish. Two screens' worth of
 // slack plus a flat minute covers the talking; a deadline that expires mid-run reports every

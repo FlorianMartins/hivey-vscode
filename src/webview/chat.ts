@@ -190,7 +190,7 @@ function transcript(state: UiState, deps: ChatDeps): HTMLElement {
       list.append(turnRule(entry, deps, piece.opening));
       continue;
     }
-    list.append(renderEntry(entry, state, deps));
+    list.append(renderEntry(entry, state, deps, piece.first));
   }
   if (state.searchQuery && !matches.size) {
     list.append(el("p", "empty", t("No message contains “{0}”.", state.searchQuery)));
@@ -434,7 +434,32 @@ function wizardFoot(deps: ChatDeps, onNext: (() => void) | undefined, label: str
   return foot;
 }
 
-function renderEntry(entry: UiEntry, state: UiState, deps: ChatDeps): HTMLElement {
+/**
+ * What pressing the way back will and will not do, in one sentence.
+ *
+ * ⚠️ Written once because it is now offered from two places — the bar between turns, and the opening
+ * question's own header — and the sentence is the part that decides whether to press it. Two copies
+ * of a promise drift, and the copy nobody is looking at is the one that drifts.
+ */
+function restoreTitle(entry: UiEntry): string {
+  if (entry.checkpointPartial) {
+    return t("Restore {0} file(s) — some changes were too large to record", entry.checkpointFiles ?? 0);
+  }
+  if (entry.checkpointCommands) {
+    return entry.checkpointFiles
+      ? t(
+          "Restore {0} file(s) — but {1} command(s) also ran, and what they changed stays",
+          entry.checkpointFiles,
+          entry.checkpointCommands,
+        )
+      : t("Rewind the conversation — {0} command(s) ran, and what they changed stays", entry.checkpointCommands);
+  }
+  return entry.checkpointFiles
+    ? t("Put the {0} file(s) this turn changed back, and rewind the conversation here", entry.checkpointFiles)
+    : t("Rewind the conversation to before this question — that turn changed no file");
+}
+
+function renderEntry(entry: UiEntry, state: UiState, deps: ChatDeps, first = false): HTMLElement {
   // The message, and next to it the things you can do to the message.
   //
   // They used to be one element, and the give-away was pinning: a pinned answer paints a tint
@@ -458,42 +483,26 @@ function renderEntry(entry: UiEntry, state: UiState, deps: ChatDeps): HTMLElemen
   // sat between the name and the tags, competing for a row that is already tight at a docked width,
   // and they were read on every turn by nobody. They now appear with the buttons, on hover, at the
   // far end of the row — the last thing on the line, which is where a total goes.
-  // ⚠️⚠️ THE WAY BACK, in the message's own header, where nothing hides it.
+  // ⚠️⚠️ THE WAY BACK FOR THE OPENING QUESTION, and only for it.
   //
-  // This control has now been "added" three times and seen none of them, and each attempt failed for
-  // a different reason worth writing down:
+  // Every other turn carries it on the bar above itself, labelled, the way the editor's own chat
+  // does — asked for in those words: « je preferais le texte "Restore Checkpoint" sur la barre comme
+  // avec Github copilot […] et garder le bouton uniquement sur le premier message ». The first
+  // question has no bar above it, because there is no boundary to draw before the first thing in a
+  // conversation, so it is the one turn that needs the control somewhere else.
   //
-  //   • On the RULE above the turn — which Florian sees above no question at all, so something about
-  //     it does not reach him. It is still drawn; it is simply not the thing to rely on.
-  //   • In `.entry-actions` — which lives at `opacity: 0` until the block is hovered. A fix nobody
-  //     can see without a mouse already on the message.
-  //   • With `opacity: 1` on that button to escape the row — which does nothing at all, because
-  //     OPACITY IS NOT INHERITED, IT MULTIPLIES. A child of a transparent parent cannot be opaque.
-  //     Caught before shipping, unlike the two above.
-  //
-  // The header has no opacity rule and no hover gate, so a control placed here exists whenever the
-  // message does. Which is what the project already says this particular control requires: "something
-  // that overwrites the working tree should never be discovered by accident."
-  if (entry.role === "user") {
+  // It stays in the HEADER rather than in `.entry-actions`, which lives at `opacity: 0` until the
+  // block is hovered, and which is where two earlier attempts at this control went to die. (The
+  // third attempt put `opacity: 1` on the button itself, which does nothing at all: opacity is not
+  // inherited, it MULTIPLIES, so a child of a transparent parent cannot be opaque.) The
+  // header has no opacity rule and no hover gate: a control placed here exists whenever the message
+  // does, which is what this particular control requires — something that overwrites the working
+  // tree should never be discovered by accident.
+  if (entry.role === "user" && first) {
     head.append(
       button({
         icon: ICON.restore,
-        // ⚠️ The tooltip carries what the rule's button used to say, because that information decides
-        // whether to press it: a turn whose work a checkpoint cannot hold must say so BEFORE the
-        // click, not in the dialog afterwards. Three promises, and it makes the one it can keep.
-        title: entry.checkpointPartial
-          ? t("Restore {0} file(s) — some changes were too large to record", entry.checkpointFiles ?? 0)
-          : entry.checkpointCommands
-            ? entry.checkpointFiles
-              ? t(
-                  "Restore {0} file(s) — but {1} command(s) also ran, and what they changed stays",
-                  entry.checkpointFiles,
-                  entry.checkpointCommands,
-                )
-              : t("Rewind the conversation — {0} command(s) ran, and what they changed stays", entry.checkpointCommands)
-            : entry.checkpointFiles
-              ? t("Put the {0} file(s) this turn changed back, and rewind the conversation here", entry.checkpointFiles)
-              : t("Rewind the conversation to before this question — that turn changed no file"),
+        title: restoreTitle(entry),
         className: `btn icon-only tiny restore-here${entry.checkpointPartial || entry.checkpointCommands ? " partial" : ""}`,
         onClick: () => deps.send({ type: "restoreCheckpoint", id: entry.id }),
       }),
@@ -717,17 +726,39 @@ const MARKS: Record<string, string> = {
  * message, because it is the only one that puts files back and something that overwrites the
  * working tree should never be discovered by accident.
  */
-function turnRule(entry: Pick<UiEntry, "id">, _deps: ChatDeps, opening = false): HTMLElement {
-  // ⚠️ A SEPARATOR, and nothing else. It used to carry the restore button, and that button was
-  // reported as invisible above every question — on an installation where this file renders it. The
-  // cause was never found; what was found is that the same action now lives in the question's own
-  // header, where no hover gate or scroll position can hide it.
+function turnRule(entry: UiEntry, deps: ChatDeps, opening = false): HTMLElement {
+  const rule = el("div", `turn-rule${opening ? " opening" : ""}`);
+  // The opening question has no boundary to draw before it, and carries its own way back in its
+  // header instead. Everywhere else the line holds the label.
+  if (opening) return rule;
+
+  // ⚠️⚠️ The LABEL is back, and the reason it ever left is worth correcting rather than quietly
+  // dropping. The note here used to read "this button was reported as invisible above every
+  // question", and that was a misreading of three reports that all said the same narrower thing:
+  // there was no way back on the FIRST message. Which was true, and had an obvious cause — the first
+  // question has no bar above it. The button on every other bar was working the whole time, and it
+  // was removed to fix a defect it did not have.
   //
-  // Two controls for one action, twenty-four pixels apart, one of which demonstrably fails to reach
-  // the person using it, is worse than one control that works. The line stays because the boundary
-  // between turns is worth drawing; the way back lives on the message.
-  void entry;
-  return el("div", `turn-rule${opening ? " opening" : ""}`);
+  // A report names a symptom. Widening it into a theory and then acting on the theory is how a
+  // working control gets deleted, and this is what that costs: « je preferais le texte "Restore
+  // Checkpoint" sur la barre comme avec Github copilot, tu peux remettre comme c'était ». For every other turn the bar reads better, and it was
+  // asked for by name: « je preferais le texte "Restore Checkpoint" sur la barre comme avec Github
+  // copilot ». The editor's own chat puts the same words in the same place, and a word is reachable
+  // by someone reading the conversation — an icon in a header is only reachable by someone who
+  // already knows what it does.
+  //
+  // Not hover-gated, unlike the editor's. What this presses overwrites the working tree, and this
+  // project's rule for that is older than the button: it "should never be discovered by accident".
+  // A control you must hover to find is one you can also press by accident while reaching past it.
+  const back = button({
+    icon: ICON.restore,
+    label: t("Restore Checkpoint"),
+    title: restoreTitle(entry),
+    className: `btn ghost tiny turn-restore${entry.checkpointPartial || entry.checkpointCommands ? " partial" : ""}`,
+    onClick: () => deps.send({ type: "restoreCheckpoint", id: entry.id }),
+  });
+  rule.append(back);
+  return rule;
 }
 
 /**
@@ -1188,14 +1219,28 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
   //
   // It also buys back the width the row was short of: three controls plus the send survive a narrow
   // panel where four did not.
-  left.append(contextButton(state, deps), modeButton(state, deps));
+  // ⚠️ The editor's own chat row, in its own order: what to attach, how to answer, which model, how
+  // hard to think, what it may reach for — then, at the far end, speak and send. Asked for by name
+  // after a first pass had moved the model out: « reprend egalement les positions de boutons de
+  // l'onglet chat de github copilot qui est propre ». The model belongs with the mode because they
+  // are one decision asked twice — "who answers, and how" — and splitting them across two rows is
+  // what made the row never look settled.
+  //
+  // `reasoning` has no equivalent in the editor's chat, where effort hides inside the model picker.
+  // It stays visible here because it was asked for in the opposite direction — it has to be reachable
+  // on a Gateway model and on a local one — and a control that exists only inside another menu is a
+  // control nobody finds. It sits after the model because it is a property OF the model.
+  left.append(contextButton(state, deps), modeButton(state, deps), modelButton(state, deps));
   if (state.reasoningAvailable) left.append(reasoningButton(state, deps));
+  // Skills last on the left rather than beside the send. It changes what `/` offers — what the
+  // assistant may reach for — which is the same kind of decision as the three chips before it, and
+  // not the same kind as "say this now". The editor groups them the same way.
+  left.append(toolsButton(state, deps));
   bar.append(left);
 
-  // Skills sit with the send rather than at the end of the left group. On a wide panel the two
-  // groups are pushed apart by `margin-left: auto`, so "last on the left" and "next to send" are
-  // not the same place at all — and this is the control you reach for while writing the message,
-  // not while configuring the conversation.
+  // Speak and send, and nothing else. The far end of the row is for the two things that ACT on the
+  // message you have written; everything that decides how it will be answered is on the left, in one
+  // run, where it reads as one group of settings rather than as six unrelated icons.
   const right = el("div", "toolbar-group end");
   // ⚠️ Shown wherever a microphone CAN work, configured or not — and the earlier rule was wrong.
   //
@@ -1208,7 +1253,6 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
   // So the button is always there when the host can record, and when nothing is configured it says
   // so and offers to configure it, instead of silently doing nothing.
   if (microphonePossible()) right.append(micButton(deps, Boolean(state.dictation)));
-  right.append(toolsButton(state, deps));
   right.append(
     // The same button as its neighbours, carrying a different glyph. `primary` made it a size and a
     // weight of its own at the end of a row of six identical controls, and "the send is special"
@@ -1232,7 +1276,7 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
   // comes from, WHICH model gives it, WHAT it may do without asking. « en terme d'ordre pour les
   // boutons du composer-footer je veux en premier le mode comme cest actuellement, ensuite le modeles
   // et ensuite approuvals ».
-  meter.append(providerButton(state, deps), modelButton(state, deps), approvalButton(state, deps));
+  meter.append(providerButton(state, deps), approvalButton(state, deps));
   meter.append(el("div", "spacer"));
   if (waiting) {
     meter.append(el("span", "composer-waiting", t("Waiting for your answer above")));
@@ -1797,9 +1841,12 @@ function modelButton(state: UiState, deps: ChatDeps): HTMLElement {
       (state.remote
         ? t("Remote model — it is billed, and what you send is pseudonymized first.")
         : t("Local model — nothing leaves this machine.")),
-    // `tiny`, like the two controls it now sits between. Without it this button was a size of its own
-    // in a row of small ones, which reads as an error rather than as emphasis.
-    className: `btn ghost tiny model${state.remote ? " remote" : " local"}`,
+    // ⚠️ NOT `tiny` any more. It was made tiny for the row under the box, where the provider and the
+    // approval scope are tiny and a full-size chip among them read as a mistake. It has moved back
+    // beside the mode and the reasoning, which are full size — and a row of three chips where one is
+    // two pixels shorter than the others is the kind of thing nobody can name and everybody sees.
+    // The class follows the neighbours, not the control.
+    className: `btn ghost model${state.remote ? " remote" : " local"}`,
     onClick: () => {
       closeMenu();
       if (isModelComboOpen()) closeModelCombo();

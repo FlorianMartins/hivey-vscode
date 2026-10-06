@@ -1326,6 +1326,7 @@ export const FR: Record<string, string> = {
   "the same model {0} already uses": "le même modèle que celui déjà utilisé par {0}",
   "{0} in · {1} out": "{0} en entrée · {1} en sortie",
   "{0} on an ordinary question": "{0} sur une question ordinaire",
+  "Restore Checkpoint": "Restaurer le point de reprise",
   "Which areas is this conversation about?": "De quels domaines relève cette conversation ?",
   "Which languages and subjects this conversation is about": "Les langages et sujets dont relève cette conversation",
   "Which sub-agents may be dispatched?": "Quels sous-agents peuvent être sollicités ?",

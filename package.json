@@ -439,12 +439,12 @@
         {
           "command": "hiveyCode.setLanguage",
           "when": "view == hiveyCode.chat || view == hiveyCode.chatSide",
-          "group": "9_settings@0"
+          "group": "9_settings@1"
         },
         {
           "command": "hiveyCode.openSettings",
           "when": "view == hiveyCode.chat || view == hiveyCode.chatSide",
-          "group": "9_settings@1"
+          "group": "9_settings@2"
         },
         {
           "command": "hiveyCode.searchConversation",
@@ -464,7 +464,7 @@
         {
           "command": "hiveyCode.setup",
           "when": "view == hiveyCode.chat || view == hiveyCode.chatSide",
-          "group": "navigation@4"
+          "group": "9_settings@0"
         }
       ],
       "editor/context": [

@@ -2120,6 +2120,30 @@ suite("Screenshot", () => {
 
       await announce("conversation");
 
+      // ⚠️ THE WIDTH PROBE, which exists to settle a question rather than to photograph a feature.
+      //
+      // "The right bar is still not locked to a minimum width" has now been reported three times, and
+      // the honest answer depends on a fact nobody in this project has checked: whether VS Code lets
+      // an extension widen its own view at all. There is no API for a minimum width
+      // (microsoft/vscode#182201 is open), but `workbench.action.increaseViewSize` exists — and
+      // microsoft/vscode#300121 says the auxiliary bar has only maximize/restore, which is a claim
+      // about keybindings, not proof about this command.
+      //
+      // So: photograph the panel, ask the editor five times to make the focused view bigger, and
+      // photograph it again. If the two frames differ, a floor can be ENFORCED rather than merely
+      // declared, and this project will build it. If they are identical, the answer is no, and it can
+      // be said once with a picture behind it instead of hedged a fourth time.
+      if (process.env["HIVEY_CODE_WIDTH_PROBE"]) {
+        await announce("width-before");
+        await vscode.commands.executeCommand("hiveyCode.chatSide.focus").then(undefined, () => undefined);
+        await vscode.commands.executeCommand("hiveyCode.chat.focus").then(undefined, () => undefined);
+        for (let i = 0; i < 5; i++) {
+          await vscode.commands.executeCommand("workbench.action.increaseViewSize").then(undefined, () => undefined);
+          await new Promise((r) => setTimeout(r, 150));
+        }
+        await announce("width-after");
+      }
+
       // The frame taken WHILE an answer is being written.
       //
       // Everything else here is photographed at rest, which is exactly why two scrolling defects
