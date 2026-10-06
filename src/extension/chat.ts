@@ -4644,7 +4644,34 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     ).allow;
   }
 
-  private askApproval(req: { tool: string; description: string; args: Record<string, unknown> }): Promise<boolean> {
+  /**
+   * How big the change on this card is, in lines.
+   *
+   * ⚠️ `write_file` is here as well as `edit_file`, and it is the one that needed it more: it replaces
+   * a file ENTIRELY, so "write src/guilde.js" on a card says nothing about whether four lines or four
+   * thousand are about to go. It costs one read of the file being replaced, which is a file the tool
+   * is about to overwrite anyway.
+   *
+   * Nothing for any other tool: a size on a card about running a command would be a number with no
+   * referent.
+   */
+  private async changeSizeFor(req: { tool: string; args: Record<string, unknown> }): Promise<string> {
+    if (req.tool === "edit_file") {
+      return describeChangeSize(changeSize(String(req.args["old"] ?? ""), String(req.args["new"] ?? "")));
+    }
+    if (req.tool !== "write_file") return "";
+    const path = pathArgument(req.args);
+    if (!path) return "";
+    try {
+      const before = await readOrEmpty(vscode.Uri.file(path));
+      return describeChangeSize(changeSize(before ?? "", String(req.args["content"] ?? "")));
+    } catch {
+      // A file that cannot be read is a file being created, and "+N" is still worth saying.
+      return describeChangeSize(changeSize("", String(req.args["content"] ?? "")));
+    }
+  }
+
+  private async askApproval(req: { tool: string; description: string; args: Record<string, unknown> }): Promise<boolean> {
     const decision = this.permissions.decide(req.tool, req.args);
 
     // A standing refusal comes first and is checked below; a standing ALLOWANCE and the scope
@@ -4691,10 +4718,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     // ⚠️ The size of the change, on the card that decides it. The diff editor used to carry this and
     // no longer opens — so the one fact that separates a two-line fix from a four-hundred-line
     // rewrite has to be here, before the answer, rather than discovered afterwards.
-    const edited =
-      req.tool === "edit_file"
-        ? describeChangeSize(changeSize(String(req.args["old"] ?? ""), String(req.args["new"] ?? "")))
-        : "";
+    const edited = await this.changeSizeFor(req);
     return new Promise<boolean>((resolve) => {
       this.askInPanel(
         {

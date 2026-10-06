@@ -2,6 +2,64 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 1.3.0 — 2026-10-06
+
+### Corrigé
+
+- **⚠️⚠️ L'intégration continue était rouge depuis des semaines, et pas une seule fois à cause du
+  produit.** Florian : « et le CI workflow a toujours plein d'erreurs cest normal ? ». Non. Et le
+  vrai défaut n'est aucun des trois qui suivent : c'est que **personne ne regardait**. Une suite qui
+  échoue à chaque poussée n'avertit plus de rien — elle a cessé d'être un signal pour devenir du
+  décor, et c'est dans cet état qu'une vraie régression passe sans être vue. Les trois causes étaient
+  **toutes environnementales**, ce qui est précisément ce qui les a rendues faciles à ignorer.
+
+  **1. Le collecteur SIEM écoutait sur l'autre pile.** Cinq tests échouaient, sur le job Node 18
+  d'Ubuntu et nulle part ailleurs, avec `connect ECONNREFUSED ::1:35751`. Le serveur de test se liait
+  à `127.0.0.1` tandis que les tests se connectent à `localhost` — volontairement, parce que le
+  certificat porte `DNS:localhost` et que **vérifier ce nom est la moitié de ce que ces tests
+  affirment**. Sur le runner, `localhost` résout d'abord en `::1` : le collecteur était bien debout,
+  sur l'autre pile. Pourquoi Node 18 seulement ? Parce que Node 20 a activé *Happy Eyeballs*
+  (`autoSelectFamily`) par défaut et **réessayait silencieusement en IPv4** — la version récente
+  masquait le défaut au lieu de le révéler. Le test se lie désormais là où le nom pointe réellement.
+
+  **2. « Docker répond » et « Docker peut exécuter ce bac à sable » sont deux faits différents.** Le
+  runner Windows *a* un démon — en mode conteneurs Windows, donc `alpine:latest` n'a pas de manifeste
+  correspondant et l'exécution meurt sur `no matching manifest for windows(10.0.26100)/amd64`. Le
+  garde-fou existant interrogeait `{{.Server.Version}}`, qui répond très bien, et concluait que le
+  bac à sable était vérifiable. Il interroge maintenant `{{.Server.Os}}`. Le test reste un **échec
+  dur** partout où le démon est Linux — c'est-à-dire tous les jobs Ubuntu et toutes les machines de
+  développement : la promesse « une commande de fond ne peut pas atteindre le réseau » n'est pas
+  prise sur parole. Là où la machine ne peut rien en dire, la réponse est la **troisième**, « je ne
+  sais pas », et elle est nommée au lieu d'être déguisée en succès.
+
+  **3. Le checkout changeait les octets sous les tests.** Plusieurs tests lisent le source du projet
+  et affirment sur lui, et certaines de ces affirmations **traversent un retour à la ligne**. Avec le
+  `core.autocrlf=true` que git met par défaut sur Windows, chaque LF devenait un CRLF à la sortie du
+  dépôt : le fichier lu par le test ne contenait plus ce que le test cherchait. **Le test avait
+  raison, le source avait raison, et le checkout s'était interposé.** Les fins de ligne sont du
+  contenu du dépôt, pas une préférence locale : `.gitattributes` les épingle (`* text=auto eol=lf`),
+  ce qui l'emporte sur `core.autocrlf` pour tout le monde. Un test garde l'épingle **et son effet**,
+  parce qu'un correctif que rien ne surveille est un correctif qui sera retiré.
+
+  La règle qui en sort — *une suite rouge n'avertit de rien* — est écrite dans
+  [`ADR-0041`](docs/adr/0041-une-suite-rouge-n-avertit-de-rien.md).
+
+  Rien de tout ceci ne concerne les fichiers que **vous** éditez : ceux-là arrivent avec les fins de
+  ligne qu'ils ont, et `findText.ts` est ce qui fait que `edit_file` les retrouve dans les deux cas.
+
+### Ajouté
+
+- **⚠️ Un résultat tronqué le dit.** La leçon que `read_file` avait déjà coûtée, appliquée partout où
+  elle s'applique. `search_text` et `list_files` ont exactement la même forme : un plafond, appliqué
+  en silence. Une recherche qui rend soixante occurrences sur deux cents sans le dire a affirmé au
+  modèle **qu'il y en a soixante** — il raisonne alors sur une image complète qu'il n'a pas, et c'est
+  pire qu'une erreur, parce que rien n'a l'air anormal. Chaque résultat coupé nomme maintenant le
+  plafond atteint et l'appel qui resserre la recherche.
+
+- **La taille du changement s'affiche aussi pour `write_file`.** C'est celui qui en avait le plus
+  besoin : il remplace un fichier **entièrement**, donc « écrire src/guilde.js » sur une carte
+  d'autorisation ne dit rien du tout sur le fait que quatre lignes ou quatre mille vont partir.
+
 ## 1.2.0 — 2026-10-06
 
 ### Ajouté

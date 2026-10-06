@@ -10,6 +10,7 @@ import { spawn } from "node:child_process";
 import { searchPattern } from "../core/agent/regex.js";
 import { describeSlice, sliceLines } from "../core/fs/slice.js";
 import { findUnique } from "../core/text/findText.js";
+import { cappedAt, describeCap } from "../core/agent/capped.js";
 import { readFile, readdir, stat, writeFile } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import type { Tool, ToolResult } from "../core/agent/loop.js";
@@ -182,9 +183,13 @@ export function buildCliTools(opts: CliToolOptions): Tool[] {
     async run(args, ctx): Promise<ToolResult> {
       const base = args["subdir"] ? safeResolve(opts, String(args["subdir"])) : opts.cwd;
       const out: string[] = [];
-      await walk(base, opts.cwd, out, Math.min(Number(args["limit"] ?? 300), 1000));
+      const limit = Math.min(Number(args["limit"] ?? 300), 1000);
+      await walk(base, opts.cwd, out, limit);
       ctx.report(t("{0} file(s)", out.length));
-      return { content: out.join("\n") || "(empty)" };
+      // A listing cut at its limit and handed over as a plain list has told the model those are all
+      // the files there are. See `core/agent/capped.ts`.
+      const cut = describeCap(cappedAt(out.length, limit), "files", "Pass a `subdir`, or raise `limit` (max 1000).");
+      return { content: (out.join("\n") || "(empty)") + cut };
     },
   };
 
@@ -234,7 +239,9 @@ export function buildCliTools(opts: CliToolOptions): Tool[] {
       // Said, because the model must not conclude that `total(` is a working regular expression and
       // build the next pattern on that belief.
       const note = literal ? "(searched as plain text: that pattern is not a valid regular expression)\n" : "";
-      return { content: note + (hits.join("\n") || "(no match)") };
+      // And said when the list was cut. One behaviour, two surfaces.
+      const cut = describeCap(cappedAt(hits.length, 60), "matches", "Narrow the pattern, or pass an `extension` to search fewer files.");
+      return { content: note + (hits.join("\n") || "(no match)") + cut };
     },
   };
 

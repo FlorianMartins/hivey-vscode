@@ -12,6 +12,7 @@
 import * as vscode from "vscode";
 import { describeSlice, sliceLines } from "../core/fs/slice.js";
 import { findUnique } from "../core/text/findText.js";
+import { cappedAt, describeCap } from "../core/agent/capped.js";
 import { searchPattern } from "../core/agent/regex.js";
 import { t } from "../shared/i18n.js";
 import { parsePlan, planSummary, PLAN_TOOL_DESCRIPTION, type Plan } from "../core/agent/plan.js";
@@ -220,8 +221,11 @@ export function buildTools(deps: ToolDeps): Tool[] {
       const glob = String(args["glob"] ?? "**/*");
       const limit = Math.min(Number(args["limit"] ?? 100), 300);
       const uris = await vscode.workspace.findFiles(glob, undefined, limit);
+      // ⚠️ Said, not swallowed. A listing cut at its limit and reported as a plain list has told the
+      // model those are all the files there are. See `core/agent/capped.ts`.
+      const cut = describeCap(cappedAt(uris.length, limit), "files", "Pass a narrower `glob`, or raise `limit` (max 300).");
       ctx.report(t("{0} file(s) for {1}", uris.length, glob));
-      return { content: uris.map(relative).join("\n") || "(no match)" };
+      return { content: (uris.map(relative).join("\n") || "(no match)") + cut };
     },
   };
 
@@ -272,7 +276,10 @@ export function buildTools(deps: ToolDeps): Tool[] {
       );
       // Said, because the model must not take `total(` for a working regular expression.
       const note = literal ? "(searched as plain text: that pattern is not a valid regular expression)\n" : "";
-      return { content: note + (out.join("\n") || "(no match)") };
+      // And said when the list was cut: sixty matches reported as sixty, out of two hundred, is a
+      // complete picture the model does not have.
+      const cut = describeCap(cappedAt(out.length, MAX_MATCHES), "matches", "Narrow the pattern, or pass a `glob` to search fewer files.");
+      return { content: note + (out.join("\n") || "(no match)") + cut };
     },
   };
 
