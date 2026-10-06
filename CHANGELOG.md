@@ -2,6 +2,61 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 1.5.0 — 2026-10-06
+
+### Modifié
+
+- **La rangée du composer est celle de l'onglet Chat de l'éditeur.** « reprend egalement les positions
+  de boutons de l'onglet chat de github copilot qui est propre ». Vérification faite, VS Code place le
+  sélecteur de **modèle dans la boîte de saisie**, à côté du mode — ce qui **contredit** une demande
+  faite plus tôt dans la même session, qui l'en avait sorti. La question a donc été posée avant de
+  bouger quoi que ce soit : défaire un choix explicite en silence est pire que l'une ou l'autre
+  disposition.
+
+  La rangée est désormais `[+] [mode] [modèle] [réflexion] [outils]` … `[micro] [envoi]`. Et c'est
+  aussi la meilleure : *quel mode répond* et *quel modèle répond* sont une seule décision posée deux
+  fois, et les séparer sur deux rangées est la raison pour laquelle celle-ci n'a jamais eu l'air posée.
+  Sous la boîte reste ce qui concerne la **conversation** et non le message : d'où vient la réponse, et
+  ce qui s'exécute sans demander.
+
+  La **réflexion** reste visible alors que l'éditeur la cache dans son sélecteur de modèle, parce
+  qu'elle a été demandée dans l'autre sens — accessible sur un modèle Gateway comme sur un modèle local
+  — et qu'un contrôle qui n'existe qu'au fond d'un autre menu est un contrôle que personne ne trouve.
+
+- **Plus de bordures sur les chips.** `.btn.ghost` veut dire « pas de contour tant qu'on ne le cherche
+  pas » et `.btn.tiny` en reposait un : même spécificité, la règle la plus bas l'emporte. Toutes les
+  pastilles portaient donc un contour qu'elles avaient demandé à ne pas avoir, dans un panneau dont
+  toutes les autres surfaces sont sans bordure. ⚠️ Le premier correctif ramenait le contour **au
+  survol**, ce qui déplaçait le bruit au lieu de le retirer ; ce qui répond à « est-ce un contrôle ? »
+  est le fond au survol, comme dans l'éditeur. Le contour ne subsiste que pour `:focus-visible`, où il
+  est la seule chose dont dispose quelqu'un au clavier.
+
+- **« Set up a model » passe dans le menu `...`.** Un élément du groupe `navigation` est dessiné comme
+  une icône de la barre de titre, tout autre groupe tombe dans le menu : déplacer le groupe **est**
+  déplacer le bouton. Il y rejoint Langue et Paramètres.
+
+- **Les contrôles ne changent plus d'état en une seule image.** 120 ms sur la couleur et le bord —
+  jamais sur la taille ni la position, parce qu'un contrôle qui **bouge** sous le pointeur est un
+  contrôle qu'on rate, et que ce serait une régression déguisée en finition. Entièrement désactivé si
+  le système demande moins de mouvement.
+
+### Corrigé
+
+- **⚠️⚠️ Le retour en arrière avait été supprimé pour réparer un défaut qu'il n'avait pas.** Le
+  commentaire du code affirmait que ce bouton « avait été signalé invisible au-dessus de **chaque**
+  question ». C'était une sur-lecture de trois signalements qui disaient tous la même chose, plus
+  étroite : il n'y avait pas de retour en arrière sur le **premier** message. Ce qui était vrai, et
+  avait une cause évidente — la première question n'a pas de barre au-dessus d'elle. Le bouton de
+  toutes les autres barres fonctionnait depuis le début.
+
+  *Un signalement nomme un symptôme ; l'élargir en théorie puis agir sur la théorie, c'est ainsi qu'un
+  contrôle qui marche se fait supprimer.* Le texte **« Restore Checkpoint » est donc de retour sur la
+  barre**, et l'icône ne reste que sur le premier message — le seul tour qui n'a pas de barre.
+
+  Au passage, `transcriptPieces` porte désormais `first` comme **valeur testée** au lieu de laisser le
+  rendu le recalculer, et la phrase qui décrit ce que la restauration fera ou ne fera pas est écrite
+  **une seule fois** pour les deux endroits.
+
 ## 1.4.1 — 2026-10-06
 
 ### Corrigé
