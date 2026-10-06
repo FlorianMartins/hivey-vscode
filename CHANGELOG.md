@@ -2,6 +2,36 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 1.4.1 — 2026-10-06
+
+### Corrigé
+
+- **⚠️⚠️ Le banc refuse d'énoncer un taux quand c'est le chronomètre qui a décidé.** Trouvé en
+  **lançant** la mesure, pas en la lisant : une série `hivey/free` est revenue avec **55 % des tâches
+  tuées à 180 s** — le client est tué avant d'écrire son rapport — et chacune était comptée comme un
+  échec du modèle. Le même préréglage faisait 32/62 deux jours plus tôt avec 3 délais dépassés.
+
+  **Diagnostiqué par découpage, pas supposé.** Le suspect évident était l'activation automatique des
+  compétences du même jour, qui ajoute ~40 noms au prompt d'une tâche IBM i. Si c'était la cause, les
+  tâches IBM i auraient souffert et les autres non. Elles souffrent pareil : IBM i 9 % → 53 %, autres
+  **2 % → 55 %**. *Une cause qui n'épouse pas la forme du changement n'est pas ce changement.* Le point
+  d'accès gratuit est simplement devenu beaucoup plus lent.
+
+  Un tel jeu mesure **le débit du fournisseur** et le publie comme la qualité du modèle — ce qui est
+  pire que de ne rien publier, parce que ça ressemble à une mesure. Le banc gagne donc le frère du
+  garde-fou qu'il avait déjà pour les refus : `timedOut` compté, et le tableau **retire le taux**
+  au-delà d'un seuil **dérivé** du bruit propre du banc mesuré par l'ADR-0034 (3 tâches). En dessous,
+  un délai reste un échec légitime — les deux séries publiées en contenaient 2 et 3, et les invalider
+  rétroactivement serait faux. Nouveau drapeau `--timeout` (le chronomètre était une constante
+  inatteignable) et chronomètre **enregistré dans les résultats** : une ligne publiée ne disait jamais
+  sous quelle horloge elle avait été obtenue.
+
+- **La liste des familles dit « déjà active » au lieu de « ce que vous avez ouvert ».** C'était vrai
+  quand le drapeau signifiait « on cocherait ça pour vous » ; il signifie désormais que la famille
+  **est en jeu** pour cette conversation — la ligne peut rester décochée et la famille répond quand
+  même. Une étiquette qui minimise ce qui a déjà eu lieu est la demi-vérité qui fait passer une
+  fonctionnalité pour cassée.
+
 ## 1.4.0 — 2026-10-06
 
 ### Corrigé
