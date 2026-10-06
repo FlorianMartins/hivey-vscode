@@ -2,6 +2,14 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 1.13.1 — 2026-10-06
+
+### Modifié
+
+- Le deuxième bouton de la carte d'installation s'appelle **« Modèle + config »**. Un libellé est un
+  **nom**, pas un inventaire : ce qui est réellement installé est écrit juste en dessous, dans le détail
+  de la carte, et répété dans la ligne qu'elle affiche une fois répondue.
+
 ## 1.13.0 — 2026-10-06
 
 ### Ajouté

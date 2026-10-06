@@ -3243,7 +3243,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           choices: gains ? ["once", "session", "no"] : ["once", "no"],
           labels: {
             once: t("Install the model"),
-            session: t("The model and ffmpeg"),
+            // Short, because it is a button. What it actually installs is spelled out in the detail
+            // below and in the line the card prints afterwards — a label is a name, not a manifest.
+            session: t("Model + config"),
             no: t("Not now"),
           },
           done: {
