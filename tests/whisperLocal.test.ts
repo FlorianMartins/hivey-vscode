@@ -379,3 +379,18 @@ test("⚠️ a click that installs something does not also start recording", () 
   // lead to three different next moves, and a boolean can only carry two of them.
   assert.match(chat, /Promise<"ready" \| "installed" \| "no">/);
 });
+
+test("⚠️ a recorder is looked for twice, because PATH can be out of date", () => {
+  // Reported with ffmpeg already installed: the chooser still said PowerShell was recording. A program
+  // installed after the editor started is not on the EDITOR's PATH — the extension host carries the
+  // environment it was launched with — so `where ffmpeg` says no about a machine that has it.
+  //
+  // Read from the source, because this is a claim about a fallback at a call site.
+  const { readFileSync } = require("node:fs") as typeof import("node:fs");
+  const whisper = readFileSync("src/extension/whisper.ts", "utf8");
+  assert.match(whisper, /function onPath\(program: string, platform: string\): boolean/);
+  assert.match(whisper, /spawnSync\(program, \["-version"\], \{ stdio: "ignore" \}\)/, "the lookup is the only answer again");
+  // ⚠️ `error` means "could not be spawned". A non-zero EXIT from a program that ran is still a
+  // program that is there — `-version` is not a flag every recorder agrees on.
+  assert.match(whisper, /return !run\.error;/);
+});

@@ -2,6 +2,27 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 1.14.1 — 2026-10-06
+
+### Corrigé
+
+- **⚠️⚠️ ffmpeg installé, et invisible : un enregistreur est désormais cherché DEUX fois.** « quand on
+  veut changer la source d'entrée du micro on a juste ce message […] alors que j'ai ffmpeg
+  d'installé ».
+
+  La cause n'est pas dans ffmpeg, elle est dans le `PATH` : **un programme installé après le démarrage
+  de l'éditeur n'est pas sur le `PATH` de l'éditeur.** Le processus d'extension porte l'environnement
+  avec lequel il a été lancé, donc `where ffmpeg` répond « non » à propos d'une machine qui l'a. La
+  recherche consulte toujours le `PATH` d'abord — et, s'il dit non, **lance simplement le programme**.
+  Un programme qui répond existe.
+
+  ⚠️ Et c'est l'absence d'`error` qui est lue, pas le code de sortie : « n'a pas pu être lancé » est
+  une réponse sur l'existence, tandis qu'un code non nul venant d'un programme qui **a** tourné n'en
+  est pas une — `-version` n'est pas un drapeau sur lequel tous les enregistreurs s'accordent.
+
+  Le message, lui, ne dit plus d'installer ce qu'on vient d'installer : il nomme la vraie raison et
+  propose de **recharger la fenêtre**, en un bouton.
+
 ## 1.14.0 — 2026-10-06
 
 ### Ajouté

@@ -587,9 +587,18 @@ export function activate(context: vscode.ExtensionContext): void {
       if (!found.devices) {
         // ⚠️ Said plainly rather than offering a list that cannot be acted on. Windows' built-in
         // recorder opens the WAVE_MAPPER, and the WAVE_MAPPER IS the Windows default input.
-        void vscode.window.showInformationMessage(
-          t("{0} always records from the system's default input, which Windows sets. Change it in Windows sound settings, or install ffmpeg to choose here.", found.program),
+        //
+        // ⚠️⚠️ And the likeliest reason to be reading this with ffmpeg already installed is named,
+        // because it was reported exactly that way: a program installed after the editor started is
+        // not on the editor's PATH, and the window has to be reloaded before it is. A message that
+        // tells somebody to install what they have just installed is a message that wastes their
+        // afternoon.
+        const answer = await vscode.window.showInformationMessage(
+          t("{0} always records from the system's default input, which Windows sets — it cannot be told which microphone to use.", found.program),
+          { modal: false, detail: t("If you have just installed ffmpeg, this window has not seen it yet: reload and it will be used instead.") },
+          t("Reload the window"),
         );
+        if (answer) await vscode.commands.executeCommand("workbench.action.reloadWindow");
         return;
       }
       const devices = inputDevices(found.devices);

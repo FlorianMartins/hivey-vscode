@@ -182,17 +182,38 @@ import { spawnSync } from "node:child_process";
 import { howToRecord, recordArgv, recorders, type Recorder } from "../core/dictation/capture.js";
 
 /** The first recorder on PATH, or nothing. `where`/`which` is how every shell answers this. */
-export function findRecorder(platform: string): Recorder | undefined {
+/**
+ * Is this program here?
+ *
+ * ⚠️ Asked TWICE, and the second way is the one that matters. `where`/`which` consults PATH, and a
+ * program can be perfectly runnable while PATH disagrees — most often because the editor was started
+ * before the program was installed, so the extension host still carries yesterday's environment. That
+ * is exactly what a freshly installed ffmpeg looks like: on the machine, and invisible to the window.
+ * So if the lookup says no, the program is simply RUN. A program that answers exists.
+ */
+function onPath(program: string, platform: string): boolean {
   const look = platform === "win32" ? "where" : "which";
+  try {
+    if (spawnSync(look, [program], { stdio: "ignore" }).status === 0) return true;
+  } catch {
+    /* the lookup itself is missing, which is not an answer about the program */
+  }
+  try {
+    const run = spawnSync(program, ["-version"], { stdio: "ignore" });
+    // `error` is "could not be spawned"; a non-zero exit from a program that ran is still a program
+    // that is there — `arecord -version` is not a flag every recorder agrees on.
+    return !run.error;
+  } catch {
+    return false;
+  }
+}
+
+export function findRecorder(platform: string): Recorder | undefined {
   return recorders(platform).find((r) => {
     // `builtin` is part of the system: PowerShell on Windows is not something to look for, and
     // looking anyway would mean a machine with an unusual PATH could not dictate at all.
     if (r.builtin) return true;
-    try {
-      return spawnSync(look, [r.program], { stdio: "ignore" }).status === 0;
-    } catch {
-      return false;
-    }
+    return onPath(r.program, platform);
   });
 }
 
