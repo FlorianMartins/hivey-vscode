@@ -2,6 +2,38 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 1.0.4 — 2026-10-06
+
+### Corrigé
+
+- **⚠️ La barre d'outils revient sur UNE ligne, et le panneau retrouve son plancher.** J'avais ajouté
+  `flex-wrap` pour que le nom du modèle cesse d'être tronqué en « qwe… ». Ça a coûté deux choses qui
+  comptent davantage, et Florian a vu les deux : le `+`, le mode, le modèle et la réflexion sont
+  **passés au-dessus** du micro, des compétences et de l'envoi — ce n'est pas là qu'on les avait mis ;
+  et **la barre latérale pouvait être refermée entièrement**, alors qu'avant le contenu la tenait
+  ouverte. ⚠️ *Une rangée qui passe à la ligne ne réclame plus sa largeur* — donc plus rien ne
+  résistait. La pression revient sur le nom du modèle, qui a un plancher et une infobulle portant
+  l'identifiant complet : la seule étiquette qui peut céder des caractères sans céder son sens. Les
+  icônes, elles, ne rétrécissent pas — un bouton d'envoi écrasé à neuf pixels n'est plus un bouton.
+
+- **⚠️⚠️ Le mode de réflexion est de nouveau réglable sur une passerelle et sur un modèle local.**
+  « avec le modèle Gateway on ne peut pas changer le mode de réflexion et ça doit être pareil avec un
+  modèle local. »
+
+  La cause est épistémique, pas technique : le catalogue est celui d'OpenRouter, et **il ne peut pas
+  répondre** pour un modèle servi par la passerelle de quelqu'un ou tournant sur sa machine. Répondre
+  `false` revenait à affirmer « ce modèle ne sait pas raisonner » — ce que personne n'a jamais dit —
+  et le panneau cachait le contrôle en conséquence. **Trois états, pas deux** : `oui`, `non`, et
+  *« on ne sait pas »*, qui n'est pas un `non` plus doux.
+
+  Dans l'inconnu, l'utilisateur en sait plus que le catalogue : le contrôle est offert **et l'effort
+  est envoyé**. ⚠️ Et il prend la voie **native**, pas la voie guidée, parce que les deux erreurs ne
+  coûtent pas pareil — un bloc guidé envoyé à un modèle qui raisonne déjà le fait réfléchir deux fois
+  et dépenser son budget de réponse sur la seconde ; un effort natif envoyé à un modèle qui n'en veut
+  pas coûte un champ ignoré, ou un 400 que `adaptRequest` sait déjà retirer. On prend l'erreur bon
+  marché. Le seul vrai `non` reste celui d'un éditeur que le catalogue **liste** et dont ce
+  modèle-là n'est pas un modèle de raisonnement.
+
 ## 1.0.3 — 2026-10-05
 
 ### Simplifié

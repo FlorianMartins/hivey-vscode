@@ -29,11 +29,42 @@ import { GENERATED_REASONING } from "./catalog.generated.js";
  */
 export const REASONING_FALLBACK = /claude|sonnet|opus|haiku|fable|deepseek|qwen|magistral|reason|think/i;
 
-/** Does this model accept a thinking budget? The catalogue first, then the family. */
-export function canReason(id: string): boolean {
-  if (!id) return false;
-  if (GENERATED_REASONING.has(id)) return true;
+/**
+ * Whether this model accepts a thinking budget — with "nobody knows" as a real answer.
+ *
+ * ⚠️⚠️ Three states, not two, and the missing one cost the feature on two whole providers. The
+ * catalogue is OpenRouter's; it cannot answer for a model served through somebody's gateway or
+ * running on their own machine, because it has never heard of either. Returning `false` there reads
+ * as "this model cannot reason" — an assertion nobody made — and the panel hid the control
+ * accordingly. Reported as « avec le modèle Gateway on ne peut pas changer le mode de réflexion et
+ * ça doit être pareil avec un modèle local ».
+ *
+ * `unknown` is not a softer `no`. It is the state where the user knows more than the catalogue does,
+ * so the control is offered and the effort is sent; a server that objects answers with a 400, which
+ * `adaptRequest` already handles by dropping the field it names. Guessing "no" cannot be corrected
+ * by anybody; guessing "yes" costs one adapted request.
+ */
+export type ReasoningSupport = "yes" | "no" | "unknown";
+
+export function reasoningSupport(id: string): ReasoningSupport {
+  if (!id) return "unknown";
+  if (GENERATED_REASONING.has(id)) return "yes";
   const bare = id.includes("/") ? id.slice(id.indexOf("/") + 1) : id;
-  if (GENERATED_REASONING.has(bare)) return true;
-  return REASONING_FALLBACK.test(id);
+  if (GENERATED_REASONING.has(bare)) return "yes";
+  if (REASONING_FALLBACK.test(id)) return "yes";
+  // A vendor prefix the catalogue carries means the catalogue HAS an opinion about this vendor's
+  // models, and this one is not among the reasoning ones. No prefix, or one it has never seen, means
+  // the model does not come from a catalogue at all — a gateway, a local runtime, a private
+  // deployment — and there is nothing here to know it by.
+  return KNOWN_VENDORS.has(id.slice(0, Math.max(0, id.indexOf("/")))) ? "no" : "unknown";
+}
+
+/** Vendors the generated catalogue actually lists, so "absent" can mean something for them. */
+const KNOWN_VENDORS = new Set(
+  [...GENERATED_REASONING].flatMap((id) => (id.includes("/") ? [id.slice(0, id.indexOf("/"))] : [])),
+);
+
+/** Does this model accept a thinking budget? Unknown counts as yes — see `reasoningSupport`. */
+export function canReason(id: string): boolean {
+  return reasoningSupport(id) !== "no";
 }

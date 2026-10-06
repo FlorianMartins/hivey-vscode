@@ -136,3 +136,25 @@ test("a reply with no block comes back untouched", () => {
   assert.equal(whole.text, "Just an answer.");
   assert.equal(whole.reasoning, "");
 });
+
+test("a model nobody can vouch for gets the provider's own thinking, not a prompted block", () => {
+  // ⚠️ The two wrong guesses do not cost the same. A prompted block sent to a model that reasons
+  // natively makes it think twice and spend its answer budget on the second think — "it only does the
+  // reasoning and gives no answer". A native effort sent to a model that cannot use it costs a field
+  // the server ignores, or a 400 `adaptRequest` already drops. So the unknown case takes the cheap
+  // mistake.
+  assert.equal(thinkingMode("llama2:7b", "medium"), "native");
+  assert.equal(thinkingMode("my-companys-model", "high"), "native");
+  // And the effort is actually SENT, which is the half that makes the control worth showing.
+  assert.equal(effortToSend("llama2:7b", "high"), "high");
+});
+
+test("the thinking control is offered on a gateway and on a local model", () => {
+  // ⚠️ Reported as « avec le modèle Gateway on ne peut pas changer le mode de réflexion et ça doit
+  // être pareil avec un modèle local ». The catalogue cannot answer for either, and answering "no"
+  // on its behalf removed the control from two whole providers.
+  assert.equal(thinkingMode("some-gateway-model", "low") === "off", false);
+  assert.equal(thinkingMode("qwen2.5-coder:7b", "low") === "off", false);
+  // `none` is still the user's decision and still means nothing runs.
+  assert.equal(thinkingMode("some-gateway-model", "none"), "off");
+});

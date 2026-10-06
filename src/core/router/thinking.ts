@@ -23,7 +23,7 @@
 // a model change, so switching from a reasoning model to a plain one kept sending `effort: "high"`
 // to an endpoint with no idea what to do with it. Hidden in the UI is not the same as not sent.
 
-import { canReason } from "./reasoning.js";
+import { reasoningSupport } from "./reasoning.js";
 import type { ReasoningEffort } from "../providers/types.js";
 
 export type ThinkingMode = "native" | "prompted" | "off";
@@ -38,7 +38,16 @@ export type ThinkingMode = "native" | "prompted" | "off";
  */
 export function thinkingMode(model: string, effort: ReasoningEffort): ThinkingMode {
   if (!effort || effort === "none") return "off";
-  return canReason(model) ? "native" : "prompted";
+  // ⚠️ "unknown" takes the NATIVE path, not the prompted one, and the asymmetry is deliberate.
+  //
+  // The two wrong guesses do not cost the same. Sending a prompted block to a model that reasons
+  // natively makes it think twice and spend its answer budget on the second think — the failure this
+  // file's header calls "it only does the reasoning and gives no answer". Sending a native effort to
+  // a model that cannot use it costs a field the server ignores, or a 400 that `adaptRequest`
+  // already knows how to drop.
+  //
+  // So a model nobody can vouch for gets the cheap mistake rather than the expensive one.
+  return reasoningSupport(model) === "no" ? "prompted" : "native";
 }
 
 /**
