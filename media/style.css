@@ -344,21 +344,44 @@ body {
   background: var(--vscode-inputValidation-errorBackground, rgba(255, 0, 0, 0.08));
 }
 
-/* The mode button is the one control that changes meaning, so it is the one that changes colour. */
+/* ⚠️ THE ICON CARRIES THE COLOUR, THE WORDS DO NOT — the same rule the provider control below already
+ * follows, and the reason it was reported as the one that looks right: « l'icone du type de providers
+ * […] a la bonne couleur du theme vscode mais pas les boutons dans la zone de saisie utilisateur ».
+ *
+ * Two things were wrong and only one of them was the colour. These rules painted the WHOLE button,
+ * so a row of chips had one shouting and the rest muted; and they reached for `--vscode-charts-*`
+ * with a HARD-CODED HEX fallback, which is a colour this project forbids itself everywhere else. A
+ * charts palette is for a bar chart: plenty of themes never tune it, and the hex then decides.
+ *
+ * `--vscode-textLink-foreground` is the workbench's own accent — the colour it uses to say "this is
+ * where the attention is" — and it is what the provider icon already wears. One accent across the
+ * row is also what makes it read as one row.
+ *
+ * The mode keeps its weight, because it is still the control that changes what the next message DOES.
+ * It just says so with its word rather than by being the brightest thing in the box. */
 .btn.mode .lbl {
   font-weight: 600;
 }
-.btn.mode-agent {
-  color: var(--vscode-charts-blue, #3794ff);
-}
-.btn.mode-plan {
-  color: var(--vscode-charts-purple, #b180d7);
-}
-.btn.mode-chat {
+.btn.mode,
+.btn.reasoning {
   color: var(--muted);
 }
-.btn.reasoning.active {
-  color: var(--vscode-charts-blue, #3794ff);
+.btn.mode:hover,
+.btn.reasoning:hover {
+  color: var(--vscode-foreground);
+}
+/* ⚠️ AGENT ALONE. « uniquement le mode agent doit avoir la couleur du theme VsCode pas le mode chat
+ * ou plan » — and it is the right rule, not just the requested one: Agent is the only mode that
+ * CHANGES YOUR FILES. Chat answers and Plan proposes; neither needs a colour that means "pay
+ * attention". A warning worn by two modes out of three is decoration. */
+.btn.mode-agent .ico,
+.btn.reasoning.active .ico {
+  color: var(--vscode-textLink-foreground, var(--vscode-foreground));
+  opacity: 1;
+}
+.btn.mode-plan .ico,
+.btn.mode-chat .ico {
+  color: var(--muted);
 }
 
 /* ── Top bar ─────────────────────────────────────────────────────────────────────────────── */
@@ -4199,8 +4222,11 @@ pre.code code {
    *
    * `--scrollbar-gutter` is measured by the page itself at startup, which is what that measurement
    * was for. */
-  width: calc(100vw - var(--scrollbar-gutter, 0px));
-  max-width: 100%;
+  /* The page's own measured width — see `publishPanelWidth`. `100vw` counts the scrollbar and
+   * `100vw - gutter` carries the error of two measurements; this is the one number that answers the
+   * question. The fallback is for the instant before the first measurement lands. */
+  width: var(--panel-width, 100%);
+  max-width: var(--panel-width, 100%);
   padding-left: 12px;
   padding-right: 12px;
 }

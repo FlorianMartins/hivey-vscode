@@ -19,6 +19,7 @@ import {
   AUDIO_EXTENSION,
   cleanTranscript,
   dictationMode,
+  transcriptionEndpoint,
   localCommand,
   transcriptionBody,
 } from "../core/dictation/dictation.js";
@@ -626,7 +627,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       appearance: s.appearance,
       panelMinWidth: Math.max(0, Math.round(s.panel.minWidth)),
       // Only when there is somewhere to transcribe. See `core/dictation/dictation.ts`.
-      ...(dictationMode(s.dictation) === "off" ? {} : { dictation: true }),
+      ...(dictationMode(s.dictation, s.chat.provider) === "off" ? {} : { dictation: true }),
       budget: { spentTodayUsd: this.gate.budget.spentToday(), dailyUsd: s.budget.dailyUsd },
       sessionCostUsd: this.session.totalCostUsd(),
       pendingApprovals: this.pendingApprovals,
@@ -3174,11 +3175,16 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    */
   private async transcribe(audioBase64: string, ms: number): Promise<void> {
     const settings = readSettings();
-    const mode = dictationMode(settings.dictation);
+    const mode = dictationMode(settings.dictation, settings.chat.provider);
     if (mode === "off") {
       this.post({
         type: "dictationFailed",
-        why: t("Dictation is not set up. Set hiveyCode.dictation.command to a transcriber on this machine."),
+        // ⚠️ Says BOTH ways out, because the one that needs no account is the one people do not know
+        // about. And it no longer pretends the editor could do this for us: VS Code's own speech is a
+        // proposed API, available to its own extensions and to nobody else.
+        why: t(
+          "Dictation needs a transcriber. Either set hiveyCode.dictation.command to one on this machine — whisper.cpp, for instance — or hiveyCode.dictation.endpoint to a service. A key for OpenAI is borrowed automatically; OpenRouter and local servers do not transcribe.",
+        ),
       });
       return;
     }
@@ -3250,7 +3256,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    * a diff, and "always" on a microphone is the one permission this project should not offer.
    */
   private async transcribeRemotely(audio: Buffer, settings: Settings): Promise<string> {
-    const endpoint = normalizeBaseUrl(settings.dictation.endpoint);
+    // The configured endpoint, or the chat provider's when it is one known to transcribe. See
+    // `transcriptionEndpoint`: nothing is borrowed on a guess.
+    const endpoint = normalizeBaseUrl(
+      transcriptionEndpoint(settings.dictation, {
+        provider: settings.chat.provider,
+        baseUrl: endpointFor(settings, settings.chat.provider),
+      }) ?? "",
+    );
     const host = (() => {
       try {
         return new URL(endpoint).host;

@@ -85,8 +85,8 @@ and not models:
 | Preset | Its identifier | Promise |
 |---|---|---|
 | **Hivey Free** | `hivey/free` | Free endpoints only. Costs nothing, and is rate-limited like everything free. |
-| **Hivey Smart** | `hivey` | A strong model where you feel it, a cheap one for the plumbing. |
-| **Hivey Pro** | `hivey/smart` | The best of the catalogue on the hard work, without paying it to write commit messages. |
+| **Hivey Pro** | `hivey/smart` | A strong model where you feel it, a cheap one for the plumbing. The middle of the three. |
+| **Hivey Smart** | `hivey` | The premium one: Anthropic's own ladder, its flagship on hard work and its small model on chores. |
 
 ⚠️ The middle column is not an implementation detail: the label and the identifier **do not match**.
 "Hivey Smart" is called `hivey`, and "Hivey Pro" is called `hivey/smart`. It is a legacy of two
@@ -105,7 +105,9 @@ preset's price. The reasoning was defensible — a row cannot carry four prices 
 not: Smart's and Pro's two "ordinary" models charge exactly the same **to read**, so the badge made
 them identical.
 
-Here is what the two presets actually did that day:
+⚠️ **This passage describes a state that has since been fixed**, and it is kept because the lesson has
+not been: Hivey Smart became the premium preset and now shares nothing with Hivey Pro. Here is what
+the two presets did on the day the question was asked:
 
 | role | Hivey Smart | Hivey Pro |
 |---|---|---|

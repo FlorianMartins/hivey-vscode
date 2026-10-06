@@ -106,7 +106,7 @@ test("the provider and the model do not wear the same glyph", () => {
   // fournisseur devant le nom du modele comme sur github copilot ». `vendorMark` falls back to the
   // chip for anything it does not recognise, so a preset and an unknown vendor still look like a
   // model rather than like a missing image.
-  assert.match(model.slice(0, 900), /icon: ICON\[vendorMark\(state\.model\)\]/);
+  assert.match(model.slice(0, 900), /iconNode: vendorIcon\(vendorSlug\(state\.model\) \?\? ""\)/);
 });
 
 test("⚠️ nothing styles this panel in a way its own CSP throws away", () => {
@@ -244,5 +244,8 @@ test("the picker and the button it fills wear the same face", () => {
   // seeing a generic chip on the control is the kind of small inconsistency that reads as a bug in
   // something else entirely.
   const combo = readFileSync("src/webview/modelCombo.ts", "utf8");
-  assert.match(combo, /icon\(vendorMark\(item\.model\.id\) as IconName, "ci-vendor"\)/);
+  assert.match(combo, /vendorIcon\(\s*vendorSlug\(item\.model\.id\) \?\? vendorSlug\(item\.model\.server \?\? ""\) \?\? "",\s*"ci-vendor",?\s*\)/);
+  // ⚠️ And both fall back to the chip rather than to nothing: a control with a hole where its icon
+  // should be reads as a failure to load, not as "we have no mark for this house".
+  assert.match(combo, /icon\("chip", "ci-vendor"\)/);
 });

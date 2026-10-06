@@ -22,6 +22,14 @@ export interface ButtonOptions {
   label?: string;
   title?: string;
   icon?: IconName;
+  /**
+   * An icon the caller has already drawn, used INSTEAD of `icon` when it is there.
+   *
+   * It exists for the maker's marks: those are filled, on a different grid, and fetched from a
+   * generated table rather than named in `ICON`. A button should not have to know any of that, and
+   * the caller already does — it is the one that knows which model this is.
+   */
+  iconNode?: SVGSVGElement | undefined;
   /** Drawn after the label — the chevron of a control that opens a menu. */
   trailingIcon?: IconName;
   className?: string;
@@ -32,7 +40,8 @@ export interface ButtonOptions {
 
 export function button(opts: ButtonOptions): HTMLButtonElement {
   const b = el("button", opts.className ?? "btn");
-  if (opts.icon) b.append(icon(opts.icon));
+  if (opts.iconNode) b.append(opts.iconNode);
+  else if (opts.icon) b.append(icon(opts.icon));
   if (opts.label) b.append(el("span", "lbl", opts.label));
   if (opts.trailingIcon) b.append(icon(opts.trailingIcon, "ico trailing"));
   if (opts.title) {
@@ -122,25 +131,6 @@ const PATHS = {
   // tried here read as "settings page" (a gear) or as "magic" (a wand), and this one reads as
   // "adjust what is on".
   tools: "M2 5.5h2.5M7.5 5.5H14M2 10.5h6.5M11.5 10.5H14M7.5 5.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 1 1 3 0M11.5 10.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 1 1 3 0",
-  // ── Who made the model ───────────────────────────────────────────────────────────────────────
-  //
-  // ⚠️ Simplified marks, drawn on the same 16×16 grid as everything else and inheriting the panel's
-  // colour — they identify a vendor at a glance the way the editor's own model picker does, and they
-  // are deliberately not reproductions of anybody's brand assets. Asked for by name: « rajoute une
-  // icone du fournisseur devant le nom du modele comme sur github copilot ».
-  //
-  // Which ones exist is decided by the catalogue, not by taste: these cover the vendors that actually
-  // appear in it. Everything else falls back to the chip, which is what the control wore before.
-  vOpenai: "M8 2.6 12.7 5.3v5.4L8 13.4 3.3 10.7V5.3ZM8 2.6v5.4m0 0 4.7 2.7M8 8 3.3 10.7",
-  vAnthropic: "M5.4 13 8 3h1.2l2.6 10M6.4 10.2h4.2",
-  vGoogle: "M13 8a5 5 0 1 1-1.6-3.7M13 8H8.4",
-  vMeta: "M3 10.5c1.6 0 2.1-5 4.3-5S10.4 10.5 12 10.5a1.9 1.9 0 0 0 0-3.8c-1.6 0-2.1 5-4.3 5S4.6 6.7 3 6.7a1.9 1.9 0 0 0 0 3.8Z",
-  vMistral: "M3 13V4h2.5v3h2.5V4h2.5v3H13v6M5.5 7v6M8 7v6M10.5 7v6",
-  vDeepseek: "M3 9.5c2.4-3.6 6.6-3.6 9 0M3 9.5c2.4 3.4 6.6 3.4 9 0M12 9.5l1.5-2.2M6.2 7.6h.01",
-  vXai: "M3.5 3.5 12.5 12.5M12.5 3.5 3.5 12.5",
-  vQwen: "M8 2.8 13 5.9v6.2L8 13.2 3 12.1V5.9ZM3 5.9l5 3.1 5-3.1M8 9v4.2",
-  vCohere: "M4.3 11.7a3.6 3.6 0 0 1 2.6-6.1h4.8M11.7 11.7a1.6 1.6 0 1 1-3.2 0 1.6 1.6 0 0 1 3.2 0Z",
-  vAmazon: "M3 10.4c3.2 2 6.8 2 10-.3M12.3 11.8c.6-1 .7-2 .3-2.3-.4-.3-1.4-.2-2.2.3M5 7.3V5.6a1.6 1.6 0 0 1 3.2 0v1.7a1.6 1.6 0 0 1-3.2 0Z",
   // A cloud: where the answer comes FROM.
   //
   // ⚠️ Added the day the provider and the model became neighbours in the same row. Both had carried
@@ -170,6 +160,43 @@ const BOLD = new Set<IconName>(["send"]);
 
 export type IconName = keyof typeof PATHS;
 
+/**
+ * A maker's mark, drawn from the real thing.
+ *
+ * ⚠️ These were hand-drawn approximations for about an hour, and the request that replaced them was
+ * exact: « est ce que tu peux prendre les vraies icones s'il te plait ». They come from
+ * lobehub/lobe-icons (MIT), fetched once by `scripts/update-vendor-icons.mjs` and committed —
+ * nothing is loaded at runtime, because this panel's CSP forbids it and the extension ships no
+ * runtime dependency.
+ *
+ * Two things differ from every other icon here and both are the brands' doing rather than a choice:
+ * they are FILLED rather than stroked, and they live on a 24×24 grid rather than 16×16. A mark drawn
+ * with a stroke is a different logo, and one rescaled by hand is a wrong one.
+ *
+ * Several paths are normal — Google's four-colour G is four shapes — so this draws all of them.
+ */
+export function vendorIcon(slug: string, className = "ico"): SVGSVGElement | undefined {
+  const paths = VENDOR_PATHS[slug];
+  if (!paths?.length) return undefined;
+  const NS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(NS, "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("width", "14");
+  svg.setAttribute("height", "14");
+  svg.setAttribute("aria-hidden", "true");
+  svg.setAttribute("class", className);
+  for (const d of paths) {
+    const path = document.createElementNS(NS, "path");
+    path.setAttribute("d", d);
+    path.setAttribute("fill", "currentColor");
+    // The marks are authored with `evenodd`, and the holes in them — the middle of a knot, the
+    // counter of a letter — close up without it.
+    path.setAttribute("fill-rule", "evenodd");
+    svg.append(path);
+  }
+  return svg;
+}
+
 export function icon(name: IconName, className = "ico"): SVGSVGElement {
   const NS = "http://www.w3.org/2000/svg";
   const svg = document.createElementNS(NS, "svg");
@@ -196,13 +223,13 @@ export function icon(name: IconName, className = "ico"): SVGSVGElement {
 }
 
 /** Names, so screens read `ICON.trash` rather than a string literal that can go stale. */
+import { VENDOR_PATHS } from "./vendorPaths.generated.js";
+
 export const ICON: Record<
   | "send" | "stop" | "add" | "history" | "search" | "close" | "chevron" | "chevronLeft" | "file"
   | "check" | "cross" | "mute" | "unmute" | "pin" | "edit" | "copy" | "trash" | "settings"
   | "shield" | "attach" | "sparkle" | "bringIn" | "forward" | "restore" | "askAgain" | "compare"
-  | "tools" | "chip" | "cloud" | "more" | "back" | "mic"
-  | "vOpenai" | "vAnthropic" | "vGoogle" | "vMeta" | "vMistral" | "vDeepseek" | "vXai" | "vQwen"
-  | "vCohere" | "vAmazon",
+  | "tools" | "chip" | "cloud" | "more" | "back" | "mic",
   IconName
 > = {
   send: "send",
@@ -236,16 +263,6 @@ export const ICON: Record<
   tools: "tools",
   chip: "chip",
   cloud: "cloud",
-  vOpenai: "vOpenai",
-  vAnthropic: "vAnthropic",
-  vGoogle: "vGoogle",
-  vMeta: "vMeta",
-  vMistral: "vMistral",
-  vDeepseek: "vDeepseek",
-  vXai: "vXai",
-  vQwen: "vQwen",
-  vCohere: "vCohere",
-  vAmazon: "vAmazon",
   more: "more",
 };
 

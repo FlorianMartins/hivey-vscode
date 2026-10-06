@@ -91,8 +91,8 @@ des **routages** et non des modèles :
 | Préréglage | Son identifiant | Promesse |
 |---|---|---|
 | **Hivey Free** | `hivey/free` | Uniquement des points d'accès gratuits. Ne coûte rien, et est limité en débit comme tout ce qui est gratuit. |
-| **Hivey Smart** | `hivey` | Un modèle fort là où ça se sent, un modèle bon marché pour la plomberie. |
-| **Hivey Pro** | `hivey/smart` | Le meilleur du catalogue sur le travail difficile, sans le payer pour écrire des messages de commit. |
+| **Hivey Pro** | `hivey/smart` | Un modèle fort là où ça se sent, un modèle bon marché pour la plomberie. Celui du milieu. |
+| **Hivey Smart** | `hivey` | Le haut de gamme : l'échelle d'Anthropic, son modèle phare sur le travail difficile et son petit modèle sur les corvées. |
 
 ⚠️ La colonne du milieu n'est pas un détail d'implémentation : le libellé et l'identifiant **ne se
 correspondent pas**. « Hivey Smart » s'appelle `hivey`, et « Hivey Pro » s'appelle `hivey/smart`.
@@ -112,7 +112,9 @@ le prix du préréglage. Le raisonnement était défendable — une ligne ne peu
 et le résultat ne l'était pas : les deux modèles « ordinaires » de Smart et de Pro coûtent exactement
 la même chose **en lecture**, donc la pastille les rendait identiques.
 
-Voici ce que les deux préréglages faisaient réellement ce jour-là :
+⚠️ **Ce passage décrit un état qui a été corrigé depuis**, et il est conservé parce que la leçon ne
+l'est pas : Hivey Smart est devenu le haut de gamme et ne partage plus rien avec Hivey Pro. Voici ce
+que les deux préréglages faisaient le jour où la question a été posée :
 
 | rôle | Hivey Smart | Hivey Pro |
 |---|---|---|

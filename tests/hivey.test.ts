@@ -93,14 +93,38 @@ test("every model the table names is one the catalogue still prices", () => {
 });
 
 test("a dearer preset is never served a worse model than a cheaper one", () => {
+  // ⚠️ Walked over the DECLARED ORDER rather than over named ids, and that is what let `hivey` move
+  // from the middle of the ladder to the top of it without a rule being weakened. The labels have
+  // been crossed since two renames — "Hivey Smart" is `hivey`, "Hivey Pro" is `hivey/smart` — so a
+  // test that says "smart <= pro" is a test that will one day assert the opposite of what it means.
   const outPrice = (id: string) => GENERATED_PRICES[id]?.out ?? 0;
+  const order = HIVEY_VARIANTS.map((v) => v.id);
   for (const role of ["everyday", "deep"] as const) {
-    const free = outPrice(HIVEY_ROUTING["hivey/free"]![role]!);
-    const smart = outPrice(HIVEY_ROUTING["hivey"]![role]!);
-    const pro = outPrice(HIVEY_ROUTING["hivey/smart"]![role]!);
-    assert.ok(free <= smart, `${role}: Free (${free}) costs more than Smart (${smart})`);
-    assert.ok(smart <= pro, `${role}: Smart (${smart}) costs more than Pro (${pro})`);
+    for (let i = 1; i < order.length; i++) {
+      const cheaper = outPrice(HIVEY_ROUTING[order[i - 1]!]![role]!);
+      const dearer = outPrice(HIVEY_ROUTING[order[i]!]![role]!);
+      assert.ok(
+        cheaper <= dearer,
+        `${role}: ${order[i - 1]} (${cheaper}) costs more than ${order[i]} (${dearer}), which the order says is dearer`,
+      );
+    }
   }
+});
+
+test("⚠️ the premium preset buys one house's whole ladder", () => {
+  // Asked for: « retravaille le modele Hivey Smart qui doit etre le modele le plus puissant
+  // (principalememt sur anthropic […]) ». Expressed as a rule — a preferred vendor and four budgets —
+  // never as four model ids, because this repository forbids itself a version number in source.
+  //
+  // What is asserted is the SHAPE, not the names: one vendor across the roles, and a ladder that
+  // climbs. Asserting `claude-opus-5.5` would be asserting the day the catalogue was fetched.
+  const roles = ["chore", "everyday", "deep"] as const;
+  const picks = roles.map((r) => HIVEY_ROUTING["hivey"]![r]!);
+  const vendors = new Set(picks.map((id) => id.slice(0, id.indexOf("/"))));
+  assert.deepEqual([...vendors], ["anthropic"], `the premium preset left its house: ${picks.join(", ")}`);
+  const out = (id: string) => GENERATED_PRICES[id]?.out ?? 0;
+  assert.ok(out(picks[0]!) < out(picks[1]!), "a chore costs the same as an ordinary turn");
+  assert.ok(out(picks[1]!) < out(picks[2]!), "the hard work is not dearer than the ordinary turn");
 });
 
 test("the deep role costs more than the everyday one — otherwise the split buys nothing", () => {

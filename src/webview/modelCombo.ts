@@ -25,9 +25,9 @@
 //     equivalent here is the mode, so switching from chat to agent re-ranks the list by how well
 //     each model drives a tool loop rather than by how well it answers a question.
 
-import { button, el, formatContext, icon, ICON, type IconName } from "./dom.js";
+import { button, el, formatContext, icon, ICON, vendorIcon } from "./dom.js";
 import { prefs, setPrefs } from "./prefs.js";
-import { vendorMark } from "../core/router/vendorIcon.js";
+import { vendorSlug } from "../core/router/vendorIcon.js";
 import { t } from "../shared/i18n.js";
 import type { ToExtension, UiModel, UiState } from "../shared/protocol.js";
 import { priceTier, PRICE_TIER_ORDER, type PriceTier } from "../core/models/tiers.js";
@@ -369,7 +369,10 @@ export function openModelCombo(anchor: HTMLElement, state: UiState, send: (m: To
     // The maker's mark, before the name, exactly as on the button that opens this list — the picker
     // and the control it fills have to agree, or choosing a model shows one face and selecting it
     // shows another.
-    node.append(icon(vendorMark(item.model.id) as IconName, "ci-vendor"));
+    node.append(
+      vendorIcon(vendorSlug(item.model.id) ?? vendorSlug(item.model.server ?? "") ?? "", "ci-vendor") ??
+        icon("chip", "ci-vendor"),
+    );
     const main = el("div", "ci-main");
     const name = el("div", "ci-name");
     // The label is the part that may be clipped; the tag is not. Putting the ellipsis on the

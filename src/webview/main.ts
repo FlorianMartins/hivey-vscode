@@ -954,6 +954,26 @@ function applyMinWidth(px: number | undefined): void {
   document.body.style.minWidth = `${Math.max(0, Math.round(px))}px`;
 }
 
+/**
+ * How wide the page actually is, published as a CSS variable.
+ *
+ * ⚠️ MEASURED, not computed. The composer was sized `100vw` — which counts the vertical scrollbar —
+ * and then `100vw` minus the scrollbar's measured width, which was closer and still wrong: it left
+ * 19 px of air on the right against 13 on the left, reported as « il y a un plus d'espace a droite
+ * que a gauche ». Two measurements subtracted from each other carry both their errors.
+ *
+ * `documentElement.clientWidth` is the one number that answers the question directly: the width
+ * inside the scrollbar, which is the width the composer may occupy. Re-read on resize, because that
+ * is the only time it changes.
+ */
+function publishPanelWidth(): void {
+  const set = () =>
+    document.documentElement.style.setProperty("--panel-width", `${document.documentElement.clientWidth}px`);
+  set();
+  window.addEventListener("resize", set);
+}
+publishPanelWidth();
+
 function publishScrollbarWidth(): void {
   const probe = document.createElement("div");
   // ⚠️ Property by property, not `cssText`. `cssText` is the style attribute under another name and

@@ -71,16 +71,42 @@ export interface RoleNeed {
 export const HIVEY_ROLES: Record<Role, RoleNeed> = {
   // Titles, commit messages, summaries, classification. High frequency, low value per call — and the
   // traffic that decides whether this costs cents or tens of dollars a day.
-  chore: { tools: false, want: "cheap", minContext: 16000, ceiling: { "hivey/free": 0, hivey: 1.5, "hivey/smart": 5 } },
+  chore: { tools: false, want: "cheap", minContext: 16000, ceiling: { "hivey/free": 0, "hivey/smart": 1.5, hivey: 5 } },
   // An ordinary chat turn.
-  everyday: { tools: true, want: "capable", minContext: 64000, ceiling: { "hivey/free": 0, hivey: 8, "hivey/smart": 30 } },
+  everyday: { tools: true, want: "capable", minContext: 64000, ceiling: { "hivey/free": 0, "hivey/smart": 8, hivey: 10 } },
   // An agent turn, or a question the router graded hard. The role the presets exist to separate.
-  deep: { tools: true, want: "capable", minContext: 128000, ceiling: { "hivey/free": 0, hivey: 25, "hivey/smart": 150 } },
+  deep: { tools: true, want: "capable", minContext: 128000, ceiling: { "hivey/free": 0, "hivey/smart": 15, hivey: 20 } },
   // Inline completion: one request per keystroke pause. Fast, cheap and code-shaped, or not at all.
-  completion: { tools: false, want: "cheap", codey: true, minContext: 8000, ceiling: { "hivey/free": 0, hivey: 1.5, "hivey/smart": 1.5 } },
+  completion: { tools: false, want: "cheap", codey: true, minContext: 8000, ceiling: { "hivey/free": 0, "hivey/smart": 1.5, hivey: 5 } },
 };
 
-export const HIVEY_VARIANT_IDS = ["hivey/free", "hivey", "hivey/smart"] as const;
+/**
+ * The presets, CHEAPEST FIRST — and this order is data that other code reads, not a listing.
+ *
+ * ⚠️ `hivey` used to sit in the middle and is now the dearest. The labels have been crossed for two
+ * renames (the one called "Hivey Smart" is `hivey`, the one called "Hivey Pro" is `hivey/smart`), so
+ * the only safe way to say "dearer" anywhere is to read this order rather than to name an id. The
+ * ladder invariant and the overlap report both do, which is what let the two swap places without a
+ * single rule being weakened.
+ */
+export const HIVEY_VARIANT_IDS = ["hivey/free", "hivey/smart", "hivey"] as const;
+
+/**
+ * A vendor a preset reaches for before any other.
+ *
+ * ⚠️ Asked for directly — « retravaille le modele Hivey Smart qui doit etre le modele le plus puissant
+ * (principalememt sur anthropic […]) » — and expressed as a RULE rather than as four model ids,
+ * because this repository forbids itself a version number in source: a vendor is stable for years, a
+ * version for weeks, and the generated table is what moves when a successor ships.
+ *
+ * The bonus is large enough to beat price inside a role's budget and small enough that it cannot
+ * conjure a model the ceiling does not allow. So the preset buys this vendor's ladder — its small
+ * model for chores, its flagship for the hard work — and if that vendor ever has nothing in a
+ * budget, the role is still filled by whoever does.
+ */
+export const PREFERRED_VENDOR: Record<string, string | undefined> = {
+  hivey: "anthropic",
+};
 
 /**
  * Vendors worth reaching for first. Names, never versions: a vendor is stable for years, a version
@@ -224,6 +250,14 @@ export function curateHivey(all: CatalogueModel[]): Record<string, Record<string
       const ceilings = Object.values(need.ceiling).filter((c) => c > 0);
       const widest = Math.max(...ceilings, 1);
       const priceWeight = ceiling > 0 ? 0.6 + 1.2 * (ceiling / widest) : 0.6;
+      // The preferred vendor's own price ladder, ranked among its own models and nobody else's.
+      const house = PREFERRED_VENDOR[variant];
+      const housePrices = house
+        ? [...new Set(universe.filter((m) => vendorOf(m) === house).map(outPrice))].sort((a, b) => a - b)
+        : [];
+      const vendorRank = (m: CatalogueModel) =>
+        housePrices.length < 2 ? 0.5 : housePrices.indexOf(outPrice(m)) / (housePrices.length - 1);
+
       const score = (m: CatalogueModel) => {
         // Recency leads for a capable role, because within a strong vendor a new generation is the
         // single best predictor of quality available in this catalogue — better than price, which
@@ -234,6 +268,20 @@ export function curateHivey(all: CatalogueModel[]): Record<string, Record<string
         // let one enormous window outweigh every other property a model has.
         s += (cheap ? 0.4 : 1.2) * (Math.min(contextOf(m), 400_000) / 400_000);
         if (STRONG_VENDORS.has(vendorOf(m))) s += cheap ? 0.4 : 1.2;
+        // The preset's own house, when it has one. Above the strong-vendor bonus because it is a
+        // choice rather than a heuristic, and below what a ceiling decides because a budget is not a
+        // preference.
+        if (PREFERRED_VENDOR[variant] && vendorOf(m) === PREFERRED_VENDOR[variant]) {
+          s += 2.5;
+          // ⚠️ And INSIDE that house, price is read as the capability ladder — which is the one place
+          // that reading is true. Across vendors it is false and this file says so twice: price "only
+          // tells you what somebody decided to charge". Within a single vendor it is their own
+          // ordering of their own models, published by them: haiku under sonnet under opus under the
+          // reasoning flagship. Without this the role picked the NEWEST Anthropic model rather than
+          // the strongest, because recency leads the global score — so the deep role bought the
+          // everyday model and the preset's whole promise went with it.
+          if (!cheap) s += 1.5 * vendorRank(m);
+        }
         if (CODEY.test(m.id)) s += need.codey ? 0.8 : -1;
         // Price, read in the direction the role wants. Weak for a capable role and never decisive
         // there: it is what the vendor charges, not what the model can do.

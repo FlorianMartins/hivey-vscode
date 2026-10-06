@@ -6,10 +6,10 @@
 // assistant is ALLOWED to do rather than how clever it is, the model button carries its price, and
 // every exchange can be muted out of the context without being deleted from the story.
 
-import { button, closeMenu, el, formatTokens, icon, ICON, menu, menuItem, menuTitle, separator } from "./dom.js";
+import { button, closeMenu, el, formatTokens, icon, ICON, menu, menuItem, menuTitle, separator, vendorIcon } from "./dom.js";
 import { markdown } from "./markdown.js";
 import { t } from "../shared/i18n.js";
-import { vendorMark } from "../core/router/vendorIcon.js";
+import { vendorSlug } from "../core/router/vendorIcon.js";
 import { transcriptPieces } from "../core/session/checkpoint.js";
 import { REMOTE_VENDORS, vendor } from "../core/providers/vendors.js";
 import { closeModelCombo, isModelComboOpen, openModelCombo } from "./modelCombo.js";
@@ -1840,7 +1840,8 @@ function modelButton(state: UiState, deps: ChatDeps): HTMLElement {
     // tells you nothing you could not already read. A preset is not one vendor's model, so it keeps
     // the chip; so does anything the lookup does not recognise, which makes an unknown vendor look
     // like a model rather than like a missing image.
-    icon: ICON[vendorMark(state.model)],
+    iconNode: vendorIcon(vendorSlug(state.model) ?? ""),
+    icon: ICON.chip,
     label: state.modelLabel,
     trailingIcon: ICON.chevron,
     title:

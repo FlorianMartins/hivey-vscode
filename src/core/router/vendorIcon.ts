@@ -1,59 +1,59 @@
-// Which mark stands for the house that made a model.
+// Which house made a model, as a slug the panel can draw.
 //
 // ⚠️ A pure lookup, in `core`, for the same reason every other decision in this project is: the panel
-// is the hardest place to test and the easiest place to get a mapping subtly wrong. Asked for by
-// name — « rajoute une icone du fournisseur devant le nom du modele comme sur github copilot » — and
-// the editor's own picker does exactly this, because a row of twenty model names all wearing the same
-// glyph tells you nothing you could not already read.
+// is the hardest place to test and the easiest place to get a mapping subtly wrong — a model wearing
+// the wrong maker's mark looks like a working feature. Asked for by name: « rajoute une icone du
+// fournisseur devant le nom du modele comme sur github copilot », then « est ce que tu peux prendre
+// les vraies icones ». The marks themselves are generated into `webview/vendorPaths.generated.ts`.
 //
 // The keys are the vendor prefixes OpenRouter actually uses, which is where the catalogue comes from;
-// the tilde-prefixed ones (`~openai`) are its own markers for a vendor's direct endpoint and must map
-// to the same mark, or the same company would wear two faces in one list.
+// the tilde-prefixed ones (`~openai`) are its own markers for a vendor's direct endpoint and map to
+// the same slug, or one company would wear two faces in a single list.
 
-/** The icon names the panel draws. Kept as plain strings so `core` never imports the webview. */
-export type VendorMark =
-  | "vOpenai"
-  | "vAnthropic"
-  | "vGoogle"
-  | "vMeta"
-  | "vMistral"
-  | "vDeepseek"
-  | "vXai"
-  | "vQwen"
-  | "vCohere"
-  | "vAmazon"
-  | "chip";
-
-const BY_VENDOR: Record<string, VendorMark> = {
-  openai: "vOpenai",
-  anthropic: "vAnthropic",
-  google: "vGoogle",
-  meta: "vMeta",
-  "meta-llama": "vMeta",
-  mistralai: "vMistral",
-  mistral: "vMistral",
-  deepseek: "vDeepseek",
-  "x-ai": "vXai",
-  xai: "vXai",
-  qwen: "vQwen",
-  alibaba: "vQwen",
-  cohere: "vCohere",
-  amazon: "vAmazon",
+const BY_VENDOR: Record<string, string> = {
+  openai: "openai",
+  anthropic: "anthropic",
+  google: "google",
+  qwen: "qwen",
+  alibaba: "qwen",
+  mistralai: "mistral",
+  mistral: "mistral",
+  deepseek: "deepseek",
+  meta: "meta",
+  "meta-llama": "meta",
+  "x-ai": "xai",
+  xai: "xai",
+  cohere: "cohere",
+  amazon: "aws",
+  aws: "aws",
+  nvidia: "nvidia",
+  "z-ai": "zhipu",
+  zhipu: "zhipu",
+  zhipuai: "zhipu",
+  minimax: "minimax",
+  moonshotai: "moonshot",
+  moonshot: "moonshot",
+  perplexity: "perplexity",
+  // The two local servers. A model served from this machine has no vendor prefix to read, so the
+  // slug comes from whoever is serving it — which is the honest answer to "whose model is this?"
+  // when the answer is "yours".
+  ollama: "ollama",
+  lmstudio: "lmstudio",
+  "lm studio": "lmstudio",
 };
 
 /**
- * The mark for a model id or a bare vendor name.
+ * The mark for a model id, a bare vendor name, or a local server's name.
  *
- * `chip` is the answer for everything unrecognised, and it is a real answer rather than a failure:
- * it is the glyph this control wore before any of these existed, so an unknown vendor looks like a
- * model rather than like a missing image.
+ * `undefined` for everything unrecognised, and the caller draws the chip it drew before any of these
+ * existed — so an unknown vendor looks like a model rather than like a missing image.
  */
-export function vendorMark(idOrVendor: string): VendorMark {
+export function vendorSlug(idOrVendor: string): string | undefined {
   const raw = (idOrVendor.includes("/") ? idOrVendor.slice(0, idOrVendor.indexOf("/")) : idOrVendor)
     .trim()
     .toLowerCase()
     // `~openai` is the catalogue's marker for a vendor's own endpoint rather than a reseller's. The
     // company is the same one; the mark has to be too.
     .replace(/^~/, "");
-  return BY_VENDOR[raw] ?? "chip";
+  return BY_VENDOR[raw];
 }

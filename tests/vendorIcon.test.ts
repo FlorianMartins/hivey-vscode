@@ -6,33 +6,35 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { vendorMark } from "../src/core/router/vendorIcon.js";
+import { vendorSlug } from "../src/core/router/vendorIcon.js";
+import { VENDOR_PATHS } from "../src/webview/vendorPaths.generated.js";
 import { GENERATED_MODELS } from "../src/core/router/catalog.generated.js";
 
 test("a model id carries its vendor, and the vendor carries the mark", () => {
-  assert.equal(vendorMark("openai/gpt-6.1-sol-pro"), "vOpenai");
-  assert.equal(vendorMark("anthropic/claude-5"), "vAnthropic");
-  assert.equal(vendorMark("x-ai/grok-4.7"), "vXai");
-  assert.equal(vendorMark("qwen/qwen3.7-flash"), "vQwen");
-  assert.equal(vendorMark("meta-llama/llama-4"), "vMeta");
+  assert.equal(vendorSlug("openai/gpt-6.1-sol-pro"), "openai");
+  assert.equal(vendorSlug("anthropic/claude-5"), "anthropic");
+  assert.equal(vendorSlug("x-ai/grok-4.7"), "xai");
+  assert.equal(vendorSlug("qwen/qwen3.7-flash"), "qwen");
+  assert.equal(vendorSlug("meta-llama/llama-4"), "meta");
   // A bare vendor name, which is what the model list hands over when it has one.
-  assert.equal(vendorMark("mistralai"), "vMistral");
+  assert.equal(vendorSlug("mistralai"), "mistral");
 });
 
 test("⚠️ a vendor's own endpoint wears the same face as its reseller's", () => {
   // The catalogue marks a vendor's direct endpoint with a tilde. The company is the same one, and two
   // faces for one company in a single list is exactly the confusion these marks exist to remove.
-  assert.equal(vendorMark("~openai/gpt-6.1"), vendorMark("openai/gpt-6.1"));
-  assert.equal(vendorMark("~anthropic"), vendorMark("anthropic"));
+  assert.equal(vendorSlug("~openai/gpt-6.1"), vendorSlug("openai/gpt-6.1"));
+  assert.equal(vendorSlug("~anthropic"), vendorSlug("anthropic"));
 });
 
 test("an unknown vendor looks like a model, not like a missing image", () => {
-  // The fallback is the glyph this control wore before any of these existed. A question mark, or an
-  // empty box, would turn "we have no mark for this house" into "something failed to load".
-  assert.equal(vendorMark("inclusionai/some-model"), "chip");
-  assert.equal(vendorMark("hivey/smart"), "chip", "a preset is not one vendor's model");
-  assert.equal(vendorMark(""), "chip");
-  assert.equal(vendorMark("qwen2.5-coder:7b"), "chip", "a local model has no vendor prefix to read");
+  // `undefined` rather than a slug, and the caller draws the chip this control wore before any of
+  // these existed. A question mark, or an empty box, would turn "we have no mark for this house" into
+  // "something failed to load".
+  assert.equal(vendorSlug("inclusionai/some-model"), undefined);
+  assert.equal(vendorSlug("hivey/smart"), undefined, "a preset is not one vendor's model");
+  assert.equal(vendorSlug(""), undefined);
+  assert.equal(vendorSlug("qwen2.5-coder:7b"), undefined, "a local model has no vendor prefix to read");
 });
 
 test("the marks cover what the catalogue is actually made of", () => {
@@ -49,11 +51,37 @@ test("the marks cover what the catalogue is actually made of", () => {
   let total = 0;
   for (const [vendor, n] of counts) {
     total += n;
-    if (vendorMark(vendor) !== "chip") covered += n;
+    if (vendorSlug(vendor)) covered += n;
   }
   assert.ok(total > 100, `only ${total} models in the catalogue — did its shape change?`);
   assert.ok(
     covered / total > 0.6,
     `only ${Math.round((100 * covered) / total)} % of catalogue models have a maker's mark; the set has drifted from what the catalogue holds`,
   );
+});
+
+test("⚠️ every slug the lookup can return is one the panel can actually draw", () => {
+  // The two halves are written in different files — the mapping in `core`, the paths generated into
+  // the webview — and they would drift apart in silence. A slug with no path is the worst of the
+  // three states: the lookup says "I know this vendor" and nothing appears, which reads as a broken
+  // image rather than as a missing mark.
+  const vendors = [
+    "openai", "~openai", "anthropic", "google", "qwen", "alibaba", "mistralai", "deepseek",
+    "meta-llama", "x-ai", "cohere", "amazon", "nvidia", "z-ai", "minimax", "moonshotai",
+    "perplexity", "ollama", "lmstudio",
+  ];
+  const orphans = vendors.map((v) => vendorSlug(v)).filter((slug): slug is string => Boolean(slug) && !VENDOR_PATHS[slug!]);
+  assert.deepEqual(orphans, [], `these resolve to a mark with no drawing: ${orphans.join(", ")}`);
+});
+
+test("the marks are the real ones, on the grid they were drawn for", () => {
+  // Fetched from lobehub/lobe-icons (MIT) rather than drawn by hand — « est ce que tu peux prendre les
+  // vraies icones ». Hand-made approximations of a logo are a different logo, and the difference is
+  // exactly what somebody recognising a vendor at a glance is using.
+  assert.ok(Object.keys(VENDOR_PATHS).length >= 15, "the generated set has shrunk");
+  for (const [slug, paths] of Object.entries(VENDOR_PATHS)) {
+    assert.ok(Array.isArray(paths) && paths.length >= 1, `${slug} has no path`);
+    // A real mark is detailed; a placeholder is not. Thirty characters is a triangle.
+    assert.ok(paths.join("").length > 60, `${slug} is too simple to be the real mark`);
+  }
 });

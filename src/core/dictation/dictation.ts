@@ -34,16 +34,50 @@ export interface DictationSettings {
 }
 
 /**
+ * Providers whose endpoint is known to transcribe audio, so dictation can borrow it.
+ *
+ * ⚠️ KNOWN, not guessed, and that is the whole care in this list. Asked for: « il faudrait que ce
+ * soit aussi simple d'utilsiation qu'un service cloud comme google mic » — so dictation should not
+ * make you configure a second service when you have already configured one. But borrowing an
+ * endpoint that does not answer `/audio/transcriptions` produces a microphone that records your
+ * voice, sends it, and fails — which is worse than a microphone that says it needs setting up.
+ *
+ * OpenRouter is the instructive absence: it is the provider most people here have a key for, and it
+ * offers no transcription endpoint at all. Local servers are absent for the same reason — Ollama and
+ * LM Studio serve text, and the audio models they can run are not reached this way.
+ */
+const CAN_TRANSCRIBE = new Set(["openai", "azure"]);
+
+/**
  * Which path a dictation takes.
  *
  * The local command WINS when both are configured, and that order is the privacy stance made
  * operational: somebody who has set up both has the means to transcribe on their own machine, and
  * nothing should quietly prefer the network because it is faster.
+ *
+ * ⚠️ And when nothing is configured at all, the CHAT provider is borrowed — but only one already
+ * known to transcribe. That is the difference between "it just works" and "it fails later": every
+ * other provider still has to be told, because being told is better than being recorded for nothing.
  */
-export function dictationMode(settings: DictationSettings): DictationMode {
+export function dictationMode(settings: DictationSettings, chatProvider?: string): DictationMode {
   if (settings.command.trim()) return "local";
   if (settings.endpoint.trim()) return "remote";
+  if (chatProvider && CAN_TRANSCRIBE.has(chatProvider)) return "remote";
   return "off";
+}
+
+/**
+ * Where a recording goes, given what is configured and what can be borrowed.
+ *
+ * Returns nothing when there is nowhere, which the caller turns into the offer to set one up.
+ */
+export function transcriptionEndpoint(
+  settings: DictationSettings,
+  chat: { provider?: string; baseUrl?: string },
+): string | undefined {
+  if (settings.endpoint.trim()) return settings.endpoint.trim();
+  if (chat.provider && CAN_TRANSCRIBE.has(chat.provider) && chat.baseUrl?.trim()) return chat.baseUrl.trim();
+  return undefined;
 }
 
 /** What the audio is written as. `webm/opus` is what every Chromium `MediaRecorder` produces. */

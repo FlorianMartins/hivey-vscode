@@ -2,6 +2,72 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 1.7.0 — 2026-10-06
+
+### Modifié
+
+- **⚠️⚠️ Hivey Smart devient le haut de gamme, et c'est Anthropic de bout en bout.** « retravaille le
+  modele Hivey Smart qui doit etre le modele le plus puissant (principalememt sur anthropic :
+  raisonnement fable5, code opus 5.5, quotidien sonnet 5.5 et petites taches haiku) ».
+
+  | rôle | Hivey Smart |
+  |---|---|
+  | petites tâches | Haiku 4.5 |
+  | quotidien | Sonnet 5.5 |
+  | travail difficile | **Opus 5.5** |
+  | complétion | Haiku 4.5 |
+
+  **Écrit comme une règle, jamais comme quatre identifiants** — ce dépôt s'interdit un numéro de
+  version dans ses sources, parce qu'un fournisseur est stable des années et une version des semaines.
+  La règle tient en deux choses : un **fournisseur préféré** et quatre **plafonds**. Quand Anthropic
+  sortira un successeur, le fichier généré bougera et rien d'autre.
+
+  ⚠️ Et il a fallu une règle de plus, qui vaut d'être dite : **à l'intérieur d'une même maison, le prix
+  EST l'échelle de capacité.** Entre fournisseurs c'est faux — ce fichier le dit deux fois, « le prix ne
+  dit que ce que quelqu'un a décidé de facturer ». Chez un seul fournisseur, c'est son propre
+  classement de ses propres modèles, qu'il publie : haiku sous sonnet sous opus. Sans cela, le rôle
+  « travail difficile » prenait le modèle Anthropic **le plus récent** et non le plus fort — donc le
+  modèle du quotidien — et toute la promesse du préréglage partait avec.
+
+  ⏭️ **Ce qui n'y est pas** : Fable 5 pour le raisonnement. Le routeur a **quatre** rôles et aucun ne
+  sépare « raisonner » de « coder » — `deep` est les deux. Lui en ajouter un cinquième est un vrai
+  changement, et je préfère te le dire plutôt que de ranger Fable quelque part où il ne correspond
+  à rien.
+
+- **⚠️ L'échelle des préréglages s'inverse, sans qu'une seule garantie soit affaiblie.** `hivey` passe
+  du milieu au sommet, donc « Hivey Pro » devient l'intermédiaire. Les invariantes qui protègent
+  l'échelle — *un préréglage plus cher n'est jamais servi un modèle pire qu'un moins cher* — **nommaient
+  les identifiants en dur** : elles auraient continué à passer en affirmant le contraire de ce qu'elles
+  voulaient dire. Elles parcourent désormais l'**ordre déclaré**. C'est ce qui a permis aux deux
+  préréglages d'échanger leur place en sécurité.
+
+### Corrigé
+
+- **Seul le mode Agent porte l'accent du thème.** « uniquement le mode agent doit avoir la couleur du
+  theme VsCode pas le mode chat ou plan » — et c'est la bonne règle, pas seulement celle demandée :
+  Agent est le seul mode qui **modifie vos fichiers**. Chat répond, Plan propose. Un avertissement
+  porté par deux modes sur trois est une décoration. Au passage, ces règles peignaient le **bouton
+  entier** avec une couleur de *graphique* et un **hexadécimal en dur** — ce que le projet s'interdit
+  partout ailleurs. L'icône porte la couleur, les mots ne la portent pas, comme le fait déjà le
+  contrôle du fournisseur juste en dessous.
+
+- **Les vraies icônes de fournisseur.** « est ce que tu peux prendre les vraies icones ». Dix-sept
+  marques officielles (lobehub/lobe-icons, MIT), récupérées une fois par un script et **commitées** —
+  rien n'est chargé à l'exécution, la CSP du panneau l'interdit et l'extension n'a aucune dépendance.
+  Elles sont remplies et dessinées sur une grille 24×24 : une marque redessinée à la main est un autre
+  logo, et c'est justement la différence qu'on utilise pour reconnaître un fournisseur d'un coup d'œil.
+
+- **Autant d'espace à droite qu'à gauche.** Le composer était large de `100vw` moins la gouttière
+  mesurée — **deux mesures soustraites portent leurs deux erreurs**, et il restait 19 px d'air à droite
+  contre 13 à gauche. La page publie désormais sa largeur réelle (`documentElement.clientWidth`), qui
+  est le seul nombre qui réponde directement à la question.
+
+- **La dictée emprunte le fournisseur déjà configuré** quand il sait transcrire, au lieu d'exiger un
+  second service. ⚠️ Seulement quand il **sait** : emprunter une adresse qui ne répond pas
+  `/audio/transcriptions` donne un micro qui enregistre votre voix, l'envoie et échoue — pire qu'un
+  micro qui annonce qu'il faut le configurer. OpenRouter est l'absence instructive : c'est le
+  fournisseur dont la plupart ont une clé, et il n'offre aucune transcription.
+
 ## 1.6.0 — 2026-10-06
 
 ### Corrigé

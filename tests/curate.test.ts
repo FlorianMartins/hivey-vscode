@@ -144,11 +144,15 @@ test("a dearer preset is never served a worse model than a cheaper one", () => {
     const m = all.find((x) => x.id === id);
     return m ? outPrice(m) : 0;
   };
+  // Over the declared order, not over named ids: `hivey` moved from the middle of the ladder to the
+  // top of it, and a test naming ids would have had to be rewritten to keep meaning the same thing.
   for (const role of ["everyday", "deep"]) {
-    assert.ok(
-      priceOf(routing["hivey/smart"]?.[role]) >= priceOf(routing["hivey"]?.[role]),
-      `Pro picked a cheaper model than Smart for ${role}`,
-    );
+    for (let i = 1; i < HIVEY_VARIANT_IDS.length; i++) {
+      assert.ok(
+        priceOf(routing[HIVEY_VARIANT_IDS[i]!]?.[role]) >= priceOf(routing[HIVEY_VARIANT_IDS[i - 1]!]?.[role]),
+        `${HIVEY_VARIANT_IDS[i]} picked a cheaper model than ${HIVEY_VARIANT_IDS[i - 1]} for ${role}`,
+      );
+    }
   }
 });
 
@@ -234,8 +238,14 @@ test("a preset that buys nothing extra is reported, not hidden", () => {
   // the cheaper preset's budget, so both presets resolved to it and the dearer one bought nothing.
   // The margin was 0.007 of a point. Reported, because it is a fact about the market and it will
   // stop being true the next time somebody ships an expensive flagship.
-  const same = { "hivey/free": { deep: "f" }, hivey: { deep: "x" }, "hivey/smart": { deep: "x" } };
-  assert.deepEqual(presetOverlaps(same), ["hivey/smart/deep = hivey/deep (x)"]);
-  const different = { "hivey/free": { deep: "f" }, hivey: { deep: "x" }, "hivey/smart": { deep: "y" } };
+  //
+  // ⚠️ Built from the DECLARED ORDER rather than from named ids. `hivey` has moved from the middle of
+  // the ladder to the top, and a test spelling out "hivey/smart = hivey" would have gone on passing
+  // while meaning the opposite — the report names the dearer preset first, and which one that is, is
+  // the very thing that changed.
+  const [cheapest, middle, dearest] = HIVEY_VARIANT_IDS;
+  const same = { [cheapest!]: { deep: "f" }, [middle!]: { deep: "x" }, [dearest!]: { deep: "x" } };
+  assert.deepEqual(presetOverlaps(same), [`${dearest}/deep = ${middle}/deep (x)`]);
+  const different = { [cheapest!]: { deep: "f" }, [middle!]: { deep: "x" }, [dearest!]: { deep: "y" } };
   assert.deepEqual(presetOverlaps(different), []);
 });

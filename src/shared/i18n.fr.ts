@@ -8,8 +8,6 @@ export const FR: Record<string, string> = {
   "Not models: each sends a kind of work — a question, an agent turn, a completion, a chore — to the model that suits it.": "Pas des modèles : chacun envoie un type de travail — une question, un tour d’agent, une complétion, une corvée — au modèle qui lui convient.",
   "Hivey": "Hivey",
   "Free endpoints only. Costs nothing, and is rate-limited like everything free.": "Uniquement des points d’accès gratuits. Ne coûte rien, et est limité en débit comme tout ce qui est gratuit.",
-  "A strong model where you feel it, a cheap one for the plumbing.": "Un modèle solide là où ça se voit, un modèle bon marché pour la tuyauterie.",
-  "The best of the catalogue on the hard work, without paying it to write commit messages.": "Le meilleur du catalogue sur le travail difficile, sans le payer pour écrire des messages de commit.",
   "  (stopped at the maximum number of steps)": "  (arrêté au nombre maximal d'étapes)",
   "  {0}+{1} tokens": "  {0}+{1} jetons",
   " · cached {0} $/M": " · cache {0} $/M",
@@ -905,8 +903,6 @@ export const FR: Record<string, string> = {
     "Impossible de lancer la commande de dictée : {0}",
   "Dictate":
     "Dicter",
-  "Dictation is not set up. Set hiveyCode.dictation.command to a transcriber on this machine.":
-    "La dictée n’est pas configurée. Renseignez hiveyCode.dictation.command avec un transcripteur installé sur cette machine.",
   "Listening… press again to stop.":
     "Écoute… appuyez à nouveau pour arrêter.",
   "No microphone was found.":
@@ -1325,6 +1321,12 @@ export const FR: Record<string, string> = {
   "No rule yet — anything that changes is asked.": "Aucune règle pour l'instant — tout ce qui modifie est demandé.",
   "Revoke what this conversation granted": "Révoquer ce que cette conversation a accordé",
   "Your rules": "Vos règles",
+  "Dictation needs a transcriber. Either set hiveyCode.dictation.command to one on this machine — whisper.cpp, for instance — or hiveyCode.dictation.endpoint to a service. A key for OpenAI is borrowed automatically; OpenRouter and local servers do not transcribe.":
+    "La dictée a besoin d'un transcripteur. Renseignez soit hiveyCode.dictation.command avec un transcripteur présent sur cette machine — whisper.cpp par exemple — soit hiveyCode.dictation.endpoint avec un service. Une clé OpenAI est empruntée automatiquement ; OpenRouter et les serveurs locaux ne transcrivent pas.",
+  "A strong model where you feel it, a cheap one for the plumbing. The middle of the three.":
+    "Un modèle fort là où ça se sent, un modèle bon marché pour la plomberie. Celui du milieu.",
+  "The premium one: Anthropic's own ladder, its flagship on hard work and its small model on chores.":
+    "Le haut de gamme : l'échelle d'Anthropic, son modèle phare sur le travail difficile et son petit modèle sur les corvées.",
   "Which areas is this conversation about?": "De quels domaines relève cette conversation ?",
   "Which languages and subjects this conversation is about": "Les langages et sujets dont relève cette conversation",
   "Which sub-agents may be dispatched?": "Quels sous-agents peuvent être sollicités ?",

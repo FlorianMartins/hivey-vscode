@@ -37,6 +37,14 @@ export type HiveyVariant = "hivey/free" | "hivey" | "hivey/smart";
 /** What kind of work a request is, from this routing's point of view. */
 export type HiveyRole = "chore" | "everyday" | "deep" | "completion";
 
+/**
+ * The presets, cheapest first.
+ *
+ * ⚠️ The order is read, not just displayed — `hiveyRoles` uses it to say which preset is cheaper than
+ * which — and `hivey` moved to the end of it. The labels have been crossed since two renames, so
+ * "Hivey Smart" is `hivey` and "Hivey Pro" is `hivey/smart`; naming an id to mean "the dearest" is
+ * exactly how that mix-up would spread, which is why nothing does.
+ */
 export const HIVEY_VARIANTS: Array<{ id: HiveyVariant; label: string; hint: string }> = [
   {
     id: "hivey/free",
@@ -44,14 +52,14 @@ export const HIVEY_VARIANTS: Array<{ id: HiveyVariant; label: string; hint: stri
     hint: t("Free endpoints only. Costs nothing, and is rate-limited like everything free."),
   },
   {
-    id: "hivey",
-    label: "Hivey Smart",
-    hint: t("A strong model where you feel it, a cheap one for the plumbing."),
-  },
-  {
     id: "hivey/smart",
     label: "Hivey Pro",
-    hint: t("The best of the catalogue on the hard work, without paying it to write commit messages."),
+    hint: t("A strong model where you feel it, a cheap one for the plumbing. The middle of the three."),
+  },
+  {
+    id: "hivey",
+    label: "Hivey Smart",
+    hint: t("The premium one: Anthropic's own ladder, its flagship on hard work and its small model on chores."),
   },
 ];
 
