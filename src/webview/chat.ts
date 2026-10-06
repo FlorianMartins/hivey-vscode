@@ -318,7 +318,11 @@ function wizardCard(state: UiState, wizard: NonNullable<UiState["wizard"]>, deps
       const main = el("div", "skill-main");
       const name = el("div", "wizard-family-name");
       name.append(el("span", undefined, group.label));
-      if (group.suggested) name.append(el("span", "wizard-suggested", t("what you have open")));
+      // ⚠️ "already on", not "suggested". The flag used to mean "we would tick this for you" and now
+      // means "this IS in play for this conversation, because of the files you have open" — the row
+      // can be left unticked and the family still answers. A label that understates what has already
+      // happened is the half-truth that makes a feature look broken.
+      if (group.suggested) name.append(el("span", "wizard-suggested", t("already on, from your open files")));
       main.append(name);
       main.append(el("div", "skill-desc", group.hint));
       row.append(main);

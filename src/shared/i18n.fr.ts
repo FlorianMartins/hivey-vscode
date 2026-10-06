@@ -1317,6 +1317,7 @@ export const FR: Record<string, string> = {
   "What Hivey Code may reach for": "Ce que Hivey Code peut mobiliser",
   "What can I do for you?": "Que puis-je faire pour vous ?",
   "What can we plan together?": "Que pouvons-nous planifier ensemble ?",
+  "already on, from your open files": "déjà active, d'après vos fichiers ouverts",
   "already on, from the files you have open": "déjà active, d'après les fichiers que vous avez ouverts",
   "The context shown is the smallest of its roles — the window you can count on whatever it is doing.":
     "Le contexte affiché est le plus petit de ses rôles — la fenêtre sur laquelle vous pouvez compter quoi qu'il fasse.",
@@ -1329,7 +1330,6 @@ export const FR: Record<string, string> = {
   "Which languages and subjects this conversation is about": "Les langages et sujets dont relève cette conversation",
   "Which sub-agents may be dispatched?": "Quels sous-agents peuvent être sollicités ?",
   "none chosen": "aucun choisi",
-  "what you have open": "ce que vous avez ouvert",
   "{0} chosen": "{0} choisi(s)",
   "{0} in play": "{0} en jeu",
   "Start a new conversation with this one as context": "Démarrer une nouvelle conversation avec celle-ci en contexte",
