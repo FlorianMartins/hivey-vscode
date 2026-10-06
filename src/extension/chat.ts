@@ -12,6 +12,7 @@ import { planGitRestore } from "../core/session/gitRestore.js";
 import { DEFAULT_AGENT_STEPS } from "../core/agent/definitions.js";
 import { changeSize, describeChangeSize } from "../core/text/diff.js";
 import { spawn } from "node:child_process";
+import { closeSync, fstatSync, openSync, readSync } from "node:fs";
 import * as fsp from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -241,6 +242,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this.approvals.set(request.id, (answer) => {
       this.forgetApproval(request.id);
       decide(answer);
+      // ⚠️ The panel is told the question is gone. Without this, the card stayed on screen marked
+      // "Allowed once." and "Waiting for your answer above" sat under the composer for the rest of
+      // the session — reported exactly so. It had always been true and never visible, because every
+      // approval used to happen inside a TURN, and the turn's next step sent the state a moment
+      // later. The first approval asked outside a turn — may I install a recorder? — had nothing
+      // following it, and the residue became the whole of what you could see.
+      this.sendState();
     });
     this.sendState();
     // A turn that is cancelled must not leave a promise hanging for ever, nor a card on screen for
@@ -3193,7 +3201,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    * question nobody proof-read.
    */
   /** The recording in progress, if any. One at a time: a second microphone is a second voice. */
-  private recording: { stop: () => Promise<string>; cancel: () => void; dir: string; started: number } | undefined;
+  private recording:
+    | { stop: () => Promise<string>; cancel: () => void; dir: string; started: number; level: ReturnType<typeof setInterval> }
+    | undefined;
 
   /**
    * Start recording with a program on this machine.
@@ -3251,7 +3261,38 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     }
     try {
       const run = startRecording(argv, wav, configured ? "signal" : (found?.stop ?? "signal"));
-      this.recording = { ...run, dir, started: Date.now() };
+      // ⚠️ How loud it is, read from the file as it grows — the panel has no microphone to listen to.
+      // A recorder that only writes when it stops, which is the Windows one, sends nothing and the
+      // ring keeps its resting size: a bar that never moves beats one that invents a voice.
+      let read = 44;
+      const level = setInterval(() => {
+        try {
+          const fd = openSync(wav, "r");
+          try {
+            const size = fstatSync(fd).size;
+            if (size <= read) return;
+            const take = Math.min(size - read, 32_000);
+            const buf = Buffer.alloc(take - (take % 2));
+            readSync(fd, buf, 0, buf.length, read);
+            read = size;
+            let sum = 0;
+            for (let i = 0; i + 1 < buf.length; i += 2) {
+              const sample = buf.readInt16LE(i) / 32768;
+              sum += sample * sample;
+            }
+            const rms = buf.length ? Math.sqrt(sum / (buf.length / 2)) : 0;
+            // Speech sits low in the range, so the bar would barely move on a linear scale. The
+            // fourth root spreads a quiet voice across the top half without making silence twitch.
+            this.post({ type: "dictationLevel", level: Math.min(1, Math.pow(rms, 0.25) * 1.3) });
+          } finally {
+            closeSync(fd);
+          }
+        } catch {
+          /* the file is not there yet, or is being written — the next tick will do */
+        }
+      }, 120);
+      this.recording = { ...run, dir, started: Date.now(), level };
+      this.post({ type: "dictationStarted" });
       this.post({ type: "dictationProgress", what: t("Listening… press again to stop.") });
     } catch (err) {
       await fsp.rm(dir, { recursive: true, force: true });
@@ -3264,6 +3305,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const run = this.recording;
     if (!run) return;
     this.recording = undefined;
+    clearInterval(run.level);
+    this.post({ type: "dictationLevel", level: 0 });
     if (cancel) {
       run.cancel();
       await fsp.rm(run.dir, { recursive: true, force: true });

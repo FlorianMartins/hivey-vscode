@@ -792,9 +792,12 @@ function micButton(deps: ChatDeps, configured: boolean): HTMLElement {
         refreshMic();
         return;
       }
-      listening = true;
+      // ⚠️ NOT `listening = true` here. The button used to light up the instant it was clicked, before
+      // the extension had started anything — so with no recorder on the machine it looked as though it
+      // were listening, and the next click "stopped" a recording that had never begun. Reported as
+      // having to click twice before anything was offered. The extension says when it has started.
       deps.send({ type: "startDictation" });
-      refreshMic();
+      setComposerNote(t("Starting…"));
 
     },
   });
@@ -812,6 +815,9 @@ let listening = false;
 
 /** Redraw just the microphone, without rebuilding the composer under a live recording. */
 function refreshMic(): void {
+  // The box as well as the button: the edge of the thing you are speaking INTO is where somebody
+  // dictating is looking, not at a 24-pixel icon in the corner of it.
+  document.querySelector<HTMLElement>(".composer")?.classList.toggle("listening", listening);
   const node = document.querySelector<HTMLElement>(".composer .btn.mic");
   if (!node) return;
   node.classList.toggle("recording", listening);
@@ -830,7 +836,27 @@ export function cancelDictation(deps?: ChatDeps): boolean {
 /** The extension says a recording ended for a reason of its own — a failure, or a cancel. */
 export function dictationStopped(): void {
   listening = false;
+  setLevel(0);
   refreshMic();
+}
+
+/** The extension says a recording has actually begun. Only now does the button say it is listening. */
+export function dictationStarted(): void {
+  listening = true;
+  refreshMic();
+}
+
+/**
+ * How loud it is, 0 to 1, as a CSS variable the ring reads.
+ *
+ * ⚠️ Measured in the extension and sent here, because this panel has no microphone to listen to — the
+ * editor withholds that from every extension. Where the recorder writes its file only when it stops,
+ * which is the Windows one, nothing arrives and the ring keeps its calm resting size: a bar that
+ * never moves is better than one that invents a voice.
+ */
+export function setLevel(level: number): void {
+  const node = document.querySelector<HTMLElement>(".composer-card");
+  node?.style.setProperty("--voice", String(Math.max(0, Math.min(1, level))));
 }
 
 /**

@@ -1345,6 +1345,7 @@ export const FR: Record<string, string> = {
     "Rien ici ne sait enregistrer. Renseignez hiveyCode.dictation.recordCommand avec une commande qui écrit un WAV, en mettant {file} pour le fichier.",
   "Nothing on this machine can record, and the panel is not allowed a microphone of its own — the editor withholds that from every extension.":
     "Rien sur cette machine ne sait enregistrer, et le panneau n'a pas droit à son propre micro — l'éditeur le refuse à toutes les extensions.",
+  "Starting…": "Démarrage…",
   "Which areas is this conversation about?": "De quels domaines relève cette conversation ?",
   "Which languages and subjects this conversation is about": "Les langages et sujets dont relève cette conversation",
   "Which sub-agents may be dispatched?": "Quels sous-agents peuvent être sollicités ?",

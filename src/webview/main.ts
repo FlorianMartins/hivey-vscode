@@ -10,6 +10,8 @@ import { chatScreen, isStreaming, planBlock, reasoningBlock, setStreaming, stepR
   NOTE_FADE_MS,
   setComposerNote,
   dictationStopped,
+  dictationStarted,
+  setLevel,
   cancelDictation,
 } from "./chat.js";
 import { atEnd, placeAfterChange, type Viewport } from "../core/ui/scroll.js";
@@ -867,6 +869,12 @@ window.addEventListener("message", (event: MessageEvent<ToPanel>) => {
     }
     // ⚠️ A one-off install of 85 MB over a home connection. A note that cannot change is
     // indistinguishable from a hang, and somebody who has just spoken a sentence is watching it.
+    case "dictationStarted":
+      dictationStarted();
+      break;
+    case "dictationLevel":
+      setLevel(m.level);
+      break;
     case "dictationProgress":
       setComposerNote(m.what);
       break;

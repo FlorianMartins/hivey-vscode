@@ -2,6 +2,51 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 1.10.0 — 2026-10-06
+
+### Corrigé
+
+- **⚠️⚠️ Une carte d'autorisation répondue hors d'un tour restait à l'écran pour toujours.** « une
+  fenetre qui s'est ouvert et ne se ferme pas avec écrit "Allowed once." et un message sous la zone de
+  chat qui pareil ne part pas avec écrit "Waiting for your answer above" ».
+
+  `forgetApproval` retirait bien la question, et **personne ne renvoyait l'état au panneau**. C'était
+  vrai depuis toujours et invisible depuis toujours : chaque autorisation se posait **à l'intérieur
+  d'un tour**, et l'étape suivante du tour renvoyait l'état un instant plus tard. La première question
+  posée hors d'un tour — *puis-je installer un enregistreur ?* — n'avait rien derrière elle, et le
+  résidu est devenu tout ce qu'on pouvait voir.
+
+- **⚠️ Le micro s'allumait avant que quoi que ce soit n'ait commencé.** « il faut cliquer puis
+  recliquer pour arreter et seulement il propose d'installer ». Le panneau se déclarait « en écoute »
+  à l'instant du clic, sans attendre l'extension — donc sans enregistreur sur la machine, le bouton
+  avait l'air d'écouter et le clic suivant « arrêtait » un enregistrement qui n'avait jamais commencé.
+  Le bouton suit désormais **ce qui est**, pas ce qui a été demandé : l'extension dit quand elle a
+  démarré.
+
+- **⚠️⚠️ Le modèle par défaut ne comprenait que l'anglais.** « quand je parle ça écrit juste "(speaking
+  in foreign language)" ou encore "Ito es que chimonto." au lieu de "Hello est ce que tu m'entend" ».
+  `tiny.en` avait été choisi pour sa taille. **Un modèle anglais-seul n'échoue pas sur du français, il
+  hallucine** — ce qui est pire, parce que la sortie ressemble à une transcription. Le défaut est
+  désormais `base`, multilingue : soixante-dix mégaoctets de plus, une seule fois, contre une
+  fonctionnalité inutilisable par quiconque ne parle pas anglais.
+
+### Modifié
+
+- **L'anneau d'écoute suit votre voix, et il est aux couleurs du thème.** « l'animation atour de la
+  zone de saisie est trop grande et en rouge […] changer l'animation pour faire des petites vibrations
+  sur les bord en fonction de l'intonation de la voix ».
+
+  Le rouge était la couleur que cette interface emploie pour un **refus** et pour une **erreur** ; un
+  micro qui fonctionne n'est ni l'un ni l'autre. Le liseré fait maintenant un pixel, dans l'accent du
+  workbench, **et il n'a aucune image-clé** : l'extension mesure le volume dans le fichier à mesure
+  qu'il s'écrit et le bord suit. *Un anneau qui pulse sur une horloge dit « il se passe quelque
+  chose » ; un anneau qui suit la voix dit « je vous entends », qui est la question que se pose
+  vraiment quelqu'un en train de dicter.*
+
+  ⚠️ Là où l'enregistreur n'écrit son fichier qu'à l'arrêt — celui de Windows — aucun niveau n'arrive
+  et le bord garde sa taille de repos. **Une barre qui ne bouge pas vaut mieux qu'une barre qui invente
+  une voix.**
+
 ## 1.9.1 — 2026-10-06
 
 ### Ajouté

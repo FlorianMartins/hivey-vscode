@@ -2,7 +2,7 @@
   "name": "hivey-code",
   "displayName": "Hivey Code",
   "description": "%extension.description%",
-  "version": "1.9.1",
+  "version": "1.10.0",
   "publisher": "hivey",
   "license": "Apache-2.0",
   "repository": {
@@ -1225,11 +1225,11 @@
           },
           "hiveyCode.dictation.localModel": {
             "type": "string",
-            "default": "tiny.en",
+            "default": "base",
             "enum": [
+              "base",
               "tiny.en",
               "base.en",
-              "base",
               "small"
             ],
             "markdownDescription": "%config.dictation.localModel%"

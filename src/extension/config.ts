@@ -13,6 +13,7 @@ import * as vscode from "vscode";
 import { allowedEndpoint, applyPolicy, featureDisabled } from "../core/policy/policy.js";
 import { policyState } from "./policy.js";
 import { t } from "../shared/i18n.js";
+import { DEFAULT_WHISPER_MODEL } from "../core/dictation/local.js";
 import { DEFAULT_GROUPS, type SkillGroup, type SkillPolicy } from "../core/session/skills.js";
 import { makeProvider, type Provider, type ProviderId } from "../core/providers/index.js";
 import { defaultEndpoints, endpointSettingKey, REMOTE_VENDORS, vendor } from "../core/providers/vendors.js";
@@ -257,7 +258,7 @@ function readSettingsRaw(scope?: vscode.Uri): Settings {
       endpoint: c.get<string>("dictation.endpoint", ""),
       model: c.get<string>("dictation.model", ""),
       language: c.get<string>("dictation.language", ""),
-      localModel: c.get<string>("dictation.localModel", "tiny.en"),
+      localModel: c.get<string>("dictation.localModel", DEFAULT_WHISPER_MODEL),
       recordCommand: c.get<string>("dictation.recordCommand", ""),
     },
     completion: {

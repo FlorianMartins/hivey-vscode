@@ -74,11 +74,22 @@ export interface WhisperModel {
  * language at all.
  */
 export const WHISPER_MODELS: WhisperModel[] = [
-  { id: "tiny.en", file: "ggml-tiny.en.bin", mb: 75, hint: "English only. The fastest, and enough for dictation." },
-  { id: "base.en", file: "ggml-base.en.bin", mb: 142, hint: "English only. Noticeably steadier on names and numbers." },
-  { id: "base", file: "ggml-base.bin", mb: 142, hint: "Every language Whisper knows, including French." },
+  { id: "base", file: "ggml-base.bin", mb: 142, hint: "Every language Whisper knows, including French. The default." },
+  { id: "tiny.en", file: "ggml-tiny.en.bin", mb: 75, hint: "English only, and the fastest. Anything else comes back as nonsense." },
+  { id: "base.en", file: "ggml-base.en.bin", mb: 142, hint: "English only. Steadier than tiny on names and numbers." },
   { id: "small", file: "ggml-small.bin", mb: 466, hint: "Every language, and the best of these. Slower on an old machine." },
 ];
+
+/**
+ * ⚠️ The default is MULTILINGUAL, and the English-only one is not first on the list any more.
+ *
+ * It was `tiny.en`, chosen for being the smallest, and the result was reported from a real machine:
+ * "Hello est-ce que tu m'entends" came back as `(speaking in foreign language)` and `Ito es que
+ * chimonto.` An English-only model does not fail on French — it HALLUCINATES, which is worse, because
+ * the output looks like a transcription. Seventy more megabytes, once, against a feature that cannot
+ * be used by anybody who does not speak English.
+ */
+export const DEFAULT_WHISPER_MODEL = "base";
 
 export function modelUrl(file: string): string {
   return `https://huggingface.co/ggerganov/whisper.cpp/resolve/main/${file}`;

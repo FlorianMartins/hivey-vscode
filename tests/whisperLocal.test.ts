@@ -12,6 +12,7 @@ import {
   WHISPER_MODELS,
   modelFor,
   modelUrl,
+  DEFAULT_WHISPER_MODEL,
   parseWhisperText,
   whisperArgv,
   whisperAsset,
@@ -64,9 +65,19 @@ test("every offered model says how big it is", () => {
     assert.ok(m.hint.length > 20, `${m.id} does not say what it is for`);
     assert.ok(modelUrl(m.file).endsWith(m.file));
   }
-  // Smallest first, because that is the order the question offers them in.
-  const sizes = WHISPER_MODELS.map((m) => m.mb);
-  assert.deepEqual([...sizes].sort((a, b) => a - b), sizes, "the list is not smallest-first");
+  // ⚠️ The DEFAULT is first, and it is multilingual — not the smallest, which is what it used to be.
+  // `tiny.en` was chosen for its size and the result was reported from a real machine: "Hello est-ce
+  // que tu m'entends" came back as `(speaking in foreign language)` and `Ito es que chimonto.` An
+  // English-only model does not FAIL on French, it hallucinates, which is worse, because the output
+  // looks like a transcription. Seventy more megabytes once, against a feature nobody outside English
+  // could use.
+  assert.equal(WHISPER_MODELS[0]!.id, DEFAULT_WHISPER_MODEL, "the default is not the one offered first");
+  assert.ok(!DEFAULT_WHISPER_MODEL.endsWith(".en"), "the default only understands English");
+  assert.equal(modelFor(DEFAULT_WHISPER_MODEL).id, DEFAULT_WHISPER_MODEL);
+  // And the English-only ones say so in their own description, where somebody choosing can read it.
+  for (const m of WHISPER_MODELS.filter((x) => x.id.endsWith(".en"))) {
+    assert.match(m.hint, /English only/, `${m.id} does not say it only understands English`);
+  }
   // An unknown id falls back to the smallest rather than to nothing: a stale setting must not break
   // dictation, it must transcribe with the safest choice.
   assert.equal(modelFor("nonsense").id, WHISPER_MODELS[0]!.id);

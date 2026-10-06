@@ -621,5 +621,21 @@ export type ToPanel =
    * that proves anything is still happening.
    */
   | { type: "dictationProgress"; what: string }
+  /**
+   * Recording has actually begun.
+   *
+   * ⚠️ The panel used to light the microphone the moment it was clicked, before the extension had
+   * started anything — so when there was no recorder, the button looked as though it were listening
+   * and the next click "stopped" a recording that never existed. Reported as having to click twice
+   * before anything was offered. The button follows what IS, not what was asked for.
+   */
+  | { type: "dictationStarted" }
+  /**
+   * How loud it is right now, from 0 to 1.
+   *
+   * Measured in the extension from the file as it grows, because the panel has no microphone of its
+   * own to listen to — see the permission note in `core/dictation/capture.ts`.
+   */
+  | { type: "dictationLevel"; level: number }
   /** The agent's plan, as it is written. Redrawn in place rather than appended. */
   | { type: "plan"; plan: Plan };
