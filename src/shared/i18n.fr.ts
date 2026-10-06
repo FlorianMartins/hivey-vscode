@@ -1356,6 +1356,7 @@ export const FR: Record<string, string> = {
   "{0} always records from the system's default input, which Windows sets. Change it in Windows sound settings, or install ffmpeg to choose here.":
     "{0} enregistre toujours depuis l'entrée par défaut du système, que Windows fixe. Changez-la dans les paramètres de son de Windows, ou installez ffmpeg pour choisir ici.",
   "{0} listed no inputs on this machine.": "{0} n'a listé aucune entrée sur cette machine.",
+  "Ready. Press the microphone to speak.": "Prêt. Appuyez sur le micro pour parler.",
   "Which areas is this conversation about?": "De quels domaines relève cette conversation ?",
   "Which languages and subjects this conversation is about": "Les langages et sujets dont relève cette conversation",
   "Which sub-agents may be dispatched?": "Quels sous-agents peuvent être sollicités ?",

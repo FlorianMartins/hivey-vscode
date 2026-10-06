@@ -2,6 +2,22 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 1.12.1 — 2026-10-06
+
+### Corrigé
+
+- **⚠️ Un clic qui installe est un clic qui a installé — il ne lance pas aussi la dictée.** « le premier
+  clique quand l'outil n'est pas installé doit servir de bouton d'installation et une fois installé il
+  doit avoir le comportement normal ». C'est la bonne règle et pas seulement celle demandée : le clic
+  qui a répondu « oui, installe-le » répondait à une **question**, il ne démarrait pas un
+  enregistrement — et quelqu'un qui vient de regarder un téléchargement se terminer n'est pas au milieu
+  d'une phrase. Écouter à cet instant enregistre le silence de quelqu'un en train de lire ce qui vient
+  de se passer.
+
+  ⚠️ Au passage, la vérification rend désormais **trois** réponses et non deux : « c'était déjà là »,
+  « je viens de l'installer » et « il n'y en a pas » mènent à trois suites différentes, et un booléen
+  n'en portait que deux. C'est ce raccourci qui produisait exactement ce comportement.
+
 ## 1.12.0 — 2026-10-06
 
 ### Ajouté

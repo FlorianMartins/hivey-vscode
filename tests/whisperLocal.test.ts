@@ -362,3 +362,20 @@ test("each tool's list of inputs is read the way that tool prints it", () => {
   assert.deepEqual(alsa.map((d) => d.id), ["plughw:CARD=PCH,DEV=0"], "a device that records silence is not an offer");
   assert.match(alsa[0]!.label, /HDA Intel PCH/, "the description is what makes the id choosable");
 });
+
+test("⚠️ a click that installs something does not also start recording", () => {
+  // « le premier clique quand l'outil n'est pas installé doit servir de bouton d'installation et une
+  // fois installé il doit avoir le comportement normal ». It is the right rule and not only the
+  // asked-for one: the click that answered "yes, install it" was answering a question, not starting a
+  // recording, and somebody who has just watched a download finish is not mid-sentence. Listening
+  // there records the silence of somebody reading what just happened.
+  //
+  // Read from the source, because this is a claim about the order of two things at a call site.
+  const { readFileSync } = require("node:fs") as typeof import("node:fs");
+  const chat = readFileSync("src/extension/chat.ts", "utf8");
+  assert.match(chat, /const ready = await this\.ensureTranscriber\(\);/);
+  assert.match(chat, /if \(ready === "installed"\) \{/, "installing and recording are one step again");
+  // Three answers, not two: "it was already there", "I have just put it there" and "there is none"
+  // lead to three different next moves, and a boolean can only carry two of them.
+  assert.match(chat, /Promise<"ready" \| "installed" \| "no">/);
+});

@@ -3211,11 +3211,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    * comme si on voulait envoyer un message alors que l'outil n'est pas installé ». Everything a thing
    * needs is asked for before it is done, not after.
    */
-  private async ensureTranscriber(): Promise<boolean> {
+  private async ensureTranscriber(): Promise<"ready" | "installed" | "no"> {
     const settings = readSettings();
     const storage = this.ctx.globalStorageUri.fsPath;
     const here = Boolean(installedWhisper(storage, process.platform, settings.dictation.localModel));
-    if (dictationMode(settings.dictation, settings.chat.provider, here) !== "off") return true;
+    if (dictationMode(settings.dictation, settings.chat.provider, here) !== "off") return "ready";
     if (!whisperAsset({ platform: process.platform, arch: process.arch })) {
       this.post({
         type: "dictationFailed",
@@ -3223,7 +3223,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           "Dictation needs a transcriber. The simplest way on any machine is a Groq key — its free tier is 2,000 transcriptions a day without a card — which this borrows automatically once it is your provider. A key for OpenAI is borrowed the same way. Or point hiveyCode.dictation.command at a transcriber on this machine, which sends nothing anywhere. OpenRouter and local model servers do not transcribe.",
         ),
       });
-      return false;
+      return "no";
     }
     const model = modelFor(settings.dictation.localModel);
     const go = await new Promise<boolean>((resolve) => {
@@ -3244,16 +3244,16 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     });
     if (!go) {
       this.post({ type: "dictationFailed", why: t("Dictation needs a transcriber, and none was installed.") });
-      return false;
+      return "no";
     }
     try {
       await installWhisper(storage, process.platform, process.arch, settings.dictation.localModel, (what) =>
         this.post({ type: "dictationProgress", what }),
       );
-      return true;
+      return "installed";
     } catch (err) {
       this.post({ type: "dictationFailed", why: t("The transcriber could not be installed: {0}", (err as Error).message) });
-      return false;
+      return "no";
     }
   }
 
@@ -3272,7 +3272,19 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private async startDictation(): Promise<void> {
     if (this.recording) return;
     // Everything this needs, asked for before a word is spoken rather than after.
-    if (!(await this.ensureTranscriber())) return;
+    //
+    // ⚠️ And a click that INSTALLED something stops there. « le premier clique quand l'outil n'est pas
+    // installé doit servir de bouton d'installation et une fois installé il doit avoir le comportement
+    // normal ». It is the right rule and not only the asked-for one: the click that answered "yes,
+    // install it" was answering a question, not starting a recording, and somebody who has just
+    // watched a download finish is not mid-sentence. Starting to listen there records the silence of
+    // somebody reading what just happened.
+    const ready = await this.ensureTranscriber();
+    if (ready === "no") return;
+    if (ready === "installed") {
+      this.post({ type: "dictationFailed", why: t("Ready. Press the microphone to speak.") });
+      return;
+    }
     const settings = readSettings();
     const dir = await fsp.mkdtemp(join(tmpdir(), "hivey-dictation-"));
     const wav = join(dir, "voice.wav");
