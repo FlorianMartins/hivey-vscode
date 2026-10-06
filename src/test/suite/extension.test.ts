@@ -1972,6 +1972,21 @@ suite("Screenshot", () => {
         process.env["HIVEY_CODE_APPEARANCE"] ?? "editor",
         vscode.ConfigurationTarget.Global,
       );
+      // ⚠️ The floor on the panel's width, photographable on demand.
+      //
+      // It exists because this setting was broken for a whole release in a way no test could reach: it
+      // was written as a style ATTRIBUTE, which this panel's CSP discards, so it did nothing and the
+      // markup was perfectly correct. The fix is reasoned — the property form is what the policy
+      // allows — and a reasoned fix to a defect that was invisible deserves to be LOOKED at. Setting
+      // this to a width larger than the panel makes the content overflow visibly, which is the floor
+      // doing its job; with the defect back, the capture is unchanged.
+      if (process.env["HIVEY_CODE_MIN_WIDTH"]) {
+        await config.update(
+          "panel.minWidth",
+          Number(process.env["HIVEY_CODE_MIN_WIDTH"]),
+          vscode.ConfigurationTarget.Global,
+        );
+      }
       // The pre-send card waits for a click, and nothing clicks in a capture: leaving it on meant
       // the harness hung on the first question and photographed six empty screens while reporting
       // "the editor never announced it". Which was also the proof the card works.

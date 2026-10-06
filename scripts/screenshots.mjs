@@ -11,7 +11,7 @@
 // image is the real interface; the sentence inside it is a fixture.
 //
 // Usage: node scripts/screenshots.mjs [--locale fr] [--theme "Default Light Modern"]
-//        [--suffix .light] [--appearance hivey] [--out docs/images]
+//        [--suffix .light] [--appearance hivey] [--min-width 900] [--out docs/images]
 
 import { spawn, spawnSync } from "node:child_process";
 import { createServer } from "node:http";
@@ -285,6 +285,10 @@ const editor = spawn("node", ["dist-integration/runTest.js"], {
     // `editor` (the default) or `hivey`. The point of photographing both is that an appearance
     // described in prose is an appearance nobody can check.
     HIVEY_CODE_APPEARANCE: args.get("appearance") ?? "editor",
+    // `--min-width 900` photographs the panel's width floor doing its job: a floor wider than the
+    // panel makes the content overflow, which is visible, where the floor itself is not. Unset, the
+    // setting is left alone and the capture is the ordinary one.
+    ...(args.get("min-width") ? { HIVEY_CODE_MIN_WIDTH: args.get("min-width") } : {}),
     HIVEY_CODE_SCREENSHOT_HOLD: String(HOLD),
     HIVEY_CODE_SCREENSHOT_MARKER: marker,
   },
