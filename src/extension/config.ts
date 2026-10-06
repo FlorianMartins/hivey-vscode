@@ -327,7 +327,25 @@ function readSettingsRaw(scope?: vscode.Uri): Settings {
       auto: c.get<boolean>("skills.auto", true),
     },
     agents: { disabled: c.get<string[]>("agents.disabled", []) },
-    panel: { minWidth: c.get<number>("panel.minWidth", 260) },
+    /**
+     * ⚠️ 470, and the figure is MEASURED rather than chosen — 260 was chosen, and it was wrong by
+     * almost half.
+     *
+     * It was reported as « 260 c'est trop bas » and the capture says why. Photographed at 540 px, the
+     * composer row runs from the attach icon at x=33 to the send at x=496: about 479 px of controls,
+     * with 34 px of slack between the two groups and a model name that can give back another 42 by
+     * shrinking to its own 7-character floor. So the row stops fitting at roughly 462 px — and below
+     * that the overflow rule CLIPS, which is the failure this floor exists to prevent: at 260 the
+     * send button is not cramped, it is gone.
+     *
+     * 470 rather than 462: the measurement was read off a screenshot, so it carries a few pixels of
+     * doubt, and the cheap mistake is the one that leaves a little air. The expensive mistake is the
+     * one that clips a control.
+     *
+     * Read as a floor on the CONTENT. Nothing here can stop the side bar being dragged narrower; see
+     * `applyMinWidth` in the webview, and the integration test that proves the editor offers no way.
+     */
+    panel: { minWidth: c.get<number>("panel.minWidth", 470) },
     permissions: {
       autoApprove: c.get<"off" | "workspace" | "all">("permissions.autoApprove", "off"),
       allowedPaths: c.get<string[]>("permissions.allowedPaths", []),

@@ -82,7 +82,7 @@
   "command.showDefinitions.title": "Create or edit skills and sub-agents",
   "command.searchConversation.title": "Search this conversation",
   "command.openSettings.title": "Open the settings",
-  "config.panel.minWidth": "Narrowest the panel is allowed to become, in pixels. Below this the panel scrolls sideways instead of rearranging itself, so dragging the side bar narrow cannot reshuffle the layout. `0` lets it shrink freely.",
+  "config.panel.minWidth": "Narrowest the panel is allowed to become, in pixels. Below this it scrolls sideways instead of rearranging itself, so dragging the side bar narrow cannot reshuffle the layout — or clip a control out of existence, which is what used to happen. The default is measured rather than chosen: the composer row needs about 462 px for its five controls plus the microphone and the send, with the model name already shrunk to its own floor. `0` lets the panel shrink freely. This is a floor on the CONTENT: VS Code gives an extension no way to stop the side bar itself being dragged narrower.",
   "config.permissions.autoApprove": "How much the agent may do without asking.\n\nWhatever this is set to, `#hiveyCode.privacy.blockedGlobs#` still applies and what leaves the machine is still governed by `#hiveyCode.privacy.egressPolicy#`. This setting changes how often you are interrupted — never what the agent is allowed to touch, and never what it may send.",
   "config.permissions.autoApprove.off": "Every change is asked for.",
   "config.permissions.autoApprove.workspace": "Changes inside the open folder run without asking. Commands, and anything outside the folder, are still asked for.",

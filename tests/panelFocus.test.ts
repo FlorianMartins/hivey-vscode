@@ -187,3 +187,37 @@ test("the way back is labelled on the bar, and only the opening question carries
     "the promise is written twice again, so the two places can disagree about what restoring does",
   );
 });
+
+test("the width floor is the width the composer actually needs", () => {
+  // ⚠️ The default was 260 and it was CHOSEN; it is now 460 and it is MEASURED. Reported as « 260
+  // c'est trop bas », and a capture of the panel at 540 px says exactly how much too low: the row runs
+  // from the attach icon at x=33 to the send at x=496 — about 479 px of controls — with 34 px of slack
+  // between the two groups and a model name able to give back another 42 by shrinking to its own
+  // seven-character floor. The row therefore stops fitting at roughly 462 px.
+  //
+  // Below the floor the group's `overflow: hidden` CLIPS rather than compresses, which is the failure
+  // this setting exists to prevent: at 260 the send button is not cramped, it is absent. A floor set
+  // under what the content needs is not a floor at all.
+  //
+  // Asserted against the row's own constraints rather than as a magic number, so adding a control to
+  // the composer and leaving the floor behind is caught here instead of in a screenshot six weeks
+  // later.
+  const manifest = JSON.parse(readFileSync("package.json", "utf8")) as {
+    contributes: { configuration: Array<{ properties: Record<string, { default?: number }> }> };
+  };
+  const floor = manifest.contributes.configuration
+    .flatMap((section) => Object.entries(section.properties))
+    .find(([id]) => id === "hiveyCode.panel.minWidth")?.[1]?.default;
+  assert.ok(typeof floor === "number", "the floor is no longer declared in the manifest");
+  assert.ok(
+    floor >= 462,
+    `the floor is ${floor}, below the ~462 px the composer row measured — the send button will be clipped away`,
+  );
+  // And the reader agrees with the manifest. They disagreed once already, in the other direction:
+  // a default written twice is a default that will be changed once.
+  assert.match(
+    readFileSync("src/extension/config.ts", "utf8"),
+    new RegExp(`c\\.get<number>\\("panel\\.minWidth",\\s*${floor}\\)`),
+    "the manifest and the settings reader declare different floors",
+  );
+});

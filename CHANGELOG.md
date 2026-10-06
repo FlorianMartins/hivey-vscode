@@ -2,6 +2,27 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 1.5.1 — 2026-10-06
+
+### Corrigé
+
+- **⚠️ Le plancher de largeur passe de 260 à 470 px, et cette fois le chiffre est MESURÉ.** « mets le
+  plancher par defaut plus haut, 260 c'est trop bas ». Il l'était, et d'à peu près la moitié.
+
+  Mesuré sur une capture du panneau à 540 px, contrôle par contrôle : la rangée du composer court de
+  l'icône de pièce jointe à x=33 jusqu'à l'envoi à x=496 — environ **479 px de contrôles** — avec 34 px
+  de mou entre les deux groupes et un nom de modèle capable d'en rendre 42 de plus en s'élidant jusqu'à
+  son propre plancher de sept caractères. La rangée cesse donc de tenir vers **462 px**. 470 plutôt que
+  462 parce que la mesure a été lue sur une image : l'erreur bon marché est celle qui laisse un peu
+  d'air, l'erreur chère est celle qui rogne un contrôle.
+
+  Car c'est bien de rognage qu'il s'agit : sous le plancher, la règle de débordement **coupe** au lieu
+  de comprimer. **À 260 px, le bouton d'envoi n'était pas à l'étroit, il n'était plus là.** Un plancher
+  posé sous ce dont le contenu a besoin n'est pas un plancher.
+
+  Un test attache désormais la valeur à ce que la rangée exige, et vérifie que le manifeste et le
+  lecteur de réglages annoncent le même chiffre — ils avaient déjà divergé une fois.
+
 ## 1.5.0 — 2026-10-06
 
 ### Modifié

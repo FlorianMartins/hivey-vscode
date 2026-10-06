@@ -82,7 +82,7 @@
   "command.showDefinitions.title": "Créer ou modifier des compétences et sous-agents",
   "command.searchConversation.title": "Rechercher dans cette conversation",
   "command.openSettings.title": "Ouvrir les réglages",
-  "config.panel.minWidth": "Largeur minimale du panneau, en pixels. En dessous, le panneau défile horizontalement au lieu de se réorganiser : tirer la barre latérale ne peut donc plus bousculer la mise en page. `0` le laisse rétrécir librement.",
+  "config.panel.minWidth": "Largeur minimale du panneau, en pixels. En dessous, il défile latéralement au lieu de se réorganiser — donc tirer la barre latérale ne peut plus bousculer la mise en page ni faire disparaître un contrôle par rognage, ce qui arrivait. La valeur par défaut est **mesurée** et non choisie : la rangée du composer réclame environ 462 px pour ses cinq contrôles plus le micro et l'envoi, le nom du modèle étant déjà réduit à son propre plancher. `0` laisse le panneau rétrécir librement. ⚠️ C'est un plancher sur le **contenu** : VS Code n'offre à une extension aucun moyen d'empêcher la barre latérale elle-même d'être rétrécie.",
   "config.permissions.autoApprove": "Ce que l'agent peut faire sans demander.\n\nQuelle que soit la valeur, `#hiveyCode.privacy.blockedGlobs#` s'applique toujours et ce qui quitte la machine reste régi par `#hiveyCode.privacy.egressPolicy#`. Ce réglage change la fréquence des interruptions — jamais ce à quoi l'agent a droit, ni ce qu'il peut envoyer.",
   "config.permissions.autoApprove.off": "Chaque modification est demandée.",
   "config.permissions.autoApprove.workspace": "Les modifications dans le dossier ouvert passent sans demander. Les commandes, et tout ce qui est hors du dossier, restent demandées.",
