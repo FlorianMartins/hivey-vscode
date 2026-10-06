@@ -14,8 +14,15 @@
 export interface Recorder {
   /** The program to look for on PATH. */
   program: string;
-  /** Its arguments, given the file to write. 16 kHz mono WAV, which is what a speech model wants. */
-  args: (wav: string) => string[];
+  /**
+   * Its arguments, given the file to write and the input to listen to.
+   *
+   * ⚠️ The device is the second argument because of a real machine with several inputs: « mon ami qui
+   * a plusieurs sources d'entrée de son […] son micro n'a rien entendu ». A recorder that always takes
+   * the system default works perfectly for anybody with one microphone and silently records nothing
+   * for anybody with two.
+   */
+  args: (wav: string, device?: string) => string[];
   /** What it belongs to, for the sentence that tells somebody what to install. */
   from: string;
   /**
@@ -29,6 +36,16 @@ export interface Recorder {
   stop: "signal" | "stdin";
   /** True when it is part of the system and need not be looked for on PATH. */
   builtin?: boolean;
+  /**
+   * How its inputs are listed, when it can be told which one to use.
+   *
+   * ⚠️ Absent means the recorder takes whatever the system calls the default and cannot be told
+   * otherwise — which is true of the Windows fallback: MCI's `waveaudio` opens the WAVE_MAPPER, and
+   * the WAVE_MAPPER is the Windows default recording device. Somebody with two microphones has to
+   * change it in Windows, or use a recorder that can be told. Saying so is the difference between a
+   * limitation and a mystery.
+   */
+  devices?: "dshow" | "alsa" | "avfoundation";
   /**
    * True when it writes the file as it records, rather than only at the end.
    *
@@ -100,7 +117,12 @@ export function recorders(platform: string): Recorder[] {
   if (platform === "darwin") {
     return [
       { program: "rec", args: (w) => ["-q", "-r", "16000", "-c", "1", "-b", "16", w], from: "sox", stop: "signal", streams: true },
-      { program: "ffmpeg", args: (w) => ["-hide_banner", "-loglevel", "error", "-flush_packets", "1", "-f", "avfoundation", "-i", ":0", "-ar", "16000", "-ac", "1", "-y", w], from: "ffmpeg", stop: "signal", streams: true },
+      {
+        program: "ffmpeg",
+        // `:0` is avfoundation's first audio input; a chosen device replaces the index.
+        args: (w, d) => ["-hide_banner", "-loglevel", "error", "-flush_packets", "1", "-f", "avfoundation", "-i", `:${d?.trim() || "0"}`, "-ar", "16000", "-ac", "1", "-y", w],
+        from: "ffmpeg", stop: "signal", streams: true, devices: "avfoundation",
+      },
     ];
   }
   if (platform === "win32") {
@@ -109,7 +131,11 @@ export function recorders(platform: string): Recorder[] {
       // `builtin` recorder matches every time, so the search never reached ffmpeg and a machine that
       // HAD it was served the lesser path anyway. Lesser in one specific way: ffmpeg streams, so the
       // edge of the box can follow the voice, and the Windows fallback writes once at the end.
-      { program: "ffmpeg", args: (w) => ["-hide_banner", "-loglevel", "error", "-flush_packets", "1", "-f", "dshow", "-i", "audio=default", "-ar", "16000", "-ac", "1", "-y", w], from: "ffmpeg", stop: "signal", streams: true },
+      {
+        program: "ffmpeg",
+        args: (w, d) => ["-hide_banner", "-loglevel", "error", "-flush_packets", "1", "-f", "dshow", "-i", `audio=${d?.trim() || "default"}`, "-ar", "16000", "-ac", "1", "-y", w],
+        from: "ffmpeg", stop: "signal", streams: true, devices: "dshow",
+      },
       // Nothing to install before anybody can speak: `winmm` has been part of Windows for thirty
       // years, and "install ffmpeg first" was never the brief.
       {
@@ -123,11 +149,19 @@ export function recorders(platform: string): Recorder[] {
     ];
   }
   return [
-    { program: "arecord", args: (w) => ["-q", "-f", "S16_LE", "-r", "16000", "-c", "1", w], from: "alsa-utils", stop: "signal", streams: true },
+    {
+      program: "arecord",
+      args: (w, d) => ["-q", ...(d?.trim() ? ["-D", d.trim()] : []), "-f", "S16_LE", "-r", "16000", "-c", "1", w],
+      from: "alsa-utils", stop: "signal", streams: true, devices: "alsa",
+    },
     { program: "pw-record", args: (w) => ["--rate", "16000", "--channels", "1", w], from: "pipewire", stop: "signal", streams: true },
     { program: "parecord", args: (w) => ["--rate=16000", "--channels=1", "--file-format=wav", w], from: "pulseaudio-utils", stop: "signal", streams: true },
     { program: "rec", args: (w) => ["-q", "-r", "16000", "-c", "1", "-b", "16", w], from: "sox", stop: "signal", streams: true },
-    { program: "ffmpeg", args: (w) => ["-hide_banner", "-loglevel", "error", "-flush_packets", "1", "-f", "alsa", "-i", "default", "-ar", "16000", "-ac", "1", "-y", w], from: "ffmpeg", stop: "signal", streams: true },
+    {
+      program: "ffmpeg",
+      args: (w, d) => ["-hide_banner", "-loglevel", "error", "-flush_packets", "1", "-f", "alsa", "-i", d?.trim() || "default", "-ar", "16000", "-ac", "1", "-y", w],
+      from: "ffmpeg", stop: "signal", streams: true, devices: "alsa",
+    },
   ];
 }
 
@@ -156,4 +190,66 @@ export function recordArgv(template: string, wav: string): string[] | undefined 
   // A template that never says where to write is one that will write somewhere else, and the first
   // sign of it would be a transcription of silence.
   return text.includes("{file}") ? argv : undefined;
+}
+
+// ── Which microphone ─────────────────────────────────────────────────────────────────────────────
+
+export interface InputDevice {
+  /** What to pass to the recorder. */
+  id: string;
+  /** What to show a person choosing. */
+  label: string;
+}
+
+/**
+ * How to ask a recorder what inputs exist.
+ *
+ * Each tool answers on **stderr**, which is where "informational output that is not the thing you
+ * asked for" goes, and each of them exits non-zero afterwards because listing was never what the
+ * command said it was doing. Both are normal and neither is a failure.
+ */
+export function listDevicesArgv(kind: NonNullable<Recorder["devices"]>): { program: string; args: string[] } {
+  if (kind === "dshow") return { program: "ffmpeg", args: ["-hide_banner", "-list_devices", "true", "-f", "dshow", "-i", "dummy"] };
+  if (kind === "avfoundation") return { program: "ffmpeg", args: ["-hide_banner", "-list_devices", "true", "-f", "avfoundation", "-i", ""] };
+  return { program: "arecord", args: ["-L"] };
+}
+
+/**
+ * The inputs, out of what the tool printed.
+ *
+ * ⚠️ Written from each tool's documented output rather than invented, and kept forgiving: a parser
+ * that returns nothing when a line is a shade different leaves somebody with several microphones
+ * exactly where they started — which is the situation this exists for. Anything unrecognised is
+ * skipped, never guessed at.
+ */
+export function parseDevices(kind: NonNullable<Recorder["devices"]>, text: string): InputDevice[] {
+  const out: InputDevice[] = [];
+  if (kind === "dshow") {
+    // `[dshow @ …] "Microphone (Realtek Audio)" (audio)` — the quoted name is what `-i audio=` takes.
+    // Video devices are listed the same way and are not microphones.
+    for (const line of text.split("\n")) {
+      const m = /"([^"]+)"\s*\(audio\)/.exec(line);
+      if (m?.[1]) out.push({ id: m[1], label: m[1] });
+    }
+    return out;
+  }
+  if (kind === "avfoundation") {
+    // Two lists in one output; only what follows "AVFoundation audio devices:" counts.
+    const after = text.split(/AVFoundation audio devices:/)[1] ?? "";
+    for (const line of after.split("\n")) {
+      const m = /\[(\d+)\]\s*(.+?)\s*$/.exec(line.replace(/^\[[^\]]*\]\s*/, ""));
+      if (m?.[1] && m[2]) out.push({ id: m[1], label: m[2] });
+    }
+    return out;
+  }
+  // `arecord -L`: a name on its own line, then indented description lines. Only the capture-capable
+  // ones are worth offering, and `null` is a device that records silence perfectly.
+  const lines = text.split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    const name = lines[i] ?? "";
+    if (/^\s/.test(name) || !name.trim() || name.trim() === "null") continue;
+    const described = (lines[i + 1] ?? "").trim();
+    out.push({ id: name.trim(), label: described ? `${name.trim()} — ${described}` : name.trim() });
+  }
+  return out;
 }

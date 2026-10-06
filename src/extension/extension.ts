@@ -6,6 +6,7 @@ import { showKnowledge } from "./knowledge.js";
 import { announcePolicy, policySource, reloadPolicy } from "./policy.js";
 import { SiemShipper } from "./siem.js";
 import { Background } from "./background.js";
+import { findRecorder, inputDevices } from "./whisper.js";
 import { Corpus } from "./corpus.js";
 import { LearnedRouting } from "./learned.js";
 import { ReviewDiagnostics, parseFindings, prepareReview, summarise } from "./review.js";
@@ -565,6 +566,50 @@ export function activate(context: vscode.ExtensionContext): void {
       }
       const uri = picked.detail ? definitionUri(picked.detail) : undefined;
       if (uri) await vscode.window.showTextDocument(uri);
+    }),
+
+    /**
+     * Pick which microphone dictation listens to.
+     *
+     * ⚠️ It exists because of a machine with several inputs, where the default was not the one being
+     * spoken into: « son micro n'a rien entendu ». Nothing was broken — the recorder took what the
+     * system calls the default, recorded a perfectly valid file of silence, and the failure surfaced
+     * three steps later as a transcriber's complaint about a temporary path.
+     */
+    vscode.commands.registerCommand("hiveyCode.chooseMicrophone", async () => {
+      const found = findRecorder(process.platform);
+      if (!found) {
+        void vscode.window.showWarningMessage(
+          t("Nothing on this machine can record yet — press the microphone in the panel and it will offer to install one."),
+        );
+        return;
+      }
+      if (!found.devices) {
+        // ⚠️ Said plainly rather than offering a list that cannot be acted on. Windows' built-in
+        // recorder opens the WAVE_MAPPER, and the WAVE_MAPPER IS the Windows default input.
+        void vscode.window.showInformationMessage(
+          t("{0} always records from the system's default input, which Windows sets. Change it in Windows sound settings, or install ffmpeg to choose here.", found.program),
+        );
+        return;
+      }
+      const devices = inputDevices(found.devices);
+      if (!devices.length) {
+        void vscode.window.showWarningMessage(t("{0} listed no inputs on this machine.", found.program));
+        return;
+      }
+      const current = vscode.workspace.getConfiguration(SECTION).get<string>("dictation.device", "");
+      const picked = await vscode.window.showQuickPick(
+        [
+          { label: t("The system default"), id: "", picked: !current },
+          ...devices.map((d) => ({ label: d.label, id: d.id, picked: d.id === current })),
+        ],
+        { placeHolder: t("Which microphone should dictation listen to?"), matchOnDetail: true },
+      );
+      if (!picked) return;
+      await vscode.workspace
+        .getConfiguration(SECTION)
+        .update("dictation.device", picked.id, vscode.ConfigurationTarget.Global);
+      void vscode.window.setStatusBarMessage(t("Dictation will listen to {0}.", picked.label), 5000);
     }),
 
     vscode.commands.registerCommand("hiveyCode.setup", async () => {

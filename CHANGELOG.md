@@ -2,6 +2,30 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 1.12.0 — 2026-10-06
+
+### Ajouté
+
+- **⚠️ On peut enfin choisir son micro.** « mon ami qui a plusieurs sources d'entrée de son […] son
+  micro n'a rien entendu ». Rien n'était cassé : l'enregistreur prenait ce que le système appelle le
+  **périphérique par défaut**, enregistrait un fichier parfaitement valide de silence, et la panne
+  refaisait surface trois étapes plus loin sous la forme d'une plainte du transcripteur à propos d'un
+  chemin temporaire. *Un réglage qui convient à presque tout le monde et se trompe en silence chez les
+  autres est pire qu'un réglage manquant.*
+
+  Nouvelle commande **« Hivey Code : choisir un micro »**, qui demande à l'enregistreur en place ce
+  qu'il voit — `ffmpeg -list_devices` sous Windows et macOS, `arecord -L` sous Linux — et écrit le
+  choix dans `hiveyCode.dictation.device`.
+
+  ⚠️ Chacun de ces outils répond sur **stderr** et **sort en erreur** ensuite, parce que lister n'était
+  pas ce que la commande prétendait faire. Les deux sont normaux : traiter la sortie non nulle comme un
+  échec annoncerait « aucun micro » sur une machine qui en a quatre.
+
+  ⚠️ Et l'enregistreur intégré de Windows **le dit** au lieu d'offrir une liste inutilisable : MCI
+  ouvre le WAVE_MAPPER, qui **est** le périphérique par défaut de Windows. Pour choisir, il faut soit
+  changer le défaut dans les paramètres de son, soit installer ffmpeg — et la commande l'explique en
+  une phrase plutôt que de laisser chercher.
+
 ## 1.11.1 — 2026-10-06
 
 ### Corrigé

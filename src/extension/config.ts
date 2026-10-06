@@ -260,6 +260,7 @@ function readSettingsRaw(scope?: vscode.Uri): Settings {
       language: c.get<string>("dictation.language", ""),
       localModel: c.get<string>("dictation.localModel", DEFAULT_WHISPER_MODEL),
       recordCommand: c.get<string>("dictation.recordCommand", ""),
+      device: c.get<string>("dictation.device", ""),
     },
     completion: {
       provider: c.get<ProviderId | "off">("completion.provider", "local"),

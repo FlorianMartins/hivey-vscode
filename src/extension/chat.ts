@@ -3278,7 +3278,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const wav = join(dir, "voice.wav");
     const configured = recordArgv(settings.dictation.recordCommand, wav);
     const found = configured ? undefined : findRecorder(process.platform);
-    const argv = configured ?? (found ? [found.program, ...found.args(wav)] : undefined);
+    const argv = configured ?? (found ? [found.program, ...found.args(wav, settings.dictation.device)] : undefined);
     if (!argv) {
       await fsp.rm(dir, { recursive: true, force: true });
       // ⚠️ OFFER TO INSTALL IT, rather than hand somebody a command to copy. « si il faut installer un

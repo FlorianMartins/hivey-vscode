@@ -1348,6 +1348,14 @@ export const FR: Record<string, string> = {
   "Starting…": "Démarrage…",
   "Nothing usable was recorded ({0}). The microphone may not be this machine's default input, or another program may have it. Setting hiveyCode.dictation.recordCommand to a command that names the device is the way past that.":
     "Rien d'exploitable n'a été enregistré ({0}). Le micro n'est peut-être pas l'entrée par défaut de cette machine, ou un autre programme le retient. Renseigner hiveyCode.dictation.recordCommand avec une commande qui nomme le périphérique est le moyen de s'en sortir.",
+  "Dictation will listen to {0}.": "La dictée écoutera {0}.",
+  "Nothing on this machine can record yet — press the microphone in the panel and it will offer to install one.":
+    "Rien sur cette machine ne sait encore enregistrer — appuyez sur le micro dans le panneau et il proposera d'en installer un.",
+  "The system default": "Le périphérique par défaut du système",
+  "Which microphone should dictation listen to?": "Quel micro la dictée doit-elle écouter ?",
+  "{0} always records from the system's default input, which Windows sets. Change it in Windows sound settings, or install ffmpeg to choose here.":
+    "{0} enregistre toujours depuis l'entrée par défaut du système, que Windows fixe. Changez-la dans les paramètres de son de Windows, ou installez ffmpeg pour choisir ici.",
+  "{0} listed no inputs on this machine.": "{0} n'a listé aucune entrée sur cette machine.",
   "Which areas is this conversation about?": "De quels domaines relève cette conversation ?",
   "Which languages and subjects this conversation is about": "Les langages et sujets dont relève cette conversation",
   "Which sub-agents may be dispatched?": "Quels sous-agents peuvent être sollicités ?",

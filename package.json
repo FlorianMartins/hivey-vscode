@@ -2,7 +2,7 @@
   "name": "hivey-code",
   "displayName": "Hivey Code",
   "description": "%extension.description%",
-  "version": "1.11.1",
+  "version": "1.12.0",
   "publisher": "hivey",
   "license": "Apache-2.0",
   "repository": {
@@ -241,6 +241,12 @@
         "title": "%command.setup.title%",
         "category": "Hivey Code",
         "icon": "$(plug)"
+      },
+      {
+        "command": "hiveyCode.chooseMicrophone",
+        "title": "%command.chooseMicrophone.title%",
+        "category": "Hivey Code",
+        "icon": "$(mic)"
       },
       {
         "command": "hiveyCode.moveToSecondarySideBar",
@@ -1217,6 +1223,11 @@
             "type": "string",
             "default": "",
             "markdownDescription": "%config.dictation.endpoint%"
+          },
+          "hiveyCode.dictation.device": {
+            "type": "string",
+            "default": "",
+            "markdownDescription": "%config.dictation.device%"
           },
           "hiveyCode.dictation.recordCommand": {
             "type": "string",

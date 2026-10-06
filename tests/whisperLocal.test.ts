@@ -20,7 +20,7 @@ import {
   whisperUrl,
 } from "../src/core/dictation/local.js";
 import { readTar } from "../src/core/archive/tar.js";
-import { howToRecord, recordArgv, recorders, windowsRecorderScript } from "../src/core/dictation/capture.js";
+import { howToRecord, parseDevices, recordArgv, recorders, windowsRecorderScript } from "../src/core/dictation/capture.js";
 import { gzipSync } from "node:zlib";
 import { describeWav, encodeWav, SPEECH_SAMPLE_RATE, WAV_HEADER_BYTES } from "../src/core/dictation/wav.js";
 
@@ -320,4 +320,45 @@ test("a recording cut short is read as far as it goes", () => {
   const facts = describeWav(cut);
   assert.equal(facts.ok, true, facts.why);
   assert.ok(facts.seconds > 0.4 && facts.seconds < 1, `${facts.seconds}s read from a truncated file`);
+});
+
+test("⚠️ the microphone can be chosen, because a machine can have several", () => {
+  // « mon ami qui a plusieurs sources d'entrée de son […] son micro n'a rien entendu ». A recorder
+  // that always takes the system default works perfectly for anybody with one microphone and silently
+  // records nothing for anybody with two.
+  const ff = recorders("win32").find((r) => r.program === "ffmpeg")!;
+  assert.ok(ff.args("v.wav").includes("audio=default"), "no device means the system default");
+  assert.ok(ff.args("v.wav", "Microphone (Realtek)").includes("audio=Microphone (Realtek)"));
+  const alsa = recorders("linux").find((r) => r.program === "arecord")!;
+  assert.ok(!alsa.args("v.wav").includes("-D"), "an empty device must not become an empty -D");
+  assert.deepEqual(alsa.args("v.wav", "plughw:1,0").slice(0, 3), ["-q", "-D", "plughw:1,0"]);
+  // ⚠️ And the Windows fallback says it CANNOT be told: MCI opens the WAVE_MAPPER, which is whatever
+  // Windows calls the default. Saying so is the difference between a limitation and a mystery.
+  assert.equal(recorders("win32").find((r) => r.builtin)!.devices, undefined);
+});
+
+test("each tool's list of inputs is read the way that tool prints it", () => {
+  // Written from the documented output of each, and forgiving: a parser that returns nothing when a
+  // line is a shade different leaves somebody with several microphones where they started.
+  assert.deepEqual(
+    parseDevices("dshow", [
+      '[dshow @ 000001] "Integrated Camera" (video)',
+      '[dshow @ 000001] "Microphone (Realtek(R) Audio)" (audio)',
+      '[dshow @ 000001] "Line In (USB Interface)" (audio)',
+    ].join("\n")).map((d) => d.id),
+    ["Microphone (Realtek(R) Audio)", "Line In (USB Interface)"],
+  );
+  assert.deepEqual(
+    parseDevices("avfoundation", [
+      "[AVFoundation indev @ 0x1] AVFoundation video devices:",
+      "[AVFoundation indev @ 0x1] [0] FaceTime HD Camera",
+      "[AVFoundation indev @ 0x1] AVFoundation audio devices:",
+      "[AVFoundation indev @ 0x1] [0] MacBook Pro Microphone",
+      "[AVFoundation indev @ 0x1] [1] Scarlett Solo",
+    ].join("\n")),
+    [{ id: "0", label: "MacBook Pro Microphone" }, { id: "1", label: "Scarlett Solo" }],
+  );
+  const alsa = parseDevices("alsa", ["null", "    Discard all samples", "plughw:CARD=PCH,DEV=0", "    HDA Intel PCH, ALC295 Analog"].join("\n"));
+  assert.deepEqual(alsa.map((d) => d.id), ["plughw:CARD=PCH,DEV=0"], "a device that records silence is not an offer");
+  assert.match(alsa[0]!.label, /HDA Intel PCH/, "the description is what makes the id choosable");
 });

@@ -53,6 +53,14 @@ export interface DictationSettings {
    * from a command line. Detection covers the usual tools; this covers the machine where it does not.
    */
   recordCommand: string;
+  /**
+   * Which input to listen to, when the machine has more than one.
+   *
+   * ⚠️ Empty means "whatever the system calls the default", which is right for almost everybody and
+   * silently wrong for anybody with two microphones: the default may be a webcam nobody speaks into,
+   * and what comes back is a file with no sound in it. Chosen with `Hivey Code: Choose a microphone`.
+   */
+  device: string;
 }
 
 /**

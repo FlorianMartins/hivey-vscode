@@ -253,3 +253,22 @@ export function startRecording(argv: string[], wav: string, how: "signal" | "std
 }
 
 export { recordArgv };
+
+import { listDevicesArgv, parseDevices, type InputDevice } from "../core/dictation/capture.js";
+
+/**
+ * The microphones this machine offers, asked of the recorder that will be used.
+ *
+ * ⚠️ Every one of these tools answers on STDERR and exits non-zero afterwards, because listing was
+ * never what the command claimed to be doing. Both are normal. Treating a non-zero exit as a failure
+ * here would report "no microphones" on a machine that has four.
+ */
+export function inputDevices(kind: NonNullable<Recorder["devices"]>): InputDevice[] {
+  const { program, args } = listDevicesArgv(kind);
+  try {
+    const run = spawnSync(program, args, { encoding: "utf8" });
+    return parseDevices(kind, `${run.stderr ?? ""}\n${run.stdout ?? ""}`);
+  } catch {
+    return [];
+  }
+}
