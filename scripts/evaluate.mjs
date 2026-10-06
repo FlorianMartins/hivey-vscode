@@ -197,6 +197,16 @@ async function verifySolutions(tasks) {
 }
 
 /** One task, one model, from a clean copy to a verdict. */
+/**
+ * The task's own temporary directory, replaced by the name of what it is.
+ *
+ * Both spellings, because a path reaches a log as itself and as a `file://` URL, and only one of the
+ * two would have been noticed.
+ */
+function scrubPaths(text, dir) {
+  return text.split(`file://${dir}`).join("<task>").split(dir).join("<task>");
+}
+
 async function runTask(task, model, endpoint, timeoutMs) {
   const dir = await checkout(task);
   // OUTSIDE the working copy, deliberately. A file the agent can see is a file it can read, edit or
@@ -240,7 +250,15 @@ async function runTask(task, model, endpoint, timeoutMs) {
       runs: await readRunRecords(reportFile),
       // Only on failure, and only the tail: the interesting part of a failed run is what the check
       // said, and a results file that carries every successful log is unreadable.
-      ...(check.code === 0 ? {} : { why: check.out.slice(-2000), agent: attempt.out.slice(-2000) }),
+      //
+      // ⚠️ With this machine's temporary paths taken out. Every task runs in a throwaway directory
+      // whose name ends in six random characters, and those names ended up quoted all through a
+      // committed report — unreproducible noise on any other machine, and enough entropy for the
+      // repository's own secret scanner to call them secrets and turn CI red. A path that exists
+      // only on the machine that ran the bench belongs nowhere in its published result.
+      ...(check.code === 0
+        ? {}
+        : { why: scrubPaths(check.out.slice(-2000), dir), agent: scrubPaths(attempt.out.slice(-2000), dir) }),
     };
   } finally {
     await rm(dir, { recursive: true, force: true });

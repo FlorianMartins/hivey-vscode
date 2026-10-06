@@ -1,331 +1,93 @@
 # Evaluation report
 
-Run at 2026-10-06T13:49:24.057Z.
+Run at 2026-10-03T11:53:09.585Z.
 
-Endpoint: `https://openrouter.ai/api/v1`. Models: `hivey/free`.
+Endpoint: `https://openrouter.ai/api/v1`. Models: `hivey`.
 
 ## Summary
 
 | model | passed | rate | time | steps | tokens in | tokens out | cost | out of steps | truncated | escalations |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `hivey/free` | 27/62 | 44 % | 9626.9 s | 211 | 703638 | 66102 | $0.0000 | 0 | 5 | 0 |
+| `hivey` | 48/56 | 86 % | 3725.8 s | 516 | 3448638 | 138198 | $4.3422 | 3 | 0 | 0 |
 
-## `hivey/free`
+## `hivey`
 
 | kind | passed | rate | time | steps | cost |
 | --- | --- | --- | --- | --- | --- |
-| bug | 16/24 | 67 % | 3457.4 s | 125 | $0.0000 |
-| feature | 1/3 | 33 % | 410.4 s | 13 | $0.0000 |
-| ibmi | 1/21 | 5 % | 3450.6 s | 23 | $0.0000 |
-| noverify | 5/6 | 83 % | 1003.6 s | 23 | $0.0000 |
-| refactor | 3/4 | 75 % | 621.1 s | 15 | $0.0000 |
-| test | 1/4 | 25 % | 683.8 s | 12 | $0.0000 |
+| bug | 24/24 | 100 % | 1357.9 s | 240 | $1.7732 |
+| feature | 3/3 | 100 % | 152.8 s | 27 | $0.2047 |
+| ibmi | 15/21 | 71 % | 1607.0 s | 170 | $1.7687 |
+| refactor | 2/4 | 50 % | 355.9 s | 37 | $0.2549 |
+| test | 4/4 | 100 % | 252.2 s | 42 | $0.3408 |
 
 | task | result | time | steps | tokens | cost |
 | --- | --- | --- | --- | --- | --- |
-| `feature-cli-flag` | pass | 93.6 s | 11 | 36057+1437 | $0.0000 |
-| `feature-validate` | **FAIL** | 136.7 s | 2 | 7688+4373 | $0.0000 |
-| `fin-amortisation` | pass | 145.4 s | 14 | 66294+3688 | $0.0000 |
-| `fin-fix-message` | **FAIL** | 180.2 s | — | — | — |
-| `fin-iban` | pass | 136.6 s | 7 | 24567+1832 | $0.0000 |
-| `fin-identifiers` | **FAIL** | 180.1 s | — | — | — |
-| `fin-market-hours` | **FAIL** | 180.0 s | — | — | — |
-| `fin-minor-units` | **FAIL** | 180.2 s | — | — | — |
-| `fin-settlement` | **FAIL** | 180.2 s | — | — | — |
-| `ibmi-cl-monmsg` | **FAIL** | 169.5 s | 4 | 13775+1826 | $0.0000 |
-| `ibmi-cl-qualify` | **FAIL** | 180.0 s | — | — | — |
-| `ibmi-cl-sbmjob` | **FAIL** | 180.0 s | — | — | — |
-| `ibmi-db2-catalog` | **FAIL** | 180.0 s | — | — | — |
-| `ibmi-db2-commit` | **FAIL** | 112.7 s | 2 | 8156+995 | $0.0000 |
-| `ibmi-db2-ddl` | **FAIL** | 108.6 s | 0 | 2532+1967 | $0.0000 |
-| `ibmi-dds-field` | **FAIL** | 150.3 s | 1 | 4996+4216 | $0.0000 |
-| `ibmi-dds-logical` | **FAIL** | 127.0 s | 6 | 23131+2873 | $0.0000 |
-| `ibmi-dds-printer` | **FAIL** | 180.0 s | — | — | — |
-| `ibmi-rpg-copy-proto` | **FAIL** | 180.1 s | — | — | — |
-| `ibmi-rpg-doc` | **FAIL** | 180.0 s | — | — | — |
-| `ibmi-rpg-fixed-lr` | **FAIL** | 98.0 s | 1 | 5292+4736 | $0.0000 |
-| `ibmi-rpg-freeform` | **FAIL** | 180.0 s | — | — | — |
-| `ibmi-rpg-indicators` | **FAIL** | 180.0 s | — | — | — |
-| `ibmi-rpg-monitor` | **FAIL** | 164.2 s | 9 | 33641+1750 | $0.0000 |
-| `ibmi-rpg-move` | **FAIL** | 180.1 s | — | — | — |
-| `ibmi-rpg-packed` | **FAIL** | 180.0 s | — | — | — |
-| `ibmi-rpg-procedure` | **FAIL** | 180.1 s | — | — | — |
-| `ibmi-rpg-sql-cursor` | **FAIL** | 180.0 s | — | — | — |
-| `ibmi-rpg-srvpgm` | **FAIL** | 180.0 s | — | — | — |
-| `ibmi-rpg-unittest` | **FAIL** | 172.3 s | 1 | 5265+4152 | $0.0000 |
-| `ibmi-sql-db2` | pass | 180.0 s | — | — | — |
-| `java-equals-hashcode` | pass | 135.7 s | 5 | 16914+943 | $0.0000 |
-| `java-junit` | pass | 151.0 s | 11 | 41667+1829 | $0.0000 |
-| `java-optional` | pass | 145.2 s | 9 | 24131+1056 | $0.0000 |
-| `java-try-with-resources` | pass | 142.5 s | 6 | 23567+1182 | $0.0000 |
-| `js-async-race` | pass | 144.3 s | 9 | 27823+1568 | $0.0000 |
-| `js-money-rounding` | **FAIL** | 139.6 s | 3 | 7765+3161 | $0.0000 |
-| `js-null-crash` | pass | 137.2 s | 11 | 36672+1277 | $0.0000 |
-| `js-off-by-one` | pass | 105.3 s | 9 | 31469+1927 | $0.0000 |
-| `noverify-column` | **FAIL** | 180.0 s | — | — | — |
-| `noverify-constant` | pass | 176.8 s | 11 | 36791+1016 | $0.0000 |
-| `noverify-option` | pass | 180.1 s | — | — | — |
-| `noverify-rename` | pass | 106.5 s | 12 | 22975+973 | $0.0000 |
-| `noverify-signature` | pass | 180.1 s | — | — | — |
-| `noverify-status` | pass | 180.1 s | — | — | — |
-| `py-aware-datetime` | pass | 180.0 s | — | — | — |
-| `py-date-parse` | pass | 92.3 s | 7 | 20662+2173 | $0.0000 |
-| `py-decimal-money` | pass | 180.0 s | — | — | — |
-| `py-mutable-default` | pass | 76.3 s | 9 | 28133+1338 | $0.0000 |
-| `py-reiterable` | pass | 155.4 s | 9 | 31134+1437 | $0.0000 |
-| `refactor-extract` | pass | 180.2 s | — | — | — |
-| `sql-fanout-double-count` | **FAIL** | 175.0 s | 4 | 7688+4269 | $0.0000 |
-| `sql-index-advice` | pass | 71.3 s | 8 | 21553+845 | $0.0000 |
-| `sql-join-fix` | pass | 156.0 s | 13 | 38766+1904 | $0.0000 |
-| `sql-latest-per-group` | **FAIL** | 180.0 s | — | — | — |
-| `sql-not-in-null` | pass | 129.8 s | 8 | 21274+1787 | $0.0000 |
-| `test-regression` | **FAIL** | 180.3 s | — | — | — |
-| `test-write-vat` | **FAIL** | 180.2 s | — | — | — |
-| `ts-exhaustive-switch` | **FAIL** | 180.1 s | — | — | — |
-| `ts-impossible-state` | pass | 150.2 s | 5 | 18377+1063 | $0.0000 |
-| `ts-narrow-any` | **FAIL** | 145.5 s | 1 | 4836+1975 | $0.0000 |
-| `ts-readonly-input` | pass | 74.0 s | 3 | 10047+534 | $0.0000 |
+| `feature-cli-flag` | pass | 50.5 s | 9 | 53935+2097 | $0.0697 |
+| `feature-validate` | pass | 52.5 s | 10 | 58576+1646 | $0.0673 |
+| `fin-amortisation` | pass | 45.3 s | 10 | 61425+1391 | $0.0661 |
+| `fin-fix-message` | pass | 81.6 s | 12 | 91477+3424 | $0.1047 |
+| `fin-iban` | pass | 50.2 s | 9 | 62353+1846 | $0.0716 |
+| `fin-identifiers` | pass | 134.9 s | 14 | 104911+4779 | $0.1261 |
+| `fin-market-hours` | pass | 61.2 s | 12 | 82297+2130 | $0.0868 |
+| `fin-minor-units` | pass | 57.3 s | 10 | 64285+1931 | $0.0731 |
+| `fin-settlement` | pass | 64.0 s | 10 | 65500+2438 | $0.0793 |
+| `ibmi-cl-monmsg` | pass | 49.7 s | 6 | 40912+1660 | $0.0546 |
+| `ibmi-cl-qualify` | **FAIL** | 100.9 s | 9 | 60240+4390 | $0.0986 |
+| `ibmi-cl-sbmjob` | **FAIL** | 41.3 s | 4 | 27833+1200 | $0.0388 |
+| `ibmi-db2-catalog` | pass | 55.7 s | 8 | 52567+1785 | $0.0659 |
+| `ibmi-db2-commit` | **FAIL** | 87.5 s | 10 | 81032+3740 | $0.1040 |
+| `ibmi-db2-ddl` | pass | 32.0 s | 3 | 25365+1540 | $0.0405 |
+| `ibmi-dds-field` | pass | 91.8 s | 9 | 66094+3730 | $0.0961 |
+| `ibmi-dds-logical` | pass | 59.4 s | 7 | 48526+2352 | $0.0686 |
+| `ibmi-dds-printer` | **FAIL** | 154.9 s | 10 | 89224+8085 | $0.1563 |
+| `ibmi-rpg-copy-proto` | pass | 77.3 s | 10 | 70987+3025 | $0.0921 |
+| `ibmi-rpg-doc` | pass | 89.6 s | 12 | 79189+3561 | $0.1007 |
+| `ibmi-rpg-fixed-lr` | pass | 58.4 s | 7 | 48590+2272 | $0.0676 |
+| `ibmi-rpg-freeform` | **FAIL** | 50.6 s | 4 | 29491+1764 | $0.0461 |
+| `ibmi-rpg-indicators` | pass | 76.5 s | 9 | 66043+3219 | $0.0900 |
+| `ibmi-rpg-monitor` | pass | 59.3 s | 9 | 66611+1773 | $0.0749 |
+| `ibmi-rpg-move` | pass | 120.6 s | 10 | 74438+5197 | $0.1186 |
+| `ibmi-rpg-packed` | pass | 119.9 s | 9 | 70390+5674 | $0.1202 |
+| `ibmi-rpg-procedure` | pass | 81.2 s | 12 | 83135+3665 | $0.1063 |
+| `ibmi-rpg-sql-cursor` | **FAIL** | 30.2 s | 3 | 22165+915 | $0.0308 |
+| `ibmi-rpg-srvpgm` | pass | 110.3 s | 11 | 77332+5732 | $0.1253 |
+| `ibmi-rpg-unittest` | pass | 92.7 s | 13 | 105473+3638 | $0.1146 |
+| `ibmi-sql-db2` | pass | 59.9 s | 8 | 52506+2402 | $0.0727 |
+| `java-equals-hashcode` | pass | 58.1 s | 9 | 61801+2378 | $0.0793 |
+| `java-junit` | pass | 52.6 s | 8 | 58088+2394 | $0.0751 |
+| `java-optional` | pass | 67.3 s | 15 | 81972+3101 | $0.1008 |
+| `java-try-with-resources` | pass | 55.7 s | 8 | 53971+1906 | $0.0676 |
+| `js-async-race` | pass | 64.7 s | 11 | 60652+2089 | $0.0725 |
+| `js-money-rounding` | pass | 43.8 s | 9 | 51775+1448 | $0.0597 |
+| `js-null-crash` | pass | 41.2 s | 9 | 47444+952 | $0.0521 |
+| `js-off-by-one` | pass | 52.4 s | 13 | 84922+1652 | $0.0806 |
+| `py-aware-datetime` | pass | 56.1 s | 10 | 68390+1945 | $0.0766 |
+| `py-date-parse` | pass | 47.0 s | 9 | 54739+1423 | $0.0621 |
+| `py-decimal-money` | pass | 59.0 s | 10 | 73419+2403 | $0.0831 |
+| `py-mutable-default` | pass | 50.6 s | 10 | 64946+1617 | $0.0712 |
+| `py-reiterable` | pass | 50.0 s | 9 | 64268+1626 | $0.0705 |
+| `refactor-extract` | pass | 57.3 s | 14 | 81610+1765 | $0.0844 |
+| `sql-fanout-double-count` | pass | 53.0 s | 10 | 58829+2035 | $0.0709 |
+| `sql-index-advice` | pass | 38.9 s | 9 | 45870+1401 | $0.0561 |
+| `sql-join-fix` | pass | 50.7 s | 9 | 50169+2027 | $0.0657 |
+| `sql-latest-per-group` | pass | 48.1 s | 10 | 56039+1745 | $0.0664 |
+| `sql-not-in-null` | pass | 46.7 s | 10 | 54537+1495 | $0.0633 |
+| `test-regression` | pass | 57.8 s | 12 | 73476+2045 | $0.0819 |
+| `test-write-vat` | pass | 49.1 s | 9 | 56279+1906 | $0.0691 |
+| `ts-exhaustive-switch` | pass | 49.8 s | 8 | 54396+1889 | $0.0677 |
+| `ts-impossible-state` | **FAIL** | 51.3 s | 8 | 55083+2023 | $0.0697 |
+| `ts-narrow-any` | **FAIL** | 180.0 s | — | — | — |
+| `ts-readonly-input` | pass | 47.4 s | 8 | 53061+1932 | $0.0679 |
 
 ### What the failures said
 
-**`feature-validate`** — agent exit 0
-
-```
-TAP version 13
-# file:///tmp/hivey-eval-feature-validate-FEfQbH/siret.test.js:3
-# import { isValidSiret } from "./siret.js";
-#          ^^^^^^^^^^^^
-# SyntaxError: The requested module './siret.js' does not provide an export named 'isValidSiret'
-# [90m    at ModuleJob._instantiate (node:internal/modules/esm/module_job:123:21)[39m
-# [90m    at async ModuleJob.run (node:internal/modules/esm/module_job:191:5)[39m
-# [90m    at async ModuleLoader.import (node:internal/modules/esm/loader:336:24)[39m
-# [90m    at async loadESM (node:internal/process/esm_loader:34:7)[39m
-# [90m    at async handleMainPromise (node:internal/modules/run_main:106:12)[39m
-# Node.js v18.19.1
-# Subtest: /tmp/hivey-eval-feature-validate-FEfQbH/siret.test.js
-not ok 1 - /tmp/hivey-eval-feature-validate-FEfQbH/siret.test.js
-  ---
-  duration_ms: 75.003811
-  location: '/tmp/hivey-eval-feature-validate-FEfQbH/siret.test.js:1:1'
-  failureType: 'testCodeFailure'
-  exitCode: 1
-  error: 'test failed'
-  code: 'ERR_TEST_FAILURE'
-  ...
-1..1
-# tests 1
-# suites 0
-# pass 0
-# fail 1
-# cancelled 0
-# skipped 0
-# todo 0
-# duration_ms 80.463251
-```
-
-**`fin-fix-message`** — agent exit 124
-
-```
-/test_runner/test:374:18)
-    Test.postRun (node:internal/test_runner/test:715:19)
-    Test.run (node:internal/test_runner/test:673:12)
-    async startSubtest (node:internal/test_runner/harness:214:3)
-  ...
-# Subtest: a one-field message is still well formed
-not ok 3 - a one-field message is still well formed
-  ---
-  duration_ms: 0.550542
-  location: 'file:///tmp/hivey-eval-fin-fix-message-lXEZ9A/fix.test.js:45:1'
-  failureType: 'testCodeFailure'
-  error: |-
-    Expected values to be strictly equal:
-    
-    undefined !== 3
-    
-  code: 'ERR_ASSERTION'
-  name: 'AssertionError'
-  expected: 3
-  operator: 'strictEqual'
-  stack: |-
-    TestContext.<anonymous> (file:///tmp/hivey-eval-fin-fix-message-lXEZ9A/fix.test.js:49:10)
-    Test.runInAsyncScope (node:async_hooks:203:9)
-    Test.run (node:internal/test_runner/test:631:25)
-    Test.processPendingSubtests (node:internal/test_runner/test:374:18)
-    Test.postRun (node:internal/test_runner/test:715:19)
-    Test.run (node:internal/test_runner/test:673:12)
-    async Test.processPendingSubtests (node:internal/test_runner/test:374:7)
-  ...
-1..3
-# tests 3
-# suites 0
-# pass 0
-# fail 3
-# cancelled 0
-# skipped 0
-# todo 0
-# duration_ms 89.574916
-```
-
-**`fin-identifiers`** — agent exit 124
-
-```
-ertFalse(valid_isin("0S0378331005"))  # country code must be letters
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-AssertionError: True is not false
-
-======================================================================
-FAIL: test_isin_with_one_wrong_digit (test_ids.IdentifierTest.test_isin_with_one_wrong_digit)
-----------------------------------------------------------------------
-Traceback (most recent call last):
-  File "/tmp/hivey-eval-fin-identifiers-ZdVScg/test_ids.py", line 14, in test_isin_with_one_wrong_digit
-    self.assertFalse(valid_isin("US0378331006"))
-AssertionError: True is not false
-
-======================================================================
-FAIL: test_lei_with_one_wrong_character (test_ids.IdentifierTest.test_lei_with_one_wrong_character)
-----------------------------------------------------------------------
-Traceback (most recent call last):
-  File "/tmp/hivey-eval-fin-identifiers-ZdVScg/test_ids.py", line 27, in test_lei_with_one_wrong_character
-    self.assertFalse(valid_lei("529900T8BM49AURSDO56"))
-AssertionError: True is not false
-
-----------------------------------------------------------------------
-Ran 6 tests in 0.000s
-
-FAILED (failures=4)
-```
-
-**`fin-market-hours`** — agent exit 124
-
-```
-onError: True is not false
-
-======================================================================
-FAIL: test_closes_at_half_past_five (test_market.MarketTest.test_closes_at_half_past_five)
-----------------------------------------------------------------------
-Traceback (most recent call last):
-  File "/tmp/hivey-eval-fin-market-hours-XiX2SK/test_market.py", line 27, in test_closes_at_half_past_five
-    self.assertTrue(is_open(utc(2026, 1, 15, 16, 29)))   # 17:29 local
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-AssertionError: False is not true
-
-======================================================================
-FAIL: test_open_in_winter (test_market.MarketTest.test_open_in_winter)
-----------------------------------------------------------------------
-Traceback (most recent call last):
-  File "/tmp/hivey-eval-fin-market-hours-XiX2SK/test_market.py", line 18, in test_open_in_winter
-    self.assertFalse(is_open(utc(2026, 1, 15, 7, 30)))   # 08:30 local, before the open
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-AssertionError: True is not false
-
-----------------------------------------------------------------------
-Ran 5 tests in 0.000s
-
-FAILED (failures=4)
-```
-
-**`fin-minor-units`** — agent exit 124
-
-```
-gSubtests (node:internal/test_runner/test:374:18)
-    Test.postRun (node:internal/test_runner/test:715:19)
-    Test.run (node:internal/test_runner/test:673:12)
-    async Test.processPendingSubtests (node:internal/test_runner/test:374:7)
-  ...
-# Subtest: an unknown currency is refused rather than assumed
-not ok 5 - an unknown currency is refused rather than assumed
-  ---
-  duration_ms: 0.210785
-  location: 'file:///tmp/hivey-eval-fin-minor-units-TD9fI9/convert.test.js:26:1'
-  failureType: 'testCodeFailure'
-  error: 'Missing expected exception.'
-  code: 'ERR_ASSERTION'
-  name: 'AssertionError'
-  operator: 'throws'
-  stack: |-
-    TestContext.<anonymous> (file:///tmp/hivey-eval-fin-minor-units-TD9fI9/convert.test.js:27:10)
-    Test.runInAsyncScope (node:async_hooks:203:9)
-    Test.run (node:internal/test_runner/test:631:25)
-    Test.processPendingSubtests (node:internal/test_runner/test:374:18)
-    Test.postRun (node:internal/test_runner/test:715:19)
-    Test.run (node:internal/test_runner/test:673:12)
-    async Test.processPendingSubtests (node:internal/test_runner/test:374:7)
-  ...
-1..5
-# tests 5
-# suites 0
-# pass 1
-# fail 4
-# cancelled 0
-# skipped 0
-# todo 0
-# duration_ms 95.744798
-```
-
-**`fin-settlement`** — agent exit 124
-
-```
-al/test_runner/test:715:19)
-    Test.run (node:internal/test_runner/test:673:12)
-    async Test.processPendingSubtests (node:internal/test_runner/test:374:7)
-  ...
-# Subtest: T+1 and T+0
-not ok 6 - T+1 and T+0
-  ---
-  duration_ms: 0.128311
-  location: 'file:///tmp/hivey-eval-fin-settlement-fssqAl/settlement.test.js:30:1'
-  failureType: 'testCodeFailure'
-  error: |-
-    Expected values to be strictly equal:
-    + actual - expected
-    
-    + '2026-10-10'
-    - '2026-10-12'
-                ^
-  code: 'ERR_ASSERTION'
-  name: 'AssertionError'
-  expected: '2026-10-12'
-  actual: '2026-10-10'
-  operator: 'strictEqual'
-  stack: |-
-    TestContext.<anonymous> (file:///tmp/hivey-eval-fin-settlement-fssqAl/settlement.test.js:31:10)
-    Test.runInAsyncScope (node:async_hooks:203:9)
-    Test.run (node:internal/test_runner/test:631:25)
-    Test.processPendingSubtests (node:internal/test_runner/test:374:18)
-    Test.postRun (node:internal/test_runner/test:715:19)
-    Test.run (node:internal/test_runner/test:673:12)
-    async Test.processPendingSubtests (node:internal/test_runner/test:374:7)
-  ...
-1..6
-# tests 6
-# suites 0
-# pass 1
-# fail 5
-# cancelled 0
-# skipped 0
-# todo 0
-# duration_ms 92.323752
-```
-
-**`ibmi-cl-monmsg`** — agent exit 0
+**`ibmi-cl-qualify`** — agent exit 0
 
 ```
 
 ```
 
-**`ibmi-cl-qualify`** — agent exit 124
-
-```
-
-```
-
-**`ibmi-cl-sbmjob`** — agent exit 124
-
-```
-
-```
-
-**`ibmi-db2-catalog`** — agent exit 124
+**`ibmi-cl-sbmjob`** — agent exit 0
 
 ```
 
@@ -337,271 +99,31 @@ not ok 6 - T+1 and T+0
 
 ```
 
-**`ibmi-db2-ddl`** — agent exit 0
+**`ibmi-dds-printer`** — agent exit 0
 
 ```
 
 ```
 
-**`ibmi-dds-field`** — agent exit 0
+**`ibmi-rpg-freeform`** — agent exit 0
 
 ```
 
 ```
 
-**`ibmi-dds-logical`** — agent exit 0
+**`ibmi-rpg-sql-cursor`** — agent exit 0
 
 ```
 
 ```
 
-**`ibmi-dds-printer`** — agent exit 124
+**`ts-impossible-state`** — agent exit 0
 
 ```
 
 ```
 
-**`ibmi-rpg-copy-proto`** — agent exit 124
-
-```
-
-```
-
-**`ibmi-rpg-doc`** — agent exit 124
-
-```
-
-```
-
-**`ibmi-rpg-fixed-lr`** — agent exit 0
-
-```
-
-```
-
-**`ibmi-rpg-freeform`** — agent exit 124
-
-```
-
-```
-
-**`ibmi-rpg-indicators`** — agent exit 124
-
-```
-
-```
-
-**`ibmi-rpg-monitor`** — agent exit 0
-
-```
-
-```
-
-**`ibmi-rpg-move`** — agent exit 124
-
-```
-
-```
-
-**`ibmi-rpg-packed`** — agent exit 124
-
-```
-
-```
-
-**`ibmi-rpg-procedure`** — agent exit 124
-
-```
-
-```
-
-**`ibmi-rpg-sql-cursor`** — agent exit 124
-
-```
-
-```
-
-**`ibmi-rpg-srvpgm`** — agent exit 124
-
-```
-
-```
-
-**`ibmi-rpg-unittest`** — agent exit 0
-
-```
-
-```
-
-**`js-money-rounding`** — agent exit 0
-
-```
-95
-  ...
-# Subtest: a half cent on a refund rounds DOWN, also away from zero
-not ok 3 - a half cent on a refund rounds DOWN, also away from zero
-  ---
-  duration_ms: 1.008622
-  location: 'file:///tmp/hivey-eval-js-money-rounding-KzP3BS/total.test.js:13:1'
-  failureType: 'testCodeFailure'
-  error: |-
-    Expected values to be strictly equal:
-    
-    -12 !== -13
-    
-  code: 'ERR_ASSERTION'
-  name: 'AssertionError'
-  expected: -13
-  actual: -12
-  operator: 'strictEqual'
-  stack: |-
-    TestContext.<anonymous> (file:///tmp/hivey-eval-js-money-rounding-KzP3BS/total.test.js:17:10)
-    Test.runInAsyncScope (node:async_hooks:203:9)
-    Test.run (node:internal/test_runner/test:631:25)
-    Test.processPendingSubtests (node:internal/test_runner/test:374:18)
-    Test.postRun (node:internal/test_runner/test:715:19)
-    Test.run (node:internal/test_runner/test:673:12)
-    async Test.processPendingSubtests (node:internal/test_runner/test:374:7)
-  ...
-# Subtest: a whole refund matches the invoice it cancels
-ok 4 - a whole refund matches the invoice it cancels
-  ---
-  duration_ms: 0.096862
-  ...
-1..4
-# tests 4
-# suites 0
-# pass 3
-# fail 1
-# cancelled 0
-# skipped 0
-# todo 0
-# duration_ms 99.820232
-```
-
-**`noverify-column`** — agent exit 124
-
-```
-Parse error near line 2: table notes has 4 columns but 3 values were supplied
-Parse error near line 3: table notes has 4 columns but 3 values were supplied
-Parse error near line 4: table notes has 4 columns but 3 values were supplied
-```
-
-**`sql-fanout-double-count`** — agent exit 0
-
-```
---- expected.txt	2026-10-06 13:38:53.641415691 +0000
-+++ -	2026-10-06 13:41:48.640894927 +0000
-@@ -1,3 +1,3 @@
--1|Durand|1750|1750
-+1|Durand|3500|5250
- 2|Lefevre|400|400
- 3|Moreau|200|0
-```
-
-**`sql-latest-per-group`** — agent exit 124
-
-```
---- expected.txt	2026-10-06 13:41:34.118591577 +0000
-+++ -	2026-10-06 13:44:34.137552345 +0000
-@@ -1,3 +1,6 @@
- CHF|2026-10-02|0.9365
-+CHF|2026-10-01|0.9410
- GBP|2026-10-02|0.8710
-+USD|2026-09-30|1.1050
- USD|2026-10-02|1.1085
-+USD|2026-10-01|1.1120
-```
-
-**`test-regression`** — agent exit 124
-
-```
-AP version 13
-# Subtest: spaces become dashes
-ok 1 - spaces become dashes
-  ---
-  duration_ms: 0.809478
-  ...
-# Subtest: accented letters become their unaccented equivalent
-not ok 2 - accented letters become their unaccented equivalent
-  ---
-  duration_ms: 1.081148
-  location: 'file:///tmp/hivey-eval-test-regression-pc2UML/slug.test.js:9:1'
-  failureType: 'testCodeFailure'
-  error: |-
-    Expected values to be strictly equal:
-    + actual - expected
-    
-    + 'cr-me-br-l-e'
-    - 'crme-brule'
-         ^
-  code: 'ERR_ASSERTION'
-  name: 'AssertionError'
-  expected: 'crme-brule'
-  actual: 'cr-me-br-l-e'
-  operator: 'strictEqual'
-  stack: |-
-    TestContext.<anonymous> (file:///tmp/hivey-eval-test-regression-pc2UML/slug.test.js:10:10)
-    Test.runInAsyncScope (node:async_hooks:203:9)
-    Test.run (node:internal/test_runner/test:631:25)
-    Test.processPendingSubtests (node:internal/test_runner/test:374:18)
-    Test.postRun (node:internal/test_runner/test:715:19)
-    Test.run (node:internal/test_runner/test:673:12)
-    async startSubtest (node:internal/test_runner/harness:214:3)
-  ...
-1..2
-# tests 2
-# suites 0
-# pass 1
-# fail 1
-# cancelled 0
-# skipped 0
-# todo 0
-# duration_ms 91.254054
-```
-
-**`test-write-vat`** — agent exit 124
-
-```
-TAP version 13
-# file:///tmp/hivey-eval-test-write-vat-Y6BsXJ/vat.test.js:1
-# import { describe, it, assert, throws } from "node:test";
-#                        ^^^^^^
-# SyntaxError: The requested module 'node:test' does not provide an export named 'assert'
-# [90m    at ModuleJob._instantiate (node:internal/modules/esm/module_job:123:21)[39m
-# [90m    at async ModuleJob.run (node:internal/modules/esm/module_job:191:5)[39m
-# [90m    at async ModuleLoader.import (node:internal/modules/esm/loader:336:24)[39m
-# [90m    at async loadESM (node:internal/process/esm_loader:34:7)[39m
-# [90m    at async handleMainPromise (node:internal/modules/run_main:106:12)[39m
-# Node.js v18.19.1
-# Subtest: /tmp/hivey-eval-test-write-vat-Y6BsXJ/vat.test.js
-not ok 1 - /tmp/hivey-eval-test-write-vat-Y6BsXJ/vat.test.js
-  ---
-  duration_ms: 74.540994
-  location: '/tmp/hivey-eval-test-write-vat-Y6BsXJ/vat.test.js:1:1'
-  failureType: 'testCodeFailure'
-  exitCode: 1
-  error: 'test failed'
-  code: 'ERR_TEST_FAILURE'
-  ...
-1..1
-# tests 1
-# suites 0
-# pass 0
-# fail 1
-# cancelled 0
-# skipped 0
-# todo 0
-# duration_ms 80.272525
-```
-
-**`ts-exhaustive-switch`** — agent exit 124
-
-```
-
-```
-
-**`ts-narrow-any`** — agent exit 0
+**`ts-narrow-any`** — agent exit 124
 
 ```
 

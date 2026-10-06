@@ -160,6 +160,20 @@ test("the container really has no network, and really sees only the worktree", (
   try {
     daemonOs = execFileSync("docker", ["version", "--format", "{{.Server.Os}}"], { encoding: "utf8", stdio: "pipe" }).trim();
   } catch (err) {
+    // ⚠️ Where the sandbox can exist, a missing engine is a HARD failure: "a background command
+    // cannot reach the network" is the one claim here nobody should take on trust, and it is enforced
+    // on every Linux runner and every developer machine.
+    //
+    // Windows is the other case, and the runner proved it twice in one day — first a daemon in
+    // Windows-container mode that cannot pull `alpine`, then no daemon at all (`cannot find
+    // //./pipe/docker_engine`). Neither says anything about the sandbox, and a Linux container is not
+    // something that platform runs. Failing there is the same decor this commit's siblings removed:
+    // a job permanently red for a reason that is not about the code, which costs every other test its
+    // power to warn.
+    if (process.platform === "win32") {
+      t.skip(`no Linux container engine is reachable on this platform: ${(err as Error).message}`);
+      return;
+    }
     throw new Error(
       `this test checks the sandbox against a real container engine and could not reach one: ${(err as Error).message}`,
     );
