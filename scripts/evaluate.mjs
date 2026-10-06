@@ -125,12 +125,21 @@ async function checkout(task, { withSolution = false } = {}) {
  * than a good intention. A green evaluation over tasks that were already passing is worse than no
  * evaluation, because somebody will quote it.
  */
+/**
+ * How long a task's CHECK may take.
+ *
+ * Not the same question as how long the agent may take, and the two were one constant until the
+ * agent's became adjustable. A check is a test command on a prepared fixture: if it needs three
+ * minutes something is wrong with the check, and no endpoint's speed can change that.
+ */
+const CHECK_TIMEOUT_MS = 180_000;
+
 async function verifyTasks(tasks) {
   let broken = 0;
   for (const task of tasks) {
     const dir = await checkout(task);
     try {
-      const result = await sh(task.check, dir, task.timeoutMs ?? 180_000);
+      const result = await sh(task.check, dir, task.timeoutMs ?? CHECK_TIMEOUT_MS);
       if (result.code === 0) {
         broken++;
         console.log(`✗ ${task.id}: the check PASSES on the untouched fixture, so this task measures nothing`);
@@ -171,7 +180,7 @@ async function verifySolutions(tasks) {
     }
     const dir = await checkout(task, { withSolution: true });
     try {
-      const result = await sh(task.check, dir, task.timeoutMs ?? 180_000);
+      const result = await sh(task.check, dir, task.timeoutMs ?? CHECK_TIMEOUT_MS);
       if (result.code === 0) {
         console.log(`✓ ${task.id}: passes on the reference solution`);
       } else {
@@ -188,7 +197,7 @@ async function verifySolutions(tasks) {
 }
 
 /** One task, one model, from a clean copy to a verdict. */
-async function runTask(task, model, endpoint) {
+async function runTask(task, model, endpoint, timeoutMs) {
   const dir = await checkout(task);
   // OUTSIDE the working copy, deliberately. A file the agent can see is a file it can read, edit or
   // delete, and a check that globs the directory would trip over it — the measurement must not be
@@ -201,7 +210,7 @@ async function runTask(task, model, endpoint) {
       // it passes through `sh -c`. See `sh`.
       ["node", CLI, "--yes", task.prompt],
       dir,
-      task.timeoutMs ?? 180_000,
+      task.timeoutMs ?? timeoutMs,
       {
         HIVEY_CODE_RUN_REPORT: reportFile,
         // Per child rather than on `process.env`, which is what made the loop below sequential by
@@ -367,6 +376,12 @@ async function main() {
   // given a model and cannot know that; only the person running it does, so it is said rather than
   // inferred. Without it the row is labelled by the model, which is honest and less useful.
   const as = flag("as", "");
+  // ⚠️ The per-task clock, which was a constant nobody could reach. On 2026-10-06 a free endpoint
+  // slowed down enough that 180 s killed 55 % of the set — and the run reported those as model
+  // failures. A measurement whose clock cannot be adjusted to the endpoint being measured produces a
+  // number about the endpoint's throughput and calls it quality. The default is unchanged, so every
+  // figure already published still means what it said.
+  const timeoutMs = Math.max(1000, (Number(flag("timeout", "180")) || 180) * 1000);
 
   if (!endpoint || !models.length) {
     // Not an error, and this is deliberate: the nightly workflow has no model unless somebody
@@ -418,7 +433,7 @@ async function main() {
   const save = () =>
     writeFile(
       file,
-      JSON.stringify({ at: new Date().toISOString(), endpoint, models, as: as || undefined, results, complete: false }, null, 2) + "\n",
+      JSON.stringify({ at: new Date().toISOString(), endpoint, models, as: as || undefined, timeoutMs, results, complete: false }, null, 2) + "\n",
     );
 
   // How many may be in flight, and why it is not simply `jobs`.
@@ -458,7 +473,7 @@ async function main() {
         active += 1;
         let result;
         try {
-          result = await runTask(item.task, item.model, endpoint);
+          result = await runTask(item.task, item.model, endpoint, timeoutMs);
         } finally {
           active -= 1;
         }
@@ -495,7 +510,7 @@ async function main() {
   console.log(`\n${table(results, models)}`);
   await writeFile(
     file,
-    JSON.stringify({ at: new Date().toISOString(), endpoint, models, as: as || undefined, results, complete: true }, null, 2) + "\n",
+    JSON.stringify({ at: new Date().toISOString(), endpoint, models, as: as || undefined, timeoutMs, results, complete: true }, null, 2) + "\n",
   );
   console.log(`\nwritten: ${file}`);
 

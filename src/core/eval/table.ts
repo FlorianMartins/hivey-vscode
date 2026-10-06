@@ -94,10 +94,30 @@ export function rowsFromOutcomes(outcomes: TaskOutcome[], label?: string): Measu
   return [...groups.entries()].map(([configuration, list]) => ({ configuration, totals: totalsFor(list) }));
 }
 
+/**
+ * How many timed-out tasks a set may hold and still state a rate.
+ *
+ * ⚠️ A judgement, and it is derived rather than picked. ADR-0034 measured this bench's own noise at
+ * three tasks — 48, 47 and 50 on three identical series — and set the rule that a difference under
+ * three tasks is not a result. Timeouts are the same kind of quantity: each one is a task whose
+ * outcome is unknown, so a set holding more of them than the noise floor can no longer be told apart
+ * from the series it would be compared with. Below the floor they are left as failures, because a
+ * task the agent genuinely cannot finish IS a failure and the published runs carried two and three.
+ *
+ * Expressed as an absolute count rather than a share, because that is how the noise was measured.
+ */
+export const TIMEOUT_NOISE_TASKS = 3;
+
 function quality(totals: Totals): string {
   // A refused task says nothing about the model, so a set containing any cannot state a rate. It
   // says how many were refused instead — which tells the reader what to fix to get a number.
   if (totals.refused) return `${totals.refused} refused — no rate`;
+  // ⚠️⚠️ And neither does a task the clock killed. Found on 2026-10-06: a `hivey/free` series came
+  // back with 55 % of its tasks killed at 180 s because the free endpoint had become much slower,
+  // and every one of them counted as a model failure. The same preset had scored 32/62 two days
+  // before. A number produced that way measures the provider's throughput and publishes it as the
+  // model's quality — which is worse than publishing nothing, because it looks like a measurement.
+  if (totals.timedOut > TIMEOUT_NOISE_TASKS) return `${totals.timedOut} timed out — no rate`;
   if (totals.passRate === undefined) return "not measured";
   return `${Math.round(totals.passRate * 100)} %`;
 }

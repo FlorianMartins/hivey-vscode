@@ -8,7 +8,7 @@ import { test } from "node:test";
 import { readdirSync, readFileSync } from "node:fs";
 import assert from "node:assert/strict";
 import { buildReport, emptyTotals, markdownReport, totalsFor, type RunRecord, type TaskOutcome } from "../src/core/eval/report.js";
-import { CONFIGURATIONS, qualityTable, rowsFromOutcomes, describeWhen } from "../src/core/eval/table.js";
+import { CONFIGURATIONS, qualityTable, rowsFromOutcomes, describeWhen, TIMEOUT_NOISE_TASKS } from "../src/core/eval/table.js";
 import { HIVEY_VARIANTS } from "../src/core/router/hivey.js";
 
 function run(over: Partial<RunRecord> = {}): RunRecord {
@@ -265,6 +265,38 @@ test("the table says how many were refused instead of printing a rate", () => {
   const md = qualityTable({ taskCount: 1, at: "2026-10-03", rows });
   assert.match(md, /1 refused — no rate/);
   assert.ok(!/\| 0 % \|/.test(md), "a refusal must never be rendered as a score");
+});
+
+test("a task the clock killed is counted, and too many of them withdraw the rate", () => {
+  // ⚠️⚠️ Found by running the bench rather than by reading it. A `hivey/free` series on 2026-10-06 came
+  // back with 55 % of its tasks killed at 180 s — `agentExit: 124`, `runs` empty because the client is
+  // killed before it writes its report — and every one of them was counted as a model failure. The
+  // same preset had scored 32/62 two days earlier with 3 timeouts, and nothing about the product had
+  // moved in that direction: the free endpoint had simply become much slower. The number that run
+  // would have published measures the PROVIDER'S THROUGHPUT and calls it the model's quality.
+  const t = totalsFor([outcome({ passed: true }), outcome({ passed: false, agentExit: 124, runs: [] })]);
+  assert.equal(t.timedOut, 1);
+  // ⚠️ Below the floor the rate SURVIVES, and that is deliberate: a task the agent genuinely cannot
+  // finish is a real failure, and the two published runs carried two and three of them. Withdrawing
+  // the rate for a single timeout would retroactively unpublish honest measurements.
+  assert.equal(t.passRate, 0.5, "one timeout is a failure, not a reason to withdraw the measurement");
+});
+
+test("the table refuses a rate once timeouts pass the bench's own noise", () => {
+  // The threshold is not picked: ADR-0034 measured this bench's noise at three tasks (48, 47, 50 on
+  // three identical series) and ruled that a difference under three tasks is not a result. A set
+  // holding more unknown outcomes than that can no longer be told apart from the series it would be
+  // compared with.
+  const killed = (n: number) =>
+    Array.from({ length: n }, () => outcome({ passed: false, agentExit: 124, runs: [] }));
+
+  const atTheFloor = rowsFromOutcomes([outcome({ passed: true }), ...killed(TIMEOUT_NOISE_TASKS)], "hivey/free");
+  assert.match(qualityTable({ taskCount: 4, at: "2026-10-06", rows: atTheFloor }), /\| 25 % \|/);
+
+  const over = rowsFromOutcomes([outcome({ passed: true }), ...killed(TIMEOUT_NOISE_TASKS + 1)], "hivey/free");
+  const md = qualityTable({ taskCount: 5, at: "2026-10-06", rows: over });
+  assert.match(md, new RegExp(`${TIMEOUT_NOISE_TASKS + 1} timed out — no rate`));
+  assert.ok(!/\| \d+ % \|/.test(md), "a set the clock decided must never be rendered as a score");
 });
 
 test("the table names the presets the product actually has", () => {

@@ -120,6 +120,22 @@ export interface Totals {
    * averaging it in as a failure produces a figure that looks like a measurement and is not one.
    */
   refused: number;
+  /**
+   * Tasks the harness killed because they ran past its clock.
+   *
+   * ⚠️⚠️ The sibling of `refused`, and it took a real run to find it. A `hivey/free` series on
+   * 2026-10-06 had 55 % of its tasks killed at 180 s — `agentExit: 124`, `runs` empty, because the
+   * client never got to write its report — and every one of them was counted as a failure. The same
+   * preset had scored 32/62 two days earlier with 3 timeouts. Nothing about the product had changed
+   * in that direction; the free endpoint had simply become much slower. A set in that state measures
+   * the PROVIDER'S THROUGHPUT and reports it as the model's quality, which is worse than reporting
+   * nothing, because it looks like a measurement.
+   *
+   * It is not zero-tolerance, and that is deliberate: a task the agent genuinely cannot finish is a
+   * real failure, and the published runs carried two and three of them. The line is drawn at the
+   * bench's own measured noise — see `TIMEOUT_NOISE_TASKS` in `table.ts`.
+   */
+  timedOut: number;
 
   /** Runs that ran out of steps, and runs cut off mid-sentence. Both are quality signals. */
   outOfSteps: number;
@@ -153,6 +169,7 @@ export function emptyTotals(tasks = 0): Totals {
     claimedDone: 0,
     planLeft: 0,
     refused: 0,
+    timedOut: 0,
     selfChecked: 0,
   };
 }
@@ -168,8 +185,13 @@ export function totalsFor(outcomes: TaskOutcome[]): Totals {
   if (!outcomes.length) return out;
   out.passed = outcomes.filter((o) => o.passed).length;
   out.refused = outcomes.filter((o) => o.runs.some((r) => r.refused)).length;
+  // 124 is what a killed child reports, and it is the harness's own clock that killed it — see `sh`
+  // in `scripts/evaluate.mjs`. Counted over tasks, like everything else above: a timed-out task has
+  // no runs at all, because the client is killed before it writes its report.
+  out.timedOut = outcomes.filter((o) => o.agentExit === 124).length;
   // A pass rate over a set that includes refused tasks is not a pass rate. Absent rather than
-  // lowered, for the same reason nothing else here is ever zero when it is unknown.
+  // lowered, for the same reason nothing else here is ever zero when it is unknown. The timeout
+  // threshold lives in `table.ts`, with the reasoning that chose the number.
   if (!out.refused) out.passRate = out.passed / outcomes.length;
   out.seconds = round1(outcomes.reduce((n, o) => n + o.seconds, 0));
 
