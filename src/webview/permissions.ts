@@ -103,29 +103,37 @@ export function permissionsScreen(state: UiState, send: (m: ToExtension) => void
     ),
   );
 
+  // ⚠️ ONE list, not two. These were "Permanent rules" and "Granted for this conversation", each with
+  // its own heading, its own explanation and its own empty state — so a fresh profile spent the first
+  // two thirds of this screen saying "nothing" twice, in two different ways, before reaching anything
+  // you could act on. The distinction is real and it is kept: every row already carries it, in the
+  // word at its end. A tag on a row says the same thing as a heading over an empty box, in one line
+  // instead of ten.
   const stored = state.permissions.filter((r) => !r.session);
   const session = state.permissions.filter((r) => r.session);
 
-  wrap.append(sectionTitle(t("Permanent rules"), t("Written to disk, in force until you remove them.")));
+  wrap.append(
+    sectionTitle(
+      t("Your rules"),
+      t("Kept until you remove them, unless the row says it is only for this conversation."),
+    ),
+  );
   const list = el("div", "perm-list");
-  if (!stored.length) list.append(el("p", "empty", t("No rule: anything that changes is asked.")));
+  if (!stored.length && !session.length) {
+    list.append(el("p", "empty", t("No rule yet — anything that changes is asked.")));
+  }
   for (const rule of stored) list.append(ruleRow(rule, send));
-  wrap.append(list);
-
-  wrap.append(sectionTitle(t("Granted for this conversation"), t("Forgotten at the next conversation.")));
-  const temp = el("div", "perm-list");
-  if (!session.length) temp.append(el("p", "empty", t("Nothing yet.")));
-  for (const rule of session) temp.append(ruleRow(rule, send));
+  for (const rule of session) list.append(ruleRow(rule, send));
   if (session.length) {
-    temp.append(
+    list.append(
       button({
-        label: t("Revoke all"),
+        label: t("Revoke what this conversation granted"),
         className: "btn tiny",
         onClick: () => send({ type: "clearSessionPermissions" }),
       }),
     );
   }
-  wrap.append(temp);
+  wrap.append(list);
 
   // ── The four lists ──────────────────────────────────────────────────────────────────────────
   //

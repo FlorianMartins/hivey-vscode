@@ -202,11 +202,14 @@ body {
   font-size: var(--fs-meta);
 }
 
+/* ⚠️ Left, not centred. A centred sentence inside a screen where every other line starts at the same
+ * left margin does not read as "this list is empty" — it reads as something that failed to lay out,
+ * which is precisely how the permissions screen's two empty lists looked. Centring is for a page with
+ * nothing on it; this is a paragraph in a page that has plenty. */
 .empty {
   color: var(--muted);
   font-size: var(--fs-control);
-  padding: var(--sp-4);
-  text-align: center;
+  padding: var(--sp-2) 0;
 }
 
 /* ── Buttons ─────────────────────────────────────────────────────────────────────────────── */
@@ -488,11 +491,14 @@ mark.hit {
   scrollbar-gutter: stable;
 }
 
+/* ⚠️ The rule that used to sit here, `.entry + .entry { border-top: 1px solid }`, is gone: every
+ * `.entry` is wrapped in its own `.entry-block`, so the two are never siblings and that selector
+ * matched NOTHING. It also contradicted a comment further down claiming turns are "separated by
+ * space, which is what the editor does" — true, and true only because the rule asserting otherwise
+ * could not fire. Removing it changes no pixel; leaving it would go on describing a drawing nobody
+ * draws, which is what you read when you go looking for how this works. */
 .entry {
   padding: var(--sp-3) 0;
-}
-.entry + .entry {
-  border-top: 1px solid var(--border);
 }
 .entry.muted {
   opacity: 0.5;
@@ -2710,7 +2716,12 @@ pre.code {
   -webkit-mask-composite: xor;
   mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   mask-composite: exclude;
-  animation: hc-rotate 1.6s linear infinite;
+  /* ⚠️ 4 s, which is the editor's own figure: its chat input declares
+   * `--chat-input-anim-duration: 4s` for the same rotating border. Ours turned in 1.6 s, which is
+   * fast enough to read as a loading spinner — something that demands attention — where the editor's
+   * reads as a surface quietly alive. The difference between a professional interface and a busy one
+   * is usually a number like this. */
+  animation: hc-rotate 4s linear infinite;
   pointer-events: none;
 }
 @keyframes hc-rotate {
@@ -4164,9 +4175,50 @@ pre.code code {
   padding-left: 16px;
   padding-right: 16px;
 }
+/* ⚠️⚠️ THE COMPOSER FOLLOWS THE SCREEN, NOT THE CONTENT — and this is the defect behind « le bouton
+ * skills and sub-agent disparait quand on diminue la largeur de la sidebar ».
+ *
+ * The panel has a width floor: below it the BODY stops shrinking and the page scrolls sideways, which
+ * is right for a transcript holding code. But the composer was inside that body, so a 300-pixel side
+ * bar left it 470 pixels wide with its right-hand end — skills, the microphone, the send — simply off
+ * screen. Nothing was clipped and nothing was broken; the controls were somewhere you had to scroll
+ * to, which to anybody using it is indistinguishable from gone.
+ *
+ * So the box you type in is pinned to the view rather than to the body: the viewport's width LESS the
+ * scrollbar's, and `sticky` at `left: 0` so it stays put while the transcript scrolls under it. The
+ * floor goes on protecting the reading surface; the controls stop being a consequence of it. */
 .composer {
+  position: sticky;
+  left: 0;
+  /* ⚠️ NOT `100vw`. A viewport unit counts the vertical scrollbar, which the content box does not —
+   * so `width: 100vw` is permanently a scrollbar wider than the space there is, and it forced a
+   * horizontal overflow on EVERY screen. The damage was not subtle: with the page then laid out
+   * wider than the view, sentences were cut off at the right edge all through the panel, which is
+   * what « la page Permissions […] est vraiment incomprehensible » turned out to be. The page was
+   * fine; it was being drawn off the edge.
+   *
+   * `--scrollbar-gutter` is measured by the page itself at startup, which is what that measurement
+   * was for. */
+  width: calc(100vw - var(--scrollbar-gutter, 0px));
+  max-width: 100%;
   padding-left: 12px;
   padding-right: 12px;
+}
+/* And once it is the screen's width, it has to survive the screen being small. Below this the chips
+ * drop their labels and become what they already are under the word — an icon with a menu — so every
+ * control stays reachable instead of three of them being pushed out of sight. The mode keeps its
+ * word: it is the one chip whose icon alone says nothing, and it is also the shortest.
+ *
+ * 430 px is where the five controls plus the three on the right stop fitting with their labels, by
+ * the same measurement that set the floor. */
+@media (max-width: 430px) {
+  .composer-toolbar .btn.model .lbl,
+  .composer-toolbar .btn.reasoning .lbl {
+    display: none;
+  }
+  .composer-toolbar .btn.model {
+    min-width: 0;
+  }
 }
 .screen-lede,
 .screen-note {
@@ -4428,12 +4480,26 @@ pre.code code {
  * a change that was not worth making — which is the actual lesson of the previous attempt.
  */
 
-/* Controls big enough to be controls. 3/6 and an 18px line gave a 24px target; 5/8 and 20px gives
-   30px, which is what the workbench's own toolbar buttons are. */
-.composer-toolbar .btn,
+/* ⚠️ The row under the composer keeps the 30 px target — « garder […] la barre tout en bas à
+   l'identique ». The row INSIDE the box goes back to 24, which is where it was before and which is
+   the one real difference left against the editor's own chat: « la seule reel difference avec le
+   design de github copilot cest les boutons qui sont plus petit ». Looked at side by side rather
+   than argued about, which is how it should have been settled the first time. */
+.composer-toolbar .btn {
+  padding: 3px var(--sp-2);
+  line-height: 18px;
+}
 .composer-footer .btn {
   padding: 5px var(--sp-3);
   line-height: 20px;
+}
+/* The maker's mark in the picker, at the size of the row's own text rather than of a button's icon. */
+.ci-vendor {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  margin-right: var(--sp-2);
+  opacity: 0.85;
 }
 
 /* Air between them, and MORE air between the two groups than within one — that difference is what

@@ -73,12 +73,15 @@ test("the composer row is the editor's own chat row, in its order", () => {
     /left\.append\(contextButton\(state, deps\), modeButton\(state, deps\), modelButton\(state, deps\)\)/,
     "attach, mode and model are no longer one run at the head of the row",
   );
-  assert.match(source, /left\.append\(toolsButton\(state, deps\)\)/, "skills left the settings group again");
-  // The far end acts on the message; it does not configure the answer. Anything else landing here is
-  // the drift this test exists to catch.
+  // ⚠️ Skills is the exception to "the editor's order", and it is a report rather than a preference:
+  // « le bouton skills and sub-agent disparait quand on diminue la largeur de la sidebar ». Last in
+  // the left group, it was the first thing cut, because that group is the one carrying
+  // `overflow: hidden`. The editor's own row never has to survive a 300-pixel panel; ours does. It
+  // sits with the send, in the group that is never clipped.
+  assert.match(source, /right\.append\(toolsButton\(state, deps\)\)/, "skills is back in the group that gets clipped");
   assert.ok(
-    !/right\.append\(toolsButton/.test(source),
-    "skills is back beside the send, where it reads as a seventh unrelated icon",
+    !/left\.append\(toolsButton/.test(source),
+    "skills is in the clipped group again, so a narrow panel will eat it",
   );
   assert.match(
     source,
@@ -99,7 +102,11 @@ test("the provider and the model do not wear the same glyph", () => {
   const provider = source.slice(source.indexOf("function providerButton("), source.indexOf("function approvalButton("));
   const model = source.slice(source.indexOf("function modelButton("));
   assert.match(provider, /icon: ICON\.cloud/, "the provider is drawn as a chip again");
-  assert.match(model.slice(0, 600), /icon: ICON\.chip/);
+  // ⚠️ And the model wears its MAKER's mark rather than a generic chip — « rajoute une icone du
+  // fournisseur devant le nom du modele comme sur github copilot ». `vendorMark` falls back to the
+  // chip for anything it does not recognise, so a preset and an unknown vendor still look like a
+  // model rather than like a missing image.
+  assert.match(model.slice(0, 900), /icon: ICON\[vendorMark\(state\.model\)\]/);
 });
 
 test("⚠️ nothing styles this panel in a way its own CSP throws away", () => {
@@ -188,20 +195,18 @@ test("the way back is labelled on the bar, and only the opening question carries
   );
 });
 
-test("the width floor is the width the composer actually needs", () => {
-  // ⚠️ The default was 260 and it was CHOSEN; it is now 460 and it is MEASURED. Reported as « 260
-  // c'est trop bas », and a capture of the panel at 540 px says exactly how much too low: the row runs
-  // from the attach icon at x=33 to the send at x=496 — about 479 px of controls — with 34 px of slack
-  // between the two groups and a model name able to give back another 42 by shrinking to its own
-  // seven-character floor. The row therefore stops fitting at roughly 462 px.
+test("⚠️ the width floor is below any ordinary side bar, and the composer looks after itself", () => {
+  // ⚠️⚠️ THE PREVIOUS VERSION OF THIS TEST WAS MEASURED AND STILL WRONG, which is the part worth
+  // keeping. It derived 470 px from the composer row's extent in a 540-pixel capture — correct
+  // arithmetic on a false premise: that the row must always have its natural width. The row drops its
+  // labels below 430 px, so it needs far less. And a floor of 470 did something much worse than being
+  // generous: on a normally sized side bar it pushed the page WIDER than the panel, so every screen
+  // was drawn with its right-hand side off the edge. Sentences cut mid-word is what the report « la
+  // page Permissions […] vraiment incomprehensible » actually was — the page was fine, it was being
+  // drawn off the edge. Proven by capturing the same screen with the floor at 0, where it is perfect.
   //
-  // Below the floor the group's `overflow: hidden` CLIPS rather than compresses, which is the failure
-  // this setting exists to prevent: at 260 the send button is not cramped, it is absent. A floor set
-  // under what the content needs is not a floor at all.
-  //
-  // Asserted against the row's own constraints rather than as a magic number, so adding a control to
-  // the composer and leaving the floor behind is caught here instead of in a screenshot six weeks
-  // later.
+  // So the floor is asserted from both sides now. A floor you can reach by accident on an ordinary
+  // panel is not a floor, it is a bug.
   const manifest = JSON.parse(readFileSync("package.json", "utf8")) as {
     contributes: { configuration: Array<{ properties: Record<string, { default?: number }> }> };
   };
@@ -209,15 +214,35 @@ test("the width floor is the width the composer actually needs", () => {
     .flatMap((section) => Object.entries(section.properties))
     .find(([id]) => id === "hiveyCode.panel.minWidth")?.[1]?.default;
   assert.ok(typeof floor === "number", "the floor is no longer declared in the manifest");
+  assert.ok(floor >= 280, `${floor} px leaves a line of prose too short to read and a code block that is all scrollbar`);
   assert.ok(
-    floor >= 462,
-    `the floor is ${floor}, below the ~462 px the composer row measured — the send button will be clipped away`,
+    floor <= 400,
+    `${floor} px is within reach of an ordinary side bar, where it pushes every screen off its own right edge`,
   );
-  // And the reader agrees with the manifest. They disagreed once already, in the other direction:
-  // a default written twice is a default that will be changed once.
+  // And the composer survives below the floor by DROPPING LABELS rather than by being clipped, which
+  // is what lets the floor be low at all.
+  // ⚠️ Comments stripped: this guard has to name the forbidden form to be understood, and a guard that
+  // fails on its own explanation teaches people to stop writing one. Second time in this file.
+  const css = readFileSync("media/style.css", "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+  assert.match(css, /@media \(max-width: 430px\)/, "the composer no longer degrades, so the floor is load-bearing again");
+  // ⚠️ And never a viewport unit for its width: `100vw` counts the vertical scrollbar, so it is
+  // permanently wider than the content box and forces a horizontal overflow on every screen.
+  assert.ok(
+    !/width: 100vw/.test(css),
+    "something is sized in `vw` again — that is a scrollbar's width of horizontal overflow, on every screen",
+  );
+  // The reader agrees with the manifest. They disagreed once already.
   assert.match(
     readFileSync("src/extension/config.ts", "utf8"),
     new RegExp(`c\\.get<number>\\("panel\\.minWidth",\\s*${floor}\\)`),
     "the manifest and the settings reader declare different floors",
   );
+});
+
+test("the picker and the button it fills wear the same face", () => {
+  // Two places show a model, and they must agree: choosing one that shows an OpenAI mark and then
+  // seeing a generic chip on the control is the kind of small inconsistency that reads as a bug in
+  // something else entirely.
+  const combo = readFileSync("src/webview/modelCombo.ts", "utf8");
+  assert.match(combo, /icon\(vendorMark\(item\.model\.id\) as IconName, "ci-vendor"\)/);
 });

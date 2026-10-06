@@ -9,6 +9,7 @@
 import { button, closeMenu, el, formatTokens, icon, ICON, menu, menuItem, menuTitle, separator } from "./dom.js";
 import { markdown } from "./markdown.js";
 import { t } from "../shared/i18n.js";
+import { vendorMark } from "../core/router/vendorIcon.js";
 import { transcriptPieces } from "../core/session/checkpoint.js";
 import { REMOTE_VENDORS, vendor } from "../core/providers/vendors.js";
 import { closeModelCombo, isModelComboOpen, openModelCombo } from "./modelCombo.js";
@@ -1232,10 +1233,11 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
   // control nobody finds. It sits after the model because it is a property OF the model.
   left.append(contextButton(state, deps), modeButton(state, deps), modelButton(state, deps));
   if (state.reasoningAvailable) left.append(reasoningButton(state, deps));
-  // Skills last on the left rather than beside the send. It changes what `/` offers — what the
-  // assistant may reach for — which is the same kind of decision as the three chips before it, and
-  // not the same kind as "say this now". The editor groups them the same way.
-  left.append(toolsButton(state, deps));
+  // ⚠️ Skills is NOT here, and the reason is a report rather than a preference: « le bouton skills and
+  // sub-agent disparait quand on diminue la largeur de la sidebar ». It was last in this group, and
+  // this group is the one with `overflow: hidden` — so it was the first thing cut when the row ran
+  // out of room. The editor puts its tool picker here; the editor's row also never has to survive a
+  // 300-pixel panel. It sits with the send instead, in the group that is never clipped.
   bar.append(left);
 
   // Speak and send, and nothing else. The far end of the row is for the two things that ACT on the
@@ -1252,6 +1254,7 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
   //
   // So the button is always there when the host can record, and when nothing is configured it says
   // so and offers to configure it, instead of silently doing nothing.
+  right.append(toolsButton(state, deps));
   if (microphonePossible()) right.append(micButton(deps, Boolean(state.dictation)));
   right.append(
     // The same button as its neighbours, carrying a different glyph. `primary` made it a size and a
@@ -1831,9 +1834,13 @@ function modeButton(state: UiState, deps: ChatDeps): HTMLElement {
 
 function modelButton(state: UiState, deps: ChatDeps): HTMLElement {
   const b: HTMLElement = button({
-    // The chip glyph: this is the one control about WHICH MODEL answers, and with three dropdowns in
-    // a row the only thing distinguishing them was the word inside.
-    icon: ICON.chip,
+    // ⚠️ The MAKER's mark, not a generic chip. « rajoute une icone du fournisseur devant le nom du
+    // modele comme sur github copilot (exemple icone openai, icone antrhopic, etc) » — and the
+    // editor's own picker does the same, because a row of twenty model names all wearing one glyph
+    // tells you nothing you could not already read. A preset is not one vendor's model, so it keeps
+    // the chip; so does anything the lookup does not recognise, which makes an unknown vendor look
+    // like a model rather than like a missing image.
+    icon: ICON[vendorMark(state.model)],
     label: state.modelLabel,
     trailingIcon: ICON.chevron,
     title:
@@ -1841,11 +1848,7 @@ function modelButton(state: UiState, deps: ChatDeps): HTMLElement {
       (state.remote
         ? t("Remote model — it is billed, and what you send is pseudonymized first.")
         : t("Local model — nothing leaves this machine.")),
-    // ⚠️ NOT `tiny` any more. It was made tiny for the row under the box, where the provider and the
-    // approval scope are tiny and a full-size chip among them read as a mistake. It has moved back
-    // beside the mode and the reasoning, which are full size — and a row of three chips where one is
-    // two pixels shorter than the others is the kind of thing nobody can name and everybody sees.
-    // The class follows the neighbours, not the control.
+    // The class follows the neighbours, not the control: these chips are all one size.
     className: `btn ghost model${state.remote ? " remote" : " local"}`,
     onClick: () => {
       closeMenu();

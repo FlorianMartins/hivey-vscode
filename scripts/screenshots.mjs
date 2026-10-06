@@ -266,6 +266,10 @@ for (const step of [[], ["--integration"]]) {
 // the fix, which is exactly when a condition goes unread.)
 if (spawnSync("pgrep", ["-f", "vscode-test/vscode"], { stdio: "ignore" }).status !== 0) {
   rmSync(".vscode-test/user-data/code.lock", { force: true });
+  // The capture's own profile, which `runTest.ts` points the editor at. Its lock has to go too, or a
+  // run interrupted half way makes every later capture fail with "only supported if no other instance
+  // of Code is running" — which says nothing about captures and sends you looking in the wrong place.
+  rmSync(".vscode-test/user-data-shots/code.lock", { force: true });
 }
 
 const xvfb = spawn("Xvfb", [display, "-screen", "0", "1600x1000x24", "-nolisten", "tcp"], { stdio: "ignore" });
@@ -342,6 +346,7 @@ function announced() {
 const SCREENS = [
   "premier",
   "conversation",
+  "permissions",
   // Only when probing: two frames around the editor's own "make this view bigger", to find out
   // whether an extension can widen its panel at all. The suite announces them in the same place.
   ...(args.has("width-probe") ? ["width-before", "width-after"] : []),

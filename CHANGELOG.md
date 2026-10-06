@@ -2,6 +2,63 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 1.6.0 — 2026-10-06
+
+### Corrigé
+
+- **⚠️⚠️ TOUT LE PANNEAU ÉTAIT DESSINÉ HORS DE SON BORD DROIT, et c'était moi.** Signalé comme « la page
+  Permissions […] est vraiment incomprehensible » — et la page n'y était pour rien : ses phrases étaient
+  **coupées en plein mot** par un débordement horizontal, sur tous les écrans. Deux causes, les deux
+  introduites dans cette session :
+
+  1. le composer avait été épinglé à `width: 100vw`, or **une unité de fenêtre compte la barre de
+     défilement verticale** que la zone de contenu n'a pas : il était donc en permanence plus large que
+     la place disponible. Il mesure désormais `100vw` **moins** la gouttière, que la page mesure
+     elle-même au démarrage — ce à quoi cette mesure servait ;
+  2. le plancher de largeur à 470 px, qui était **mesuré et pourtant faux** : l'arithmétique était
+     juste, la prémisse ne l'était pas. Elle supposait que la rangée du composer exige toujours sa
+     largeur naturelle, alors qu'elle sait maintenant **abandonner ses libellés** sous 430 px. Un
+     plancher qu'on atteint par accident sur une barre latérale ordinaire n'est pas un plancher, c'est
+     un défaut. Il redescend à **320 px**, et il ne parle plus du composer — qui se débrouille seul —
+     mais de la surface de lecture.
+
+  Prouvé par la capture du même écran avec le plancher à 0, où il est parfait.
+
+- **La page Permissions, une fois lisible, est aussi plus courte.** « Règles permanentes » et
+  « Accordées pour cette conversation » avaient chacune son titre, son explication et son état vide :
+  sur un profil neuf, les deux premiers tiers de l'écran disaient « rien », deux fois, avant d'arriver
+  à quoi que ce soit d'actionnable. **Une seule liste** désormais — la distinction est réelle et elle
+  est conservée là où elle a toujours été, dans le mot au bout de chaque ligne. Et un état vide
+  **s'aligne à gauche** : centré au milieu d'un écran dont toutes les lignes commencent à la même
+  marge, il ne se lit pas comme « cette liste est vide » mais comme quelque chose qui a raté sa mise en
+  page.
+
+- **⚠️ Une campagne de captures ne contamine plus les tests.** Le scénario de capture écrit des réglages
+  au niveau **global** — un point d'accès, un modèle, une langue — parce que c'est la seule façon de
+  photographier un panneau configuré. Ils vivaient dans le profil que toutes les exécutions suivantes
+  relisent : la suite d'intégration a ensuite échoué sur « settings read back with the defaults the
+  manifest declares », annonçant `local` là où le manifeste dit `openai-compatible`. Rien n'était
+  cassé ; une exécution précédente avait laissé ses meubles. *Un test qu'une exécution sans rapport
+  peut faire échouer est un test qu'on finira par ne plus croire.* Profils séparés.
+
+### Modifié
+
+- **Les boutons de la zone de saisie rapetissent.** « la seule reel difference avec le design de github
+  copilot cest les boutons qui sont plus petit » — vérifié côte à côte plutôt que discuté : la rangée
+  **dans** la boîte repasse à 24 px de haut, celle du bas garde ses 30 px (« garder […] la barre tout
+  en bas à l'identique »).
+
+- **Le modèle porte la marque de son fabricant.** « rajoute une icone du fournisseur devant le nom du
+  modele comme sur github copilot (exemple icone openai, icone antrhopic, etc) ». Dix marques
+  simplifiées, dessinées sur la même grille 16×16 que le reste et héritant de la couleur du panneau —
+  sur le bouton **et** dans la liste de choix, car les deux doivent s'accorder. Ce que la table ne
+  reconnaît pas garde la puce, de sorte qu'un fournisseur inconnu ressemble à un modèle et non à une
+  image manquante. Un test la confronte au catalogue réel, dans les deux sens.
+
+- **Le bouton Skills ne disparaît plus en rétrécissant.** Il était dernier du groupe de gauche, et
+  c'est ce groupe qui porte `overflow: hidden` : il était donc la première chose coupée. Il rejoint
+  l'envoi, dans le groupe qui n'est jamais rogné.
+
 ## 1.5.1 — 2026-10-06
 
 ### Corrigé

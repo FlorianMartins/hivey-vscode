@@ -2147,6 +2147,16 @@ suite("Screenshot", () => {
 
       await announce("conversation");
 
+      // ⚠️ The permissions screen, photographed for the first time. It was the one surface with no
+      // picture of it anywhere, and it is also the one reported as « incomprehensible » — which is not
+      // a coincidence: a screen nobody photographs is a screen nobody looks at as a whole. Nine
+      // stacked sections and six separate lists are obvious in a frame and invisible in the source,
+      // where each section is a tidy twelve lines.
+      await vscode.commands.executeCommand("hiveyCode.showPermissions");
+      await announce("permissions");
+      await vscode.commands.executeCommand("hiveyCode.newSession");
+      await new Promise((r) => setTimeout(r, 1200));
+
       // ⚠️ THE WIDTH PROBE, which exists to settle a question rather than to photograph a feature.
       //
       // "The right bar is still not locked to a minimum width" has now been reported three times, and

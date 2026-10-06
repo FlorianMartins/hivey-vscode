@@ -2,7 +2,7 @@
   "name": "hivey-code",
   "displayName": "Hivey Code",
   "description": "%extension.description%",
-  "version": "1.5.1",
+  "version": "1.6.0",
   "publisher": "hivey",
   "license": "Apache-2.0",
   "repository": {
@@ -566,7 +566,7 @@
           },
           "hiveyCode.panel.minWidth": {
             "type": "number",
-            "default": 470,
+            "default": 320,
             "minimum": 0,
             "maximum": 900,
             "markdownDescription": "%config.panel.minWidth%"

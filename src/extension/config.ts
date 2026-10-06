@@ -328,24 +328,24 @@ function readSettingsRaw(scope?: vscode.Uri): Settings {
     },
     agents: { disabled: c.get<string[]>("agents.disabled", []) },
     /**
-     * ⚠️ 470, and the figure is MEASURED rather than chosen — 260 was chosen, and it was wrong by
-     * almost half.
+     * ⚠️⚠️ 320 — and the previous 470 was ALSO measured, which is the lesson.
      *
-     * It was reported as « 260 c'est trop bas » and the capture says why. Photographed at 540 px, the
-     * composer row runs from the attach icon at x=33 to the send at x=496: about 479 px of controls,
-     * with 34 px of slack between the two groups and a model name that can give back another 42 by
-     * shrinking to its own 7-character floor. So the row stops fitting at roughly 462 px — and below
-     * that the overflow rule CLIPS, which is the failure this floor exists to prevent: at 260 the
-     * send button is not cramped, it is gone.
+     * It was derived from the composer row's extent in a 540-pixel capture, and the arithmetic was
+     * right. The premise was not: it assumed the row must always have its natural width. The row now
+     * drops its labels below 430 px, so it needs far less, and a floor set at 470 did something much
+     * worse than being generous — it pushed the page wider than the panel on a normally sized side
+     * bar, so EVERY screen was drawn with its right-hand side off the edge. Sentences cut mid-word is
+     * what « la page Permissions […] vraiment incomprehensible » actually was.
      *
-     * 470 rather than 462: the measurement was read off a screenshot, so it carries a few pixels of
-     * doubt, and the cheap mistake is the one that leaves a little air. The expensive mistake is the
-     * one that clips a control.
+     * So the floor is no longer about the composer, which now looks after itself. It is about the
+     * reading surface: below roughly 320 px a line of prose is too short to read and a code block is
+     * nothing but its own scrollbar. It is comfortably under any ordinary side bar width, which is
+     * the property the 470 lacked: a floor you can reach by accident is not a floor, it is a bug.
      *
-     * Read as a floor on the CONTENT. Nothing here can stop the side bar being dragged narrower; see
-     * `applyMinWidth` in the webview, and the integration test that proves the editor offers no way.
+     * Read as a floor on the CONTENT. Nothing here can stop the side bar being dragged narrower — see
+     * the integration test that proves the editor offers no way, and `applyMinWidth` in the webview.
      */
-    panel: { minWidth: c.get<number>("panel.minWidth", 470) },
+    panel: { minWidth: c.get<number>("panel.minWidth", 320) },
     permissions: {
       autoApprove: c.get<"off" | "workspace" | "all">("permissions.autoApprove", "off"),
       allowedPaths: c.get<string[]>("permissions.allowedPaths", []),
