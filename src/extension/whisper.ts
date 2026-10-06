@@ -220,7 +220,13 @@ export function startRecording(argv: string[], wav: string, how: "signal" | "std
   const child = spawn(program!, args, { stdio: ["pipe", "ignore", "pipe"] });
   let why = "";
   child.stderr?.on("data", (d: Buffer) => (why += d.toString("utf8")));
-  const ended = new Promise<void>((resolve) => child.on("close", () => resolve()));
+  let code: number | null = null;
+  const ended = new Promise<void>((resolve) =>
+    child.on("close", (status) => {
+      code = status;
+      resolve();
+    }),
+  );
   return {
     stop: async () => {
       // ⚠️ A line, not a signal, for the recorder that has to SAVE. The Windows one writes its file
@@ -229,7 +235,13 @@ export function startRecording(argv: string[], wav: string, how: "signal" | "std
       if (how === "stdin") child.stdin?.end("\n");
       else child.kill("SIGINT");
       await Promise.race([ended, new Promise((r) => setTimeout(r, 4000))]);
-      if (!existsSync(wav)) throw new Error(why.trim().split("\n").slice(-2).join(" ") || "the recorder wrote nothing");
+      // ⚠️ The recorder's own words, when it had any. They used to be collected and dropped, so a
+      // microphone that could not be opened — no input device, or another program holding it — ended
+      // as a file with a header and no frames, and the person was shown a transcriber's complaint
+      // about a temporary path instead.
+      const said = why.trim().split("\n").filter(Boolean).slice(-2).join(" ");
+      if (code && code !== 0) throw new Error(said || `the recorder exited ${code}`);
+      if (!existsSync(wav)) throw new Error(said || "the recorder wrote nothing");
       return wav;
     },
     cancel: () => {

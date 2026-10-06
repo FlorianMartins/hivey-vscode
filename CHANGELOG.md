@@ -2,6 +2,29 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 1.11.1 — 2026-10-06
+
+### Corrigé
+
+- **⚠️⚠️ Un enregistrement cassé était transmis tel quel au transcripteur, et c'est SON message
+  d'erreur que l'utilisateur recevait.** Signalé depuis la machine d'un collègue : `failed to read the
+  frames of the audio data (Invalid argument)`, suivi d'un chemin temporaire. C'est vrai, c'est
+  inutile, et c'est inquiétant — c'est l'avis d'un lecteur C++ sur un fichier dont personne n'avait
+  parlé.
+
+  Le fichier est désormais **ouvert et examiné avant d'être transmis** : « rien n'a été enregistré »
+  est la phrase sur laquelle on peut agir, et elle ne peut être dite qu'en regardant. L'examen est
+  volontairement tolérant sur tout ce qui n'empêche pas de transcrire — l'ordre des morceaux, un
+  `LIST`, une taille déclarée plus grande que ce qui est sur le disque quand un enregistreur a été
+  interrompu — et strict sur ce qui l'empêche : pas un WAV, pas de données, pas une seconde de son.
+
+- **⚠️ Le script Windows avalait ses propres erreurs.** Tous les appels à `mci` étaient dirigés vers
+  `Out-Null` : un périphérique qui refusait de s'ouvrir — pas d'entrée, ou un autre programme qui le
+  retient — produisait un **échec parfaitement silencieux** et un fichier avec un en-tête et aucune
+  trame. Chaque appel est maintenant vérifié et traduit en clair par `mciGetErrorString`, et
+  l'enregistreur qui sort en erreur fait remonter **ses propres mots** au lieu de les laisser mourir.
+  Au passage, `set hv format tag pcm` est ajouté : c'est lui qui fait tenir le reste du réglage.
+
 ## 1.11.0 — 2026-10-06
 
 ### Corrigé

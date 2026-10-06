@@ -61,17 +61,23 @@ export function windowsRecorderScript(wav: string): string {
   const file = wav.split("'").join("''");
   return [
     "$ErrorActionPreference='Stop'",
-    'Add-Type -Name M -Namespace Hv -MemberDefinition \'[DllImport("winmm.dll",CharSet=CharSet.Auto)] public static extern int mciSendString(string c, System.Text.StringBuilder r, int l, System.IntPtr h);\'',
-    "[Hv.M]::mciSendString('open new type waveaudio alias hv',$null,0,0)|Out-Null",
-    // 16 kHz, mono, 16-bit: the shape a speech model reads, asked for before recording rather than
-    // converted afterwards.
-    "[Hv.M]::mciSendString('set hv bitspersample 16 channels 1 samplespersec 16000 alignment 2 bytespersec 32000',$null,0,0)|Out-Null",
-    "[Hv.M]::mciSendString('record hv',$null,0,0)|Out-Null",
+    'Add-Type -Name M -Namespace Hv -MemberDefinition \'[DllImport("winmm.dll",CharSet=CharSet.Auto)] public static extern int mciSendString(string c, System.Text.StringBuilder r, int l, System.IntPtr h); [DllImport("winmm.dll",CharSet=CharSet.Auto)] public static extern bool mciGetErrorString(int e, System.Text.StringBuilder s, int l);\'',
+    // ⚠️ Every call is CHECKED. They were all piped to `Out-Null`, so a device that refused to open —
+    // no input, or another program holding it — produced a perfectly quiet failure and a file with a
+    // header and no frames. The person then got whisper.cpp's opinion of that file, which named a
+    // temporary path and said `Invalid argument`. The error belongs where it happens.
+    "function mci($c){ $r=New-Object System.Text.StringBuilder 256; $e=[Hv.M]::mciSendString($c,$r,256,0); if($e -ne 0){ $m=New-Object System.Text.StringBuilder 256; [void][Hv.M]::mciGetErrorString($e,$m,256); [Console]::Error.WriteLine($m.ToString()); exit 1 } }",
+    "mci('open new type waveaudio alias hv')",
+    // 16 kHz, mono, 16-bit PCM: the shape a speech model reads, asked for before recording rather
+    // than converted afterwards. `format tag pcm` is what makes the rest of the line stick.
+    "mci('set hv format tag pcm')",
+    "mci('set hv bitspersample 16 channels 1 samplespersec 16000 alignment 2 bytespersec 32000')",
+    "mci('record hv')",
     // Blocks until the extension writes a line. This is the stop button.
     "[Console]::In.ReadLine()|Out-Null",
-    "[Hv.M]::mciSendString('stop hv',$null,0,0)|Out-Null",
-    `[Hv.M]::mciSendString('save hv "${file}"',$null,0,0)|Out-Null`,
-    "[Hv.M]::mciSendString('close hv',$null,0,0)|Out-Null",
+    "mci('stop hv')",
+    `mci('save hv "${file}"')`,
+    "mci('close hv')",
   ].join("; ");
 }
 

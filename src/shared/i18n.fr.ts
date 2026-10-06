@@ -1346,6 +1346,8 @@ export const FR: Record<string, string> = {
   "Nothing on this machine can record, and the panel is not allowed a microphone of its own — the editor withholds that from every extension.":
     "Rien sur cette machine ne sait enregistrer, et le panneau n'a pas droit à son propre micro — l'éditeur le refuse à toutes les extensions.",
   "Starting…": "Démarrage…",
+  "Nothing usable was recorded ({0}). The microphone may not be this machine's default input, or another program may have it. Setting hiveyCode.dictation.recordCommand to a command that names the device is the way past that.":
+    "Rien d'exploitable n'a été enregistré ({0}). Le micro n'est peut-être pas l'entrée par défaut de cette machine, ou un autre programme le retient. Renseigner hiveyCode.dictation.recordCommand avec une commande qui nomme le périphérique est le moyen de s'en sortir.",
   "Which areas is this conversation about?": "De quels domaines relève cette conversation ?",
   "Which languages and subjects this conversation is about": "Les langages et sujets dont relève cette conversation",
   "Which sub-agents may be dispatched?": "Quels sous-agents peuvent être sollicités ?",

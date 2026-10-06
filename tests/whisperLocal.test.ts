@@ -22,7 +22,7 @@ import {
 import { readTar } from "../src/core/archive/tar.js";
 import { howToRecord, recordArgv, recorders, windowsRecorderScript } from "../src/core/dictation/capture.js";
 import { gzipSync } from "node:zlib";
-import { encodeWav, SPEECH_SAMPLE_RATE, WAV_HEADER_BYTES } from "../src/core/dictation/wav.js";
+import { describeWav, encodeWav, SPEECH_SAMPLE_RATE, WAV_HEADER_BYTES } from "../src/core/dictation/wav.js";
 
 test("each machine is offered the archive built for it", () => {
   assert.equal(whisperAsset({ platform: "linux", arch: "x64" }), "whisper-bin-ubuntu-x64.tar.gz");
@@ -289,4 +289,35 @@ test("⚠️ every ffmpeg line flushes, or the file arrives in one piece and not
       assert.equal(r.streams, true);
     }
   }
+});
+
+test("⚠️ a recording is looked at before a transcriber is blamed for it", () => {
+  // Reported from a colleague's machine: `failed to read the frames of the audio data (Invalid
+  // argument)` followed by a temporary path — whisper.cpp's opinion of a file nobody had asked about.
+  // True, useless and alarming. What somebody can act on is "nothing was recorded", and that can only
+  // be said by opening the file first.
+  assert.equal(describeWav(new Uint8Array(8)).why, "that file is not a recording");
+  assert.equal(describeWav(new TextEncoder().encode("not a wav at all, really")).why, "that file is not a recording");
+  // A header with no frames is what an input device that opened and captured nothing leaves behind.
+  assert.equal(describeWav(encodeWav([], 16_000)).why, "nothing was recorded");
+  // A tenth of a second is below anything anybody meant to say.
+  assert.equal(describeWav(encodeWav([new Float32Array(800)], 16_000)).why, "the recording is empty");
+
+  const good = describeWav(encodeWav([new Float32Array(16_000)], 16_000));
+  assert.equal(good.ok, true);
+  assert.equal(good.rate, 16_000);
+  assert.equal(good.channels, 1);
+  assert.equal(good.bits, 16);
+  assert.equal(Math.round(good.seconds), 1);
+});
+
+test("a recording cut short is read as far as it goes", () => {
+  // A recorder that was interrupted leaves a `data` size larger than the bytes on disk. Trusting the
+  // declared size would read past the end; refusing the file would throw away a sentence that is
+  // perfectly transcribable.
+  const whole = encodeWav([new Float32Array(16_000)], 16_000);
+  const cut = whole.slice(0, whole.length - 8_000);
+  const facts = describeWav(cut);
+  assert.equal(facts.ok, true, facts.why);
+  assert.ok(facts.seconds > 0.4 && facts.seconds < 1, `${facts.seconds}s read from a truncated file`);
 });

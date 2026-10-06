@@ -120,6 +120,7 @@ import type {
 } from "../shared/protocol.js";
 import { findRecorder, installWhisper, installedWhisper, recordArgv, recorderAdvice, runWhisper, startRecording } from "./whisper.js";
 import { modelFor, whisperAsset } from "../core/dictation/local.js";
+import { describeWav } from "../core/dictation/wav.js";
 import { SECTION, endpointFor, providerFor, readSettings, routerConfig, type Keys, type Settings, writeTarget } from "./config.js";
 import { EgressGate, safeHost, summarize } from "./egress.js";
 import { renderPromptAudit, type PromptAudit } from "../core/audit/prompt.js";
@@ -3380,8 +3381,28 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     }
     try {
       const wav = await run.stop();
-      this.post({ type: "dictationProgress", what: t("Transcribing…") });
       const audio = await fsp.readFile(wav);
+      // ⚠️ LOOKED AT before it is handed on. A broken recording used to reach whisper.cpp and the
+      // person got ITS error — `failed to read the frames of the audio data (Invalid argument)`
+      // followed by a temporary path. True, useless and alarming: it is a C++ reader's opinion of a
+      // file nobody asked about. What somebody can act on is "nothing was recorded", and that can
+      // only be said by opening the file here.
+      const facts = describeWav(audio);
+      if (!facts.ok) {
+        this.log.appendLine(
+          `[dictation] unusable wav: ${facts.why}, ${audio.length} bytes, ${facts.rate} Hz, ${facts.channels}ch, ${facts.bits}-bit`,
+        );
+        this.post({
+          type: "dictationFailed",
+          why: t(
+            "Nothing usable was recorded ({0}). The microphone may not be this machine's default input, or another program may have it. Setting hiveyCode.dictation.recordCommand to a command that names the device is the way past that.",
+            facts.why ?? "",
+          ),
+        });
+        return;
+      }
+      this.log.appendLine(`[dictation] ${facts.seconds.toFixed(1)}s, ${facts.rate} Hz, ${facts.channels}ch`);
+      this.post({ type: "dictationProgress", what: t("Transcribing…") });
       await this.transcribe(audio.toString("base64"), Date.now() - run.started);
     } catch (err) {
       this.post({ type: "dictationFailed", why: t("The recording failed: {0}", (err as Error).message) });
