@@ -1274,7 +1274,7 @@
     "check:course": "node scripts/check-course.mjs"
   },
   "devDependencies": {
-    "@types/node": "^18.19.0",
+    "@types/node": "^26.6.3",
     "@types/vscode": "^1.93.0",
     "@vscode/test-electron": "^2.5.2",
     "esbuild": "^0.25.0",
