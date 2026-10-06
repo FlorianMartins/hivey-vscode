@@ -119,21 +119,26 @@ export function approvalCard(request: UiApproval, deps: ChatDeps): HTMLElement {
   };
   // Egress consent is per destination, so "this conversation" would be a promise about the wrong
   // thing. The labels differ too: what is being agreed to is sending, not permitting an action.
+  // A card may name its own buttons. See `labels` in the protocol: the four slots are a channel, not
+  // a vocabulary, and "Allow" on a button that downloads 142 MB is a small lie.
+  const named = (slot: "once" | "session" | "always" | "no", fallback: string) => request.labels?.[slot] ?? fallback;
+  const saidAfter = (slot: "once" | "session" | "always" | "no", fallback: string) => request.done?.[slot] ?? fallback;
   const available: Record<string, () => HTMLElement> = {
     once: () =>
       button({
-        label: budget ? t("Send anyway") : egress ? t("Send") : t("Allow"),
+        label: named("once", budget ? t("Send anyway") : egress ? t("Send") : t("Allow")),
         className: "btn primary",
-        onClick: () => answer("once", budget || egress ? t("Sent.") : t("Allowed once.")),
+        onClick: () => answer("once", saidAfter("once", budget || egress ? t("Sent.") : t("Allowed once."))),
       }),
     session: () =>
       button({
-        label: budget ? t("For this conversation") : t("Always (this conversation)"),
+        label: named("session", budget ? t("For this conversation") : t("Always (this conversation)")),
         className: "btn",
         title: budget
           ? t("Send this and everything else in this conversation, without moving the cap")
           : t("Stop asking for {0} until the next conversation", request.tool),
-        onClick: () => answer("session", budget ? t("Allowed for this conversation, sent.") : t("Allowed for this conversation.")),
+        onClick: () =>
+          answer("session", saidAfter("session", budget ? t("Allowed for this conversation, sent.") : t("Allowed for this conversation."))),
       }),
     always: () =>
       button({
@@ -152,9 +157,9 @@ export function approvalCard(request: UiApproval, deps: ChatDeps): HTMLElement {
       }),
     no: () =>
       button({
-        label: budget || egress ? t("Do not send") : t("Refuse"),
+        label: named("no", budget || egress ? t("Do not send") : t("Refuse")),
         className: "btn danger",
-        onClick: () => answer("no", budget || egress ? t("Not sent.") : t("Refused.")),
+        onClick: () => answer("no", saidAfter("no", budget || egress ? t("Not sent.") : t("Refused."))),
       }),
   };
   for (const choice of request.choices) actions.append(available[choice]!());

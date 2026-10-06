@@ -34,6 +34,20 @@ export interface UiApproval {
   command?: string;
   choices: Array<"once" | "session" | "always" | "no">;
   detail?: string[];
+  /**
+   * What each button should say, when "Allow" is not what it does.
+   *
+   * ⚠️ The four slots are a channel, not a vocabulary. They were named for permissions — allow once,
+   * for this conversation, always, never — and a card asking « install the model, or the model and
+   * ffmpeg, or neither? » has three real choices and none of them is "allow". Writing "Allow" on a
+   * button that downloads 142 MB is the kind of small lie an interface should not tell.
+   *
+   * Where a card gives labels, the slot carries only the answer back; what it MEANS is here, where
+   * both ends can read it.
+   */
+  labels?: Partial<Record<"once" | "session" | "always" | "no", string>>;
+  /** What the card says once it has been answered, per choice. */
+  done?: Partial<Record<"once" | "session" | "always" | "no", string>>;
 }
 
 export interface UiStep {

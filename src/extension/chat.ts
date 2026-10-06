@@ -3226,23 +3226,49 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       return "no";
     }
     const model = modelFor(settings.dictation.localModel);
-    const go = await new Promise<boolean>((resolve) => {
+    // ⚠️ Three choices, not two. « tu ne peux pas proposer soit d'installer le modèle soit d'installer
+    // le ffmpeg soit de quitter ? » — and ffmpeg belongs on this card rather than on its own, because
+    // it is not a second requirement, it is what the SAME feature gains: a microphone you can choose
+    // when the machine has several, and an edge that follows your voice because ffmpeg writes its file
+    // as it records. Offered only where there is something to gain: not when it is already installed,
+    // and not where nothing can install it.
+    const current = findRecorder(process.platform);
+    const gains = current && !current.devices;
+    const go = await new Promise<"model" | "both" | "no">((resolve) => {
       this.askInPanel(
         {
           id: randomNonce(),
           tool: "run_command",
           description: t("Install a transcriber on this machine? ({0} MB, once)", model.mb + 10),
-          choices: ["once", "no"],
+          choices: gains ? ["once", "session", "no"] : ["once", "no"],
+          labels: {
+            once: t("Install the model"),
+            session: t("The model and ffmpeg"),
+            no: t("Not now"),
+          },
+          done: {
+            once: t("Installing the model…"),
+            session: t("Installing the model and ffmpeg…"),
+            no: t("Nothing was installed."),
+          },
           detail: [
             t("Your voice is then turned into words here, by whisper.cpp. Nothing is sent anywhere, ever, and it costs nothing."),
             t("Downloaded from github.com and huggingface.co — the only addresses this extension fetches without being told to."),
             t("Model: {0} — {1}", model.id, model.hint),
+            ...(gains
+              ? [t("With ffmpeg as well ({0}), you can choose which microphone to use and the box follows your voice while you speak. {1} can do neither.", recorderAdvice(process.platform), current!.program)]
+              : []),
           ],
         },
-        (answer) => resolve(answer === "once"),
+        (answer) => resolve(answer === "once" ? "model" : answer === "session" ? "both" : "no"),
       );
     });
-    if (!go) {
+    if (go === "both") {
+      const term = vscode.window.createTerminal({ name: "Hivey Code — ffmpeg" });
+      term.show(true);
+      term.sendText(recorderAdvice(process.platform));
+    }
+    if (go === "no") {
       this.post({ type: "dictationFailed", why: t("Dictation needs a transcriber, and none was installed.") });
       return "no";
     }

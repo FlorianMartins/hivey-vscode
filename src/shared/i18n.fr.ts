@@ -1357,6 +1357,13 @@ export const FR: Record<string, string> = {
     "{0} enregistre toujours depuis l'entrée par défaut du système, que Windows fixe. Changez-la dans les paramètres de son de Windows, ou installez ffmpeg pour choisir ici.",
   "{0} listed no inputs on this machine.": "{0} n'a listé aucune entrée sur cette machine.",
   "Ready. Press the microphone to speak.": "Prêt. Appuyez sur le micro pour parler.",
+  "Install the model": "Installer le modèle",
+  "Installing the model and ffmpeg…": "Installation du modèle et de ffmpeg…",
+  "Installing the model…": "Installation du modèle…",
+  "Nothing was installed.": "Rien n'a été installé.",
+  "The model and ffmpeg": "Le modèle et ffmpeg",
+  "With ffmpeg as well ({0}), you can choose which microphone to use and the box follows your voice while you speak. {1} can do neither.":
+    "Avec ffmpeg en plus ({0}), vous pouvez choisir quel micro utiliser et la boîte suit votre voix pendant que vous parlez. {1} ne sait faire ni l'un ni l'autre.",
   "Which areas is this conversation about?": "De quels domaines relève cette conversation ?",
   "Which languages and subjects this conversation is about": "Les langages et sujets dont relève cette conversation",
   "Which sub-agents may be dispatched?": "Quels sous-agents peuvent être sollicités ?",

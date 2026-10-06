@@ -2,6 +2,25 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 1.13.0 — 2026-10-06
+
+### Ajouté
+
+- **La carte d'installation offre trois choix : le modèle, le modèle **et** ffmpeg, ou rien.** « tu ne
+  peux pas proposer soit d'installer le modèle soit d'installer le ffmpeg soit de quitter ? » — et
+  ffmpeg a sa place sur **cette** carte plutôt que sur une autre, parce que ce n'est pas une seconde
+  exigence : c'est ce que la **même** fonctionnalité y gagne. Un micro qu'on peut choisir quand la
+  machine en a plusieurs, et un bord qui suit la voix, parce que ffmpeg écrit son fichier à mesure
+  qu'il enregistre. Proposé seulement quand il y a quelque chose à gagner : pas s'il est déjà là, pas
+  là où rien ne peut l'installer.
+
+- **⚠️ Une carte d'autorisation peut enfin nommer ses propres boutons.** Les quatre emplacements sont un
+  **canal**, pas un vocabulaire : ils ont été nommés pour des permissions — autoriser une fois, pour
+  cette conversation, toujours, jamais — et une carte qui demande « le modèle, ou le modèle et ffmpeg,
+  ou ni l'un ni l'autre ? » a trois vrais choix dont aucun ne s'appelle « autoriser ». **Écrire
+  « Autoriser » sur un bouton qui télécharge 142 Mo est le genre de petit mensonge qu'une interface ne
+  doit pas se permettre.**
+
 ## 1.12.1 — 2026-10-06
 
 ### Corrigé

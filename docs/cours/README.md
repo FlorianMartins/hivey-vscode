@@ -1,6 +1,6 @@
 # Comprendre Hivey Code — le cours
 
-**À jour pour la version 1.12.1.**
+**À jour pour la version 1.13.0.**
 
 Ce cours explique ce qu'est Hivey Code, à quoi servent toutes les technologies qu'il emploie, et
 comment elles s'articulent — **sans supposer que vous savez programmer**. Si vous ne savez pas ce
