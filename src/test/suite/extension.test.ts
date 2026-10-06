@@ -31,6 +31,33 @@ suite("Hivey Code", () => {
     assert.equal(ext!.isActive, true);
   });
 
+  test("⚠️ the editor still offers an extension no way to widen its own view", async () => {
+    // This is the evidence behind an answer given three times and doubted three times: "the right bar
+    // is still not locked to a minimum width". There is no API for a minimum width
+    // (microsoft/vscode#182201 is open), and the remaining hope was `workbench.action.increaseViewSize`
+    // — which exists, as this asserts, so the probe that used it was not testing a missing command.
+    //
+    // It was run against this panel docked in the secondary side bar, five times, with the view
+    // focused, between two screenshots. The two frames are identical: the command exists and does
+    // nothing for an auxiliary-bar view, which is what microsoft/vscode#300121 says in words.
+    //
+    // ⚠️ This test is here to FAIL the day that changes. If the editor ever ships a way to size a view
+    // — `workbench.action.increaseAuxiliaryBarSize`, a `minimumWidth` on the view contribution, or
+    // anything of the kind — the floor this panel can only declare becomes a floor it can enforce, and
+    // somebody should be told rather than left repeating "it cannot be done".
+    const commands = await vscode.commands.getCommands(true);
+    assert.ok(
+      commands.includes("workbench.action.increaseViewSize"),
+      "the command the width probe used is gone, so the probe's result says nothing",
+    );
+    const sizing = commands.filter((c) => /auxiliarybar/i.test(c) && /(size|width|resize)/i.test(c));
+    assert.deepEqual(
+      sizing,
+      [],
+      `the editor now has auxiliary-bar sizing commands (${sizing.join(", ")}) — the panel's width floor can stop being a declaration and become enforced`,
+    );
+  });
+
   test("every command the manifest declares is registered", async () => {
     const ext = vscode.extensions.getExtension(ID)!;
     await ext.activate();
