@@ -22,6 +22,33 @@ Taken 2026-10-03T13:14:46.752Z against `https://openrouter.ai/api/v1` with `hive
 | `hivey/smart` | — | not measured | — | — | — | — |
 | `deepseek-v4.1-flash alone` | 44/56 | 79 % | 1/56 | 11/56 | 2296 s | $0.1357 ($0.0024/task) |
 
+### A re-measurement was attempted on 2026-10-06 and withdrawn
+
+Recorded rather than left out, because an attempt that produced no number is itself a result — and
+because the next person to try will otherwise repeat it.
+
+The `hivey/free` preset was re-run on the full 62 tasks after the skill families were fixed. It came
+back **27 passed and 30 tasks killed by the harness's 180-second clock** — 48 % of the set. The same
+preset scored 32/62 two days earlier with 3 timeouts.
+
+The obvious suspect was the skills change itself: an IBM i prompt now carries about forty more skill
+names, which costs tokens on every turn. Splitting the set says otherwise:
+
+| | IBM i tasks killed | other tasks killed |
+|---|---|---|
+| 2026-10-04 | 9 % | 2 % |
+| 2026-10-06 | 53 % | **55 %** |
+
+Only the IBM i tasks gain those forty skills, and the two groups moved together. **A cause that does
+not follow the shape of the change is not that change** — the free endpoint had simply become much
+slower. A set in that state measures the provider's throughput on the day and would publish it as the
+model's quality.
+
+So no figure from that run is published, and the 2026-10-04 line above stands. The bench now refuses
+to state a rate once timeouts pass its own measured noise (three tasks, ADR-0034), the per-task clock
+is adjustable (`--timeout`), and the clock is recorded in every results file — because a published row
+never used to say under which one it was obtained.
+
 ### ⚠️ Every line above was measured with the skill families switched off
 
 Not a caveat about precision — a condition that was never intended and was found on 2026-10-06, after
