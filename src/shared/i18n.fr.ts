@@ -923,8 +923,6 @@ export const FR: Record<string, string> = {
     "La commande de dictée a échoué.",
   "The microphone could not be opened: {0}":
     "Le micro n’a pas pu être ouvert : {0}",
-  "The microphone was refused. Allow it for this window and try again.":
-    "Le micro a été refusé. Autorisez-le pour cette fenêtre et réessayez.",
   "The recording could not be read.":
     "L’enregistrement n’a pas pu être lu.",
   "This editor does not give the panel a microphone.":
@@ -941,8 +939,6 @@ export const FR: Record<string, string> = {
   "Connect": "Connecter",
   "Dictate — needs a transcriber. Click to set one up.":
     "Dicter — il faut un transcripteur. Cliquez pour en configurer un.",
-  "Set a transcriber to dictate — the setting is open.":
-    "Renseignez un transcripteur pour dicter — le réglage est ouvert.",
   "read {0} (lines {1}-{2} of {3})": "lu {0} (lignes {1}-{2} sur {3})",
   "{0} lines": "{0} lignes",
   "Refused by the reviewer: {0}": "Refusé par le relecteur : {0}",
@@ -1336,6 +1332,12 @@ export const FR: Record<string, string> = {
   "The transcriber is not installed.": "Le transcripteur n'est pas installé.",
   "Your voice is then turned into words here, by whisper.cpp. Nothing is sent anywhere, ever, and it costs nothing.":
     "Votre voix est alors transformée en mots ici même, par whisper.cpp. Rien n'est envoyé nulle part, jamais, et cela ne coûte rien.",
+  "VS Code does not give an extension's panel the microphone — the editor decides this, and there is no setting for it. Dictation has to record outside the panel; see hiveyCode.dictation.":
+    "VS Code n'accorde pas le micro au panneau d'une extension — c'est l'éditeur qui en décide, et aucun réglage ne l'ouvre. La dictée doit enregistrer hors du panneau ; voir hiveyCode.dictation.",
+  "No recorder was found on this machine, and the panel is not allowed a microphone of its own. Install one — {0} — or set hiveyCode.dictation.recordCommand to whatever records a WAV here, with {file} for the file.":
+    "Aucun enregistreur n'a été trouvé sur cette machine, et le panneau n'a pas droit à son propre micro. Installez-en un — {0} — ou renseignez hiveyCode.dictation.recordCommand avec ce qui enregistre un WAV ici, en écrivant {file} pour le fichier.",
+  "The recorder could not be started: {0}": "L'enregistreur n'a pas pu démarrer : {0}",
+  "The recording failed: {0}": "L'enregistrement a échoué : {0}",
   "Which areas is this conversation about?": "De quels domaines relève cette conversation ?",
   "Which languages and subjects this conversation is about": "Les langages et sujets dont relève cette conversation",
   "Which sub-agents may be dispatched?": "Quels sous-agents peuvent être sollicités ?",

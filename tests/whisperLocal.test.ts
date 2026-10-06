@@ -19,6 +19,7 @@ import {
   whisperUrl,
 } from "../src/core/dictation/local.js";
 import { readTar } from "../src/core/archive/tar.js";
+import { howToRecord, recordArgv, recorders } from "../src/core/dictation/capture.js";
 import { gzipSync } from "node:zlib";
 import { encodeWav, SPEECH_SAMPLE_RATE, WAV_HEADER_BYTES } from "../src/core/dictation/wav.js";
 
@@ -189,4 +190,38 @@ test("several chunks make one file", () => {
   const one = encodeWav([Float32Array.from([0.25, 0.5, 0.75])], 16_000);
   const many = encodeWav([Float32Array.from([0.25]), Float32Array.from([0.5, 0.75])], 16_000);
   assert.deepEqual([...one], [...many]);
+});
+
+// ── Recording, from outside the panel ────────────────────────────────────────────────────────────
+
+test("⚠️ every recorder writes 16 kHz mono, because that is what a speech model reads", () => {
+  // The panel cannot record at all — VS Code grants `media` to the workbench and withholds it from a
+  // `vscode-webview://` origin, with no prompt and no setting. So a program on the machine does it,
+  // and every one of them has to be asked for the same thing or whisper hears a chipmunk.
+  for (const platform of ["linux", "darwin", "win32"]) {
+    const list = recorders(platform);
+    assert.ok(list.length >= 1, `${platform} has no recorder at all`);
+    for (const r of list) {
+      const argv = r.args("/tmp/v.wav").join(" ");
+      assert.match(argv, /16000|16k/, `${r.program} does not ask for 16 kHz`);
+      assert.ok(argv.includes("/tmp/v.wav"), `${r.program} never says where to write`);
+      assert.ok(r.from.length > 2, `${r.program} does not say what to install it from`);
+    }
+  }
+  // And the advice names a package rather than saying "install something".
+  for (const platform of ["linux", "darwin", "win32"]) {
+    assert.match(howToRecord(platform), /install/, `${platform} has no instruction`);
+  }
+});
+
+test("a recording command the user wrote is split the way a shell would, without being one", () => {
+  // A path on Windows has spaces in it, and splitting on whitespace alone is exactly how that breaks.
+  assert.deepEqual(recordArgv('"C:\\Program Files\\sox\\rec.exe" -r 16000 {file}', "C:\\t\\v.wav"), [
+    "C:\\Program Files\\sox\\rec.exe", "-r", "16000", "C:\\t\\v.wav",
+  ]);
+  assert.deepEqual(recordArgv("rec -q {file}", "/tmp/v.wav"), ["rec", "-q", "/tmp/v.wav"]);
+  // ⚠️ A template that never says where to write would record somewhere else, and the first sign of
+  // it would be a transcription of silence. Refused rather than run.
+  assert.equal(recordArgv("rec -q", "/tmp/v.wav"), undefined);
+  assert.equal(recordArgv("   ", "/tmp/v.wav"), undefined);
 });

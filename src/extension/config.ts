@@ -258,6 +258,7 @@ function readSettingsRaw(scope?: vscode.Uri): Settings {
       model: c.get<string>("dictation.model", ""),
       language: c.get<string>("dictation.language", ""),
       localModel: c.get<string>("dictation.localModel", "tiny.en"),
+      recordCommand: c.get<string>("dictation.recordCommand", ""),
     },
     completion: {
       provider: c.get<ProviderId | "off">("completion.provider", "local"),

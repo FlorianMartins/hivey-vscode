@@ -7,7 +7,9 @@
 
 import { button, closeMenu, el, icon, ICON, menuIsOpen, searchInput } from "./dom.js";
 import { chatScreen, isStreaming, planBlock, reasoningBlock, setStreaming, stepRow, type ChatDeps, captureDraft, restoreDraft,
+  NOTE_FADE_MS,
   setComposerNote,
+  dictationStopped,
   cancelDictation,
 } from "./chat.js";
 import { atEnd, placeAfterChange, type Viewport } from "../core/ui/scroll.js";
@@ -846,6 +848,7 @@ window.addEventListener("message", (event: MessageEvent<ToPanel>) => {
       setStreaming(false);
       break;
     case "dictated": {
+      dictationStopped();
       // Into the composer, never sent. A recogniser mis-hears, and a dictated question that sends
       // itself is a question nobody proof-read — which is also what makes a wrong transcription a
       // non-event instead of a wasted turn.
@@ -868,7 +871,10 @@ window.addEventListener("message", (event: MessageEvent<ToPanel>) => {
       setComposerNote(m.what);
       break;
     case "dictationFailed":
-      setComposerNote(m.why);
+      // Fades: it describes a moment that has passed, and nothing else was going to clear it — a
+      // failed dictation sends nothing more, so the line sat there for the rest of the session.
+      dictationStopped();
+      setComposerNote(m.why, NOTE_FADE_MS);
       break;
     case "restoreDraft": {
       // A rewind puts the question back where it was typed. Focused and selected, because the
@@ -905,7 +911,7 @@ document.addEventListener("keydown", (ev) => {
     // A recording in flight is the innermost thing of all, and the one where Escape has to mean
     // "throw it away": somebody who changes their mind mid-sentence has not asked for their voice to
     // be transcribed anywhere.
-    if (cancelDictation()) {
+    if (cancelDictation(deps)) {
       ev.preventDefault();
     } else if (menuIsOpen()) {
       closeMenu();

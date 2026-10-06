@@ -175,3 +175,60 @@ export async function modelBytes(storage: string, modelId: string): Promise<numb
     return 0;
   }
 }
+
+// ── Recording, from outside the panel ────────────────────────────────────────────────────────────
+
+import { spawnSync } from "node:child_process";
+import { howToRecord, recordArgv, recorders, type Recorder } from "../core/dictation/capture.js";
+
+/** The first recorder on PATH, or nothing. `where`/`which` is how every shell answers this. */
+export function findRecorder(platform: string): Recorder | undefined {
+  const look = platform === "win32" ? "where" : "which";
+  return recorders(platform).find((r) => {
+    try {
+      return spawnSync(look, [r.program], { stdio: "ignore" }).status === 0;
+    } catch {
+      return false;
+    }
+  });
+}
+
+export function recorderAdvice(platform: string): string {
+  return howToRecord(platform);
+}
+
+export interface Recording {
+  /** Stop, and resolve with the file once the recorder has closed it. */
+  stop: () => Promise<string>;
+  /** Stop and throw the file away. */
+  cancel: () => void;
+}
+
+/**
+ * Start recording to a WAV, with whatever this machine has.
+ *
+ * ⚠️ The process is ended with SIGINT rather than SIGKILL, and that is not politeness: every one of
+ * these tools finalises its WAV header on SIGINT and leaves a truncated, unreadable file on SIGKILL.
+ * The header holds the sample count, so a file that was never closed says it is empty.
+ */
+export function startRecording(argv: string[], wav: string): Recording {
+  const [program, ...args] = argv;
+  const child = spawn(program!, args, { stdio: ["ignore", "ignore", "pipe"] });
+  let why = "";
+  child.stderr?.on("data", (d: Buffer) => (why += d.toString("utf8")));
+  const ended = new Promise<void>((resolve) => child.on("close", () => resolve()));
+  return {
+    stop: async () => {
+      child.kill("SIGINT");
+      await Promise.race([ended, new Promise((r) => setTimeout(r, 4000))]);
+      if (!existsSync(wav)) throw new Error(why.trim().split("\n").slice(-2).join(" ") || "the recorder wrote nothing");
+      return wav;
+    },
+    cancel: () => {
+      child.kill("SIGINT");
+      void ended.then(() => rm(wav, { force: true }));
+    },
+  };
+}
+
+export { recordArgv };

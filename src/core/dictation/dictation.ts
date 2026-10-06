@@ -45,6 +45,14 @@ export interface DictationSettings {
    * with different names, and one setting for both would have to be wrong for one of them.
    */
   localModel: string;
+  /**
+   * A command that records a WAV, with `{file}` for where to write it.
+   *
+   * ⚠️ It exists because the panel cannot have a microphone — VS Code withholds `media` from a
+   * webview — so the recording is made by a program, and Windows ships nothing that records to a file
+   * from a command line. Detection covers the usual tools; this covers the machine where it does not.
+   */
+  recordCommand: string;
 }
 
 /**

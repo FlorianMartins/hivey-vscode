@@ -370,18 +370,20 @@ body {
 .btn.reasoning:hover {
   color: var(--vscode-foreground);
 }
-/* ⚠️ AGENT ALONE. « uniquement le mode agent doit avoir la couleur du theme VsCode pas le mode chat
- * ou plan » — and it is the right rule, not just the requested one: Agent is the only mode that
- * CHANGES YOUR FILES. Chat answers and Plan proposes; neither needs a colour that means "pay
- * attention". A warning worn by two modes out of three is decoration. */
-.btn.mode-agent .ico,
+/* ⚠️ All three modes, in the workbench's own accent. This was Agent alone for an hour — on the
+ * reasoning that Agent is the only mode that CHANGES YOUR FILES, so it is the only one that needs a
+ * colour meaning "pay attention". Sound about a WARNING, and wrong about this mark, which is not
+ * one: « rajoutes les couleurs du thème vscode sur le mode chat et le mode plan aussi pour une
+ * cohérence graphique comme pour le mode agent ». A row where one chip is lit and two are grey reads
+ * as two of them being disabled.
+ *
+ * One accent for all three, never a palette of three: what tells the modes apart is the word inside
+ * them, which is right there and unambiguous. The colour says "this is the control that decides how
+ * the next message is answered", and that is true of all three. */
+.btn.mode .ico,
 .btn.reasoning.active .ico {
   color: var(--vscode-textLink-foreground, var(--vscode-foreground));
   opacity: 1;
-}
-.btn.mode-plan .ico,
-.btn.mode-chat .ico {
-  color: var(--muted);
 }
 
 /* ── Top bar ─────────────────────────────────────────────────────────────────────────────── */

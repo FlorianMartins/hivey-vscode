@@ -58,7 +58,15 @@ export async function startRecording(
     const name = (err as { name?: string }).name;
     onError(
       name === "NotAllowedError"
-        ? t("The microphone was refused. Allow it for this window and try again.")
+        // ⚠️ NOT "allow it and try again", which was advice nobody could follow. VS Code decides this
+        // in its Electron main process and there is no setting, no prompt and no way round it: a
+        // `vscode-webview://` origin is granted {pointerLock, notifications, clipboard…} and the
+        // workbench is granted {…, media}. An extension panel is the first list. That is also why the
+        // editor's OWN microphone works — it is not in a panel.
+        //
+        // So this says what is true and where the way out is, rather than asking for a permission
+        // that cannot be given.
+        ? t("VS Code does not give an extension's panel the microphone — the editor decides this, and there is no setting for it. Dictation has to record outside the panel; see hiveyCode.dictation.")
         : name === "NotFoundError"
           ? t("No microphone was found.")
           : t("The microphone could not be opened: {0}", (err as Error).message),

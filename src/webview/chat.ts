@@ -770,8 +770,8 @@ function turnRule(entry: UiEntry, deps: ChatDeps, opening = false): HTMLElement 
  * Escape cancels, and cancelling throws the recording away without sending it anywhere — somebody
  * who changes their mind mid-sentence has not asked for their voice to be transcribed.
  */
-function micButton(deps: ChatDeps, configured: boolean, wav = false): HTMLElement {
-  const recording = Boolean(activeRecorder);
+function micButton(deps: ChatDeps, configured: boolean): HTMLElement {
+  const recording = listening;
   const control = button({
     icon: ICON.mic,
     title: recording
@@ -781,60 +781,56 @@ function micButton(deps: ChatDeps, configured: boolean, wav = false): HTMLElemen
         : t("Dictate — needs a transcriber. Click to set one up."),
     className: `btn ghost icon-only mic${recording ? " recording" : ""}${configured ? "" : " unconfigured"}`,
     onClick: () => {
-      // Nothing to transcribe with: say so and open the setting, rather than record into nowhere.
-      if (!configured && !activeRecorder) {
-        deps.send({ type: "openSettings", key: "hiveyCode.dictation.command" });
-        setComposerNote(t("Set a transcriber to dictate — the setting is open."));
-        return;
-      }
-      if (activeRecorder) {
-        activeRecorder.stop();
-        activeRecorder = undefined;
+      // ⚠️ The recording happens in the EXTENSION, not here. VS Code grants `media` to the workbench
+      // and withholds it from a `vscode-webview://` origin, with no prompt and no setting — so
+      // `getUserMedia` in this panel answers `NotAllowedError` for ever, which is what « aucun moyen
+      // d'activer » was. The button is now two messages; a program on the machine does the listening.
+      if (listening) {
+        listening = false;
+        deps.send({ type: "stopDictation" });
         setComposerNote(t("Transcribing…"));
+        refreshMic();
         return;
       }
-      setComposerNote(t("Listening… press again to stop."));
-      void startRecording(
-        (audio, ms) => {
-          activeRecorder = undefined;
-          deps.send({ type: "dictate", audio, ms });
-        },
-        (why) => {
-          activeRecorder = undefined;
-          setComposerNote(why);
-          refreshMic();
-        },
-        // WAV when the words will be made here: whisper.cpp reads WAV, FLAC and MP3 and not the
-        // Opus every recorder produces. Decided before the recording starts, because deciding
-        // afterwards would mean losing the sentence that was just spoken.
-        wav,
-      ).then((started) => {
-        activeRecorder = started;
-        refreshMic();
-      });
+      listening = true;
+      deps.send({ type: "startDictation" });
+      refreshMic();
+
     },
   });
   return control;
 }
 
-/** The recorder in flight, if any. Module scope because the composer is rebuilt under it. */
-let activeRecorder: Recorder | undefined;
+/**
+ * Whether a recording is running, which the extension is doing.
+ *
+ * Module scope because the composer is rebuilt under it: a flag held in the button would be lost the
+ * first time anything else arrived, and the microphone would go back to looking idle while the
+ * machine was still listening.
+ */
+let listening = false;
 
 /** Redraw just the microphone, without rebuilding the composer under a live recording. */
 function refreshMic(): void {
   const node = document.querySelector<HTMLElement>(".composer .btn.mic");
   if (!node) return;
-  node.classList.toggle("recording", Boolean(activeRecorder));
+  node.classList.toggle("recording", listening);
 }
 
 /** Cancel a recording in flight. Called by Escape, and when the panel goes away. */
-export function cancelDictation(): boolean {
-  if (!activeRecorder) return false;
-  activeRecorder.cancel();
-  activeRecorder = undefined;
+export function cancelDictation(deps?: ChatDeps): boolean {
+  if (!listening) return false;
+  listening = false;
+  deps?.send({ type: "stopDictation", cancel: true });
   setComposerNote("");
   refreshMic();
   return true;
+}
+
+/** The extension says a recording ended for a reason of its own — a failure, or a cancel. */
+export function dictationStopped(): void {
+  listening = false;
+  refreshMic();
 }
 
 /**
@@ -844,7 +840,23 @@ export function cancelDictation(): boolean {
  * so it belongs next to the control. A dialog for "listening" would be a dialog to dismiss while
  * talking.
  */
-export function setComposerNote(text: string): void {
+let noteTimer: ReturnType<typeof setTimeout> | undefined;
+
+/**
+ * A line under the composer, for something that has just happened.
+ *
+ * ⚠️ `fadeMs` exists because nothing ever cleared this. A failure printed here stayed until the next
+ * render — and a render only happens when the extension sends something, so after a dictation that
+ * failed there was nothing left to send and the message sat there for the rest of the session:
+ * « et le message ne disparait pas... ».
+ *
+ * A STATE — "Listening…", "Transcribing…" — must not fade: it is true until it stops being true, and
+ * a label that vanished while the microphone was still open would be worse than none. An EVENT —
+ * something failed, something finished — fades, because it describes a moment that has passed.
+ */
+export function setComposerNote(text: string, fadeMs?: number): void {
+  if (noteTimer) clearTimeout(noteTimer);
+  noteTimer = undefined;
   const host = document.querySelector<HTMLElement>(".composer-footer");
   if (!host) return;
   let note = host.querySelector<HTMLElement>(".composer-note");
@@ -857,7 +869,11 @@ export function setComposerNote(text: string): void {
     host.prepend(note);
   }
   note.textContent = text;
+  if (fadeMs) noteTimer = setTimeout(() => setComposerNote(""), fadeMs);
 }
+
+/** How long a message about something that has already happened stays on screen. */
+export const NOTE_FADE_MS = 8000;
 
 /**
  * What the agent did, folded once the turn is over.
@@ -1259,7 +1275,10 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
   // So the button is always there when the host can record, and when nothing is configured it says
   // so and offers to configure it, instead of silently doing nothing.
   right.append(toolsButton(state, deps));
-  if (microphonePossible()) right.append(micButton(deps, Boolean(state.dictation), Boolean(state.dictationWav)));
+  // ⚠️ No longer gated on `microphonePossible()`: that asked whether the PANEL could record, and the
+  // answer in VS Code is permanently no. The recording is the extension's job now, so what decides
+  // whether the button appears is whether there is anywhere to send the result.
+  right.append(micButton(deps, Boolean(state.dictation)));
   right.append(
     // The same button as its neighbours, carrying a different glyph. `primary` made it a size and a
     // weight of its own at the end of a row of six identical controls, and "the send is special"

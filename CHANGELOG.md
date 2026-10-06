@@ -2,6 +2,53 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 1.9.0 — 2026-10-06
+
+### Corrigé
+
+- **⚠️⚠️ LE PANNEAU N'A PAS DROIT AU MICRO, ET C'EST VS CODE QUI LE DÉCIDE.** « quand je clique sur le
+  micro j'ai ce message et aucun moyen d'activer ». Il n'y en a effectivement aucun, et notre message
+  demandait l'impossible. La preuve est dans le code de l'éditeur, dans son processus principal :
+
+  ```js
+  a = {pointerLock, notifications, clipboard-read, …}      // ← une origine vscode-webview://
+  l = {pointerLock, notifications, media, local-fonts, …}  // ← le workbench
+  setPermissionRequestHandler((…, perm, allow, d) =>
+    isWebview(d.requestingUrl) ? allow(a.has(perm)) : isWorkbench(…) ? allow(l.has(perm)) : allow(false));
+  ```
+
+  `media` est accordé à l'éditeur et **refusé au panneau d'une extension** — sans invite, sans réglage,
+  sans contournement. C'est aussi pourquoi le micro du Chat de VS Code fonctionne : il n'est pas dans
+  un panneau.
+
+  **L'enregistrement sort donc du panneau.** L'extension cherche un enregistreur sur la machine —
+  `arecord`, `pw-record`, `parecord`, `rec`, `ffmpeg` — et lance celui qu'elle trouve ; le bouton micro
+  n'est plus qu'un départ et un arrêt. Quand il n'y en a aucun, le message **nomme le paquet à
+  installer** au lieu de demander une permission qui ne peut pas être donnée, et
+  `hiveyCode.dictation.recordCommand` permet d'écrire exactement ce qui marche sur sa machine — ce qui
+  est la seule réponse praticable sous Windows, qui ne livre rien qui enregistre vers un fichier en
+  ligne de commande.
+
+  ⚠️ Le processus est arrêté par **SIGINT et non SIGKILL**, et ce n'est pas de la politesse : tous ces
+  outils finalisent l'en-tête WAV sur SIGINT et laissent un fichier tronqué sur SIGKILL. L'en-tête
+  porte le nombre d'échantillons — un fichier jamais refermé déclare qu'il est vide.
+
+- **⚠️ Le message sous le composer ne s'effaçait jamais.** « et le message ne disparait pas... » :
+  rien ne le nettoyait, et comme le panneau ne se redessine que lorsque l'extension lui envoie quelque
+  chose, un échec de dictée — qui n'envoie plus rien ensuite — restait affiché jusqu'à la fin de la
+  session. Un **état** (« Écoute… ») ne s'efface toujours pas, parce qu'il est vrai tant qu'il l'est ;
+  un **événement** disparaît au bout de huit secondes.
+
+### Modifié
+
+- **Les trois modes portent l'accent du thème.** « rajoutes les couleurs du thème vscode sur le mode
+  chat et le mode plan aussi pour une cohérence graphique comme pour le mode agent ». C'était Agent
+  seul pendant une heure — au motif qu'il est le seul mode qui **modifie vos fichiers** — un
+  raisonnement juste à propos d'un **avertissement** et faux à propos de cette marque, qui n'en est pas
+  un : une rangée où une pastille est allumée et deux sont grises se lit comme deux pastilles
+  désactivées. Un seul accent pour les trois, jamais une palette de trois : ce qui distingue les modes,
+  c'est le mot écrit dedans.
+
 ## 1.8.0 — 2026-10-06
 
 ### Ajouté

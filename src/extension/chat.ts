@@ -116,7 +116,7 @@ import type {
   UiState,
   UiApproval,
 } from "../shared/protocol.js";
-import { installWhisper, installedWhisper, runWhisper } from "./whisper.js";
+import { findRecorder, installWhisper, installedWhisper, recordArgv, recorderAdvice, runWhisper, startRecording } from "./whisper.js";
 import { modelFor, whisperAsset } from "../core/dictation/local.js";
 import { SECTION, endpointFor, providerFor, readSettings, routerConfig, type Keys, type Settings, writeTarget } from "./config.js";
 import { EgressGate, safeHost, summarize } from "./egress.js";
@@ -1073,6 +1073,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           break;
         case "dictate":
           await this.transcribe(m.audio, m.ms);
+          break;
+        case "startDictation":
+          await this.startDictation();
+          break;
+        case "stopDictation":
+          await this.stopDictation(Boolean(m.cancel));
           break;
         case "shareEntry":
           await this.shareEntry(m.id);
@@ -3186,6 +3192,68 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    * in a sent question — a recogniser mis-hears, and a dictated question that sends itself is a
    * question nobody proof-read.
    */
+  /** The recording in progress, if any. One at a time: a second microphone is a second voice. */
+  private recording: { stop: () => Promise<string>; cancel: () => void; dir: string; started: number } | undefined;
+
+  /**
+   * Start recording with a program on this machine.
+   *
+   * ⚠️ Here rather than in the panel because VS Code does not give an extension's panel a microphone
+   * — `media` is granted to the workbench and withheld from a `vscode-webview://` origin, with no
+   * prompt and no setting. Reported as « aucun moyen d'activer », and there genuinely is none.
+   */
+  private async startDictation(): Promise<void> {
+    if (this.recording) return;
+    const settings = readSettings();
+    const dir = await fsp.mkdtemp(join(tmpdir(), "hivey-dictation-"));
+    const wav = join(dir, "voice.wav");
+    const configured = recordArgv(settings.dictation.recordCommand, wav);
+    const found = configured ? undefined : findRecorder(process.platform);
+    const argv = configured ?? (found ? [found.program, ...found.args(wav)] : undefined);
+    if (!argv) {
+      await fsp.rm(dir, { recursive: true, force: true });
+      this.post({
+        type: "dictationFailed",
+        why: t(
+          "No recorder was found on this machine, and the panel is not allowed a microphone of its own. Install one — {0} — or set hiveyCode.dictation.recordCommand to whatever records a WAV here, with {file} for the file.",
+          recorderAdvice(process.platform),
+        ),
+      });
+      return;
+    }
+    try {
+      const run = startRecording(argv, wav);
+      this.recording = { ...run, dir, started: Date.now() };
+      this.post({ type: "dictationProgress", what: t("Listening… press again to stop.") });
+    } catch (err) {
+      await fsp.rm(dir, { recursive: true, force: true });
+      this.post({ type: "dictationFailed", why: t("The recorder could not be started: {0}", (err as Error).message) });
+    }
+  }
+
+  /** Stop, and turn what was recorded into words — or throw it away. */
+  private async stopDictation(cancel: boolean): Promise<void> {
+    const run = this.recording;
+    if (!run) return;
+    this.recording = undefined;
+    if (cancel) {
+      run.cancel();
+      await fsp.rm(run.dir, { recursive: true, force: true });
+      this.post({ type: "dictationProgress", what: "" });
+      return;
+    }
+    try {
+      const wav = await run.stop();
+      this.post({ type: "dictationProgress", what: t("Transcribing…") });
+      const audio = await fsp.readFile(wav);
+      await this.transcribe(audio.toString("base64"), Date.now() - run.started);
+    } catch (err) {
+      this.post({ type: "dictationFailed", why: t("The recording failed: {0}", (err as Error).message) });
+    } finally {
+      await fsp.rm(run.dir, { recursive: true, force: true });
+    }
+  }
+
   private async transcribe(audioBase64: string, ms: number): Promise<void> {
     const settings = readSettings();
     const storage = this.ctx.globalStorageUri.fsPath;

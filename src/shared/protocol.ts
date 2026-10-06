@@ -471,6 +471,15 @@ export type ToExtension =
    * kilobytes, so the third it costs to encode is not worth a second channel.
    */
   | { type: "dictate"; audio: string; ms: number }
+  /**
+   * Record using a program on the machine, because the panel is not allowed a microphone.
+   *
+   * ⚠️ VS Code grants `media` to the workbench and not to a `vscode-webview://` origin, with no
+   * setting and no prompt — so `getUserMedia` in this panel answers `NotAllowedError` for ever. The
+   * recording therefore happens in the extension host, and these two messages are the button.
+   */
+  | { type: "startDictation" }
+  | { type: "stopDictation"; cancel?: boolean }
   /** Carry one message into another conversation, as context there. */
   | { type: "shareEntry"; id: string }
   | { type: "setMode"; mode: Mode }
