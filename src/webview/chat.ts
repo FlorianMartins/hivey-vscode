@@ -841,8 +841,12 @@ export function dictationStopped(): void {
 }
 
 /** The extension says a recording has actually begun. Only now does the button say it is listening. */
-export function dictationStarted(): void {
+export function dictationStarted(levels: boolean): void {
   listening = true;
+  // ⚠️ When nothing will report the voice, the edge BREATHES instead of sitting still. A ring that
+  // never moves is indistinguishable from a broken one, and inventing a level would be worse than
+  // either — it would claim to hear something.
+  document.querySelector<HTMLElement>(".composer")?.classList.toggle("quiet", !levels);
   refreshMic();
 }
 

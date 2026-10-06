@@ -870,7 +870,7 @@ window.addEventListener("message", (event: MessageEvent<ToPanel>) => {
     // ⚠️ A one-off install of 85 MB over a home connection. A note that cannot change is
     // indistinguishable from a hang, and somebody who has just spoken a sentence is watching it.
     case "dictationStarted":
-      dictationStarted();
+      dictationStarted(m.levels);
       break;
     case "dictationLevel":
       setLevel(m.level);

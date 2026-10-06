@@ -2,6 +2,44 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 1.11.0 — 2026-10-06
+
+### Corrigé
+
+- **⚠️⚠️ L'onde ne bougeait pas, et la cause n'était pas celle que j'avais annoncée.** « l'animation
+  elle ne fonctionne pas, je voudrais vraiment faire vibrer en mode onde sonore les bords ». Grâce à
+  « tu peux installer ffmpeg si tu veux tester », la chaîne a pu être **mesurée** ici plutôt que
+  raisonnée — et elle a révélé deux erreurs à moi :
+
+  1. **ffmpeg tamponne sa sortie.** Sans `-flush_packets 1`, le WAV arrive **d'un seul bloc à la fin**
+     et le bord ne bouge jamais. Neuf secondes de capture en temps réel donnent **71 relevés de niveau
+     avec le drapeau, et zéro sans**. J'avais classé ffmpeg comme « diffuse » sans le vérifier.
+  2. **Sur Windows, ffmpeg n'était jamais essayé.** Le recours intégré était premier et, étant
+     `builtin`, il correspond **toujours** — donc la recherche ne l'atteignait pas, et une machine qui
+     avait ffmpeg était servie par le chemin inférieur quand même. ffmpeg passe devant.
+
+  ⚠️ La courbe du niveau a aussi été **recalibrée sur un vrai enregistrement** : il manquait un
+  **plancher**. Sans lui, le bruit de la pièce tenait le bord allumé au quart et la différence entre le
+  silence et une voix était invisible — ce qui est exactement ce à quoi sert cette animation. L'écart
+  mesuré passe de 0,29 à 0,41, et le vrai silence rend zéro.
+
+  Et là où l'enregistreur n'écrit qu'à l'arrêt — le recours Windows — le bord **respire** lentement au
+  lieu de rester plat : *un anneau qui ne bouge jamais est indiscernable d'un anneau cassé, et en
+  inventer un niveau serait pire que les deux — ce serait prétendre entendre quelque chose.*
+
+- **⚠️ La proposition d'installer le modèle arrive au PREMIER clic.** « on doit cliquer deux fois comme
+  si on voulait envoyer un message alors que l'outil n'est pas installé ». Elle vivait dans la
+  transcription, donc **après** l'enregistrement. Tout ce dont une chose a besoin se demande avant de
+  la faire, pas après.
+
+- **La langue est désormais suggérée au lieu d'être devinée.** « si je dis "Hello est ce que tu
+  m'entend" il écrit "Elo, is what you're trying to do?" ». ⚠️ **Whisper choisit UNE langue pour tout
+  le clip**, d'après ses premières secondes : le mot « Hello » décide anglais, et le français qui suit
+  est entendu comme de l'anglais. C'est ainsi que le modèle fonctionne et aucun réglage de notre côté
+  n'y change rien — mais **le laisser deviner est un choix**, et c'est le mauvais pour quelqu'un dont
+  l'éditeur est en français. La langue de l'éditeur sert donc d'indication par défaut, et
+  `hiveyCode.dictation.language` l'emporte pour qui dicte dans une langue qu'il ne lit pas.
+
 ## 1.10.0 — 2026-10-06
 
 ### Corrigé

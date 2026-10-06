@@ -629,7 +629,7 @@ export type ToPanel =
    * and the next click "stopped" a recording that never existed. Reported as having to click twice
    * before anything was offered. The button follows what IS, not what was asked for.
    */
-  | { type: "dictationStarted" }
+  | { type: "dictationStarted"; levels: boolean }
   /**
    * How loud it is right now, from 0 to 1.
    *

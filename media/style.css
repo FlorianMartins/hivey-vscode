@@ -4418,11 +4418,21 @@ pre.code code {
   transition: opacity 90ms linear, transform 90ms linear, box-shadow 90ms linear;
   pointer-events: none;
 }
+/* No voice to follow — the recorder writes its file only when it stops. It breathes, slowly, so the
+   box plainly says "listening" without claiming to hear anything in particular. */
+.composer.listening.quiet .composer-card::before {
+  animation: hc-breathe 2.6s ease-in-out infinite;
+}
+@keyframes hc-breathe {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.7; }
+}
 @media (prefers-reduced-motion: reduce) {
   .composer.listening .composer-card::before {
     transition: none;
     transform: none;
     box-shadow: none;
+    animation: none;
     opacity: 0.6;
   }
 }

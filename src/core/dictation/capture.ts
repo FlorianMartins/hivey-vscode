@@ -29,6 +29,15 @@ export interface Recorder {
   stop: "signal" | "stdin";
   /** True when it is part of the system and need not be looked for on PATH. */
   builtin?: boolean;
+  /**
+   * True when it writes the file as it records, rather than only at the end.
+   *
+   * ⚠️ This is what decides whether the edge of the box can follow the voice: the loudness is read
+   * from the file as it grows, because the panel has no microphone of its own to listen to. The
+   * Windows fallback saves once, at the end — so with it there is nothing to read until there is
+   * nothing left to show, and the ring has to say "listening" some other way rather than pretend.
+   */
+  streams: boolean;
 }
 
 /**
@@ -74,34 +83,45 @@ export function windowsRecorderScript(wav: string): string {
  * install. How each is stopped is on the entry itself: SIGINT for the ones that finalise their WAV
  * header on it, a line of input for the Windows one, which has to reach an explicit `save`.
  */
+/**
+ * ⚠️ `-flush_packets 1` on every ffmpeg line, and it is not a flourish.
+ *
+ * ffmpeg buffers its output, so without it the WAV arrives in one piece and the edge of the box never
+ * moves — which is exactly the symptom reported. Measured rather than reasoned: a nine-second
+ * real-time capture produced 71 level readings with it and 0 without.
+ */
 export function recorders(platform: string): Recorder[] {
   if (platform === "darwin") {
     return [
-      { program: "rec", args: (w) => ["-q", "-r", "16000", "-c", "1", "-b", "16", w], from: "sox", stop: "signal" },
-      { program: "ffmpeg", args: (w) => ["-hide_banner", "-loglevel", "error", "-f", "avfoundation", "-i", ":0", "-ar", "16000", "-ac", "1", "-y", w], from: "ffmpeg", stop: "signal" },
+      { program: "rec", args: (w) => ["-q", "-r", "16000", "-c", "1", "-b", "16", w], from: "sox", stop: "signal", streams: true },
+      { program: "ffmpeg", args: (w) => ["-hide_banner", "-loglevel", "error", "-flush_packets", "1", "-f", "avfoundation", "-i", ":0", "-ar", "16000", "-ac", "1", "-y", w], from: "ffmpeg", stop: "signal", streams: true },
     ];
   }
   if (platform === "win32") {
     return [
-      // ⚠️ FIRST, and `builtin`, so nothing has to be installed before anybody can speak. Windows is
-      // the one platform that ships no command-line recorder, and "install ffmpeg first" is not the
-      // brief. `winmm` has been part of Windows for thirty years.
+      // ⚠️ ffmpeg FIRST, and the `builtin` one after it — the other way round was a real defect: a
+      // `builtin` recorder matches every time, so the search never reached ffmpeg and a machine that
+      // HAD it was served the lesser path anyway. Lesser in one specific way: ffmpeg streams, so the
+      // edge of the box can follow the voice, and the Windows fallback writes once at the end.
+      { program: "ffmpeg", args: (w) => ["-hide_banner", "-loglevel", "error", "-flush_packets", "1", "-f", "dshow", "-i", "audio=default", "-ar", "16000", "-ac", "1", "-y", w], from: "ffmpeg", stop: "signal", streams: true },
+      // Nothing to install before anybody can speak: `winmm` has been part of Windows for thirty
+      // years, and "install ffmpeg first" was never the brief.
       {
         program: "powershell",
         args: (w) => ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", windowsRecorderScript(w)],
         from: "Windows",
         stop: "stdin",
         builtin: true,
+        streams: false,
       },
-      { program: "ffmpeg", args: (w) => ["-hide_banner", "-loglevel", "error", "-f", "dshow", "-i", "audio=default", "-ar", "16000", "-ac", "1", "-y", w], from: "ffmpeg", stop: "signal" },
     ];
   }
   return [
-    { program: "arecord", args: (w) => ["-q", "-f", "S16_LE", "-r", "16000", "-c", "1", w], from: "alsa-utils", stop: "signal" },
-    { program: "pw-record", args: (w) => ["--rate", "16000", "--channels", "1", w], from: "pipewire", stop: "signal" },
-    { program: "parecord", args: (w) => ["--rate=16000", "--channels=1", "--file-format=wav", w], from: "pulseaudio-utils", stop: "signal" },
-    { program: "rec", args: (w) => ["-q", "-r", "16000", "-c", "1", "-b", "16", w], from: "sox", stop: "signal" },
-    { program: "ffmpeg", args: (w) => ["-hide_banner", "-loglevel", "error", "-f", "alsa", "-i", "default", "-ar", "16000", "-ac", "1", "-y", w], from: "ffmpeg", stop: "signal" },
+    { program: "arecord", args: (w) => ["-q", "-f", "S16_LE", "-r", "16000", "-c", "1", w], from: "alsa-utils", stop: "signal", streams: true },
+    { program: "pw-record", args: (w) => ["--rate", "16000", "--channels", "1", w], from: "pipewire", stop: "signal", streams: true },
+    { program: "parecord", args: (w) => ["--rate=16000", "--channels=1", "--file-format=wav", w], from: "pulseaudio-utils", stop: "signal", streams: true },
+    { program: "rec", args: (w) => ["-q", "-r", "16000", "-c", "1", "-b", "16", w], from: "sox", stop: "signal", streams: true },
+    { program: "ffmpeg", args: (w) => ["-hide_banner", "-loglevel", "error", "-flush_packets", "1", "-f", "alsa", "-i", "default", "-ar", "16000", "-ac", "1", "-y", w], from: "ffmpeg", stop: "signal", streams: true },
   ];
 }
 

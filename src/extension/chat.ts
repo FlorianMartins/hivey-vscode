@@ -22,6 +22,7 @@ import {
   dictationMode,
   transcriptionEndpoint,
   transcriptionModel,
+  recogniserLanguage,
   localCommand,
   transcriptionBody,
 } from "../core/dictation/dictation.js";
@@ -3200,6 +3201,61 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    * in a sent question — a recogniser mis-hears, and a dictated question that sends itself is a
    * question nobody proof-read.
    */
+  /**
+   * Make sure there is somewhere to turn a voice into words, asking to install one if not.
+   *
+   * ⚠️ Called BEFORE the recording starts, which is the whole point. It used to live inside
+   * `transcribe`, so the question "shall I install a transcriber?" arrived only after somebody had
+   * pressed the microphone, spoken, and pressed it again — reported as « on doit cliquer deux fois
+   * comme si on voulait envoyer un message alors que l'outil n'est pas installé ». Everything a thing
+   * needs is asked for before it is done, not after.
+   */
+  private async ensureTranscriber(): Promise<boolean> {
+    const settings = readSettings();
+    const storage = this.ctx.globalStorageUri.fsPath;
+    const here = Boolean(installedWhisper(storage, process.platform, settings.dictation.localModel));
+    if (dictationMode(settings.dictation, settings.chat.provider, here) !== "off") return true;
+    if (!whisperAsset({ platform: process.platform, arch: process.arch })) {
+      this.post({
+        type: "dictationFailed",
+        why: t(
+          "Dictation needs a transcriber. The simplest way on any machine is a Groq key — its free tier is 2,000 transcriptions a day without a card — which this borrows automatically once it is your provider. A key for OpenAI is borrowed the same way. Or point hiveyCode.dictation.command at a transcriber on this machine, which sends nothing anywhere. OpenRouter and local model servers do not transcribe.",
+        ),
+      });
+      return false;
+    }
+    const model = modelFor(settings.dictation.localModel);
+    const go = await new Promise<boolean>((resolve) => {
+      this.askInPanel(
+        {
+          id: randomNonce(),
+          tool: "run_command",
+          description: t("Install a transcriber on this machine? ({0} MB, once)", model.mb + 10),
+          choices: ["once", "no"],
+          detail: [
+            t("Your voice is then turned into words here, by whisper.cpp. Nothing is sent anywhere, ever, and it costs nothing."),
+            t("Downloaded from github.com and huggingface.co — the only addresses this extension fetches without being told to."),
+            t("Model: {0} — {1}", model.id, model.hint),
+          ],
+        },
+        (answer) => resolve(answer === "once"),
+      );
+    });
+    if (!go) {
+      this.post({ type: "dictationFailed", why: t("Dictation needs a transcriber, and none was installed.") });
+      return false;
+    }
+    try {
+      await installWhisper(storage, process.platform, process.arch, settings.dictation.localModel, (what) =>
+        this.post({ type: "dictationProgress", what }),
+      );
+      return true;
+    } catch (err) {
+      this.post({ type: "dictationFailed", why: t("The transcriber could not be installed: {0}", (err as Error).message) });
+      return false;
+    }
+  }
+
   /** The recording in progress, if any. One at a time: a second microphone is a second voice. */
   private recording:
     | { stop: () => Promise<string>; cancel: () => void; dir: string; started: number; level: ReturnType<typeof setInterval> }
@@ -3214,6 +3270,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    */
   private async startDictation(): Promise<void> {
     if (this.recording) return;
+    // Everything this needs, asked for before a word is spoken rather than after.
+    if (!(await this.ensureTranscriber())) return;
     const settings = readSettings();
     const dir = await fsp.mkdtemp(join(tmpdir(), "hivey-dictation-"));
     const wav = join(dir, "voice.wav");
@@ -3281,9 +3339,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
               sum += sample * sample;
             }
             const rms = buf.length ? Math.sqrt(sum / (buf.length / 2)) : 0;
-            // Speech sits low in the range, so the bar would barely move on a linear scale. The
-            // fourth root spreads a quiet voice across the top half without making silence twitch.
-            this.post({ type: "dictationLevel", level: Math.min(1, Math.pow(rms, 0.25) * 1.3) });
+            // ⚠️ Calibrated against a real recording rather than guessed. Speech sits very low in a
+            // linear scale — an RMS of 0.01 to 0.1 — so a bar driven by it barely moves; the fourth
+            // root opens that range out. The FLOOR is the other half and the half that was missing:
+            // without it, room noise held the edge at a quarter lit and the difference between
+            // silence and a voice was invisible, which is the whole thing this is for.
+            const open = Math.pow(rms, 0.25);
+            this.post({ type: "dictationLevel", level: Math.max(0, Math.min(1, (open - 0.2) / 0.55)) });
           } finally {
             closeSync(fd);
           }
@@ -3292,7 +3354,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         }
       }, 120);
       this.recording = { ...run, dir, started: Date.now(), level };
-      this.post({ type: "dictationStarted" });
+      // Whether the edge can follow the voice at all. A recorder that writes its file once, at the
+      // end, sends nothing to follow — and a ring left flat is indistinguishable from a broken one, so
+      // the panel is told to breathe instead of to pretend.
+      this.post({ type: "dictationStarted", levels: configured ? true : (found?.streams ?? false) });
       this.post({ type: "dictationProgress", what: t("Listening… press again to stop.") });
     } catch (err) {
       await fsp.rm(dir, { recursive: true, force: true });
@@ -3333,42 +3398,6 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       settings.chat.provider,
       Boolean(installedWhisper(storage, process.platform, settings.dictation.localModel)),
     );
-    // ⚠️ Nothing configured, but something OFFERABLE. The three answers ruled out by measurement —
-    // VS Code's proposed speech API, the browser's recogniser, the operating systems' own dictation —
-    // left one that works the same everywhere: a model on this machine. So instead of refusing, this
-    // asks, says the size, and installs. Asked for: « oui construis le Whisper local ».
-    if (mode === "off" && whisperAsset({ platform: process.platform, arch: process.arch })) {
-      const model = modelFor(settings.dictation.localModel);
-      const go = await new Promise<boolean>((resolve) => {
-        this.askInPanel(
-          {
-            id: randomNonce(),
-            tool: "run_command",
-            description: t("Install a transcriber on this machine? ({0} MB, once)", model.mb + 10),
-            choices: ["once", "no"],
-            detail: [
-              t("Your voice is then turned into words here, by whisper.cpp. Nothing is sent anywhere, ever, and it costs nothing."),
-              t("Downloaded from github.com and huggingface.co — the only addresses this extension fetches without being told to."),
-              t("Model: {0} — {1}", model.id, model.hint),
-            ],
-          },
-          (answer) => resolve(answer === "once"),
-        );
-      });
-      if (!go) {
-        this.post({ type: "dictationFailed", why: t("Dictation needs a transcriber, and none was installed.") });
-        return;
-      }
-      try {
-        await installWhisper(storage, process.platform, process.arch, settings.dictation.localModel, (what) =>
-          this.post({ type: "dictationProgress", what }),
-        );
-        mode = "whisper";
-      } catch (err) {
-        this.post({ type: "dictationFailed", why: t("The transcriber could not be installed: {0}", (err as Error).message) });
-        return;
-      }
-    }
     if (mode === "off") {
       this.post({
         type: "dictationFailed",
@@ -3471,7 +3500,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const wav = join(dir, "voice.wav");
     try {
       await fsp.writeFile(wav, audio);
-      return await runWhisper(where, wav, settings.dictation.language);
+      return await runWhisper(where, wav, recogniserLanguage(settings.dictation, language()));
     } finally {
       await fsp.rm(dir, { recursive: true, force: true });
     }
@@ -3513,7 +3542,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
     const { body, contentType } = transcriptionBody(audio, {
       model: transcriptionModel(settings.dictation, settings.chat.provider),
-      ...(settings.dictation.language ? { language: settings.dictation.language } : {}),
+      // The same hint a local transcriber gets: the editor's language when nothing was chosen.
+      ...(() => {
+        const hint = recogniserLanguage(settings.dictation, language());
+        return hint ? { language: hint } : {};
+      })(),
     });
     // The gateway's key, when one is stored: a self-hosted transcriber usually needs none, and a
     // missing key is not a reason to refuse — the endpoint will say so if it minds.

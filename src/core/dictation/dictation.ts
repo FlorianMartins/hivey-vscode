@@ -140,6 +140,28 @@ export function transcriptionEndpoint(
   return undefined;
 }
 
+/**
+ * Which language to tell the recogniser, when the user has not said.
+ *
+ * ⚠️⚠️ Whisper picks ONE language for a whole clip, from its opening seconds, and then transcribes
+ * everything as that language. Reported from a real machine: "Hello est-ce que tu m'entends" came back
+ * as "Elo, is what you're trying to do?", while "salut est-ce que tu m'entends" was perfect. The word
+ * "Hello" decided English and the French that followed was heard as English. That is how the model
+ * works and no setting on our side changes it — but LETTING IT GUESS is a choice, and it is the worse
+ * one for somebody whose editor is in French.
+ *
+ * So the editor's own language is the default hint. It is a far better prior than silence, it is
+ * exactly as wrong as the editor is about who is using it, and `dictation.language` overrides it for
+ * anybody who dictates in a language they do not read their tools in.
+ */
+export function recogniserLanguage(settings: DictationSettings, uiLanguage: string): string | undefined {
+  const chosen = settings.language.trim();
+  if (chosen) return chosen;
+  // A BCP-47 tag may carry a region — `fr-CA` — and whisper wants the language alone.
+  const base = uiLanguage.split(/[-_]/)[0]?.toLowerCase();
+  return base && base !== "auto" ? base : undefined;
+}
+
 /** What the audio is written as. `webm/opus` is what every Chromium `MediaRecorder` produces. */
 export const AUDIO_EXTENSION = "webm";
 export const AUDIO_MIME = "audio/webm";

@@ -241,10 +241,17 @@ test("⚠️ Windows records with what Windows already has", () => {
   // Reported from a real machine: « je suis sur Windows et j'ai ce message ». Windows is the one
   // platform that ships no command-line recorder, and "install ffmpeg before you may speak" is not
   // the brief. `winmm` has been part of every Windows for thirty years, and PowerShell can call it.
-  const [first] = recorders("win32");
-  assert.equal(first!.program, "powershell");
-  assert.equal(first!.builtin, true, "it would be looked for on PATH, and a thin PATH would silence it");
-  const script = first!.args("C:\\t\\v.wav").join(" ");
+  const list = recorders("win32");
+  const builtin = list.find((r) => r.builtin);
+  assert.ok(builtin, "Windows has nothing it can record with out of the box");
+  assert.equal(builtin!.program, "powershell");
+  // ⚠️ And it is NOT first: a `builtin` entry matches every time, so putting it first meant the search
+  // never reached ffmpeg and a machine that HAD ffmpeg was served the lesser path anyway. Lesser in
+  // one specific way — ffmpeg streams, so the edge of the box can follow the voice.
+  assert.equal(list[0]!.program, "ffmpeg", "the built-in fallback shadows a better recorder again");
+  assert.equal(list[0]!.streams, true);
+  assert.equal(builtin!.streams, false, "the fallback writes once at the end; claiming otherwise fakes a voice");
+  const script = builtin!.args("C:\\t\\v.wav").join(" ");
   assert.match(script, /winmm\.dll/);
   assert.match(script, /samplespersec 16000/, "a speech model reads 16 kHz");
   assert.match(script, /channels 1/);
@@ -255,11 +262,13 @@ test("⚠️ the Windows recorder is stopped by a LINE, never by a signal", () =
   // Its file is produced by an explicit `save`, and a process that has been killed never reaches it —
   // the recording would be lost at exactly the moment somebody finished speaking. Every other
   // recorder finalises its own header on SIGINT, so they are stopped that way.
-  assert.equal(recorders("win32")[0]!.stop, "stdin");
-  assert.match(recorders("win32")[0]!.args("x").join(" "), /ReadLine/);
+  const win = recorders("win32").find((r) => r.builtin)!;
+  assert.equal(win.stop, "stdin");
+  assert.match(win.args("x").join(" "), /ReadLine/);
   for (const platform of ["linux", "darwin"]) {
     for (const r of recorders(platform)) {
       assert.equal(r.stop, "signal", `${platform}/${r.program} would need a different stop`);
+      assert.equal(r.streams, true, `${platform}/${r.program} claims not to stream, so the edge would never move`);
     }
   }
 });
@@ -268,4 +277,16 @@ test("a path with a quote in it cannot end the PowerShell string", () => {
   // A temporary path has no quote in it today. A path is not the place to find that out.
   const script = windowsRecorderScript("C:\\a'b\\v.wav");
   assert.ok(script.includes(`save hv "C:\\a''b\\v.wav"`), script.slice(-120));
+});
+
+test("⚠️ every ffmpeg line flushes, or the file arrives in one piece and nothing animates", () => {
+  // Measured rather than reasoned: a nine-second real-time capture produced 71 level readings with
+  // `-flush_packets 1` and ZERO without it — ffmpeg buffers its output, so the WAV lands whole at the
+  // end and the edge of the box never moves. That was the reported symptom.
+  for (const platform of ["linux", "darwin", "win32"]) {
+    for (const r of recorders(platform).filter((x) => x.program === "ffmpeg")) {
+      assert.ok(r.args("x.wav").includes("-flush_packets"), `${platform}/ffmpeg buffers, so the edge stays flat`);
+      assert.equal(r.streams, true);
+    }
+  }
 });
