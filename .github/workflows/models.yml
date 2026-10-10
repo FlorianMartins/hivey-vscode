@@ -16,8 +16,12 @@ jobs:
   refresh:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          # This job commits and pushes the refreshed catalogue, so it keeps the
+          # token; it uploads no artifact, so the credential cannot leak through one.
+          persist-credentials: true # zizmor: ignore[artipacked]
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "20"
           cache: npm
@@ -31,11 +35,11 @@ jobs:
       - name: Commit when something moved
         run: |
           # Two generated files, one job: the price catalogue, and the Hivey presets curated from it.
-          FILES="src/core/router/catalog.generated.ts src/core/router/hivey.generated.ts"
-          if [[ -n "$(git status --porcelain $FILES)" ]]; then
+          FILES=(src/core/router/catalog.generated.ts src/core/router/hivey.generated.ts)
+          if [[ -n "$(git status --porcelain "${FILES[@]}")" ]]; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add $FILES
+            git add "${FILES[@]}"
             git commit -m "chore(models): refresh the catalogue and the Hivey presets"
             git push
           else
