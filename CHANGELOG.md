@@ -6,6 +6,16 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **⚠️ La lueur fait vraiment le tour du cadre.** « il fait gauche, haut, droite, bas et pas le tour
+  proprement ». C'était un dégradé conique tournant autour du **centre** : sur un cadre quatre fois
+  plus large que haut, un angle n'est pas une distance, et l'arc filait sur les petits côtés et se
+  traînait sur les grands. La lumière suit maintenant le **périmètre** (`offset-path: border-box`),
+  coins arrondis compris, à vitesse constante : un cœur lumineux sur le trait et un halo doux à
+  l'extérieur, jamais par-dessus le texte. Immobile si le système demande moins d'animations.
+
+- **Le bouton Stop est rouge.** Rempli, carré blanc sur rouge, pendant que l'IA raisonne, agit ou
+  répond — la seule couleur qui ne peut pas se lire comme « envoyer ».
+
 - **⚠️ Ce que lit le modèle est en anglais, quelle que soit la langue de l'interface.** « tous les
   skills, tools, etc sont en Français […] passer tout en anglais ». Les corps des skills, leurs noms
   et descriptions côté modèle, les instructions des actions sur la sélection, les invites des

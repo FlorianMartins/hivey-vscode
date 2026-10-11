@@ -1124,6 +1124,20 @@ export function restoreDraft(draft: Draft | undefined): void {
   }
 }
 
+/**
+ * The light that runs around the composer while a turn is working — see `.composer-ring` in the
+ * stylesheet. Always present and hidden at rest, so a turn starting only has to toggle a class on
+ * the composer (`setStreaming`) rather than rebuild it.
+ */
+function composerRing(): HTMLElement[] {
+  const ring = el("div", "composer-ring");
+  ring.append(el("span", "composer-ring-light"));
+  const halo = el("div", "composer-halo");
+  halo.append(el("span", "composer-halo-light"));
+  for (const node of [ring, halo]) node.setAttribute("aria-hidden", "true");
+  return [halo, ring];
+}
+
 function composer(state: UiState, deps: ChatDeps): HTMLElement {
   lastDeps = deps;
   // The working state lives on the composer rather than on the transcript because that is where the
@@ -1135,6 +1149,7 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
   const waiting = state.pendingApprovals.length > 0;
   const wrap = el("div", `composer${isStreaming() && !waiting ? " working" : ""}${waiting ? " waiting" : ""}`);
   const card = el("div", "composer-card");
+  card.append(...composerRing());
   // Paste and drop, on the card rather than the text area: dropping a file on the chips or on the
   // toolbar is the same intent, and a target that only accepts the middle of itself is a target
   // people miss. An ordinary paste is untouched — see `wirePaste`.
@@ -1327,7 +1342,7 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
     // weight of its own at the end of a row of six identical controls, and "the send is special"
     // is a thing a toolbar says by position, not by paint.
     isStreaming()
-      ? button({ icon: ICON.stop, title: t("Stop the answer"), className: "btn ghost icon-only send", onClick: () => deps.send({ type: "stop" }) })
+      ? button({ icon: ICON.stop, title: t("Stop the answer"), className: "btn ghost icon-only send stop", onClick: () => deps.send({ type: "stop" }) })
       : button({ icon: ICON.send, title: t("Send (⏎)"), className: "btn ghost icon-only send", onClick: () => submit(area, deps) }),
   );
   bar.append(right);
