@@ -182,6 +182,17 @@ export interface TurnResult {
 const DEFAULT_MAX_STEPS = 30;
 
 /**
+ * How many times one turn asks for the rest of a reply the output cap cut off. Two: enough to get
+ * past one long plan or one large file, few enough that a model which keeps writing past any cap
+ * cannot spend the whole step budget doing it.
+ */
+const MAX_CONTINUATIONS = 2;
+const CONTINUE_AFTER_CUT =
+  "Your previous reply was cut off by the output token limit before you finished, and any tool call you were writing was lost. " +
+  "Continue from where you stopped without repeating what you already wrote. " +
+  "If you were writing a large file, a long plan or a big edit, split it into several smaller tool calls, each well under the limit.";
+
+/**
  * Below this there is nothing worth caching, and marking it costs money.
  *
  * A cache entry is written at a premium — Anthropic charges 1.25× for the tokens it stores — and
@@ -238,6 +249,8 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
   let reasoning = "";
   /** Set by the last response that ran out of output budget. See `TurnResult.truncated`. */
   let truncated = false;
+  /** How many times this turn has asked for the rest of a reply the cap cut off. */
+  let continuations = 0;
 
   for (let step = 0; step < maxSteps; step++) {
     if (opts.signal?.aborted) return done("cancelled");
@@ -280,6 +293,18 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
     const answer = opts.afterResponse ? opts.afterResponse(res.text) : res.text;
     if (answer) text = text ? `${text}\n${answer}` : answer;
     if (res.reasoning) reasoning += res.reasoning;
+
+    // ⚠️ Cut off by the output cap with nothing to run: NOT an answer. It was returned as one, so a
+    // turn that ended « Voici le plan, puis j'attaque : » — the plan or the call it announced lost to
+    // the cap — looked finished, and the agent simply stopped. Asked to carry on instead, a bounded
+    // number of times, with the one instruction that keeps it from being cut again: smaller pieces.
+    if (truncated && !res.toolCalls.length && tools.length && continuations < MAX_CONTINUATIONS) {
+      continuations++;
+      opts.report?.("the reply hit the output limit — asking the model to continue");
+      working.push({ role: "assistant", content: res.text || "(cut off)" });
+      working.push({ role: "user", content: CONTINUE_AFTER_CUT });
+      continue;
+    }
 
     if (!res.toolCalls.length) {
       // The cheap middle between telling the user and escalating to a billed model: ask the same

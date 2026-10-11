@@ -1771,6 +1771,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       messages: prepared.messages,
       tools,
       maxSteps: definition.maxSteps ?? DEFAULT_AGENT_STEPS,
+      // The same cap as the turn that delegated. It had none, so on a self-hosted server a sub-agent
+      // could generate until the whole context slot was full — minutes of a "stuck" turn with nothing
+      // on screen, since a sub-agent streams nothing to the panel.
+      maxTokens: env.settings.chat.maxOutputTokens,
       ...(run.signal ? { signal: run.signal } : {}),
       approve: (req) => this.askApproval(req),
       beforeRequest: async (msgs) => {
@@ -4755,6 +4759,17 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             "The model used its whole answer budget on reasoning and produced no reply. Raise hiveyCode.chat.maxOutputTokens, or use a lower reasoning effort.",
           );
         }
+      }
+
+      // ⚠️ And when there IS text but the cap still cut it — the loop's own continuations spent, or a
+      // chat turn with no tools to carry on with — it is said, not left to look finished. That was
+      // the whole of the "it stops, it is stuck" report: nothing on screen distinguished a reply
+      // that ended from one the budget ended.
+      if (result.truncated && result.text.trim() && !ctl.signal.aborted) {
+        const why = t("The reply was cut off at the output limit ({0} tokens). Raise hiveyCode.chat.maxOutputTokens, or ask it to continue.", settings.chat.maxOutputTokens);
+        this.log.appendLine(`[turn] reply cut off at max_tokens=${settings.chat.maxOutputTokens}`);
+        this.post({ type: "status", text: why, ok: false });
+        turnNotices.push({ kind: "tool", text: why });
       }
 
       // What the provider's cache actually served, accumulated across the conversation. Shown in the

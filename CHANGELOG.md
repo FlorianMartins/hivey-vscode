@@ -6,6 +6,22 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **⚠️⚠️ L'agent qui « se bloque » : la réponse coupée par `maxOutputTokens` était prise pour une
+  réponse finie.** « il ne fait ni le plan ni l'action […] il ne va pas jusqu'à la fin ».
+
+  Vu en direct sur Qwen3.8 (llama.cpp) : 8192 tokens générés en 4 min 40, `finish_reason: "length"`,
+  puis plus aucune requête. Le texte s'arrêtait sur « Voici le plan, puis j'attaque : » — le plan ou
+  l'appel d'outil annoncé avait été mangé par la limite, et la boucle rendait la demi-phrase comme
+  réponse, sans rien dire. Désormais :
+  - un appel d'outil **inachevé** au moment de la coupure est écarté (il était exécuté avec un JSON
+    cassé, et `length` était écrasé par `tool_calls`, si bien que personne ne savait pourquoi) — dans
+    le client OpenAI-compatible comme dans le client Anthropic ;
+  - en mode agent, une réponse coupée sans rien à exécuter est **poursuivie** : le modèle reçoit
+    « continue là où tu t'es arrêté, et découpe les gros fichiers en plusieurs appels » — au plus deux
+    fois par tour ;
+  - si la réponse reste coupée, c'est **dit** dans le panneau, avec le réglage à augmenter ;
+  - les sous-agents reçoivent la même limite de sortie que le tour (ils n'en avaient aucune).
+
 - **⚠️ L'anneau qui tourne autour de la zone de saisie est visible dès le début du tour, réflexion
   comprise.** « rajouter cet effet dès le début de la réponse (aussi lors du raisonnement) ».
 

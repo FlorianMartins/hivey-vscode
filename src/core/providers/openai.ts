@@ -315,12 +315,21 @@ export class OpenAICompatibleProvider implements Provider {
         text = "";
       }
     }
-    if (toolCalls.length) stopReason = "tool_calls";
+    // ⚠️ Cut off by the output cap: a call still being written when the budget ran out is HALF a
+    // call. It used to be kept, and `stopReason` overwritten with "tool_calls" — so the turn ran a
+    // call with broken JSON, the model was told its arguments were unreadable, wrote the same huge
+    // call again and was cut again, four minutes a time on a local model, and nobody was told the
+    // budget was the reason. Complete calls are kept; an unfinished one is dropped, and "length"
+    // survives so the loop can ask for the rest. Seen live on Qwen3.8 through llama.cpp: « Voici le
+    // plan, puis j'attaque : » and then nothing, 8192 tokens later.
+    const cut = stopReason === "length";
+    const usable = cut ? toolCalls.filter((c) => isCompleteJson(c.args)) : toolCalls;
+    if (usable.length && !cut) stopReason = "tool_calls";
 
     return {
       text,
       reasoning,
-      toolCalls,
+      toolCalls: usable,
       usage,
       stopReason,
       ...(this.lastShortened ? { shortenedTo: this.lastShortened } : {}),
@@ -607,4 +616,14 @@ export async function describeHttpError(res: Response, provider?: string): Promi
             ? " — rate limited by the provider."
             : "";
   return `HTTP ${res.status} ${res.statusText}${detail ? `: ${detail}` : ""}${hint}`;
+}
+
+/** Whether a tool call's arguments are a whole JSON value — false for one the output cap cut short. */
+export function isCompleteJson(args: string): boolean {
+  try {
+    JSON.parse(args || "{}");
+    return true;
+  } catch {
+    return false;
+  }
 }

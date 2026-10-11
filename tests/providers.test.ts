@@ -95,6 +95,25 @@ test("a tool call split across chunks is reassembled by index", async () => {
   assert.deepEqual(JSON.parse(r.toolCalls[0]!.args), { path: "a.ts" });
 });
 
+test("⚠️ a tool call cut off by max_tokens is dropped, and the cut is still reported", async () => {
+  // It was kept with broken JSON and `stopReason` overwritten to "tool_calls": the loop ran half a
+  // call, and nothing knew the output cap was the reason. Seen live on Qwen3.8 via llama.cpp.
+  const s = await serve((_req, res) =>
+    sse(res, [
+      { choices: [{ delta: { content: "Voici le plan, puis j'attaque :" } }] },
+      { choices: [{ delta: { tool_calls: [{ index: 0, id: "call_1", function: { name: "write_file", arguments: '{"path":"a.ts","content":"lo' } }] } }] },
+      { choices: [{ delta: {}, finish_reason: "length" }] },
+    ]),
+  );
+  const p = new OpenAICompatibleProvider({ id: "local", baseUrl: s.url, isLocal: true });
+  const r = await p.chat({ model: "m", messages: [{ role: "user", content: "go" }] });
+  await s.close();
+
+  assert.equal(r.stopReason, "length");
+  assert.equal(r.toolCalls.length, 0, "half a call is not a call");
+  assert.equal(r.text, "Voici le plan, puis j'attaque :");
+});
+
 test("reasoning tokens are separated from the answer", async () => {
   const s = await serve((_req, res) =>
     sse(res, [

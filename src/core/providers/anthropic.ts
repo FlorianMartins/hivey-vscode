@@ -11,7 +11,7 @@ import type { ChatDelta, ChatRequest, ChatResult, Provider, ToolCall, Usage } fr
 import { toolCallsFromText } from "./textToolCall.js";
 import { EMPTY_USAGE, THINKING_BUDGET } from "./types.js";
 import { keepCacheMarks } from "./cache.js";
-import { describeHttpError } from "./openai.js";
+import { describeHttpError, isCompleteJson } from "./openai.js";
 
 export interface AnthropicOptions {
   baseUrl: string;
@@ -176,9 +176,13 @@ export class AnthropicProvider implements Provider {
         text = "";
       }
     }
-    if (toolCalls.length) stopReason = "tool_calls";
+    // Cut off by `max_tokens`: an unfinished call is dropped and "length" kept, as in the
+    // OpenAI-compatible client — see the note there.
+    const cut = stopReason === "length";
+    const usable = cut ? toolCalls.filter((c) => isCompleteJson(c.args)) : toolCalls;
+    if (usable.length && !cut) stopReason = "tool_calls";
 
-    return { text, reasoning, toolCalls, usage, stopReason };
+    return { text, reasoning, toolCalls: usable, usage, stopReason };
   }
 
   async listModels(): Promise<string[]> {

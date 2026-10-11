@@ -306,6 +306,32 @@ test("a turn that finished does not claim to have been cut off", () => {
   });
 });
 
+test("⚠️ an agent reply cut off by the cap is continued, not taken for the answer", async () => {
+  // « Voici le plan, puis j'attaque : » — and the turn ended there: the plan, or the call it
+  // announced, was lost to max_tokens and the loop returned the half-sentence as the answer.
+  const write = tool("write_file");
+  const provider = scriptedProvider([
+    { text: "Voici le plan, puis j'attaque :", truncated: true },
+    { toolCalls: [{ id: "1", name: "write_file", args: "{}" }] },
+    { text: "Fait." },
+  ]);
+  const r = await runTurn({ ...base, provider, tools: [write] });
+  assert.equal(write.calls.length, 1, "the call that was cut off is written again and run");
+  assert.equal(r.stoppedBecause, "answer");
+  assert.equal(r.truncated, false);
+  const asked = provider.seen[1]!.messages.at(-1)!;
+  assert.equal(asked.role, "user");
+  assert.match(String(asked.content), /cut off by the output token limit/);
+});
+
+test("continuing after a cut is bounded", async () => {
+  // A model that writes past any cap must not spend the whole step budget doing it.
+  const provider = scriptedProvider([{ text: "and on and on", truncated: true }]);
+  const r = await runTurn({ ...base, provider, tools: [tool("read_file")] });
+  assert.equal(provider.seen.length, 3, "one reply and two continuations, then it stops");
+  assert.equal(r.truncated, true, "and says it was cut off");
+});
+
 test("the budget the caller asked for is the budget that is sent", () => {
   // The turn used a constant of 4 096 written at the call site, which is comfortable for a chat
   // reply and not enough for a reasoning model writing a plan. It is a setting now, and this is the
