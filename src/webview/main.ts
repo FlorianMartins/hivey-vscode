@@ -361,7 +361,7 @@ class LiveTurn {
     if (!this.thinking || this.thinking.folded) return;
     this.thinking.folded = true;
     this.thinking.body.hidden = true;
-    this.thinking.wrap.classList.remove("open");
+    this.thinking.wrap.classList.remove("open", "thinking");
   }
 
   /**
@@ -454,6 +454,9 @@ class LiveTurn {
     following(() => {
       if (!this.thinking) {
         const wrap = reasoningBlock("", { open: true });
+        // Lit while it is being written, like the composer's ring: the frame says "this is still
+        // going" without a word to read. Removed when the answer takes over, or the turn ends.
+        wrap.classList.add("thinking");
         const body = wrap.querySelector<HTMLElement>(".collapsible-body")!;
         // A reader who scrolls the box up has said where they want to be; one who scrolls it back to
         // the bottom has said to resume. Tracked on the box rather than guessed from the content,
@@ -559,6 +562,9 @@ class LiveTurn {
       this.text = undefined;
     }
     this.root.classList.remove("streaming");
+    // A turn that ends while still thinking — stopped, or a model that never answered — leaves a
+    // record, not a block that goes on claiming to think.
+    this.thinking?.wrap.classList.remove("thinking");
   }
 }
 

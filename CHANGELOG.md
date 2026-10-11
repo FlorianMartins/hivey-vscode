@@ -2,6 +2,27 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 1.14.2 — 2026-10-11
+
+### Corrigé
+
+- **⚠️ L'anneau qui tourne autour de la zone de saisie est visible dès le début du tour, réflexion
+  comprise.** « rajouter cet effet dès le début de la réponse (aussi lors du raisonnement) ».
+
+  L'anneau était bien allumé dès `turnStart` — et caché. La zone garde le focus après Entrée, et le
+  contour de focus (même position, même épaisseur, 70 % de la même couleur) recouvrait l'arc qui
+  tourne : on ne le voyait qu'une fois le focus parti ailleurs, typiquement en cliquant dans la
+  réponse. Pendant un tour, le contour descend à une piste discrète (18 %) ; la taille du cadre ne
+  bouge pas, et c'est l'arc qu'on voit.
+
+### Ajouté
+
+- **Le cadre du raisonnement a sa couleur.** Bordure teintée et liseré à gauche — le violet des
+  graphiques de l'éditeur, ou le cyan de l'apparence Hivey — pour qu'il ne se lise plus comme une
+  liste d'étapes repliée. Tant que le modèle réfléchit, le cadre « respire » doucement ; il s'arrête
+  dès que la réponse commence (ou que le tour se termine). Immobile si le système demande moins
+  d'animations.
+
 ## 1.14.1 — 2026-10-06
 
 ### Corrigé

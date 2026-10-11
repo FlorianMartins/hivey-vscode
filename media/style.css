@@ -852,6 +852,60 @@ pre.code {
   overflow-y: auto;
 }
 
+/* The model's reasoning, in a colour of its own.
+ *
+ * It wore the same grey frame as a folded list of steps, so the one block that is the model talking
+ * to itself looked like bookkeeping. A tinted frame and a leading edge — the language the approval
+ * cards already speak — says "this is thought, not answer" without a legend. The editor's chart
+ * purple: not the focus colour (that is the composer's), not a warning, not a success, so it claims
+ * no meaning it does not have. */
+:root {
+  --reasoning: var(--vscode-charts-purple, #b180d7);
+}
+:root[data-appearance="hivey"] {
+  /* Cyan against Hivey's amber: the second accent the palette already has. */
+  --reasoning: #5fd0f5;
+}
+.collapsible.reasoning {
+  border-color: color-mix(in srgb, var(--reasoning) 40%, transparent);
+  border-left: 2px solid var(--reasoning);
+  background: color-mix(in srgb, var(--reasoning) 5%, transparent);
+}
+.collapsible.reasoning > .collapsible-head {
+  color: color-mix(in srgb, var(--reasoning) 75%, var(--vscode-foreground));
+}
+.collapsible.reasoning > .collapsible-body {
+  border-top-color: color-mix(in srgb, var(--reasoning) 25%, transparent);
+}
+/* While it is being written the frame breathes, at the composer ring's unhurried pace: alive, not
+   urgent. It stops the moment the answer takes over. */
+.collapsible.reasoning.thinking {
+  animation: hc-reasoning 2.8s ease-in-out infinite;
+}
+@keyframes hc-reasoning {
+  0%,
+  100% {
+    border-top-color: color-mix(in srgb, var(--reasoning) 35%, transparent);
+    border-right-color: color-mix(in srgb, var(--reasoning) 35%, transparent);
+    border-bottom-color: color-mix(in srgb, var(--reasoning) 35%, transparent);
+    box-shadow: 0 0 0 0 transparent;
+  }
+  50% {
+    border-top-color: color-mix(in srgb, var(--reasoning) 85%, transparent);
+    border-right-color: color-mix(in srgb, var(--reasoning) 85%, transparent);
+    border-bottom-color: color-mix(in srgb, var(--reasoning) 85%, transparent);
+    box-shadow: 0 0 10px -2px color-mix(in srgb, var(--reasoning) 45%, transparent);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .collapsible.reasoning.thinking {
+    animation: none;
+    border-top-color: color-mix(in srgb, var(--reasoning) 70%, transparent);
+    border-right-color: color-mix(in srgb, var(--reasoning) 70%, transparent);
+    border-bottom-color: color-mix(in srgb, var(--reasoning) 70%, transparent);
+  }
+}
+
 /* ── Approval ────────────────────────────────────────────────────────────────────────────── */
 
 /* One colour per box, on the edge that says which kind.
@@ -2753,6 +2807,22 @@ pre.code {
   to {
     --hc-angle: 360deg;
   }
+}
+/* ⚠️ The ring was there, and hidden — by the focus outline.
+ *
+ * Both draw `--ring` at `--ring-inset`, on purpose, so the card never changes size. But the box
+ * KEEPS focus after Enter, which is to say for every turn sent from the keyboard, and a solid 70%
+ * outline under a turning arc of the same colour leaves nothing to see turn: the arc only showed
+ * once something else took the focus — typically once the answer was arriving and the reader
+ * clicked in it. Reported as « rajouter cet effet dès le début de la réponse (aussi lors du
+ * raisonnement) ».
+ *
+ * So while working the outline steps down to a faint track: same position and weight (still no
+ * jump), dim enough that the arc running over it is the thing you see. */
+.composer.working .composer-card,
+.composer.working .composer-card:focus-within {
+  outline: var(--ring) solid color-mix(in srgb, var(--vscode-focusBorder) 18%, transparent);
+  outline-offset: var(--ring-inset);
 }
 /* Motion is a preference, and someone who has switched it off in the operating system has said so
    about every interface, not only about this one. The ring stays, still, as a plain accent. */

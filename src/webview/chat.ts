@@ -1014,7 +1014,11 @@ export function collapsible(
  * why there is no setting for it: the right answer changes halfway through, by itself.
  */
 export function reasoningBlock(body: string, opts: { open?: boolean } = {}): HTMLElement {
-  return collapsible(t("Reasoning"), body, opts);
+  const wrap = collapsible(t("Reasoning"), body, opts);
+  // Its own class, so the frame can carry a colour of its own: a plain grey box among grey boxes
+  // read as one more folded step list, and the thinking is not that.
+  wrap.classList.add("reasoning");
+  return wrap;
 }
 
 function startEdit(entry: UiEntry, deps: ChatDeps): void {
