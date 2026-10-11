@@ -118,9 +118,11 @@ import type {
   UiState,
   UiApproval,
 } from "../shared/protocol.js";
-import { findRecorder, installWhisper, installedWhisper, recordArgv, recorderAdvice, runWhisper, startRecording } from "./whisper.js";
+import { findRecorder, inputDevices, installWhisper, installedWhisper, recordArgv, recorderAdvice, runWhisper, startRecording } from "./whisper.js";
 import { modelFor, whisperAsset } from "../core/dictation/local.js";
 import { describeWav } from "../core/dictation/wav.js";
+import { chooseDevice, isDeviceError, recorders } from "../core/dictation/capture.js";
+import { pickMicrophone } from "./microphone.js";
 import { SECTION, endpointFor, providerFor, readSettings, routerConfig, type Keys, type Settings, writeTarget } from "./config.js";
 import { EgressGate, safeHost, summarize } from "./egress.js";
 import { renderPromptAudit, type PromptAudit } from "../core/audit/prompt.js";
@@ -3369,8 +3371,31 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const dir = await fsp.mkdtemp(join(tmpdir(), "hivey-dictation-"));
     const wav = join(dir, "voice.wav");
     const configured = recordArgv(settings.dictation.recordCommand, wav);
-    const found = configured ? undefined : findRecorder(process.platform);
-    const argv = configured ?? (found ? [found.program, ...found.args(wav, settings.dictation.device)] : undefined);
+    let found = configured ? undefined : findRecorder(process.platform);
+    // Which input, settled BEFORE the recorder starts. See `chooseDevice`: on DirectShow there is no
+    // "default" to fall back on, so with several inputs and none chosen the person is asked — once;
+    // the answer is remembered.
+    let device = settings.dictation.device;
+    if (found?.devices === "dshow") {
+      const choice = chooseDevice(found.devices, device, inputDevices(found.devices));
+      if ("ask" in choice) {
+        const picked = await pickMicrophone(choice.ask, false);
+        if (!picked) {
+          await fsp.rm(dir, { recursive: true, force: true });
+          this.post({ type: "dictationFailed", why: t("Choose a microphone to dictate: this machine has several inputs.") });
+          return;
+        }
+        device = picked.id;
+      } else if ("device" in choice) {
+        device = choice.device;
+      } else {
+        // ffmpeg lists nothing it can open; Windows' own recorder takes whatever Windows calls the
+        // default, which is better than a recorder that cannot start.
+        found = recorders(process.platform).find((r) => r.builtin) ?? found;
+      }
+    }
+    const recorder = found;
+    const argv = configured ?? (recorder ? [recorder.program, ...recorder.args(wav, device)] : undefined);
     if (!argv) {
       await fsp.rm(dir, { recursive: true, force: true });
       // ⚠️ OFFER TO INSTALL IT, rather than hand somebody a command to copy. « si il faut installer un
@@ -3454,8 +3479,19 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       this.post({ type: "dictationProgress", what: t("Listening… press again to stop.") });
     } catch (err) {
       await fsp.rm(dir, { recursive: true, force: true });
-      this.post({ type: "dictationFailed", why: t("The recorder could not be started: {0}", (err as Error).message) });
+      const message = (err as Error).message;
+      this.post({ type: "dictationFailed", why: t("The recorder could not be started: {0}", message) });
+      if (isDeviceError(message)) this.offerMicrophoneChoice();
     }
+  }
+
+  private offerMicrophoneChoice(): void {
+    const choose = t("Choose a microphone");
+    void vscode.window
+      .showWarningMessage(t("The microphone could not be opened. With several inputs, pick the one to listen to."), choose)
+      .then((answer) => {
+        if (answer === choose) void vscode.commands.executeCommand("hiveyCode.chooseMicrophone");
+      });
   }
 
   /** Stop, and turn what was recorded into words — or throw it away. */
@@ -3491,13 +3527,19 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             facts.why ?? "",
           ),
         });
+        // Silence is what a valid recording from the wrong input sounds like.
+        this.offerMicrophoneChoice();
         return;
       }
       this.log.appendLine(`[dictation] ${facts.seconds.toFixed(1)}s, ${facts.rate} Hz, ${facts.channels}ch`);
       this.post({ type: "dictationProgress", what: t("Transcribing…") });
       await this.transcribe(audio.toString("base64"), Date.now() - run.started);
     } catch (err) {
-      this.post({ type: "dictationFailed", why: t("The recording failed: {0}", (err as Error).message) });
+      const message = (err as Error).message;
+      this.post({ type: "dictationFailed", why: t("The recording failed: {0}", message) });
+      // The input could not be opened: the one failure a choice of microphone fixes, so the choice
+      // is offered right there instead of being left to be found in a menu.
+      if (isDeviceError(message)) this.offerMicrophoneChoice();
     } finally {
       await fsp.rm(run.dir, { recursive: true, force: true });
     }

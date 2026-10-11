@@ -1354,6 +1354,11 @@ export const FR: Record<string, string> = {
   "The system default": "Le périphérique par défaut du système",
   "Which microphone should dictation listen to?": "Quel micro la dictée doit-elle écouter ?",
   "{0} listed no inputs on this machine.": "{0} n'a listé aucune entrée sur cette machine.",
+  "Choose a microphone to dictate: this machine has several inputs.":
+    "Choisissez un micro pour dicter : cette machine a plusieurs entrées.",
+  "Choose a microphone": "Choisir un micro",
+  "The microphone could not be opened. With several inputs, pick the one to listen to.":
+    "Le micro n'a pas pu être ouvert. Avec plusieurs entrées, choisissez celle à écouter.",
   "Ready. Press the microphone to speak.": "Prêt. Appuyez sur le micro pour parler.",
   "Install the model": "Installer le modèle",
   "Installing the model and ffmpeg…": "Installation du modèle et de ffmpeg…",

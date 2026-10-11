@@ -7,6 +7,7 @@ import { announcePolicy, policySource, reloadPolicy } from "./policy.js";
 import { SiemShipper } from "./siem.js";
 import { Background } from "./background.js";
 import { findRecorder, inputDevices } from "./whisper.js";
+import { pickMicrophone } from "./microphone.js";
 import { Corpus } from "./corpus.js";
 import { LearnedRouting } from "./learned.js";
 import { ReviewDiagnostics, parseFindings, prepareReview, summarise } from "./review.js";
@@ -606,19 +607,9 @@ export function activate(context: vscode.ExtensionContext): void {
         void vscode.window.showWarningMessage(t("{0} listed no inputs on this machine.", found.program));
         return;
       }
-      const current = vscode.workspace.getConfiguration(SECTION).get<string>("dictation.device", "");
-      const picked = await vscode.window.showQuickPick(
-        [
-          { label: t("The system default"), id: "", picked: !current },
-          ...devices.map((d) => ({ label: d.label, id: d.id, picked: d.id === current })),
-        ],
-        { placeHolder: t("Which microphone should dictation listen to?"), matchOnDetail: true },
-      );
-      if (!picked) return;
-      await vscode.workspace
-        .getConfiguration(SECTION)
-        .update("dictation.device", picked.id, vscode.ConfigurationTarget.Global);
-      void vscode.window.setStatusBarMessage(t("Dictation will listen to {0}.", picked.label), 5000);
+      // No "system default" on DirectShow: it has no device by that name, and offering it was
+      // offering « Error opening input file audio=default ».
+      await pickMicrophone(devices, found.devices !== "dshow");
     }),
 
     vscode.commands.registerCommand("hiveyCode.setup", async () => {

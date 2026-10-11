@@ -20,7 +20,7 @@ import {
   whisperUrl,
 } from "../src/core/dictation/local.js";
 import { readTar } from "../src/core/archive/tar.js";
-import { howToRecord, parseDevices, recordArgv, recorders, windowsRecorderScript } from "../src/core/dictation/capture.js";
+import { chooseDevice, howToRecord, isDeviceError, parseDevices, recordArgv, recorders, windowsRecorderScript } from "../src/core/dictation/capture.js";
 import { gzipSync } from "node:zlib";
 import { describeWav, encodeWav, SPEECH_SAMPLE_RATE, WAV_HEADER_BYTES } from "../src/core/dictation/wav.js";
 
@@ -327,7 +327,6 @@ test("⚠️ the microphone can be chosen, because a machine can have several", 
   // that always takes the system default works perfectly for anybody with one microphone and silently
   // records nothing for anybody with two.
   const ff = recorders("win32").find((r) => r.program === "ffmpeg")!;
-  assert.ok(ff.args("v.wav").includes("audio=default"), "no device means the system default");
   assert.ok(ff.args("v.wav", "Microphone (Realtek)").includes("audio=Microphone (Realtek)"));
   const alsa = recorders("linux").find((r) => r.program === "arecord")!;
   assert.ok(!alsa.args("v.wav").includes("-D"), "an empty device must not become an empty -D");
@@ -393,4 +392,34 @@ test("⚠️ a recorder is looked for twice, because PATH can be out of date", (
   // ⚠️ `error` means "could not be spawned". A non-zero EXIT from a program that ran is still a
   // program that is there — `-version` is not a flag every recorder agrees on.
   assert.match(whisper, /return !run\.error;/);
+});
+
+test("⚠️ DirectShow is never asked for a device called \"default\"", () => {
+  // « L'enregistrement a échoué : Error opening input file audio=default. Error opening input files:
+  // I/O error » — DirectShow has no such device. A machine with several inputs must NAME one.
+  const two = [{ id: "Microphone (Realtek)", label: "Microphone (Realtek)" }, { id: "Casque (USB)", label: "Casque (USB)" }];
+  assert.deepEqual(chooseDevice("dshow", "", two), { ask: two }, "several and none chosen: ask");
+  assert.deepEqual(chooseDevice("dshow", "Casque (USB)", two), { device: "Casque (USB)" });
+  assert.deepEqual(chooseDevice("dshow", "Unplugged headset", two), { ask: two }, "a device that has gone is not a choice");
+  assert.deepEqual(chooseDevice("dshow", "", [two[0]!]), { device: "Microphone (Realtek)" }, "the only one needs no question");
+  assert.deepEqual(chooseDevice("dshow", "", []), { none: true });
+  // The others have a real default, so an empty choice is passed on untouched.
+  assert.deepEqual(chooseDevice("alsa", "", two), { device: "" });
+  assert.deepEqual(chooseDevice("avfoundation", "1", []), { device: "1" });
+  assert.ok(isDeviceError("Error opening input file audio=default. Error opening input files: I/O error"));
+  assert.ok(!isDeviceError("whisper: model not found"));
+});
+
+test("an older ffmpeg's DirectShow list, in sections, is read too", () => {
+  // Before ffmpeg 5 the names carry no "(audio)": they sit under a section heading instead.
+  const listed = parseDevices("dshow", [
+    "[dshow @ 0000] DirectShow video devices (some may be both video and audio devices)",
+    '[dshow @ 0000]  "Integrated Camera"',
+    '[dshow @ 0000]     Alternative name "@device_pnp_usb#vid"',
+    "[dshow @ 0000] DirectShow audio devices",
+    '[dshow @ 0000]  "Microphone (Realtek(R) Audio)"',
+    '[dshow @ 0000]     Alternative name "@device_cm_{33D9A762}\\wave_{ABC}"',
+    '[dshow @ 0000]  "Casque (Jabra Evolve)"',
+  ].join("\n"));
+  assert.deepEqual(listed.map((d) => d.id), ["Microphone (Realtek(R) Audio)", "Casque (Jabra Evolve)"]);
 });
