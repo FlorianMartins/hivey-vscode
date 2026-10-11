@@ -1,7 +1,7 @@
 // Putting back what a command changed, which no checkpoint can hold.
 //
-// Florian: « il faudrait qu'il fasse un flash du ou des programmes avant la modification pour y
-// revenir par la suite ». The snapshot he is asking for already exists and is not ours — a git
+// Florian: "it should take a snapshot of the program(s) before the change so you can go back to it
+// later". The snapshot he is asking for already exists and is not ours — a git
 // working tree IS the file's previous state. What this decides is which files that applies to.
 
 import { test } from "node:test";

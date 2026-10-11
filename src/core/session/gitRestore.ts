@@ -1,7 +1,7 @@
 // Putting back what a COMMAND changed, which no checkpoint can hold.
 //
-// Florian: « le restore to checkpoint semble pas fonctionnel globalement, il faudrait qu'il fasse un
-// flash du ou des programmes avant la modification pour y revenir par la suite ».
+// Florian: "restore to checkpoint doesn't seem to work overall; it should take a snapshot of the
+// program(s) before the change so you can go back to it later".
 //
 // A checkpoint is built in `confirmEdit`, so it holds exactly what the edit tools touched. A command
 // is opaque — `prettier --write`, `sed -i`, a build that regenerates a stylesheet, or an agent that

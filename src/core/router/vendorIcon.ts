@@ -2,9 +2,9 @@
 //
 // ⚠️ A pure lookup, in `core`, for the same reason every other decision in this project is: the panel
 // is the hardest place to test and the easiest place to get a mapping subtly wrong — a model wearing
-// the wrong maker's mark looks like a working feature. Asked for by name: « rajoute une icone du
-// fournisseur devant le nom du modele comme sur github copilot », then « est ce que tu peux prendre
-// les vraies icones ». The marks themselves are generated into `webview/vendorPaths.generated.ts`.
+// the wrong maker's mark looks like a working feature. Asked for by name: "add a provider icon in
+// front of the model name like on GitHub Copilot", then "can you use the real icons". The marks
+// themselves are generated into `webview/vendorPaths.generated.ts`.
 //
 // The keys are the vendor prefixes OpenRouter actually uses, which is where the catalogue comes from;
 // the tilde-prefixed ones (`~openai`) are its own markers for a vendor's direct endpoint and map to

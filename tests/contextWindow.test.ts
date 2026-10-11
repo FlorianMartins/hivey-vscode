@@ -15,8 +15,8 @@ test("with no figure, the budget is the model's window less what the turn still 
   // about money: "an unbounded budget on a million-token window would turn every question into a
   // bill". A sound argument made in the wrong place. The spending caps already watch this and they
   // ASK; the ceiling did the same job by silently withholding the model's own window, which is the
-  // version the user cannot see, answer or weigh. Asked for directly: « si le modèle propose 1M,
-  // prendre le 1M plutôt que 64k ».
+  // version the user cannot see, answer or weigh. Asked for directly: "if the model offers 1M, take
+  // the 1M rather than 64k".
   assert.equal(contextBudget(undefined, 8192), CONTEXT_FLOOR_TOKENS);
   assert.ok(contextBudget(undefined, 200_000) > 100_000, "a 200k model should give six figures");
   assert.ok(contextBudget(undefined, 1_000_000) > 700_000, "a million-token model should give most of a million");

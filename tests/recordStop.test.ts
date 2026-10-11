@@ -1,6 +1,6 @@
 // How a recorder is stopped decides whether there is a file at all.
 //
-// « Rien d'exploitable n'a été enregistré (that file is not a recording) » — on Windows, Node's
+// "Nothing usable was recorded (that file is not a recording)" — on Windows, Node's
 // `kill("SIGINT")` terminates the process outright, so ffmpeg died before writing its WAV header.
 // ffmpeg is told to stop the way it understands everywhere: a `q` on its standard input.
 

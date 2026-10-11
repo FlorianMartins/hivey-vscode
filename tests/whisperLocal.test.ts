@@ -238,7 +238,7 @@ test("a recording command the user wrote is split the way a shell would, without
 });
 
 test("⚠️ Windows records with what Windows already has", () => {
-  // Reported from a real machine: « je suis sur Windows et j'ai ce message ». Windows is the one
+  // Reported from a real machine: "I'm on Windows and I get this message". Windows is the one
   // platform that ships no command-line recorder, and "install ffmpeg before you may speak" is not
   // the brief. `winmm` has been part of every Windows for thirty years, and PowerShell can call it.
   const list = recorders("win32");
@@ -324,7 +324,7 @@ test("a recording cut short is read as far as it goes", () => {
 });
 
 test("⚠️ the microphone can be chosen, because a machine can have several", () => {
-  // « mon ami qui a plusieurs sources d'entrée de son […] son micro n'a rien entendu ». A recorder
+  // "my friend who has several sound input sources […] his mic didn't hear anything". A recorder
   // that always takes the system default works perfectly for anybody with one microphone and silently
   // records nothing for anybody with two.
   const ff = recorders("win32").find((r) => r.program === "ffmpeg")!;
@@ -364,8 +364,8 @@ test("each tool's list of inputs is read the way that tool prints it", () => {
 });
 
 test("⚠️ a click that installs something does not also start recording", () => {
-  // « le premier clique quand l'outil n'est pas installé doit servir de bouton d'installation et une
-  // fois installé il doit avoir le comportement normal ». It is the right rule and not only the
+  // "the first click, when the tool isn't installed, should act as an install button, and once it's
+  // installed it should behave normally". It is the right rule and not only the
   // asked-for one: the click that answered "yes, install it" was answering a question, not starting a
   // recording, and somebody who has just watched a download finish is not mid-sentence. Listening
   // there records the silence of somebody reading what just happened.
@@ -396,8 +396,8 @@ test("⚠️ a recorder is looked for twice, because PATH can be out of date", (
 });
 
 test("⚠️ DirectShow is never asked for a device called \"default\"", () => {
-  // « L'enregistrement a échoué : Error opening input file audio=default. Error opening input files:
-  // I/O error » — DirectShow has no such device. A machine with several inputs must NAME one.
+  // "Recording failed: Error opening input file audio=default. Error opening input files: I/O
+  // error" — DirectShow has no such device. A machine with several inputs must NAME one.
   const two = [{ id: "Microphone (Realtek)", label: "Microphone (Realtek)" }, { id: "Casque (USB)", label: "Casque (USB)" }];
   assert.deepEqual(chooseDevice("dshow", "", two), { ask: two }, "several and none chosen: ask");
   assert.deepEqual(chooseDevice("dshow", "Casque (USB)", two), { device: "Casque (USB)" });

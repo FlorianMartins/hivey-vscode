@@ -1,4 +1,4 @@
-// « le modèle bascule en Anglais » — the reply language is decided from the question and restated
+// "the model switches to English" — the reply language is decided from the question and restated
 // after the transcript, where a model reads it last, rather than left to one line at the top of
 // the system prompt that a few screens of English tool output wash away.
 

@@ -112,8 +112,8 @@ test("a dearer preset is never served a worse model than a cheaper one", () => {
 });
 
 test("⚠️ the premium preset buys one house's whole ladder", () => {
-  // Asked for: « retravaille le modele Hivey Smart qui doit etre le modele le plus puissant
-  // (principalememt sur anthropic […]) ». Expressed as a rule — a preferred vendor and four budgets —
+  // Asked for: "rework the Hivey Smart model, which should be the most powerful model (mainly on
+  // Anthropic […])". Expressed as a rule — a preferred vendor and four budgets —
   // never as four model ids, because this repository forbids itself a version number in source.
   //
   // What is asserted is the SHAPE, not the names: one vendor across the roles, and a ladder that
@@ -149,8 +149,8 @@ test("a preset is named by its name, and knows every model it can reach", () => 
 test("a preset answers for all four of its roles, not just the ordinary one", () => {
   // The defect, as an assertion. The panel priced a preset by its `everyday` role and presented that
   // as the preset's price — so Hivey Smart and Hivey Pro came out identical, because their two
-  // everyday models happen to charge the same to read. « comment ça se fait que les modeles Hivey pro
-  // et Hivey smart sortent le meme prix ? le smart est censé utiliser les meilleurs modeles ».
+  // everyday models happen to charge the same to read. "how come the Hivey Pro and Hivey Smart
+  // models come out at the same price? Smart is supposed to use the best models".
   for (const variant of ["hivey/free", "hivey", "hivey/smart"]) {
     const roles = hiveyRoles(variant);
     assert.equal(roles.length, HIVEY_ROLES.length, `${variant} does not answer for every role`);

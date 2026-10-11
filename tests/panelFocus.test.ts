@@ -58,8 +58,8 @@ test("reasoning arrives through the scroll-follow, like the answer does", () => 
 
 test("the composer row is the editor's own chat row, in its order", () => {
   // ⚠️ Asked for, and it REPLACES an earlier arrangement from this same session: the model had been
-  // moved out of the box to sit with the provider and the approval scope. « reprend egalement les
-  // positions de boutons de l'onglet chat de github copilot qui est propre », and the editor puts the
+  // moved out of the box to sit with the provider and the approval scope. "also copy the button
+  // positions from the GitHub Copilot chat tab, which is clean", and the editor puts the
   // model picker in the chat input field beside the mode. Confirmed before moving anything, because
   // the two instructions contradict each other and undoing somebody's explicit choice in silence is
   // worse than either layout.
@@ -74,7 +74,7 @@ test("the composer row is the editor's own chat row, in its order", () => {
     "attach, mode and model are no longer one run at the head of the row",
   );
   // ⚠️ Skills is the exception to "the editor's order", and it is a report rather than a preference:
-  // « le bouton skills and sub-agent disparait quand on diminue la largeur de la sidebar ». Last in
+  // "the skills and sub-agent button disappears when you make the sidebar narrower". Last in
   // the left group, it was the first thing cut, because that group is the one carrying
   // `overflow: hidden`. The editor's own row never has to survive a 300-pixel panel; ours does. It
   // sits with the send, in the group that is never clipped.
@@ -102,8 +102,8 @@ test("the provider and the model do not wear the same glyph", () => {
   const provider = source.slice(source.indexOf("function providerButton("), source.indexOf("function approvalButton("));
   const model = source.slice(source.indexOf("function modelButton("));
   assert.match(provider, /icon: ICON\.cloud/, "the provider is drawn as a chip again");
-  // ⚠️ And the model wears its MAKER's mark rather than a generic chip — « rajoute une icone du
-  // fournisseur devant le nom du modele comme sur github copilot ». `vendorMark` falls back to the
+  // ⚠️ And the model wears its MAKER's mark rather than a generic chip — "add a provider icon in
+  // front of the model name like on GitHub Copilot". `vendorMark` falls back to the
   // chip for anything it does not recognise, so a preset and an unknown vendor still look like a
   // model rather than like a missing image.
   assert.match(model.slice(0, 900), /iconNode: vendorIcon\(vendorSlug\(state\.model\) \?\? ""\)/);
@@ -173,9 +173,9 @@ test("the minimum width reaches the page, and says what it cannot do", () => {
 });
 
 test("the way back is labelled on the bar, and only the opening question carries it in its header", () => {
-  // ⚠️ Asked for by name: « je preferais le texte "Restore Checkpoint" sur la barre comme avec Github
-  // copilot, tu peux remettre comme c'était […] et garder le bouton uniquement sur le premier
-  // message ». Both halves matter and they are not interchangeable — the opening question has no bar
+  // ⚠️ Asked for by name: "I preferred the 'Restore Checkpoint' text on the bar like with GitHub
+  // Copilot, can you put it back the way it was […] and keep the button only on the first message".
+  // Both halves matter and they are not interchangeable — the opening question has no bar
   // above it, because there is no boundary to draw before the first thing in a conversation, so it is
   // the one turn that needs the control somewhere else.
   const source = readFileSync("src/webview/chat.ts", "utf8");
@@ -201,8 +201,8 @@ test("⚠️ the width floor is below any ordinary side bar, and the composer lo
   // arithmetic on a false premise: that the row must always have its natural width. The row drops its
   // labels below 430 px, so it needs far less. And a floor of 470 did something much worse than being
   // generous: on a normally sized side bar it pushed the page WIDER than the panel, so every screen
-  // was drawn with its right-hand side off the edge. Sentences cut mid-word is what the report « la
-  // page Permissions […] vraiment incomprehensible » actually was — the page was fine, it was being
+  // was drawn with its right-hand side off the edge. Sentences cut mid-word is what the report "the
+  // Permissions page […] really incomprehensible" actually was — the page was fine, it was being
   // drawn off the edge. Proven by capturing the same screen with the floor at 0, where it is perfect.
   //
   // So the floor is asserted from both sides now. A floor you can reach by accident on an ordinary

@@ -1,8 +1,8 @@
 // The provider's thinking by default; the prompted kind only where there is none.
 //
-// Florian: « pour le mode de raisonnement je veux utiliser celui du fournisseur par defaut et pas
-// forcer celui de deepseek sur tous, le mode de reflexion deepseek doit etre uniquement sur les
-// modeles par defaut sans raisonnement ». These tests are that sentence, made unbreakable.
+// Florian: "for the reasoning mode I want to use the provider's own by default and not force
+// DeepSeek's on all of them; DeepSeek's thinking mode should only be on the default models without
+// reasoning". These tests are that sentence, made unbreakable.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -150,8 +150,8 @@ test("a model nobody can vouch for gets the provider's own thinking, not a promp
 });
 
 test("the thinking control is offered on a gateway and on a local model", () => {
-  // ⚠️ Reported as « avec le modèle Gateway on ne peut pas changer le mode de réflexion et ça doit
-  // être pareil avec un modèle local ». The catalogue cannot answer for either, and answering "no"
+  // ⚠️ Reported as "with the Gateway model you can't change the thinking mode, and it must be the
+  // same with a local model". The catalogue cannot answer for either, and answering "no"
   // on its behalf removed the control from two whole providers.
   assert.equal(thinkingMode("some-gateway-model", "low") === "off", false);
   assert.equal(thinkingMode("qwen2.5-coder:7b", "low") === "off", false);

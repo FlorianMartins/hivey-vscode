@@ -2,8 +2,8 @@
 //
 // ⚠️ From a real session, in the model's own words:
 //
-//     « Le fichier contient des caractères accentués que ma copie ne reproduit pas à l'identique.
-//       Je découpe donc l'édition en petits morceaux sans accents. »
+//     "The file contains accented characters that my copy doesn't reproduce identically. So I'm
+//       splitting the edit into small pieces without accents."
 //
 // It had worked out that accents were the problem and was routing around them — writing smaller and
 // smaller edits that avoided the letters it could not reproduce. That is the shape of a defect
@@ -43,8 +43,8 @@ function normalizeWithMap(text: string): { norm: string; map: number[] } {
     // ⚠️ LINE ENDINGS FIRST, and this is the other half of the same defect. A file saved on Windows
     // holds `\r\n`; a model writes `\n`. They are the same text on screen and different strings to
     // `indexOf`, so EVERY multi-line edit failed on a Windows checkout — and the model worked it out
-    // on its own, in a real session: « Le premier edit multi-ligne échoue sans doute à cause des fins
-    // de ligne Windows. Je refais la modification sur une seule ligne. » It was writing worse edits
+    // on its own, in a real session: "The first multi-line edit probably fails because of Windows
+    // line endings. I'm redoing the change on a single line." It was writing worse edits
     // to route around a bug.
     //
     // Both characters map back to where the pair began, so a replacement spans the `\r` as well as

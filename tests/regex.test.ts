@@ -63,7 +63,7 @@ test("an ordinary pattern is untouched", () => {
 });
 
 test("a pattern that is not a regex at all is searched as text", () => {
-  // ⚠️ Why « beaucoup de search text ... echouent ». A model looking for a call site types `total(`.
+  // ⚠️ Why "many search text ... fail". A model looking for a call site types `total(`.
   // As a regular expression that is `Unterminated group`, so the search failed and answered nothing
   // — and five of eight patterns taken from ordinary code search fail the same way: `cost.usd(`,
   // `?.length`, `C++`, `foo)`. Every one of them is obviously a literal.

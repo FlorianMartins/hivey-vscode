@@ -2,9 +2,10 @@
 //
 // ⚠️ From a real session on a 6,500-line file, in the model's own words:
 //
-//     « read_file coupe le fichier avant la zone utile. Je lis les deux passages par une commande. »
-//     « Le fichier est coupé avant la zone qui m'intéresse. »
-//     « La sortie a été tronquée au milieu. »
+//     "read_file cuts the file off before the useful part. I'm reading the two passages with a
+//       command."
+//     "The file is cut off before the part I'm interested in."
+//     "The output was truncated in the middle."
 //
 // `read_file` took a path and nothing else, returned the head of the file, and said "truncated if
 // very large" in its description. So on any file big enough to matter the model could not reach the

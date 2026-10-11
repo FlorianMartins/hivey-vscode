@@ -1,7 +1,8 @@
 // Reading part of a file, and saying what was left out.
 //
-// From a real session on a 6,500-line file: « read_file coupe le fichier avant la zone utile. Je lis
-// les deux passages par une commande. » The tool took a path and nothing else, returned the head, and
+// From a real session on a 6,500-line file: "read_file cuts the file off before the useful part.
+// I'm reading the two passages with a command." The tool took a path and nothing else, returned the
+// head, and
 // said "truncated if very large" in its description — so on any file long enough to matter the model
 // could not reach what it needed, and shelled out to `sed`. A tool that truncates without saying how
 // to continue has told the model the file ends there.

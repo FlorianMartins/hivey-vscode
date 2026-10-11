@@ -494,8 +494,8 @@ function renderEntry(entry: UiEntry, state: UiState, deps: ChatDeps, first = fal
   // ⚠️⚠️ THE WAY BACK FOR THE OPENING QUESTION, and only for it.
   //
   // Every other turn carries it on the bar above itself, labelled, the way the editor's own chat
-  // does — asked for in those words: « je preferais le texte "Restore Checkpoint" sur la barre comme
-  // avec Github copilot […] et garder le bouton uniquement sur le premier message ». The first
+  // does — asked for in those words: "I preferred the 'Restore Checkpoint' text on the bar like
+  // with GitHub Copilot […] and keep the button only on the first message". The first
   // question has no bar above it, because there is no boundary to draw before the first thing in a
   // conversation, so it is the one turn that needs the control somewhere else.
   //
@@ -748,10 +748,11 @@ function turnRule(entry: UiEntry, deps: ChatDeps, opening = false): HTMLElement 
   // was removed to fix a defect it did not have.
   //
   // A report names a symptom. Widening it into a theory and then acting on the theory is how a
-  // working control gets deleted, and this is what that costs: « je preferais le texte "Restore
-  // Checkpoint" sur la barre comme avec Github copilot, tu peux remettre comme c'était ». For every other turn the bar reads better, and it was
-  // asked for by name: « je preferais le texte "Restore Checkpoint" sur la barre comme avec Github
-  // copilot ». The editor's own chat puts the same words in the same place, and a word is reachable
+  // working control gets deleted, and this is what that costs: "I preferred the 'Restore
+  // Checkpoint' text on the bar like with GitHub Copilot, can you put it back the way it was". For
+  // every other turn the bar reads better, and it was asked for by name: "I preferred the 'Restore
+  // Checkpoint' text on the bar like with GitHub Copilot". The editor's own chat puts the same
+  // words in the same place, and a word is reachable
   // by someone reading the conversation — an icon in a header is only reachable by someone who
   // already knows what it does.
   //
@@ -790,8 +791,9 @@ function micButton(deps: ChatDeps, configured: boolean): HTMLElement {
     onClick: () => {
       // ⚠️ The recording happens in the EXTENSION, not here. VS Code grants `media` to the workbench
       // and withholds it from a `vscode-webview://` origin, with no prompt and no setting — so
-      // `getUserMedia` in this panel answers `NotAllowedError` for ever, which is what « aucun moyen
-      // d'activer » was. The button is now two messages; a program on the machine does the listening.
+      // `getUserMedia` in this panel answers `NotAllowedError` for ever, which is what "no way to
+      // enable it" was. The button is now two messages; a program on the machine does the
+      // listening.
       if (listening) {
         listening = false;
         deps.send({ type: "stopDictation" });
@@ -885,7 +887,7 @@ let noteTimer: ReturnType<typeof setTimeout> | undefined;
  * ⚠️ `fadeMs` exists because nothing ever cleared this. A failure printed here stayed until the next
  * render — and a render only happens when the extension sends something, so after a dictation that
  * failed there was nothing left to send and the message sat there for the rest of the session:
- * « et le message ne disparait pas... ».
+ * "and the message doesn't go away...".
  *
  * A STATE — "Listening…", "Transcribing…" — must not fade: it is true until it stops being true, and
  * a label that vanished while the microphone was still open would be worse than none. An EVENT —
@@ -1271,9 +1273,9 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
   // separate buttons for about an hour, and the cost was immediate and measurable — the model name
   // collapsed to "qwe…" because every icon in this row is width the one label carrying real
   // information does not have. Copilot has one configure affordance for the same reason.
-  // ⚠️ The MODEL is not here any more. Asked for directly: « le choix du modele tu peux le sortir de la
-  // zone de saisie user au niveau du choix du mode de reponse (local, openrouter, fournisseurs ou
-  // gateway) et du bouton approuval […] pour un rendu plus propre et homogene ». And it is the right
+  // ⚠️ The MODEL is not here any more. Asked for directly: "you can move the model choice out of
+  // the user input area, next to the response mode choice (local, openrouter, providers or gateway)
+  // and the approval button […] for a cleaner, more consistent look". And it is the right
   // cut, not just a tidier one: which service answers, which model answers and what it may do without
   // asking are three settings of the CONVERSATION, so they belong together outside the box — while
   // what to attach, which mode and how hard to think are about THIS message. The box held one control
@@ -1283,8 +1285,8 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
   // panel where four did not.
   // ⚠️ The editor's own chat row, in its own order: what to attach, how to answer, which model, how
   // hard to think, what it may reach for — then, at the far end, speak and send. Asked for by name
-  // after a first pass had moved the model out: « reprend egalement les positions de boutons de
-  // l'onglet chat de github copilot qui est propre ». The model belongs with the mode because they
+  // after a first pass had moved the model out: "also copy the button positions from the GitHub
+  // Copilot chat tab, which is clean". The model belongs with the mode because they
   // are one decision asked twice — "who answers, and how" — and splitting them across two rows is
   // what made the row never look settled.
   //
@@ -1294,8 +1296,8 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
   // control nobody finds. It sits after the model because it is a property OF the model.
   left.append(contextButton(state, deps), modeButton(state, deps), modelButton(state, deps));
   if (state.reasoningAvailable) left.append(reasoningButton(state, deps));
-  // ⚠️ Skills is NOT here, and the reason is a report rather than a preference: « le bouton skills and
-  // sub-agent disparait quand on diminue la largeur de la sidebar ». It was last in this group, and
+  // ⚠️ Skills is NOT here, and the reason is a report rather than a preference: "the skills and
+  // sub-agent button disappears when you make the sidebar narrower". It was last in this group, and
   // this group is the one with `overflow: hidden` — so it was the first thing cut when the row ran
   // out of room. The editor puts its tool picker here; the editor's row also never has to survive a
   // 300-pixel panel. It sits with the send instead, in the group that is never clipped.
@@ -1310,8 +1312,8 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
   // It was hidden until a transcriber was configured, on the reasoning that "a button that looks
   // like it is listening and is not is worse than no button". That reasoning is sound and it was
   // applied to the wrong thing: it argues against a button that pretends to RECORD, not against one
-  // that offers to set dictation up. Hiding it made the feature undiscoverable — reported as « je ne
-  // vois pas le bouton pour l'enregistrement vocal » by the person who asked for it.
+  // that offers to set dictation up. Hiding it made the feature undiscoverable — reported as "I
+  // don't see the button for voice recording" by the person who asked for it.
   //
   // So the button is always there when the host can record, and when nothing is configured it says
   // so and offers to configure it, instead of silently doing nothing.
@@ -1340,9 +1342,9 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
   // written, and inside the border they read as controls of the text.
   //
   // The order is the one that was asked for and it is also the order of the question: WHERE the answer
-  // comes from, WHICH model gives it, WHAT it may do without asking. « en terme d'ordre pour les
-  // boutons du composer-footer je veux en premier le mode comme cest actuellement, ensuite le modeles
-  // et ensuite approuvals ».
+  // comes from, WHICH model gives it, WHAT it may do without asking. "in terms of order for the
+  // composer-footer buttons, I want the mode first as it is now, then the models, and then
+  // approvals".
   meter.append(providerButton(state, deps), approvalButton(state, deps));
   meter.append(el("div", "spacer"));
   if (waiting) {
@@ -1389,8 +1391,8 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
     // putting a suffix back. The ambiguity was never in the word, it was in the ADJACENCY: two
     // unrelated figures side by side read as a ratio. They are separated by the row's layout now.
     // (Earlier note kept because the reasoning still holds:)
-    // Florian read this row as a rate: « pour 40k token ça coute 3.60$ ce qui me semble un peu
-    // excessif avec sonnet 5.5 ». The arithmetic was right — $3.60 is what the CONVERSATION had
+    // Florian read this row as a rate: "for 40k tokens it costs $3.60, which seems a bit excessive
+    // to me with sonnet 5.5". The arithmetic was right — $3.60 is what the CONVERSATION had
     // cost, and the 40 k beside it is the context the NEXT question will send. Two unrelated
     // quantities, adjacent, one of them unlabelled, read as a ratio: 40 k tokens for $3.60 is
     // $90/M, which is forty-five times Sonnet's input price and rightly alarming.
@@ -1641,8 +1643,8 @@ export function setStreaming(value: boolean): void {
   // while BUILDING the composer — so it existed exactly as long as the next rebuild agreed with it.
   // Any `state` message arriving mid-turn re-renders from `state.busy`, and `turnEnd` did not
   // re-render at all, so the ring could vanish while the model was still thinking and linger after
-  // it had stopped. Reported as « il ne semble plus y avoir l'animation autour de la zone de saisie
-  // user quand l'IA est en reflexion ».
+  // it had stopped. Reported as "the animation around the user input area no longer seems to be
+  // there when the AI is thinking".
   //
   // Toggling the class here makes the state true of the DOM at the moment it becomes true, whatever
   // the next render decides. The build-time class stays, for the composer that does not exist yet.
@@ -1900,8 +1902,8 @@ function modeButton(state: UiState, deps: ChatDeps): HTMLElement {
 
 function modelButton(state: UiState, deps: ChatDeps): HTMLElement {
   const b: HTMLElement = button({
-    // ⚠️ The MAKER's mark, not a generic chip. « rajoute une icone du fournisseur devant le nom du
-    // modele comme sur github copilot (exemple icone openai, icone antrhopic, etc) » — and the
+    // ⚠️ The MAKER's mark, not a generic chip. "add a provider icon in front of the model name like
+    // on GitHub Copilot (e.g. OpenAI icon, Anthropic icon, etc.)" — and the
     // editor's own picker does the same, because a row of twenty model names all wearing one glyph
     // tells you nothing you could not already read. A preset is not one vendor's model, so it keeps
     // the chip; so does anything the lookup does not recognise, which makes an unknown vendor look
@@ -2121,8 +2123,8 @@ function reasoningButton(state: UiState, deps: ChatDeps): HTMLElement {
   const current = REASONING.find((r) => r.id === state.reasoning) ?? REASONING[0]!;
   const b = button({
     // ⚠️ A leading glyph, because the closed button shows only its VALUE. "Agent · qwen2.5-coder ·
-    // Direct" gives no clue that the third one is about thinking — reported as « c'est toujours aussi
-    // compliqué de comprendre les menus ». The row wraps now, so the 14px this costs is no longer
+    // Direct" gives no clue that the third one is about thinking — reported as "the menus are still
+    // just as hard to understand". The row wraps now, so the 14px this costs is no longer
     // taken from the model name.
     icon: ICON.sparkle,
     label: current.label,

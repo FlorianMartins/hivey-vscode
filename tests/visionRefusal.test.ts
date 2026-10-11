@@ -1,7 +1,7 @@
 // A model that cannot read images, found out from the server rather than from the catalogue.
 //
-// « HTTP 500 Internal Server Error: image input is not supported - hint: if this is unexpected, you
-// may need to provide the mmproj » — llama.cpp without its vision projector. The turn failed, and so
+// "HTTP 500 Internal Server Error: image input is not supported - hint: if this is unexpected, you
+// may need to provide the mmproj" — llama.cpp without its vision projector. The turn failed, and so
 // did every later one, since the image stays in the conversation.
 
 import { test } from "node:test";

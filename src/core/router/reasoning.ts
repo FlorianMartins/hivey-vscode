@@ -36,8 +36,8 @@ export const REASONING_FALLBACK = /claude|sonnet|opus|haiku|fable|deepseek|qwen|
  * catalogue is OpenRouter's; it cannot answer for a model served through somebody's gateway or
  * running on their own machine, because it has never heard of either. Returning `false` there reads
  * as "this model cannot reason" — an assertion nobody made — and the panel hid the control
- * accordingly. Reported as « avec le modèle Gateway on ne peut pas changer le mode de réflexion et
- * ça doit être pareil avec un modèle local ».
+ * accordingly. Reported as "with the Gateway model you can't change the thinking mode, and it must
+ * be the same with a local model".
  *
  * `unknown` is not a softer `no`. It is the state where the user knows more than the catalogue does,
  * so the control is offered and the effort is sent; a server that objects answers with a 400, which

@@ -344,7 +344,7 @@ function readSettingsRaw(scope?: vscode.Uri): Settings {
      * drops its labels below 430 px, so it needs far less, and a floor set at 470 did something much
      * worse than being generous — it pushed the page wider than the panel on a normally sized side
      * bar, so EVERY screen was drawn with its right-hand side off the edge. Sentences cut mid-word is
-     * what « la page Permissions […] vraiment incomprehensible » actually was.
+     * what "the Permissions page […] really incomprehensible" actually was.
      *
      * So the floor is no longer about the composer, which now looks after itself. It is about the
      * reading surface: below roughly 320 px a line of prose is too short to read and a code block is
@@ -478,8 +478,8 @@ export function managedSettings(): { organisation?: string; keys: string[]; refu
 /**
  * Whether requests to this provider skip pseudonymization and the send consent.
  *
- * ⚠️ « les anonymisations des données s'appliquent également sur les modèles locaux et gateway […]
- * c'est des environnements sûrs ». "Local" used to be decided by the ADDRESS alone — localhost, a
+ * ⚠️ "data anonymisation also applies to local and gateway models […] those are safe environments".
+ * "Local" used to be decided by the ADDRESS alone — localhost, a
  * private range, `.lan` — so the local endpoint pointed at the team's own server by a public name,
  * or the company gateway, was treated like a cloud: every name and host replaced by markers, which
  * costs answer quality on infrastructure the user runs. The two self-hosted providers are trusted

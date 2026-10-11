@@ -320,8 +320,8 @@ export class OpenAICompatibleProvider implements Provider {
     // call with broken JSON, the model was told its arguments were unreadable, wrote the same huge
     // call again and was cut again, four minutes a time on a local model, and nobody was told the
     // budget was the reason. Complete calls are kept; an unfinished one is dropped, and "length"
-    // survives so the loop can ask for the rest. Seen live on Qwen3.8 through llama.cpp: « Voici le
-    // plan, puis j'attaque : » and then nothing, 8192 tokens later.
+    // survives so the loop can ask for the rest. Seen live on Qwen3.8 through llama.cpp: "Here is
+    // the plan, then I'll get started:" and then nothing, 8192 tokens later.
     const cut = stopReason === "length";
     const usable = cut ? toolCalls.filter((c) => isCompleteJson(c.args)) : toolCalls;
     if (usable.length && !cut) stopReason = "tool_calls";

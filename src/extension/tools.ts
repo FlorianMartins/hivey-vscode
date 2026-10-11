@@ -372,8 +372,8 @@ export function buildTools(deps: ToolDeps): Tool[] {
           // ⚠️ NOT required, and the difference is a feature the tool did not have. Deleting a snippet
           // means replacing it with nothing — and with `new` required, a model doing that either sends
           // `""` and meets a provider that drops empty arguments, or omits the field and fails schema
-          // validation. Reported from a real session in the model's own words: « Le paramètre `new`
-          // vide est refusé. » It shelled out to Node to delete two lines.
+          // validation. Reported from a real session in the model's own words: "The empty `new`
+          // parameter is rejected." It shelled out to Node to delete two lines.
           new: { type: "string", description: "The replacement. Omit it, or pass \"\", to delete the snippet." },
         },
         required: ["path", "old"],
@@ -389,8 +389,8 @@ export function buildTools(deps: ToolDeps): Tool[] {
       // ⚠️ Not `indexOf`. A file holding `é` as `e` + a combining accent and a model writing it as a
       // single code point are the same text on screen and different strings to `indexOf` — so the
       // tool said "that snippet does not appear in the file" about a snippet plainly in the file. A
-      // real session worked the cause out and began routing around it: « je découpe donc l'édition en
-      // petits morceaux sans accents ». See `core/text/findText.ts`.
+      // real session worked the cause out and began routing around it: "so I'm splitting the edit
+      // into small pieces without accents". See `core/text/findText.ts`.
       const found = findUnique(text, oldText);
       if ("problem" in found) {
         return {
@@ -414,8 +414,8 @@ export function buildTools(deps: ToolDeps): Tool[] {
       ctx.report(t("edited {0}", relative(uri)));
       if (!ok) return { content: "The editor refused the edit.", isError: true };
       // ⚠️ And CHECK. `applyEdit` returning true has been seen alongside a document that did not
-      // change — reported as « edit_file a annoncé deux modifications réussies, mais elCoord n'a pas
-      // changé ». A tool that reports success it has not verified sends the model to spend its
+      // change — reported as "edit_file reported two successful changes, but elCoord didn't
+      // change". A tool that reports success it has not verified sends the model to spend its
       // remaining steps disbelieving its own trace, which is exactly what that session did.
       if (doc.getText() === text) {
         return {
@@ -486,8 +486,8 @@ export function buildTools(deps: ToolDeps): Tool[] {
     // and that had two faults which together produced the worst report of this project so far: an
     // agent whose own tools contradicted each other. From a real session —
     //
-    //     « Les outils se contredisent. Les diagnostics de l'éditeur signalent copierDepuis à la
-    //       ligne 6545, alors que search_text et git_diff ne le voient pas. »
+    //     "The tools contradict each other. The editor's diagnostics report copierDepuis at line
+    //       6545, while search_text and git_diff don't see it."
     //
     // Diagnostics read the editor's BUFFER; `search_text` and `git_diff` read the DISK. The edit was
     // in one and not the other, so the model spent a dozen steps re-reading, re-checking and

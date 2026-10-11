@@ -1017,9 +1017,9 @@ export function groupsForPaths(paths: string[]): SkillGroup[] {
  * ⚠️ `detectGroups` existed for a long time and did almost nothing with its answer — it pre-ticked a
  * box in a wizard most people never open. So somebody editing RPG with the default settings got
  * `general` and nothing else: forty IBM i skills, every one backed by an evaluation task, sat
- * switched off while the model guessed. Florian, reading a session full of mistakes: « la detection
- * automatique des programmes ouverts ne semble pas faire l'activation et desactivation des skills
- * automatisé non plus, ce qui expliqierai pourquoi il créé autant d'erreur ». The detection was
+ * switched off while the model guessed. Florian, reading a session full of mistakes: "the automatic
+ * detection of open programs doesn't seem to do the automated enabling and disabling of skills
+ * either, which would explain why it makes so many errors". The detection was
  * right; nothing acted on it. The comment in `config.ts` even claimed families "default to the ones
  * that apply whatever is open", which is what the code should have done and did not.
  *

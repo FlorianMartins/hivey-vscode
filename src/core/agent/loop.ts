@@ -165,8 +165,8 @@ export interface TurnResult {
 /**
  * How many tool calls one turn may make.
  *
- * ⚠️ Raised from 12, and the number was not the only problem. Reported as « il arrête une tâche en
- * plein milieu donc les agents et subagent ne fonctionnent pas » — a turn ending with its work half
+ * ⚠️ Raised from 12, and the number was not the only problem. Reported as "it stops a task right in
+ * the middle, so agents and subagents don't work" — a turn ending with its work half
  * done, which is the worst outcome an agent has: a repository in a state nobody chose.
  *
  * Twelve was calibrated against turns that worked. A turn that hits a defect does not spend its steps
@@ -295,7 +295,8 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
     if (res.reasoning) reasoning += res.reasoning;
 
     // ⚠️ Cut off by the output cap with nothing to run: NOT an answer. It was returned as one, so a
-    // turn that ended « Voici le plan, puis j'attaque : » — the plan or the call it announced lost to
+    // turn that ended "Here is the plan, then I'll get started:" — the plan or the call it
+    // announced lost to
     // the cap — looked finished, and the agent simply stopped. Asked to carry on instead, a bounded
     // number of times, with the one instruction that keeps it from being cut again: smaller pieces.
     //

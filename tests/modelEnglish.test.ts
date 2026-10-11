@@ -1,4 +1,4 @@
-// « tous les skills, tools, etc sont en Français dans le code, tu peux passer tout en anglais ».
+// "all the skills, tools, etc. are in French in the code, can you switch everything to English".
 // What the MODEL reads — skill names and bodies, the description it is given — stays English
 // whatever the interface language; what a PERSON reads — the hint in the panel — is translated at
 // display time with `t(sk.hint)`.

@@ -159,7 +159,7 @@ export function turnDirectives(parts: TurnDirectiveParts): string {
 /**
  * The language the user is writing in, read from what they wrote.
  *
- * ⚠️ « le modèle bascule en Anglais ». The rule "answer in the language the user writes in" sits at
+ * ⚠️ "the model switches to English". The rule "answer in the language the user writes in" sits at
  * the top of the system prompt, and after a few screens of English code, logs and tool output a
  * local model follows the most recent text instead. So the language is decided HERE, from the
  * question, and restated after the transcript every turn. Deliberately simple — a handful of very

@@ -164,7 +164,7 @@ export type IconName = keyof typeof PATHS;
  * A maker's mark, drawn from the real thing.
  *
  * ⚠️ These were hand-drawn approximations for about an hour, and the request that replaced them was
- * exact: « est ce que tu peux prendre les vraies icones s'il te plait ». They come from
+ * exact: "can you use the real icons please". They come from
  * lobehub/lobe-icons (MIT), fetched once by `scripts/update-vendor-icons.mjs` and committed —
  * nothing is loaded at runtime, because this panel's CSP forbids it and the extension ships no
  * runtime dependency.

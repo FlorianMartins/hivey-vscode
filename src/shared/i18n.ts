@@ -48,8 +48,8 @@ function detect(): string | undefined {
  * whose strings were already produced.
  *
  * So the panel switched to French and the mode labels, the skill families and the 100-odd skill hints
- * stayed in whatever `process.env.LANG` happened to say: « quand on selectionne une langue dans les
- * parametres que l'extension complete change de langue ».
+ * stayed in whatever `process.env.LANG` happened to say: "when you select a language in the
+ * settings, the whole extension should change language".
  *
  * A rebuilder mutates its own array IN PLACE, so every module that already imported it sees the new
  * strings without being changed or re-imported. Registering one is a deliberate edit in the file that
@@ -104,7 +104,7 @@ export function t(text: string, ...args: Array<string | number>): string {
 /**
  * The same `{0}` filling as `t()`, and NEVER translated: for text the MODEL reads.
  *
- * ⚠️ « tous les skills, tools, etc sont en Français ». Skill bodies, tool results, selection
+ * ⚠️ "all the skills, tools, etc. are in French". Skill bodies, tool results, selection
  * instructions and context labels were written in English and passed through `t()`, so with the
  * interface in French the model was prompted in French — and `/explain` became `/expliquer`. What
  * a person reads follows their language; what the model reads is the product's own instructions,

@@ -1,6 +1,6 @@
 // Speaking instead of typing.
 //
-// Florian: « je voudrais que tu rajoutes une option pour dicter (parler) ».
+// Florian: "I'd like you to add an option to dictate (speak)".
 //
 // Three decisions shape this, and the first two are forced:
 //
@@ -66,8 +66,8 @@ export interface DictationSettings {
 /**
  * Providers whose endpoint is known to transcribe audio, so dictation can borrow it.
  *
- * ⚠️ KNOWN, not guessed, and that is the whole care in this list. Asked for: « il faudrait que ce
- * soit aussi simple d'utilsiation qu'un service cloud comme google mic » — so dictation should not
+ * ⚠️ KNOWN, not guessed, and that is the whole care in this list. Asked for: "it should be as
+ * simple to use as a cloud service like Google mic" — so dictation should not
  * make you configure a second service when you have already configured one. But borrowing an
  * endpoint that does not answer `/audio/transcriptions` produces a microphone that records your
  * voice, sends it, and fails — which is worse than a microphone that says it needs setting up.

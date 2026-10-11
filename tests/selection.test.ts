@@ -41,7 +41,8 @@ test("the lightbulb gets a couple of rows, not the whole catalogue", () => {
 });
 
 test("the label follows the interface language; the instruction the model reads stays English", () => {
-  // « tous les skills, tools, etc sont en Français […] passer tout en anglais ». What a person reads
+  // "all the skills, tools, etc. are in French […] switch everything to English". What a person
+  // reads
   // is translated; what the model reads is the product's own instructions, in English — the reply
   // language is said separately, by `languageDirective`.
   try {

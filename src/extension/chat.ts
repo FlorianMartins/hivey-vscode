@@ -881,8 +881,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           // probe starts immediately, because the useful version of this screen is the one that
           // already knows what is running by the time it is read.
           //
-          // ⚠️ But ONLY when nothing is configured at all. « quand on fait une update de l'extension
-          // alors qu'on a déjà une configuration il renvoie toujours sur l'écran de configuration ».
+          // ⚠️ But ONLY when nothing is configured at all. "when you update the extension while you
+          // already have a configuration, it always sends you back to the setup screen".
           // The flag is set by the setup screen's own button, so anybody who configured through the
           // settings — a gateway, a local server, a key — never had it, and `cannotAnswer` is about
           // the CURRENT provider's key, which a keyless gateway never has. Either sent an
@@ -3280,8 +3280,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    *
    * ⚠️ Called BEFORE the recording starts, which is the whole point. It used to live inside
    * `transcribe`, so the question "shall I install a transcriber?" arrived only after somebody had
-   * pressed the microphone, spoken, and pressed it again — reported as « on doit cliquer deux fois
-   * comme si on voulait envoyer un message alors que l'outil n'est pas installé ». Everything a thing
+   * pressed the microphone, spoken, and pressed it again — reported as "you have to click twice as
+   * if you wanted to send a message, even though the tool isn't installed". Everything a thing
    * needs is asked for before it is done, not after.
    */
   private async ensureTranscriber(): Promise<"ready" | "installed" | "no"> {
@@ -3299,8 +3299,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       return "no";
     }
     const model = modelFor(settings.dictation.localModel);
-    // ⚠️ Three choices, not two. « tu ne peux pas proposer soit d'installer le modèle soit d'installer
-    // le ffmpeg soit de quitter ? » — and ffmpeg belongs on this card rather than on its own, because
+    // ⚠️ Three choices, not two. "can't you offer either to install the model, or to install
+    // ffmpeg, or to quit?" — and ffmpeg belongs on this card rather than on its own, because
     // it is not a second requirement, it is what the SAME feature gains: a microphone you can choose
     // when the machine has several, and an edge that follows your voice because ffmpeg writes its file
     // as it records. Offered only where there is something to gain: not when it is already installed,
@@ -3361,8 +3361,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   /**
    * Offer ffmpeg to somebody whose transcriber is already in place.
    *
-   * ⚠️ Because the offer used to live on the install card and nowhere else: « si il est déjà installé
-   * il ne propose pas d'installer le ffmpeg ». Somebody who set dictation up last week, or who already
+   * ⚠️ Because the offer used to live on the install card and nowhere else: "if it's already
+   * installed, it doesn't offer to install ffmpeg". Somebody who set dictation up last week, or who
+   * already
    * had a transcriber, never saw it — and they are exactly the people for whom it matters, since what
    * ffmpeg buys is choosing a microphone when the machine has several and an edge that follows the
    * voice.
@@ -3417,15 +3418,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    *
    * ⚠️ Here rather than in the panel because VS Code does not give an extension's panel a microphone
    * — `media` is granted to the workbench and withheld from a `vscode-webview://` origin, with no
-   * prompt and no setting. Reported as « aucun moyen d'activer », and there genuinely is none.
+   * prompt and no setting. Reported as "no way to enable it", and there genuinely is none.
    */
   private async startDictation(): Promise<void> {
     if (this.recording) return;
     // Everything this needs, asked for before a word is spoken rather than after.
     //
-    // ⚠️ And a click that INSTALLED something stops there. « le premier clique quand l'outil n'est pas
-    // installé doit servir de bouton d'installation et une fois installé il doit avoir le comportement
-    // normal ». It is the right rule and not only the asked-for one: the click that answered "yes,
+    // ⚠️ And a click that INSTALLED something stops there. "the first click, when the tool isn't
+    // installed, should act as an install button, and once it's installed it should behave
+    // normally". It is the right rule and not only the asked-for one: the click that answered "yes,
     // install it" was answering a question, not starting a recording, and somebody who has just
     // watched a download finish is not mid-sentence. Starting to listen there records the silence of
     // somebody reading what just happened.
@@ -3469,9 +3470,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const argv = configured ?? (recorder ? [recorder.program, ...recorder.args(wav, device)] : undefined);
     if (!argv) {
       await fsp.rm(dir, { recursive: true, force: true });
-      // ⚠️ OFFER TO INSTALL IT, rather than hand somebody a command to copy. « si il faut installer un
-      // widget on ne peut pas faire en sorte que quand on clique sur le micro qu'il demande un
-      // approuval pour faire la commande dans le terminal pour installer ? » — and it is the right
+      // ⚠️ OFFER TO INSTALL IT, rather than hand somebody a command to copy. "if a widget has to be
+      // installed, can't we make it so that clicking the mic asks for approval to run the install
+      // command in the terminal?" — and it is the right
       // shape: this extension already asks before it runs anything, so an install is the same
       // question it asks every day, with a card that says exactly what will run.
       //
@@ -3828,8 +3829,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           // writes came from commands, so there is nothing to put back and plenty that changed.
           //
           // ⚠️ It names the remedy, because the message without one reads as "this feature is
-          // broken". Reported that way: « il ouvre une fenêtre qui dit qu'il ne peut pas modifier et
-          // restore les modifications ». The turn in question had written its files through `node -e`
+          // broken". Reported that way: "it opens a window saying it can't modify and restore the
+          // changes". The turn in question had written its files through `node -e`
           // — because `edit_file` was failing on Windows line endings — so the checkpoint truthfully
           // held nothing. Both halves are worth saying: what this cannot undo, and what can.
           t(
@@ -3894,7 +3895,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
     // ⚠️⚠️ AND SAVE. A `WorkspaceEdit` writes to the editor's in-memory documents, not to disk: the
     // buffers show the old content while every file on disk still holds the agent's version. That
-    // is the defect Florian reported as "le restore to checkpoint ne semble pas revert le code" —
+    // is the defect Florian reported as "restore to checkpoint doesn't seem to revert the code" —
     // and it is the worst shape a bug can take here, because the screen says it worked. Everything
     // that reads from disk disagrees: the compiler, a watcher rebuilding a stylesheet, git, the next
     // shell command. Worse, closing the window without saving loses the restore entirely.
@@ -4780,7 +4781,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         // that refuses before it starts, which is what a rate limit and a dead network both are.
         const untouched = !streamed && !steps.length;
         // ⚠️ A model that cannot read images, said by the server rather than by the catalogue —
-        // « image input is not supported … you may need to provide the mmproj ». Asked again without
+        // "image input is not supported … you may need to provide the mmproj". Asked again without
         // them, once, and remembered, instead of a turn (and every later one) that fails outright.
         const hadImages = sendMessages.some((msg) => msg.images?.length);
         if (untouched && !ctl.signal.aborted && hadImages && isImageRefusal(String((err as Error)?.message ?? err))) {
@@ -5191,8 +5192,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    * approval systems that did not know about each other: one that the Always button satisfied, and
    * one that asked again right behind it.
    *
-   * That is both of Florian's reports at once — « le mode agent fait du compare au lieu de
-   * modifier » and « il redemande les autorisations après si on clique sur toujours ». Neither was
+   * That is both of Florian's reports at once — "agent mode does a compare instead of editing" and
+   * "it asks for permission again afterwards if you click always". Neither was
    * a bug in the permission store, which was right all along; the second asker simply never
    * consulted it.
    */
@@ -5303,9 +5304,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           description: req.description,
           ...(command ? { command } : {}),
           ...(edited ? { detail: [t("{0} lines", edited)] } : {}),
-          // ⚠️ Three, not four. Florian: « il faudrait juste le bouton Accept, toujours ou deny, pas
-          // toujours pour la conversation car par défaut toujours c'est uniquement sur la
-          // conversation en cours ». He is describing a menu whose middle two entries were the same
+          // ⚠️ Three, not four. Florian: "there should just be the Accept, always or deny button,
+          // not always for the conversation, because by default always only applies to the current
+          // conversation". He is describing a menu whose middle two entries were the same
           // promise worded differently — and the one that said "this conversation" was the one that
           // appeared not to work, because a SECOND asker ignored it. With that fixed, the remaining
           // honest distinction is "this time" against "from now on, everywhere, until you change it
@@ -5509,8 +5510,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   /**
    * Record the file's prior state, and let the edit through.
    *
-   * ⚠️⚠️ THIS NO LONGER ASKS, and that is the fix Florian asked for three times: « le mode agent ne
-   * devrait même pas faire de diff », « il continue de faire les diff au lieu de modifier ».
+   * ⚠️⚠️ THIS NO LONGER ASKS, and that is the fix Florian asked for three times: "agent mode
+   * shouldn't even do a diff", "it keeps doing diffs instead of editing".
    *
    * The approval already happened. `askApproval` put a card in the panel, named the file, and took
    * the answer — Accept, Always or Deny. This function then opened a diff EDITOR TAB, stealing the

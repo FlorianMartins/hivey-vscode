@@ -4,7 +4,7 @@
 // is not configurable: an origin of `vscode-webview://` is granted {pointerLock, notifications,
 // clipboard…} and the workbench is granted {…, media, local-fonts}. An extension's panel is the first
 // list, so `getUserMedia` answers `NotAllowedError` with no prompt and no setting — which is exactly
-// what was reported, « aucun moyen d'activer ». It is also why the editor's own microphone works:
+// what was reported, "no way to enable it". It is also why the editor's own microphone works:
 // that one is not in a panel.
 //
 // So the recording is made by a program on the machine and handed over as a file. Which program is
@@ -17,8 +17,9 @@ export interface Recorder {
   /**
    * Its arguments, given the file to write and the input to listen to.
    *
-   * ⚠️ The device is the second argument because of a real machine with several inputs: « mon ami qui
-   * a plusieurs sources d'entrée de son […] son micro n'a rien entendu ». A recorder that always takes
+   * ⚠️ The device is the second argument because of a real machine with several inputs: "my friend
+   * who has several sound input sources […] his mic didn't hear anything". A recorder that always
+   * takes
    * the system default works perfectly for anybody with one microphone and silently records nothing
    * for anybody with two.
    */
@@ -36,7 +37,7 @@ export interface Recorder {
    * ⚠️⚠️ `quit` for ffmpeg, on every platform: a `q` on its standard input, which is ffmpeg's own
    * "stop and finish the file". On Windows there IS no SIGINT — Node's `kill("SIGINT")` terminates
    * the process outright — so ffmpeg died before writing its header and the file was not a WAV at
-   * all: « Rien d'exploitable n'a été enregistré (that file is not a recording) ».
+   * all: "Nothing usable was recorded (that file is not a recording)".
    */
   stop: "signal" | "stdin" | "quit";
   /** True when it is part of the system and need not be looked for on PATH. */
@@ -66,7 +67,7 @@ export interface Recorder {
  * Recording on Windows, with what Windows already has.
  *
  * ⚠️ This exists because Windows ships nothing that records to a file from a command line — reported
- * from a real machine: « je suis sur Windows et j'ai ce message ». Telling somebody to install ffmpeg
+ * from a real machine: "I'm on Windows and I get this message". Telling somebody to install ffmpeg
  * before they can speak is not "as simple as a cloud service", which was the whole brief.
  *
  * `winmm` is the multimedia layer every Windows has had for thirty years, and `mciSendString` is its
@@ -276,7 +277,7 @@ export function parseDevices(kind: NonNullable<Recorder["devices"]>, text: strin
  * Which input to record from, decided before the recorder starts.
  *
  * ⚠️ DirectShow has NO device called "default". `-i audio=default` is a name ffmpeg looks up and
- * does not find, and the failure reads « Error opening input file audio=default. […] I/O error » —
+ * does not find, and the failure reads "Error opening input file audio=default. […] I/O error" —
  * reported by somebody with several inputs, which is exactly the case it breaks. So on `dshow` a
  * device must be NAMED: the one chosen, if it still exists; the only one, if there is one; otherwise
  * the person is asked. With none listed, there is nothing ffmpeg can open and the caller falls back

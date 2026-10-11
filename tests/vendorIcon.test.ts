@@ -75,8 +75,8 @@ test("⚠️ every slug the lookup can return is one the panel can actually draw
 });
 
 test("the marks are the real ones, on the grid they were drawn for", () => {
-  // Fetched from lobehub/lobe-icons (MIT) rather than drawn by hand — « est ce que tu peux prendre les
-  // vraies icones ». Hand-made approximations of a logo are a different logo, and the difference is
+  // Fetched from lobehub/lobe-icons (MIT) rather than drawn by hand — "can you use the real icons".
+  // Hand-made approximations of a logo are a different logo, and the difference is
   // exactly what somebody recognising a vendor at a glance is using.
   assert.ok(Object.keys(VENDOR_PATHS).length >= 15, "the generated set has shrunk");
   for (const [slug, paths] of Object.entries(VENDOR_PATHS)) {

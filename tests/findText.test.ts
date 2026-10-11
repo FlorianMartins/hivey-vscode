@@ -1,7 +1,7 @@
 // A snippet the model wrote, inside a file somebody else wrote.
 //
-// From a real session on a French codebase: « Le fichier contient des caractères accentués que ma
-// copie ne reproduit pas à l'identique. Je découpe donc l'édition en petits morceaux sans accents. »
+// From a real session on a French codebase: "The file contains accented characters that my copy
+// doesn't reproduce identically. So I'm splitting the edit into small pieces without accents."
 // The model had worked the cause out and was routing around it, writing ever smaller edits that
 // avoided the letters it could not reproduce — which is what a defect that costs a whole session
 // looks like from the inside.
@@ -91,8 +91,8 @@ test("a multi-line snippet matches a file saved on Windows", () => {
   // ⚠️⚠️ The other half of the same defect, and the one that made agent mode look broken on a real
   // project. A Windows checkout holds `\r\n`; a model writes `\n`. Identical on screen, different to
   // `indexOf` — so EVERY multi-line edit failed, and the model worked the cause out and began routing
-  // around it: « Le premier edit multi-ligne échoue sans doute à cause des fins de ligne Windows. Je
-  // refais la modification sur une seule ligne. » It was writing worse edits to dodge a bug.
+  // around it: "The first multi-line edit probably fails because of Windows line endings. I'm
+  // redoing the change on a single line." It was writing worse edits to dodge a bug.
   const windows = "function a() {\r\n  return 1;\r\n}\r\n";
   const found = findUnique(windows, "function a() {\n  return 1;\n}");
   assert.ok("start" in found, "a LF snippet must find its CRLF original");

@@ -1780,8 +1780,8 @@ suite("Hivey Code", () => {
       // ⚠️ NO review, and that is the fix rather than a regression. This test sets
       // `permissions.autoApprove: "all"`, and `confirmEdit` used to open a diff and a notification
       // ANYWAY — unconditionally, with no idea the user had already granted the edit. Two approval
-      // systems that did not know about each other, reported as « le mode agent fait du compare au
-      // lieu de modifier » and « il redemande les autorisations après si on clique sur toujours ».
+      // systems that did not know about each other, reported as "agent mode does a compare instead
+      // of editing" and "it asks for permission again afterwards if you click always".
       //
       // The review surface still exists and still appears when approval is actually needed; what it
       // must not do is re-ask a question already answered. Asserted as an absence, because an
@@ -2148,7 +2148,8 @@ suite("Screenshot", () => {
       await announce("conversation");
 
       // ⚠️ The permissions screen, photographed for the first time. It was the one surface with no
-      // picture of it anywhere, and it is also the one reported as « incomprehensible » — which is not
+      // picture of it anywhere, and it is also the one reported as "incomprehensible" — which is
+      // not
       // a coincidence: a screen nobody photographs is a screen nobody looks at as a whole. Nine
       // stacked sections and six separate lists are obvious in a frame and invisible in the source,
       // where each section is a tidy twelve lines.
@@ -2281,7 +2282,7 @@ suite("Screenshot", () => {
       await announce("passerelle");
 
       // ⚠️ The provider screen, with a card open. It was photographed by NOTHING, and it is the one
-      // Florian singled out — « c'est toujours aussi compliqué de comprendre les menus, settings ».
+      // Florian singled out — "the menus and settings are still just as hard to understand".
       // So it was changed blind, twice, and the scroll-jump it had (every keystroke in a key field
       // rebuilt the screen and returned it to the top) is exactly the kind of defect a photograph
       // catches and a unit test cannot: nothing is wrong with the DOM, the reader is just somewhere

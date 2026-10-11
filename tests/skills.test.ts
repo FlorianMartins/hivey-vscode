@@ -183,8 +183,8 @@ test("an unrecognized workspace suggests nothing, rather than guessing", () => {
 test("what is open switches its families ON, not merely suggests them", () => {
   // The defect this closes: `detectGroups` was computed and then used to tick a box in a wizard, so
   // somebody editing RPG with default settings got `general` and nothing else while forty IBM i
-  // skills sat switched off. Florian: « la detection automatique des programmes ouverts ne semble pas
-  // faire l'activation et desactivation des skills automatisé ».
+  // skills sat switched off. Florian: "the automatic detection of open programs doesn't seem to do
+  // the automated enabling and disabling of skills".
   const { groups, fromOpenFiles } = familiesInPlay(["general"], ["rpgle", "sqlrpgle"], true);
   assert.ok(groups.includes("rpg"), "an open RPG member did not bring the RPG family in");
   assert.ok(groups.includes("db2i"), "sqlrpgle implies embedded SQL for i");

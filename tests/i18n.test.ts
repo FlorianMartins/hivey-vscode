@@ -130,8 +130,8 @@ function walk(dir: string): string[] {
 }
 
 test("a language change rebuilds the labels that were translated at module load", () => {
-  // ⚠️ `t()` resolving at call time is not enough, and that gap is why « quand on selectionne une
-  // langue dans les parametres » left half the extension in the old one. A module that writes
+  // ⚠️ `t()` resolving at call time is not enough, and that gap is why "when you select a language
+  // in the settings" left half the extension in the old one. A module that writes
   // `export const MODES = [{ label: t("Chat") }]` calls `t()` while the module is being EVALUATED —
   // once, before the extension has read its own `language` setting, because ES modules evaluate
   // their imports first. `setLanguage("fr")` afterwards changed nothing about those strings.

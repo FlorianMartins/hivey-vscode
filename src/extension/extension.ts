@@ -57,7 +57,7 @@ async function pickMode(): Promise<Mode | undefined> {
 /**
  * Say, once, why some of Hivey Code stays in the editor's language.
  *
- * « la traduction des textes de survol des options peut aussi adopter la langue choisie ». The
+ * "the translation of the options' hover texts can also follow the chosen language". The
  * settings page — descriptions and hovers — the menus and the command names come from
  * `package.nls.*.json`, which VS Code picks from ITS display language; no API lets an extension
  * choose otherwise. This used to be said only to somebody changing the language through the
@@ -385,9 +385,9 @@ export function activate(context: vscode.ExtensionContext): void {
     /**
      * Add a provider: the address and the key, in one pass, checked.
      *
-     * ⚠️ This flow had two faults and Florian named both: « l'ajout d'une nouvelle clé API qui est
-     * bug et pas user friendly par exemple pour le gateway qui demande de stocker l'adresse et
-     * ensuite de stocker la clé API plutôt que de remplir les deux champs et valider ».
+     * ⚠️ This flow had two faults and Florian named both: "adding a new API key is buggy and not
+     * user friendly, for example for the gateway, which asks you to store the address and then
+     * store the API key instead of filling in both fields and confirming".
      *
      *   • IT NEVER ASKED FOR THE ADDRESS. For the one provider whose address is the user's to supply
      *     — a gateway, Azure, LiteLLM, a corporate proxy — the key was stored and the address had to
@@ -602,7 +602,7 @@ export function activate(context: vscode.ExtensionContext): void {
      * Pick which microphone dictation listens to.
      *
      * ⚠️ It exists because of a machine with several inputs, where the default was not the one being
-     * spoken into: « son micro n'a rien entendu ». Nothing was broken — the recorder took what the
+     * spoken into: "his mic didn't hear anything". Nothing was broken — the recorder took what the
      * system calls the default, recorded a perfectly valid file of silence, and the failure surfaced
      * three steps later as a transcriber's complaint about a temporary path.
      */
@@ -637,7 +637,7 @@ export function activate(context: vscode.ExtensionContext): void {
         return;
       }
       // No "system default" on DirectShow: it has no device by that name, and offering it was
-      // offering « Error opening input file audio=default ».
+      // offering "Error opening input file audio=default".
       await pickMicrophone(devices, found.devices !== "dshow");
     }),
 

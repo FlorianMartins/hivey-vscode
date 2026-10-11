@@ -65,8 +65,8 @@ export const IMAGE_TOKENS = 1300;
  * Whether a provider's error says it cannot take images — as opposed to anything else going wrong.
  *
  * ⚠️ The catalogue cannot know a self-hosted model: llama.cpp started without its `--mmproj` answers
- * « HTTP 500 Internal Server Error: image input is not supported - hint: if this is unexpected, you
- * may need to provide the mmproj ». That broke the whole turn, and every later turn too, since the
+ * "HTTP 500 Internal Server Error: image input is not supported - hint: if this is unexpected, you
+ * may need to provide the mmproj". That broke the whole turn, and every later turn too, since the
  * image stays in the conversation. Read here so the caller can resend without the images.
  */
 export function isImageRefusal(message: string): boolean {

@@ -1,5 +1,5 @@
-// « les anonymisations des données s'appliquent également sur les modèles locaux et gateway […]
-// c'est des environnements sûrs ». Self-hosted is decided by WHAT the provider is, not by its
+// "data anonymisation also applies to local and gateway models […] those are safe environments".
+// Self-hosted is decided by WHAT the provider is, not by its
 // address: the local endpoint reached by a public name, or the company gateway, is still the
 // user's own infrastructure. Clouds stay pseudonymized whatever happens.
 

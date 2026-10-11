@@ -307,7 +307,7 @@ test("a turn that finished does not claim to have been cut off", () => {
 });
 
 test("⚠️ an agent reply cut off by the cap is continued, not taken for the answer", async () => {
-  // « Voici le plan, puis j'attaque : » — and the turn ended there: the plan, or the call it
+  // "Here is the plan, then I'll get started:" — and the turn ended there: the plan, or the call it
   // announced, was lost to max_tokens and the loop returned the half-sentence as the answer.
   const write = tool("write_file");
   const provider = scriptedProvider([
