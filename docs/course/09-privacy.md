@@ -35,6 +35,12 @@ marker of its own. The model works on the marked text. When its answer comes bac
 Why reversible: if `⟨HOST_1⟩` stayed in the answer, the tool would be unusable. The vault that holds the
 correspondence **stays on your machine**; it never leaves.
 
+**Your own infrastructure is not a cloud.** The local endpoint and your own OpenAI-compatible gateway
+are trusted by default, whatever their address: what you write is sent to them as it is, with no
+markers and no send consent, because pseudonymising for a server you run costs answer quality and
+protects nothing. `privacy.trustSelfHosted` switches this off, and an organisation policy that
+forbids unredacted requests overrides it. Cloud providers are always pseudonymised.
+
 ### 3. Refuse
 
 If something has the shape of a **secret credential** — an API key, a password — and survived step 2,

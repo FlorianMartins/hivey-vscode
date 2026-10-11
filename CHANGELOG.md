@@ -6,6 +6,16 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **⚠️ Plus de pseudonymisation vers le modèle local ni vers votre propre gateway.** « les
+  anonymisations des données s'appliquent également sur les modèles locaux et gateway […] c'est des
+  environnements sûrs ». « Local » était décidé par l'**adresse** seule (localhost, plages privées,
+  `.lan`) : l'endpoint local atteint par un nom public, ou la gateway de l'équipe, passaient pour un
+  cloud — noms et hôtes remplacés par des marqueurs, confirmation d'envoi, réponses moins bonnes.
+  Ces deux fournisseurs sont désormais des environnements de confiance par défaut
+  (`hiveyCode.privacy.trustSelfHosted`, désactivable) ; une politique d'organisation qui interdit les
+  envois non pseudonymisés l'emporte. Les fournisseurs cloud restent pseudonymisés, et le panneau dit
+  maintenant « envoyé tel quel » au lieu de promettre une pseudonymisation qui n'a plus lieu.
+
 - **⚠️ Plus d'écran de configuration après une mise à jour quand quelque chose est déjà configuré.**
   « quand on fait une update […] il renvoie toujours sur l'écran de configuration ». L'écran
   s'ouvrait tant que son propre bouton « terminer » n'avait jamais été pressé, ou dès que le

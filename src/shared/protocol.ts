@@ -300,6 +300,8 @@ export interface UiState {
    * gateway" appeared to do nothing at all.
    */
   remote: boolean;
+  /** Remote, but the user's own infrastructure: sent as is, without pseudonymization. */
+  trusted?: boolean;
   /** Whether this provider charges the user. Drives the cost row, and nothing else. */
   billed: boolean;
   contextTokens: number;

@@ -866,6 +866,11 @@
             "default": false,
             "description": "%config.privacy.allowUnredacted%"
           },
+          "hiveyCode.privacy.trustSelfHosted": {
+            "type": "boolean",
+            "default": true,
+            "description": "%config.privacy.trustSelfHosted%"
+          },
           "hiveyCode.privacy.blockedGlobs": {
             "type": "array",
             "items": {

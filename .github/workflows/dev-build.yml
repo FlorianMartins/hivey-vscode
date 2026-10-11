@@ -75,8 +75,10 @@ jobs:
           subject="$(git log -1 --format=%s "$SHA")"
           notes="Version ${VERSION} — latest pushed commit: ${short} on ${BRANCH} — ${subject}
 
-          Install: download hivey-code.vsix, then in VS Code: Extensions → … → Install from VSIX…
+          Install: download hivey-code.vsix, then in VS Code: Ctrl+Shift+P → Extensions: Install from VSIX…
           (or: code --install-extension hivey-code.vsix --force)
+          Do NOT double-click the file on Windows: that opens Visual Studio's VSIX installer, which
+          cannot install a VS Code extension and rejects the version string.
 
           Built $(date -u +%Y-%m-%dT%H:%MZ). Not a release: a testing channel replaced on every push."
 

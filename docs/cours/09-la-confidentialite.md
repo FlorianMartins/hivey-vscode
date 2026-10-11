@@ -38,6 +38,13 @@ marqué. Quand sa réponse revient, les marqueurs sont **remis à l'endroit** av
 Pourquoi réversible : si `⟨HOST_1⟩` restait dans la réponse, l'outil serait inutilisable. Le coffre
 qui fait la correspondance **reste sur votre machine** ; il ne part jamais.
 
+**Votre propre infrastructure n'est pas un cloud.** L'endpoint local et votre propre gateway
+compatible OpenAI sont considérés comme sûrs par défaut, quelle que soit leur adresse : ce que vous
+écrivez leur est envoyé tel quel, sans marqueurs ni confirmation d'envoi, car pseudonymiser pour un
+serveur que vous administrez coûte en qualité de réponse et ne protège rien. `privacy.trustSelfHosted`
+désactive ce comportement, et une politique d'organisation qui interdit les envois non pseudonymisés
+l'emporte. Les fournisseurs cloud sont toujours pseudonymisés.
+
 ### 3. Refuser
 
 Si quelque chose a la forme d'un **identifiant secret** — une clé d'API, un mot de passe — et a

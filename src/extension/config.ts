@@ -17,7 +17,7 @@ import { DEFAULT_WHISPER_MODEL } from "../core/dictation/local.js";
 import { DEFAULT_GROUPS, type SkillGroup, type SkillPolicy } from "../core/session/skills.js";
 import { makeProvider, type Provider, type ProviderId } from "../core/providers/index.js";
 import { defaultEndpoints, endpointSettingKey, REMOTE_VENDORS, vendor } from "../core/providers/vendors.js";
-import { isLocalEndpoint } from "../core/redaction/index.js";
+import { isLocalEndpoint, isSelfHostedProvider } from "../core/redaction/index.js";
 import { checkEndpoint, describeMissingEndpoint, describeUnusableEndpoint, looksLikeApiKey } from "../core/providers/endpoint.js";
 import { ATTACHMENT_CEILING_TOKENS } from "../core/util/tokens.js";
 import type { RedactionLevel, RedactionPolicy } from "../core/redaction/types.js";
@@ -65,6 +65,8 @@ export interface Settings {
     confirmSend: "always" | "never";
     auditLog: boolean;
     customTerms: string[];
+    /** Local endpoint and own gateway are trusted: no pseudonymization, no send consent. See `trustsSelfHosted`. */
+    trustSelfHosted: boolean;
   };
   budget: { perRequestUsd: number; dailyUsd: number; perRequestTokens: number };
   /** Whether an answer may carry a "To know" note. See `core/session/notices.ts`. */
@@ -293,6 +295,7 @@ function readSettingsRaw(scope?: vscode.Uri): Settings {
       confirmSend: c.get<"always" | "never">("privacy.confirmSend", "always"),
       auditLog: c.get<boolean>("privacy.auditLog", true),
       customTerms: c.get<string[]>("privacy.customTerms", []),
+      trustSelfHosted: c.get<boolean>("privacy.trustSelfHosted", true),
     },
     budget: {
       // The fallbacks come from the one place that holds the shipped limits, so the panel and the
@@ -419,6 +422,9 @@ function restrict(raw: Settings): Settings {
       redaction: narrowed.redaction,
       allowUnredacted: narrowed.allowUnredacted,
       blockedGlobs: narrowed.blockedGlobs,
+      // An organisation that forbids unredacted requests forbids them to its own gateway too — and
+      // so does the safest mode a refused policy falls back to.
+      trustSelfHosted: raw.privacy.trustSelfHosted && state.policy.allowUnredacted !== false,
     },
     budget: narrowed.budget,
     notices: raw.notices,
@@ -465,6 +471,20 @@ export function managedSettings(): { organisation?: string; keys: string[]; refu
     keys: managed,
     ...(state.kind === "refused" ? { refused: state.why } : {}),
   };
+}
+
+/**
+ * Whether requests to this provider skip pseudonymization and the send consent.
+ *
+ * ⚠️ « les anonymisations des données s'appliquent également sur les modèles locaux et gateway […]
+ * c'est des environnements sûrs ». "Local" used to be decided by the ADDRESS alone — localhost, a
+ * private range, `.lan` — so the local endpoint pointed at the team's own server by a public name,
+ * or the company gateway, was treated like a cloud: every name and host replaced by markers, which
+ * costs answer quality on infrastructure the user runs. The two self-hosted providers are trusted
+ * by default; the setting turns that off, and a policy forbidding unredacted requests overrides it.
+ */
+export function trustsSelfHosted(s: Settings, provider: string): boolean {
+  return s.privacy.trustSelfHosted && isSelfHostedProvider(provider);
 }
 
 export function redactionPolicy(s: Settings): RedactionPolicy {

@@ -23,7 +23,7 @@ import type { ChatMessage } from "../core/providers/types.js";
 import { Budget, type SpendStore, type Spend } from "../core/router/budget.js";
 import { isBlockedPath, matchGlob } from "../core/util/glob.js";
 import { estimateMessageTokens } from "../core/util/tokens.js";
-import { redactionPolicy, type Settings } from "./config.js";
+import { redactionPolicy, trustsSelfHosted, type Settings } from "./config.js";
 import { link, verifyChain, type Chained, type ChainVerdict } from "../core/audit/chain.js";
 
 /** A ledger row: what was sent, plus its place in the chain. */
@@ -98,8 +98,10 @@ export class EgressGate {
     vault = new Vault(),
   ): Promise<PreparedRequest | undefined> {
     // Local endpoints skip the whole gate: redacting text that never leaves the machine costs
-    // answer quality and buys nothing.
-    if (target.isLocal) {
+    // answer quality and buys nothing. So do the self-hosted ones — the local endpoint and the
+    // user's own gateway, whatever their address — unless that trust is switched off or a policy
+    // forbids it: see `trustsSelfHosted`.
+    if (target.isLocal || trustsSelfHosted(settings, target.provider)) {
       return { messages, vault, findings: [], estimatedTokens: estimateMessageTokens(messages) };
     }
 

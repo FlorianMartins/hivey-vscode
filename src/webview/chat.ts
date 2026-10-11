@@ -222,9 +222,11 @@ function welcome(state: UiState, deps: ChatDeps): HTMLElement {
     el(
       "p",
       "welcome-lede",
-      state.remote
-        ? t("The selected model is remote: what leaves is pseudonymized, and you are asked before the first request.")
-        : t("The model runs on your machine. Nothing you write here leaves the network."),
+      state.remote && state.trusted
+        ? t("The selected model runs on your own infrastructure: what you write is sent as is, without pseudonymization.")
+        : state.remote
+          ? t("The selected model is remote: what leaves is pseudonymized, and you are asked before the first request.")
+          : t("The model runs on your machine. Nothing you write here leaves the network."),
     ),
   );
   return w;
@@ -1759,9 +1761,11 @@ function providerButton(state: UiState, deps: ChatDeps): HTMLElement {
     icon: ICON.cloud,
     label: state.remote ? current.short : t("Local"),
     trailingIcon: ICON.chevron,
-    title: state.remote
-      ? t("{0} — what leaves is pseudonymized first", current.label)
-      : t("Runs on this machine: nothing leaves, nothing is billed"),
+    title: state.remote && state.trusted
+      ? t("{0} — your own infrastructure: sent as is, without pseudonymization", current.label)
+      : state.remote
+        ? t("{0} — what leaves is pseudonymized first", current.label)
+        : t("Runs on this machine: nothing leaves, nothing is billed"),
     className: `btn ghost tiny provider${state.remote ? " remote" : " local"}`,
     onClick: () =>
       menu(b, (close) => {

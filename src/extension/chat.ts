@@ -123,7 +123,7 @@ import { modelFor, whisperAsset } from "../core/dictation/local.js";
 import { describeWav } from "../core/dictation/wav.js";
 import { chooseDevice, isDeviceError, recorders } from "../core/dictation/capture.js";
 import { pickMicrophone } from "./microphone.js";
-import { SECTION, endpointFor, providerFor, readSettings, routerConfig, type Keys, type Settings, writeTarget } from "./config.js";
+import { SECTION, endpointFor, providerFor, readSettings, routerConfig, trustsSelfHosted, type Keys, type Settings, writeTarget } from "./config.js";
 import { EgressGate, safeHost, summarize } from "./egress.js";
 import { renderPromptAudit, type PromptAudit } from "../core/audit/prompt.js";
 import { youShouldKnow, type Notice } from "../core/session/notices.js";
@@ -621,6 +621,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       // Where the answer comes from. NOT whether it costs anything — those were the same field for
       // two releases and a gateway broke both of them at once.
       remote: isHivey(s.chat.model) || !isLocalEndpoint(baseUrl),
+      // So the panel stops promising pseudonymization the gate no longer applies there.
+      trusted: !isHivey(s.chat.model) && trustsSelfHosted(s, s.chat.provider),
       billed: isHivey(s.chat.model) || billsTheUser(s.chat.provider),
       contextTokens,
       ...(this.contextParts().length ? { contextParts: this.contextParts() } : {}),

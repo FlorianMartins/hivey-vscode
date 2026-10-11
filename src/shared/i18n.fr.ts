@@ -1357,6 +1357,10 @@ export const FR: Record<string, string> = {
   "Choose a microphone to dictate: this machine has several inputs.":
     "Choisissez un micro pour dicter : cette machine a plusieurs entrées.",
   "Choose a microphone": "Choisir un micro",
+  "The selected model runs on your own infrastructure: what you write is sent as is, without pseudonymization.":
+    "Le modèle choisi tourne sur votre propre infrastructure : ce que vous écrivez est envoyé tel quel, sans pseudonymisation.",
+  "{0} — your own infrastructure: sent as is, without pseudonymization":
+    "{0} — votre propre infrastructure : envoyé tel quel, sans pseudonymisation",
   "The settings descriptions, menus and command names of Hivey Code follow VS Code's own display language ({0}), not the language chosen for Hivey Code.":
     "Les descriptions des réglages, les menus et les noms de commandes de Hivey Code suivent la langue d'affichage de VS Code ({0}), pas la langue choisie pour Hivey Code.",
   "{0} cannot read images: asked again without them.": "{0} ne sait pas lire les images : question renvoyée sans elles.",
