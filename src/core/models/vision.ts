@@ -38,3 +38,31 @@ export function acceptsImages(model: string): boolean {
  * request through because it under-counted costs money.
  */
 export const IMAGE_TOKENS = 1300;
+
+/**
+ * Whether a provider's error says it cannot take images — as opposed to anything else going wrong.
+ *
+ * ⚠️ The catalogue cannot know a self-hosted model: llama.cpp started without its `--mmproj` answers
+ * « HTTP 500 Internal Server Error: image input is not supported - hint: if this is unexpected, you
+ * may need to provide the mmproj ». That broke the whole turn, and every later turn too, since the
+ * image stays in the conversation. Read here so the caller can resend without the images.
+ */
+export function isImageRefusal(message: string): boolean {
+  return /image input is not supported|mmproj|does not support (image|vision)|images? (are|is) not supported|vision is not supported|not a (vision|multimodal) model|image_url.*(not supported|unsupported)/i.test(
+    message,
+  );
+}
+
+/**
+ * The same messages with the images taken out — and SAID to be taken out, in the message they were
+ * attached to, so the model does not answer as though it had looked at them.
+ */
+export function withoutImages<M extends { content: string; images?: unknown[] }>(messages: M[]): M[] {
+  return messages.map((m) => {
+    const n = m.images?.length ?? 0;
+    if (!n) return m;
+    const { images: _dropped, ...rest } = m;
+    const note = `[${n} image(s) attached by the user were removed: this model cannot read images. Say so if the question depends on them.]`;
+    return { ...rest, content: m.content ? `${m.content}\n\n${note}` : note } as M;
+  });
+}

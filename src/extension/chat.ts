@@ -32,10 +32,10 @@ import { knowledgeAmbient } from "./knowledge.js";
 import { language, t } from "../shared/i18n.js";
 import { runTurn, type Tool } from "../core/agent/loop.js";
 import { Permissions, commandPrefix, type PermissionStore, type Rule } from "../core/agent/permissions.js";
-import { stablePrompt, turnDirectives } from "../core/prompts.js";
+import { detectLanguage, languageDirective, stablePrompt, turnDirectives } from "../core/prompts.js";
 import { costOf, estimateCost, makeLookup, type Price } from "../core/router/pricing.js";
 import { calibrate, observe, prune, type Calibration } from "../core/util/calibrate.js";
-import { acceptsImages, IMAGE_TOKENS } from "../core/models/vision.js";
+import { acceptsImages, IMAGE_TOKENS, isImageRefusal, withoutImages } from "../core/models/vision.js";
 import { checkEndpoint } from "../core/providers/endpoint.js";
 import { handoverNote, selfCheckMessage, verifyTurn, type TurnStep } from "../core/router/outcome.js";
 import { unifiedDiff } from "../core/text/diff.js";
@@ -145,6 +145,7 @@ const HISTORY_KEY = "hiveyCode.sessions";
 const PERMISSIONS_KEY = "hiveyCode.permissions";
 /** Set once the user has been through the first-run screen, or dismissed it. */
 const SETUP_SEEN_KEY = "hiveyCode.setupSeen";
+const VISIONLESS_KEY = "hiveyCode.visionless";
 
 /**
  * The only addresses `openExternal` will open.
@@ -876,7 +877,17 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           // First run: open on the setup screen rather than on a chat that cannot answer. The
           // probe starts immediately, because the useful version of this screen is the one that
           // already knows what is running by the time it is read.
-          if (!this.ctx.globalState.get<boolean>(SETUP_SEEN_KEY) || (await this.cannotAnswer())) {
+          //
+          // ⚠️ But ONLY when nothing is configured at all. « quand on fait une update de l'extension
+          // alors qu'on a déjà une configuration il renvoie toujours sur l'écran de configuration ».
+          // The flag is set by the setup screen's own button, so anybody who configured through the
+          // settings — a gateway, a local server, a key — never had it, and `cannotAnswer` is about
+          // the CURRENT provider's key, which a keyless gateway never has. Either sent an
+          // established user back to the first-run screen on every reload, and every update reloads.
+          // An existing configuration now counts as having seen setup, and the panel opens on chat.
+          if (await this.hasExistingSetup()) {
+            if (!this.ctx.globalState.get<boolean>(SETUP_SEEN_KEY)) await this.ctx.globalState.update(SETUP_SEEN_KEY, true);
+          } else if (!this.ctx.globalState.get<boolean>(SETUP_SEEN_KEY) || (await this.cannotAnswer())) {
             this.screen = "setup";
             await this.refreshSetup();
             void this.probeLocal();
@@ -1850,6 +1861,41 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    * enough to be felt on activation, and a local endpoint that is merely not running yet is a
    * temporary state, not a misconfiguration.
    */
+  /**
+   * Models seen to refuse images, as `provider::model`. Kept across restarts: a llama.cpp server
+   * without its `--mmproj` will refuse them tomorrow too, and finding out costs a failed request.
+   */
+  private visionlessSeen?: Set<string>;
+  private get visionless(): Set<string> {
+    return (this.visionlessSeen ??= new Set(this.ctx.globalState.get<string[]>(VISIONLESS_KEY) ?? []));
+  }
+
+  private rememberVisionless(key: string): void {
+    if (this.visionless.has(key)) return;
+    this.visionless.add(key);
+    void this.ctx.globalState.update(VISIONLESS_KEY, [...this.visionless].slice(-50));
+  }
+
+  /**
+   * Whether this person has configured anything at all: a key in the keychain, an endpoint or a
+   * server written in the settings, a provider or model chosen. Read from what was SET, not from
+   * the effective values — `endpoints.local` has a default, and a default is not a configuration.
+   */
+  private async hasExistingSetup(): Promise<boolean> {
+    const config = vscode.workspace.getConfiguration(SECTION);
+    const explicitly = (key: string): boolean => {
+      const seen = config.inspect(key);
+      return [seen?.globalValue, seen?.workspaceValue, seen?.workspaceFolderValue].some(
+        (v) => v !== undefined && v !== "" && !(Array.isArray(v) && v.length === 0),
+      );
+    };
+    if (["chat.provider", "chat.model", "endpoints.servers"].some(explicitly)) return true;
+    const endpoints = Object.keys(readSettings().endpoints);
+    if (endpoints.some((p) => explicitly(`endpoints.${p}`))) return true;
+    for (const v of REMOTE_VENDORS) if (await this.keys.get(v.id)) return true;
+    return false;
+  }
+
   private async cannotAnswer(): Promise<boolean> {
     const settings = readSettings();
     const provider = settings.chat.provider;
@@ -3527,7 +3573,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         this.post({
           type: "dictationFailed",
           why: t(
-            "Nothing usable was recorded ({0}). The microphone may not be this machine's default input, or another program may have it. Setting hiveyCode.dictation.recordCommand to a command that names the device is the way past that.",
+            "Nothing usable was recorded ({0}). The microphone listened to may not be the right one, or another program may be holding it: choose the microphone (Hivey Code: Choose a microphone) and try again.",
             facts.why ?? "",
           ),
         });
@@ -4284,9 +4330,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     // map included. What used to sit in it and should not: the dialect note, which is derived from
     // the attached files, and the participant directive, which is per-turn by definition. Both now
     // ride after the transcript, where they are also read last. See `stablePrompt`.
+    // The reply language, decided from the question and restated after the transcript: see
+    // `detectLanguage` for why the system prompt's own rule was not enough.
+    const lastQuestion = [...this.session.entries].reverse().find((e) => e.role === "user")?.text ?? "";
     const directives = turnDirectives({
       dialect: dialectNote(this.attachments),
       ...(this.participant ? { participant: participantDirective(this.participant) } : {}),
+      language: languageDirective(detectLanguage(lastQuestion, language())),
     });
     // Named rather than inlined, because the card that asks the user to consent has to be able to
     // say how big each of them is. A number nobody can attribute is a number nobody can act on.
@@ -4586,6 +4636,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       const splitThinking = thinkingHow ? thinkingSplitter() : undefined;
 
       // One attempt, wrapped so it can be repeated against a different endpoint. See the catch below.
+      // Without images for a model already seen to refuse them — see `visionless`. The images of
+      // EARLIER questions are in here too, which is why one refusal used to break every turn after.
+      const imageKey = `${providerId}::${model}`;
+      let sendMessages = this.visionless.has(imageKey) ? withoutImages(prepared.messages) : prepared.messages;
       const attempt = (
         useProvider: Provider,
         useModel: string,
@@ -4594,7 +4648,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         runTurn({
         provider: useProvider,
         model: useModel,
-        messages: prepared.messages,
+        messages: sendMessages,
         tools,
         signal: ctl.signal,
         maxTokens: outputTokens,
@@ -4702,8 +4756,20 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         // re-run the side effect. So the fallback covers exactly the case it is for — a provider
         // that refuses before it starts, which is what a rate limit and a dead network both are.
         const untouched = !streamed && !steps.length;
-        if (!untouched || ctl.signal.aborted || !isRetryable(err) || !chain.length) throw err;
-        result = await this.runFallback(chain, settings, { provider: providerId, model, why: "" }, attempt, ctl);
+        // ⚠️ A model that cannot read images, said by the server rather than by the catalogue —
+        // « image input is not supported … you may need to provide the mmproj ». Asked again without
+        // them, once, and remembered, instead of a turn (and every later one) that fails outright.
+        const hadImages = sendMessages.some((msg) => msg.images?.length);
+        if (untouched && !ctl.signal.aborted && hadImages && isImageRefusal(String((err as Error)?.message ?? err))) {
+          this.rememberVisionless(imageKey);
+          this.log.appendLine(`[turn] ${model} refused images; resending without them`);
+          this.post({ type: "status", text: t("{0} cannot read images: asked again without them.", model), ok: false });
+          sendMessages = withoutImages(sendMessages);
+          result = await attempt(provider, model);
+        } else {
+          if (!untouched || ctl.signal.aborted || !isRetryable(err) || !chain.length) throw err;
+          result = await this.runFallback(chain, settings, { provider: providerId, model, why: "" }, attempt, ctl);
+        }
       }
 
       // The splitter's tail, BEFORE the restorers: an unterminated deliberation goes to the reasoning

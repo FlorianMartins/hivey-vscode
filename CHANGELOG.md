@@ -6,6 +6,38 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **⚠️ Plus d'écran de configuration après une mise à jour quand quelque chose est déjà configuré.**
+  « quand on fait une update […] il renvoie toujours sur l'écran de configuration ». L'écran
+  s'ouvrait tant que son propre bouton « terminer » n'avait jamais été pressé, ou dès que le
+  fournisseur courant n'avait pas de clé — donc à chaque rechargement pour qui avait configuré par
+  les réglages, ou utilisait une gateway sans clé. Une clé dans le trousseau, un endpoint ou un
+  serveur renseigné, un fournisseur ou un modèle choisi suffisent maintenant : le panneau s'ouvre sur
+  le chat.
+
+- **⚠️ Une image jointe ne casse plus le tour sur un modèle qui ne lit pas les images.**
+  « HTTP 500 Internal Server Error: image input is not supported - hint: […] provide the mmproj ».
+  Le refus est reconnu, la question est renvoyée **sans les images** (le modèle est prévenu qu'elles
+  ont été retirées), et le modèle est retenu comme « sans vision » : les images — y compris celles
+  des questions précédentes, qui faisaient échouer chaque tour suivant — ne lui sont plus envoyées.
+
+- **⚠️ Le modèle ne bascule plus en anglais.** La consigne « réponds dans la langue de
+  l'utilisateur » n'était qu'en tête du prompt système ; après quelques écrans de code et de sorties
+  d'outils en anglais, un modèle local suivait le texte le plus récent. La langue est maintenant
+  déduite de la question (repli : la langue de l'interface) et **réaffirmée après la conversation à
+  chaque tour**, là où le modèle la lit en dernier.
+
+- **⚠️ Dictée : « that file is not a recording ».** Sous Windows il n'existe pas de SIGINT : Node
+  **tue** le processus, et ffmpeg mourait avant d'écrire l'en-tête WAV. ffmpeg est maintenant arrêté
+  comme il l'entend, par un `q` sur son entrée standard, sur toutes les plateformes (vérifié par un
+  vrai enregistrement dans les tests). Le message d'erreur propose de choisir le micro au lieu de
+  renvoyer vers `recordCommand`.
+
+- **Langue des réglages et menus.** Les descriptions des réglages, les menus et les noms de commandes
+  suivent la langue d'affichage de VS Code — aucune API ne permet à une extension de la changer.
+  C'est maintenant expliqué une fois au démarrage quand les deux langues diffèrent, avec le bouton
+  qui change celle de VS Code. Trois descriptions des serveurs MCP, écrites en dur en anglais, sont
+  traduites.
+
 - **⚠️⚠️ L'agent qui « se bloque » : la réponse coupée par `maxOutputTokens` était prise pour une
   réponse finie.** « il ne fait ni le plan ni l'action […] il ne va pas jusqu'à la fin ».
 

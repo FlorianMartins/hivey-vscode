@@ -267,7 +267,8 @@ test("⚠️ the Windows recorder is stopped by a LINE, never by a signal", () =
   assert.match(win.args("x").join(" "), /ReadLine/);
   for (const platform of ["linux", "darwin"]) {
     for (const r of recorders(platform)) {
-      assert.equal(r.stop, "signal", `${platform}/${r.program} would need a different stop`);
+      // ffmpeg is the exception everywhere: `q` on its stdin — see recordStop.test.ts.
+      assert.equal(r.stop, r.program === "ffmpeg" ? "quit" : "signal", `${platform}/${r.program} would need a different stop`);
       assert.equal(r.streams, true, `${platform}/${r.program} claims not to stream, so the edge would never move`);
     }
   }

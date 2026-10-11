@@ -807,11 +807,11 @@
                     "stdio",
                     "http"
                   ],
-                  "description": "stdio runs a program locally; http talks to a server."
+                  "description": "%config.mcp.servers.type%"
                 },
                 "command": {
                   "type": "string",
-                  "description": "The program to run (stdio)."
+                  "description": "%config.mcp.servers.command%"
                 },
                 "args": {
                   "type": "array",
@@ -830,7 +830,7 @@
                 },
                 "url": {
                   "type": "string",
-                  "description": "The server URL (http)."
+                  "description": "%config.mcp.servers.url%"
                 },
                 "headers": {
                   "type": "object",

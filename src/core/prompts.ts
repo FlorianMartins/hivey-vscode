@@ -148,8 +148,53 @@ export interface TurnDirectiveParts {
   dialect?: string;
   /** The named participant this turn is addressed to, when the user picked one. */
   participant?: string;
+  /** Which language to reply in. See `languageDirective`. */
+  language?: string;
 }
 
 export function turnDirectives(parts: TurnDirectiveParts): string {
-  return [parts.dialect, parts.participant].filter(Boolean).join("\n\n").trim();
+  return [parts.dialect, parts.participant, parts.language].filter(Boolean).join("\n\n").trim();
+}
+
+/**
+ * The language the user is writing in, read from what they wrote.
+ *
+ * ⚠️ « le modèle bascule en Anglais ». The rule "answer in the language the user writes in" sits at
+ * the top of the system prompt, and after a few screens of English code, logs and tool output a
+ * local model follows the most recent text instead. So the language is decided HERE, from the
+ * question, and restated after the transcript every turn. Deliberately simple — a handful of very
+ * common words and the accents only French uses — and it falls back to the interface language when
+ * the question is too short or too technical to tell.
+ */
+export function detectLanguage(text: string, fallback: "en" | "fr"): "en" | "fr" {
+  const words = text.toLowerCase().replace(/`[^`]*`/g, " ").match(/[a-zàâçéèêëîïôûùüÿœ']+/g) ?? [];
+  let fr = 0;
+  let en = 0;
+  for (const w of words) {
+    if (FRENCH_WORDS.has(w)) fr++;
+    if (ENGLISH_WORDS.has(w)) en++;
+    if (/[àâçèêëîïôûùœ]/.test(w)) fr += 0.5;
+  }
+  if (fr + en < 2) return fallback;
+  return fr >= en ? "fr" : "en";
+}
+
+const FRENCH_WORDS = new Set([
+  "le", "la", "les", "des", "une", "est", "et", "pour", "que", "qui", "dans", "pas", "sur", "avec", "tu", "vous",
+  "je", "il", "ce", "cette", "mais", "fais", "peux", "plait", "plaît", "merci", "quoi", "comment", "pourquoi", "du",
+  "au", "aux", "ne", "on", "nous",
+]);
+const ENGLISH_WORDS = new Set([
+  "the", "and", "is", "are", "for", "that", "with", "this", "please", "can", "you", "what", "why", "how", "does",
+  "do", "not", "it", "of", "to", "in", "my", "should", "would", "could",
+]);
+
+/** Restated after the transcript every turn, where a model reads it last. */
+export function languageDirective(lang: "en" | "fr"): string {
+  const name = lang === "fr" ? "French" : "English";
+  return (
+    `Reply language: ${name}. Write every sentence of your reply in ${name} — explanations, plans, summaries, ` +
+    `questions and notices — including after reading code, logs or tool output in another language. ` +
+    `Keep code, identifiers, file names, commands and error messages exactly as they are.`
+  );
 }

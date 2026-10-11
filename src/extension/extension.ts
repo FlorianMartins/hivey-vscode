@@ -54,6 +54,34 @@ async function pickMode(): Promise<Mode | undefined> {
   return picked?.id;
 }
 
+/**
+ * Say, once, why some of Hivey Code stays in the editor's language.
+ *
+ * « la traduction des textes de survol des options peut aussi adopter la langue choisie ». The
+ * settings page — descriptions and hovers — the menus and the command names come from
+ * `package.nls.*.json`, which VS Code picks from ITS display language; no API lets an extension
+ * choose otherwise. This used to be said only to somebody changing the language through the
+ * command, so a language chosen in the settings looked half-applied with no explanation. Now it is
+ * said once at startup for each mismatch, with the one button that does change it.
+ */
+async function explainEditorLanguage(context: vscode.ExtensionContext): Promise<void> {
+  const chosen = readSettings().language;
+  const editor = vscode.env.language.toLowerCase();
+  if (chosen === "auto" || editor.startsWith(chosen)) return;
+  const seenKey = "hiveyCode.editorLanguageExplained";
+  const combo = `${chosen}->${editor}`;
+  if (context.globalState.get<string>(seenKey) === combo) return;
+  await context.globalState.update(seenKey, combo);
+  const change = t("Change VS Code's language");
+  const answer = await vscode.window.showInformationMessage(
+    t("The settings descriptions, menus and command names of Hivey Code follow VS Code's own display language ({0}), not the language chosen for Hivey Code.", vscode.env.language),
+    { modal: false, detail: t("The command palette entries and the settings page follow VS Code's own display language, which an extension cannot change.") },
+    change,
+  );
+  // The editor's own picker: it lists the languages, installs the language pack and restarts.
+  if (answer === change) await vscode.commands.executeCommand("workbench.action.configureLocale");
+}
+
 export function activate(context: vscode.ExtensionContext): void {
   // The editor knows which language the user reads, unless they said otherwise.
   const applyLanguage = () => {
@@ -61,6 +89,7 @@ export function activate(context: vscode.ExtensionContext): void {
     setLanguage(choice === "auto" ? vscode.env.language : choice);
   };
   applyLanguage();
+  void explainEditorLanguage(context);
   const log = vscode.window.createOutputChannel("Hivey Code");
   const keys = new Keys(context.secrets);
   const disposables: vscode.Disposable[] = [];

@@ -1346,8 +1346,8 @@ export const FR: Record<string, string> = {
   "Nothing on this machine can record, and the panel is not allowed a microphone of its own — the editor withholds that from every extension.":
     "Rien sur cette machine ne sait enregistrer, et le panneau n'a pas droit à son propre micro — l'éditeur le refuse à toutes les extensions.",
   "Starting…": "Démarrage…",
-  "Nothing usable was recorded ({0}). The microphone may not be this machine's default input, or another program may have it. Setting hiveyCode.dictation.recordCommand to a command that names the device is the way past that.":
-    "Rien d'exploitable n'a été enregistré ({0}). Le micro n'est peut-être pas l'entrée par défaut de cette machine, ou un autre programme le retient. Renseigner hiveyCode.dictation.recordCommand avec une commande qui nomme le périphérique est le moyen de s'en sortir.",
+  "Nothing usable was recorded ({0}). The microphone listened to may not be the right one, or another program may be holding it: choose the microphone (Hivey Code: Choose a microphone) and try again.":
+    "Rien d'exploitable n'a été enregistré ({0}). Le micro écouté n'est peut-être pas le bon, ou un autre programme le retient : choisissez le micro (Hivey Code : Choisir un micro) et réessayez.",
   "Dictation will listen to {0}.": "La dictée écoutera {0}.",
   "Nothing on this machine can record yet — press the microphone in the panel and it will offer to install one.":
     "Rien sur cette machine ne sait encore enregistrer — appuyez sur le micro dans le panneau et il proposera d'en installer un.",
@@ -1357,6 +1357,9 @@ export const FR: Record<string, string> = {
   "Choose a microphone to dictate: this machine has several inputs.":
     "Choisissez un micro pour dicter : cette machine a plusieurs entrées.",
   "Choose a microphone": "Choisir un micro",
+  "The settings descriptions, menus and command names of Hivey Code follow VS Code's own display language ({0}), not the language chosen for Hivey Code.":
+    "Les descriptions des réglages, les menus et les noms de commandes de Hivey Code suivent la langue d'affichage de VS Code ({0}), pas la langue choisie pour Hivey Code.",
+  "{0} cannot read images: asked again without them.": "{0} ne sait pas lire les images : question renvoyée sans elles.",
   "The microphone could not be opened. With several inputs, pick the one to listen to.":
     "Le micro n'a pas pu être ouvert. Avec plusieurs entrées, choisissez celle à écouter.",
   "Ready. Press the microphone to speak.": "Prêt. Appuyez sur le micro pour parler.",

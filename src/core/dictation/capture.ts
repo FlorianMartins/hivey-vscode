@@ -32,8 +32,13 @@ export interface Recorder {
    * ones. `stdin` for the Windows one, which cannot use a signal at all: the file is written by an
    * explicit `save` call that has to RUN, and a killed process runs nothing. It waits for a line
    * instead.
+   *
+   * ⚠️⚠️ `quit` for ffmpeg, on every platform: a `q` on its standard input, which is ffmpeg's own
+   * "stop and finish the file". On Windows there IS no SIGINT — Node's `kill("SIGINT")` terminates
+   * the process outright — so ffmpeg died before writing its header and the file was not a WAV at
+   * all: « Rien d'exploitable n'a été enregistré (that file is not a recording) ».
    */
-  stop: "signal" | "stdin";
+  stop: "signal" | "stdin" | "quit";
   /** True when it is part of the system and need not be looked for on PATH. */
   builtin?: boolean;
   /**
@@ -121,7 +126,7 @@ export function recorders(platform: string): Recorder[] {
         program: "ffmpeg",
         // `:0` is avfoundation's first audio input; a chosen device replaces the index.
         args: (w, d) => ["-hide_banner", "-loglevel", "error", "-flush_packets", "1", "-f", "avfoundation", "-i", `:${d?.trim() || "0"}`, "-ar", "16000", "-ac", "1", "-y", w],
-        from: "ffmpeg", stop: "signal", streams: true, devices: "avfoundation",
+        from: "ffmpeg", stop: "quit", streams: true, devices: "avfoundation",
       },
     ];
   }
@@ -134,7 +139,7 @@ export function recorders(platform: string): Recorder[] {
       {
         program: "ffmpeg",
         args: (w, d) => ["-hide_banner", "-loglevel", "error", "-flush_packets", "1", "-f", "dshow", "-i", `audio=${d?.trim() || "default"}`, "-ar", "16000", "-ac", "1", "-y", w],
-        from: "ffmpeg", stop: "signal", streams: true, devices: "dshow",
+        from: "ffmpeg", stop: "quit", streams: true, devices: "dshow",
       },
       // Nothing to install before anybody can speak: `winmm` has been part of Windows for thirty
       // years, and "install ffmpeg first" was never the brief.
@@ -160,7 +165,7 @@ export function recorders(platform: string): Recorder[] {
     {
       program: "ffmpeg",
       args: (w, d) => ["-hide_banner", "-loglevel", "error", "-flush_packets", "1", "-f", "alsa", "-i", d?.trim() || "default", "-ar", "16000", "-ac", "1", "-y", w],
-      from: "ffmpeg", stop: "signal", streams: true, devices: "alsa",
+      from: "ffmpeg", stop: "quit", streams: true, devices: "alsa",
     },
   ];
 }
