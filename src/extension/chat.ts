@@ -146,6 +146,7 @@ const PERMISSIONS_KEY = "hiveyCode.permissions";
 /** Set once the user has been through the first-run screen, or dismissed it. */
 const SETUP_SEEN_KEY = "hiveyCode.setupSeen";
 const VISIONLESS_KEY = "hiveyCode.visionless";
+const VISIONLESS_TTL_MS = 24 * 60 * 60 * 1000;
 
 /**
  * The only addresses `openExternal` will open.
@@ -1855,27 +1856,30 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   }
 
   /**
-   * Whether the configured model could not answer if asked.
-   *
-   * A remote provider with no key in the keychain is the case that matters: the conversation looks
-   * ready, the first question fails, and the error names a setting rather than a thing to do. Better
-   * to open on the screen that fixes it. A local endpoint is not checked here — probing takes long
-   * enough to be felt on activation, and a local endpoint that is merely not running yet is a
-   * temporary state, not a misconfiguration.
+   * Models seen to refuse images, as `provider::model` → when. Kept across restarts — a llama.cpp
+   * server without its `--mmproj` will refuse them tomorrow too, and finding out costs a failed
+   * request — but only for a day: the server may be given its projector, and a model remembered as
+   * blind for ever would never be shown an image again.
    */
-  /**
-   * Models seen to refuse images, as `provider::model`. Kept across restarts: a llama.cpp server
-   * without its `--mmproj` will refuse them tomorrow too, and finding out costs a failed request.
-   */
-  private visionlessSeen?: Set<string>;
-  private get visionless(): Set<string> {
-    return (this.visionlessSeen ??= new Set(this.ctx.globalState.get<string[]>(VISIONLESS_KEY) ?? []));
+  private visionlessSeen?: Map<string, number>;
+  private visionlessMap(): Map<string, number> {
+    if (!this.visionlessSeen) {
+      const stored = this.ctx.globalState.get<Record<string, number>>(VISIONLESS_KEY);
+      // An older build stored a plain list; it is simply forgotten.
+      this.visionlessSeen = new Map(stored && !Array.isArray(stored) ? Object.entries(stored) : []);
+    }
+    return this.visionlessSeen;
+  }
+
+  private isVisionless(key: string): boolean {
+    return Date.now() - (this.visionlessMap().get(key) ?? 0) < VISIONLESS_TTL_MS;
   }
 
   private rememberVisionless(key: string): void {
-    if (this.visionless.has(key)) return;
-    this.visionless.add(key);
-    void this.ctx.globalState.update(VISIONLESS_KEY, [...this.visionless].slice(-50));
+    const seen = this.visionlessMap();
+    seen.set(key, Date.now());
+    const fresh = [...seen].filter(([, at]) => Date.now() - at < VISIONLESS_TTL_MS).slice(-50);
+    void this.ctx.globalState.update(VISIONLESS_KEY, Object.fromEntries(fresh));
   }
 
   /**
@@ -1898,6 +1902,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     return false;
   }
 
+  /**
+   * Whether the configured model could not answer if asked.
+   *
+   * A remote provider with no key in the keychain is the case that matters: the conversation looks
+   * ready, the first question fails, and the error names a setting rather than a thing to do. Better
+   * to open on the screen that fixes it. A local endpoint is not checked here — probing takes long
+   * enough to be felt on activation, and a local endpoint that is merely not running yet is a
+   * temporary state, not a misconfiguration.
+   */
   private async cannotAnswer(): Promise<boolean> {
     const settings = readSettings();
     const provider = settings.chat.provider;
@@ -4641,7 +4654,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       // Without images for a model already seen to refuse them — see `visionless`. The images of
       // EARLIER questions are in here too, which is why one refusal used to break every turn after.
       const imageKey = `${providerId}::${model}`;
-      let sendMessages = this.visionless.has(imageKey) ? withoutImages(prepared.messages) : prepared.messages;
+      let sendMessages = this.isVisionless(imageKey) ? withoutImages(prepared.messages) : prepared.messages;
       const attempt = (
         useProvider: Provider,
         useModel: string,
