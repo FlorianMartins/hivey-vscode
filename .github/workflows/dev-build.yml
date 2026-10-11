@@ -40,6 +40,23 @@ jobs:
       - name: Install (locked)
         run: npm ci
 
+      # ⚠️ A version of its own for every build. They all said 1.14.2, and VS Code refused the second
+      # one: « The version 1.14.2 already exists and cannot be modified ». The NEXT patch with a
+      # `-dev.<run>` suffix sorts above the release it is built from, above the previous dev build,
+      # and below the real next release — so each install is an upgrade, and the release replaces it.
+      - name: Dev version
+        id: version
+        env:
+          RUN: ${{ github.run_number }}
+        run: |
+          set -euo pipefail
+          base="$(node -p "require('./package.json').version")"
+          next="$(node -p "const [a,b,c]=process.argv[1].split('-')[0].split('.').map(Number); [a,b,c+1].join('.')" "$base")"
+          version="${next}-dev.${RUN}"
+          npm pkg set version="$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Dev build version: $version"
+
       - name: Build and package
         run: |
           npm run build
@@ -51,11 +68,12 @@ jobs:
           REPO: ${{ github.repository }}
           SHA: ${{ github.sha }}
           BRANCH: ${{ github.ref_name }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
           short="${SHA:0:7}"
           subject="$(git log -1 --format=%s "$SHA")"
-          notes="Latest pushed commit: ${short} on ${BRANCH} — ${subject}
+          notes="Version ${VERSION} — latest pushed commit: ${short} on ${BRANCH} — ${subject}
 
           Install: download hivey-code.vsix, then in VS Code: Extensions → … → Install from VSIX…
           (or: code --install-extension hivey-code.vsix --force)
@@ -70,8 +88,8 @@ jobs:
           fi
 
           if gh release view dev --repo "$REPO" >/dev/null 2>&1; then
-            gh release edit dev --repo "$REPO" --prerelease --title "Dev build (${short})" --notes "$notes"
+            gh release edit dev --repo "$REPO" --prerelease --title "Dev build ${VERSION} (${short})" --notes "$notes"
           else
-            gh release create dev --repo "$REPO" --prerelease --verify-tag --title "Dev build (${short})" --notes "$notes"
+            gh release create dev --repo "$REPO" --prerelease --verify-tag --title "Dev build ${VERSION} (${short})" --notes "$notes"
           fi
           gh release upload dev hivey-code.vsix --repo "$REPO" --clobber
