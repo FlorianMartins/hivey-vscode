@@ -330,7 +330,9 @@ function readSettingsRaw(scope?: vscode.Uri): Settings {
       // was `general` alone no matter what was on screen. Individual skills inside an active family
       // stay opt-OUT — see `SkillPolicy`.
       groups: c.get<SkillGroup[]>("skills.groups", DEFAULT_GROUPS),
-      disabled: c.get<string[]>("skills.disabled", []),
+      // Skill names were translated until 1.14.2 (`/expliquer`…); a choice saved under the old
+      // name keeps applying to the English one.
+      disabled: c.get<string[]>("skills.disabled", []).map((name) => LEGACY_SKILL_NAMES[name] ?? name),
       auto: c.get<boolean>("skills.auto", true),
     },
     agents: { disabled: c.get<string[]>("agents.disabled", []) },
@@ -483,6 +485,14 @@ export function managedSettings(): { organisation?: string; keys: string[]; refu
  * costs answer quality on infrastructure the user runs. The two self-hosted providers are trusted
  * by default; the setting turns that off, and a policy forbidding unredacted requests overrides it.
  */
+/** The French names built-in skills had while they were translated. */
+const LEGACY_SKILL_NAMES: Record<string, string> = {
+  "/expliquer": "/explain",
+  "/corriger": "/fix",
+  "/revue": "/review",
+  "/optimiser": "/optimize",
+};
+
 export function trustsSelfHosted(s: Settings, provider: string): boolean {
   return s.privacy.trustSelfHosted && isSelfHostedProvider(provider);
 }

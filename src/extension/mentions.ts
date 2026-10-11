@@ -17,7 +17,7 @@
 
 import * as vscode from "vscode";
 import { isDocumentUri } from "./models.js";
-import { t } from "../shared/i18n.js";
+import { en, t } from "../shared/i18n.js";
 import type { ContextItem } from "../core/session/session.js";
 import { describeMention, type Mention } from "../core/session/mentions.js";
 import { headToTokens } from "../core/util/tokens.js";
@@ -69,7 +69,7 @@ export async function resolveMentions(mentions: Mention[], deps: ResolveDeps): P
       out.push({
         kind: "note",
         label: describeMention(mention),
-        body: t("“{0}” could not be resolved: {1}", mention.raw, error instanceof Error ? error.message : String(error)),
+        body: en("“{0}” could not be resolved: {1}", mention.raw, error instanceof Error ? error.message : String(error)),
       });
     }
   }
@@ -154,7 +154,7 @@ async function resolveOne(mention: Mention, deps: ResolveDeps): Promise<ContextI
         // "None" is information: it tells the model the compiler is happy and the bug is elsewhere.
         // Cut, because a project mid-refactor reports thousands of them and the first hundred say
         // everything the next thousand would.
-        body: body ? headToTokens(body, deps.attachmentTokens) : t("The language servers report no errors or warnings."),
+        body: body ? headToTokens(body, deps.attachmentTokens) : en("The language servers report no errors or warnings."),
       };
     }
 

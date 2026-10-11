@@ -2226,7 +2226,7 @@ function slashHints(container: HTMLElement, area: HTMLTextAreaElement, deps: Cha
     .filter((sk) => !sk.builtin && sk.enabled)
     .map((sk) => ({ name: sk.name, hint: sk.description }));
   const rows = suggestionsFor(query, {
-    slash: [...available.map((c) => ({ name: c.name, hint: c.hint })), ...repoSkills],
+    slash: [...available.map((c) => ({ name: c.name, hint: t(c.hint) })), ...repoSkills],
     mentions: MENTIONS,
     participants: PARTICIPANTS,
   });

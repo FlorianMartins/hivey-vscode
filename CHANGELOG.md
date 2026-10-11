@@ -6,6 +6,18 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **⚠️ Ce que lit le modèle est en anglais, quelle que soit la langue de l'interface.** « tous les
+  skills, tools, etc sont en Français […] passer tout en anglais ». Les corps des skills, leurs noms
+  et descriptions côté modèle, les instructions des actions sur la sélection, les invites des
+  commandes de l'éditeur et plusieurs résultats d'outils passaient par la traduction de l'interface :
+  avec l'interface en français, le modèle était instruit en français, et `/explain` devenait
+  `/expliquer`. Ils passent désormais par `en()`, qui ne traduit jamais ; seul ce qu'une personne lit
+  (description d'un skill dans le panneau, libellés) suit sa langue. La langue de **réponse** reste
+  celle de l'utilisateur, par la directive dédiée — et les instructions du produit sont retirées de la
+  question avant de détecter sa langue, pour que `/explain` tapé en français reçoive une réponse en
+  français. Un skill désactivé sous son ancien nom français le reste. 148 traductions devenues
+  inutiles sont retirées.
+
 - **⚠️ Plus de pseudonymisation vers le modèle local ni vers votre propre gateway.** « les
   anonymisations des données s'appliquent également sur les modèles locaux et gateway […] c'est des
   environnements sûrs ». « Local » était décidé par l'**adresse** seule (localhost, plages privées,

@@ -11,7 +11,7 @@
 // conversation, where the answer can be read, argued with and followed up. A rewrite belongs in the
 // file, in the undo stack, in the diff — nobody wants "here is your function, now copy it".
 
-import { t } from "../../shared/i18n.js";
+import { en, t } from "../../shared/i18n.js";
 
 export interface SelectionAction {
   /** Stable across translations: menus, tests and telemetry-free logs all key on this. */
@@ -39,14 +39,14 @@ export function selectionActions(): SelectionAction[] {
       id: "explain",
       label: t("Explain this selection"),
       where: "chat",
-      instruction: t("Explain what this code does, then what it is for. Be concrete about the inputs and what comes back."),
+      instruction: en("Explain what this code does, then what it is for. Be concrete about the inputs and what comes back."),
       lightbulb: true,
     },
     {
       id: "review",
       label: t("Find problems in it"),
       where: "chat",
-      instruction: t(
+      instruction: en(
         "Review this code for defects: wrong results, unhandled failures, races, injection, resource leaks. Say what input triggers each one. If you find nothing, say so rather than inventing something.",
       ),
       lightbulb: true,
@@ -55,37 +55,37 @@ export function selectionActions(): SelectionAction[] {
       id: "test",
       label: t("Write a test for it"),
       where: "chat",
-      instruction: t("Write a test for this code, in the style of the tests already in this repository."),
+      instruction: en("Write a test for this code, in the style of the tests already in this repository."),
     },
     {
       id: "document",
       label: t("Document it"),
       where: "chat",
-      instruction: t("Add concise documentation above this code, in the language and style of the file."),
+      instruction: en("Add concise documentation above this code, in the language and style of the file."),
     },
     {
       id: "usage",
       label: t("Show me how it is used"),
       where: "chat",
-      instruction: t("Find where this is called from in the workspace and summarize how the callers use it."),
+      instruction: en("Find where this is called from in the workspace and summarize how the callers use it."),
     },
     {
       id: "simplify",
       label: t("Simplify it"),
       where: "file",
-      instruction: t("Simplify this code without changing what it does or the names other code depends on."),
+      instruction: en("Simplify this code without changing what it does or the names other code depends on."),
     },
     {
       id: "errors",
       label: t("Handle the failures"),
       where: "file",
-      instruction: t("Handle the ways this code can fail, in the style this file already uses. Do not swallow errors silently."),
+      instruction: en("Handle the ways this code can fail, in the style this file already uses. Do not swallow errors silently."),
     },
     {
       id: "types",
       label: t("Add the types"),
       where: "file",
-      instruction: t("Add or tighten the type annotations for this code. Change no runtime behavior."),
+      instruction: en("Add or tighten the type annotations for this code. Change no runtime behavior."),
     },
   ];
 }

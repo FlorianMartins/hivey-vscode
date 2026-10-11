@@ -29,7 +29,7 @@ import {
 import { checkCredentials, normalizeBaseUrl } from "../core/providers/credentials.js";
 import { callSignature, safeArgs } from "../core/agent/callSignature.js";
 import { knowledgeAmbient } from "./knowledge.js";
-import { language, t } from "../shared/i18n.js";
+import { en, language, t, withoutModelText } from "../shared/i18n.js";
 import { runTurn, type Tool } from "../core/agent/loop.js";
 import { Permissions, commandPrefix, type PermissionStore, type Rule } from "../core/agent/permissions.js";
 import { detectLanguage, languageDirective, stablePrompt, turnDirectives } from "../core/prompts.js";
@@ -2098,7 +2098,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       sk.needs !== "knowledge" || readSettings().knowledge.enabled;
     const builtins = BUILTIN_SKILLS.filter((sk) => policy.groups.includes(sk.group) && available(sk)).map((sk) => ({
       name: sk.name,
-      description: sk.hint,
+      description: t(sk.hint),
       enabled: isSkillEnabled(sk.name, policy),
       builtin: true,
       group: sk.group,
@@ -2195,7 +2195,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         w.step === "skills"
           ? BUILTIN_SKILLS.filter((sk) => policy.groups.includes(sk.group) && !ALWAYS_ON.has(sk.name)).map((sk) => ({
               name: sk.name,
-              description: sk.hint,
+              description: t(sk.hint),
               enabled: isSkillEnabled(sk.name, policy),
               builtin: true,
               group: sk.group,
@@ -4055,7 +4055,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       // it first — it is the oldest entry the moment the next question is asked.
       this.session.add({
         role: "assistant",
-        text: `${t("**Summary of the conversation so far**")}\n\n${summary}`,
+        text: `${en("**Summary of the conversation so far**")}\n\n${summary}`,
         model,
         pinned: true,
       });
@@ -4347,7 +4347,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     // ride after the transcript, where they are also read last. See `stablePrompt`.
     // The reply language, decided from the question and restated after the transcript: see
     // `detectLanguage` for why the system prompt's own rule was not enough.
-    const lastQuestion = [...this.session.entries].reverse().find((e) => e.role === "user")?.text ?? "";
+    // Built-in skill instructions are taken out first: they are English on purpose, and `/explain`
+    // typed in a French interface must not read as a question asked in English.
+    const lastQuestion = withoutModelText([...this.session.entries].reverse().find((e) => e.role === "user")?.text ?? "");
     const directives = turnDirectives({
       dialect: dialectNote(this.attachments),
       ...(this.participant ? { participant: participantDirective(this.participant) } : {}),

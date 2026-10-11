@@ -101,6 +101,42 @@ export function t(text: string, ...args: Array<string | number>): string {
   });
 }
 
+/**
+ * The same `{0}` filling as `t()`, and NEVER translated: for text the MODEL reads.
+ *
+ * ⚠️ « tous les skills, tools, etc sont en Français ». Skill bodies, tool results, selection
+ * instructions and context labels were written in English and passed through `t()`, so with the
+ * interface in French the model was prompted in French — and `/explain` became `/expliquer`. What
+ * a person reads follows their language; what the model reads is the product's own instructions,
+ * and stays English. The reply language is a separate, explicit directive (`languageDirective`).
+ */
+export function en(text: string, ...args: Array<string | number>): string {
+  MODEL_TEXT.add(text);
+  if (!args.length) return text;
+  return text.replace(/\{(\d+)\}/g, (match, index: string) => {
+    const value = args[Number(index)];
+    return value === undefined ? match : String(value);
+  });
+}
+
+/** Every template that has gone through `en()`. See `withoutModelText`. */
+const MODEL_TEXT = new Set<string>();
+
+/**
+ * A message with the product's own English instructions taken out — what is left is what the
+ * PERSON wrote. `/explain` typed in a French interface sends an English instruction, and reading
+ * the reply language off that would answer a French speaker in English.
+ */
+export function withoutModelText(message: string): string {
+  let out = message;
+  for (const template of MODEL_TEXT) {
+    for (const part of template.split(/\{\d+\}/)) {
+      if (part.trim().length >= 12) out = out.split(part).join(" ");
+    }
+  }
+  return out;
+}
+
 /** Every English string the French table claims to translate — used by the coverage test. */
 export function translationKeys(lang: Lang): string[] {
   return Object.keys(TABLES[lang]);
