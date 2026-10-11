@@ -15,6 +15,17 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
   réponse. Pendant un tour, le contour descend à une piste discrète (18 %) ; la taille du cadre ne
   bouge pas, et c'est l'arc qu'on voit.
 
+- **⚠️ Dictée sous Windows avec plusieurs entrées audio : plus de `audio=default`.** « L'enregistrement
+  a échoué : Error opening input file audio=default. Error opening input files: I/O error ».
+
+  DirectShow n'a **aucun** périphérique nommé « default » : sans micro choisi, ffmpeg cherchait un nom
+  qui n'existe pas. L'entrée est maintenant fixée avant d'enregistrer : celle choisie si elle existe
+  encore, la seule s'il n'y en a qu'une, sinon **la question est posée une fois** et la réponse
+  retenue. Aucune entrée listée : on se rabat sur l'enregistreur intégré de Windows. Le sélecteur ne
+  propose plus « le périphérique par défaut » sous DirectShow, les listes au format des anciens ffmpeg
+  (par sections) sont lues, et une entrée impossible à ouvrir — ou un enregistrement silencieux —
+  propose directement **Choisir un micro**.
+
 ### Ajouté
 
 - **Le cadre du raisonnement a sa couleur.** Bordure teintée et liseré à gauche — le violet des

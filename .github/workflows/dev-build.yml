@@ -1,0 +1,77 @@
+name: Dev build
+
+# One link that always serves the latest pushed commit as an installable .vsix:
+#
+#   https://github.com/FlorianMartins/hivey-vscode/releases/download/dev/hivey-code.vsix
+#
+# The `dev` pre-release is re-pointed and its asset replaced on every push, so the URL never
+# changes. It is a testing channel, not a release: no tests gate it (CI does that), and the
+# marketplace is never touched.
+
+on:
+  push:
+    branches-ignore:
+      - "dependabot/**"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+# The latest push wins; an older build finishing last must not overwrite a newer one.
+concurrency:
+  group: dev-build
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # create/update the `dev` release and move its tag
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install (locked)
+        run: npm ci
+
+      - name: Build and package
+        run: |
+          npm run build
+          npx --yes @vscode/vsce@3.9.2 package --no-dependencies -o hivey-code.vsix
+
+      - name: Publish to the dev release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          short="${SHA:0:7}"
+          subject="$(git log -1 --format=%s "$SHA")"
+          notes="Latest pushed commit: ${short} on ${BRANCH} — ${subject}
+
+          Install: download hivey-code.vsix, then in VS Code: Extensions → … → Install from VSIX…
+          (or: code --install-extension hivey-code.vsix --force)
+
+          Built $(date -u +%Y-%m-%dT%H:%MZ). Not a release: a testing channel replaced on every push."
+
+          # Move (or create) the tag through the API: no git credentials are kept in this job.
+          if gh api "repos/${REPO}/git/refs/tags/dev" >/dev/null 2>&1; then
+            gh api -X PATCH "repos/${REPO}/git/refs/tags/dev" -f sha="$SHA" -F force=true >/dev/null
+          else
+            gh api -X POST "repos/${REPO}/git/refs" -f ref="refs/tags/dev" -f sha="$SHA" >/dev/null
+          fi
+
+          if gh release view dev --repo "$REPO" >/dev/null 2>&1; then
+            gh release edit dev --repo "$REPO" --prerelease --title "Dev build (${short})" --notes "$notes"
+          else
+            gh release create dev --repo "$REPO" --prerelease --verify-tag --title "Dev build (${short})" --notes "$notes"
+          fi
+          gh release upload dev hivey-code.vsix --repo "$REPO" --clobber

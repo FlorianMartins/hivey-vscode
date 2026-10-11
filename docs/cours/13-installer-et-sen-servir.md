@@ -110,6 +110,12 @@ reconnaisseur se trompe, et une question dictée qui s'enverrait d'elle-même se
 personne n'a relue. Échap pendant l'enregistrement jette tout : changer d'avis au milieu d'une phrase
 n'est pas une demande de transcription.
 
+**Plusieurs micros ?** Sous Windows avec ffmpeg, il n'existe pas d'entrée « par défaut » sur laquelle
+se rabattre : il faut nommer le périphérique. Avec une seule entrée, elle est prise d'office ; avec
+plusieurs et aucune choisie, le premier appui sur le micro demande laquelle, et s'en souvient.
+**Hivey Code : Choisir un micro**, dans le menu du panneau, permet d'en changer ensuite — et c'est
+proposé directement dès qu'une entrée ne peut pas être ouverte.
+
 ## 4 ter. Changer l'apparence
 
 `hiveyCode.appearance` a deux valeurs :
