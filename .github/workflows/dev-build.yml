@@ -40,22 +40,37 @@ jobs:
       - name: Install (locked)
         run: npm ci
 
-      # ⚠️ A version of its own for every build. They all said 1.14.2, and VS Code refused the second
-      # one: « The version 1.14.2 already exists and cannot be modified ». The NEXT patch with a
-      # `-dev.<run>` suffix sorts above the release it is built from, above the previous dev build,
-      # and below the real next release — so each install is an upgrade, and the release replaces it.
+      # ⚠️ A version of its own for every build, and numbers only. They all said 1.14.2, and the
+      # second one was refused: "The version 1.14.2 already exists and cannot be modified". A
+      # `-dev.N` suffix was then refused too: "It must be one to four numbers". So every build takes
+      # the previous dev build's number plus one patch — 1.14.3, 1.14.4, … — and never goes below
+      # the version in package.json. Each install is an upgrade; a real release bumps package.json.
       - name: Dev version
         id: version
         env:
-          RUN: ${{ github.run_number }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
           base="$(node -p "require('./package.json').version")"
-          next="$(node -p "const [a,b,c]=process.argv[1].split('-')[0].split('.').map(Number); [a,b,c+1].join('.')" "$base")"
-          version="${next}-dev.${RUN}"
+          # "Dev build 1.14.7 (abc1234)" → 1.14.7; nothing yet → empty.
+          previous="$(gh release view dev --repo "$REPO" --json name --jq .name 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?' | head -1 || true)"
+          version="$(node -e '
+            const parse = (v) => { const [core, pre] = v.split("-"); return { n: core.split(".").map(Number), pre: Boolean(pre) }; };
+            const cmp = (a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
+            const base = parse(process.argv[1]).n;
+            let next = [base[0], base[1], base[2] + 1];
+            if (process.argv[2]) {
+              const prev = parse(process.argv[2]);
+              // 1.14.3-dev.8 sorts below 1.14.3, so 1.14.3 is already an upgrade over it.
+              const after = prev.pre ? prev.n : [prev.n[0], prev.n[1], prev.n[2] + 1];
+              if (cmp(after, next) > 0) next = after;
+            }
+            console.log(next.join("."));
+          ' "$base" "$previous")"
           npm pkg set version="$version"
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "Dev build version: $version"
+          echo "Dev build version: $version (previous: ${previous:-none}, package.json: $base)"
 
       - name: Build and package
         run: |
