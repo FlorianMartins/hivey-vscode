@@ -298,7 +298,12 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
     // turn that ended « Voici le plan, puis j'attaque : » — the plan or the call it announced lost to
     // the cap — looked finished, and the agent simply stopped. Asked to carry on instead, a bounded
     // number of times, with the one instruction that keeps it from being cut again: smaller pieces.
-    if (truncated && !res.toolCalls.length && tools.length && continuations < MAX_CONTINUATIONS) {
+    //
+    // ⚠️ Not when the THINKING ate the budget and there is no text at all: asking again at the same
+    // cap would be eaten the same way. That case belongs to the caller, which retries with more room
+    // (see "It spent the whole answer on thinking" in the extension) — and this used to pre-empt it.
+    const thoughtOnly = !res.text.trim() && Boolean(res.reasoning?.trim());
+    if (truncated && !thoughtOnly && !res.toolCalls.length && tools.length && continuations < MAX_CONTINUATIONS) {
       continuations++;
       opts.report?.("the reply hit the output limit — asking the model to continue");
       working.push({ role: "assistant", content: res.text || "(cut off)" });
