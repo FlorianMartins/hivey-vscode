@@ -35,7 +35,7 @@ import { Permissions, commandPrefix, type PermissionStore, type Rule } from "../
 import { detectLanguage, languageDirective, stablePrompt, turnDirectives } from "../core/prompts.js";
 import { costOf, estimateCost, makeLookup, type Price } from "../core/router/pricing.js";
 import { calibrate, observe, prune, type Calibration } from "../core/util/calibrate.js";
-import { acceptsImages, IMAGE_TOKENS, isImageRefusal, withoutImages } from "../core/models/vision.js";
+import { acceptsImages, IMAGE_TOKENS, isCatalogued, isImageRefusal, withoutImages } from "../core/models/vision.js";
 import { checkEndpoint } from "../core/providers/endpoint.js";
 import { handoverNote, selfCheckMessage, verifyTurn, type TurnStep } from "../core/router/outcome.js";
 import { unifiedDiff } from "../core/text/diff.js";
@@ -1235,7 +1235,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           // and the person pasting is the only one who can choose a different model.
           if (item.image) {
             const settings = readSettings();
-            if (!acceptsImages(settings.chat.model)) {
+            const model = settings.chat.model;
+            const providerId = isHivey(model) ? "openrouter" : settings.chat.provider;
+            // Only when it is KNOWN: listed in the catalogue without vision, or refused by this very
+            // server recently. A self-hosted model is not listed, and may well read images — Qwen on
+            // llama.cpp does once given its `--mmproj`; if it cannot, its refusal is handled at send.
+            const blind = this.isVisionless(`${providerId}::${model}`) || (isCatalogued(model) && !acceptsImages(model));
+            if (blind) {
               void vscode.window.showWarningMessage(
                 t("{0} does not read images. It is attached, but the answer will be about the text alone.", settings.chat.model),
               );

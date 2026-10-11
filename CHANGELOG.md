@@ -40,7 +40,11 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
   « HTTP 500 Internal Server Error: image input is not supported - hint: […] provide the mmproj ».
   Le refus est reconnu, la question est renvoyée **sans les images** (le modèle est prévenu qu'elles
   ont été retirées), et le modèle est retenu comme « sans vision » : les images — y compris celles
-  des questions précédentes, qui faisaient échouer chaque tour suivant — ne lui sont plus envoyées.
+  des questions précédentes, qui faisaient échouer chaque tour suivant — ne lui sont plus envoyées
+  (pendant 24 h : le serveur peut entre-temps recevoir son `--mmproj`). Et l'avertissement « ne lit
+  pas les images » à l'ajout d'une image n'apparaît plus que quand c'est **su** — modèle du catalogue
+  sans vision, ou refus récent de ce serveur : un modèle auto-hébergé n'est dans aucun catalogue, et
+  Qwen sur llama.cpp lit très bien les images une fois son projecteur chargé.
 
 - **⚠️ Le modèle ne bascule plus en anglais.** La consigne « réponds dans la langue de
   l'utilisateur » n'était qu'en tête du prompt système ; après quelques écrans de code et de sorties

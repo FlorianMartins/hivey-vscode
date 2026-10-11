@@ -9,8 +9,30 @@
 // does not say so — the good case is a request rejected with a confusing error, the bad case is an
 // answer confidently written about an image nobody looked at.
 
-import { GENERATED_VISION } from "../router/catalog.generated.js";
+import { GENERATED_MODELS, GENERATED_VISION } from "../router/catalog.generated.js";
 import { hiveyModel, isHivey } from "../router/hivey.js";
+
+/**
+ * Whether the catalogue knows this model at all — and therefore whether `acceptsImages` returning
+ * false is a FACT ("this model is listed, without vision") or only an absence. A model on a
+ * self-hosted server is never listed, and saying it "does not read images" was untrue for a
+ * llama.cpp server given its `--mmproj`. For those, the server's own refusal decides — see
+ * `isImageRefusal`.
+ */
+export function isCatalogued(model: string): boolean {
+  if (!model) return false;
+  if (isHivey(model)) return true;
+  return CATALOGUED.has(model);
+}
+
+const CATALOGUED: ReadonlySet<string> = (() => {
+  const set = new Set<string>();
+  for (const [id] of GENERATED_MODELS) {
+    set.add(id);
+    if (id.includes("/")) set.add(id.slice(id.indexOf("/") + 1));
+  }
+  return set;
+})();
 
 /**
  * True when this model has been seen to accept images.
