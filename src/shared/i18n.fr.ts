@@ -1171,6 +1171,10 @@ export const FR: Record<string, string> = {
   "Choose a microphone to dictate: this machine has several inputs.":
     "Choisissez un micro pour dicter : cette machine a plusieurs entrées.",
   "Choose a microphone": "Choisir un micro",
+  "The conversation no longer fits the model's context: summarizing it, then asking again…":
+    "La conversation ne tient plus dans le contexte du modèle : résumé en cours, puis la question est reposée…",
+  "This question and its attachments do not fit the model's context window. Detach a file or narrow the selection, then ask again.":
+    "Cette question et ses pièces jointes ne tiennent pas dans la fenêtre de contexte du modèle. Retirez un fichier ou réduisez la sélection, puis reposez-la.",
   "The selected model runs on your own infrastructure: what you write is sent as is, without pseudonymization.":
     "Le modèle choisi tourne sur votre propre infrastructure : ce que vous écrivez est envoyé tel quel, sans pseudonymisation.",
   "{0} — your own infrastructure: sent as is, without pseudonymization":

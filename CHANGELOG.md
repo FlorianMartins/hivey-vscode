@@ -6,6 +6,13 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **Une conversation trop longue pour le contexte du serveur est résumée, puis la question est
+  reposée — au lieu de finir en erreur.** Le serveur local tourne désormais avec un peu moins de
+  contexte par conversation (le décodage spéculatif qui double la vitesse occupe une part de la
+  carte graphique). Quand il refuse une requête pour cette raison (« exceeds the available context
+  size »), l'historique AVANT la question est résumé, la question est remise après le résumé et
+  posée de nouveau, une fois. Si la question seule ne tient pas, le message dit quoi retirer.
+
 - **⚠️ Les tâches annexes ne font plus réfléchir le modèle auto-hébergé.** La prédiction d'édition,
   le message de commit et le résumé de conversation demandaient « pas de réflexion », mais rien
   n'était envoyé à llama.cpp — qui appliquait alors l'effort par défaut de son modèle (le maximum,

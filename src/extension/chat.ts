@@ -40,7 +40,7 @@ import { checkEndpoint } from "../core/providers/endpoint.js";
 import { handoverNote, selfCheckMessage, verifyTurn, type TurnStep } from "../core/router/outcome.js";
 import { unifiedDiff } from "../core/text/diff.js";
 import { escalationTarget, route, type Route } from "../core/router/route.js";
-import { describeFallback, fallbackChain, isRetryable } from "../core/router/fallback.js";
+import { describeFallback, fallbackChain, isContextOverflow, isRetryable } from "../core/router/fallback.js";
 import type { Provider } from "../core/providers/index.js";
 import { Session, renderEntry, type ContextItem, type Entry, type SessionData } from "../core/session/session.js";
 import { headToTokens } from "../core/util/tokens.js";
@@ -4549,6 +4549,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       ...(settings.completion.model ? { localModel: settings.completion.model } : {}),
     });
 
+    /** The server refused the FIRST request for lack of context — see `recoverFromOverflow`. */
+    let overflowed = false;
     try {
       const provider = await providerFor(settings, this.keys, providerId);
 
@@ -4785,6 +4787,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         // ⚠️ A model that cannot read images, said by the server rather than by the catalogue —
         // "image input is not supported … you may need to provide the mmproj". Asked again without
         // them, once, and remembered, instead of a turn (and every later one) that fails outright.
+        // ⚠️ The conversation no longer fits the server's context window, and nothing has been said
+        // or done yet: summarized, then asked again — once — after this turn has ended. The server
+        // runs with less context per conversation since speculative decoding took its share of the
+        // GPU, so a long conversation that used to fit can now not.
+        if (untouched && !ctl.signal.aborted && !this.recoveringOverflow && isContextOverflow(String((err as Error)?.message ?? err))) {
+          overflowed = true;
+          throw err;
+        }
         const hadImages = sendMessages.some((msg) => msg.images?.length);
         if (untouched && !ctl.signal.aborted && hadImages && isImageRefusal(String((err as Error)?.message ?? err))) {
           this.rememberVisionless(imageKey);
@@ -4993,10 +5003,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     } catch (err) {
       const message = (err as Error).message;
       this.log.appendLine(`[turn] ${message}`);
+      if (overflowed) {
+        // Not an error the user has to act on: the recovery below takes over.
+        this.post({ type: "status", text: t("The conversation no longer fits the model's context: summarizing it, then asking again…") });
+      }
       // A turn the user stopped has no error to report. Cancellation surfaces as a failure at
       // whatever layer noticed first, and showing that to someone who pressed stop tells them their
       // own decision went wrong.
-      if (!ctl.signal.aborted) {
+      else if (!ctl.signal.aborted) {
         // Written into the conversation, ALWAYS — and this is the defect that hid every other one.
         //
         // It used to be recorded only when an empty assistant entry already existed, which is to
@@ -5045,6 +5059,51 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         this.post({ type: "turnEnd" });
         this.sendState();
       }
+      // After the turn is fully released, never from inside it: recovery summarizes (a turn of its
+      // own) and then asks again. See `recoverFromOverflow`.
+      if (overflowed && this.turn === undefined) setTimeout(() => void this.recoverFromOverflow(), 0);
+    }
+  }
+
+  /** Set while a recovery runs, so a conversation that still does not fit fails plainly, once. */
+  private recoveringOverflow = false;
+
+  /**
+   * The conversation stopped fitting the server's context window: summarize what came BEFORE the
+   * question, put the question back after the summary, and ask it again.
+   *
+   * The question is set aside first, because `compact()` summarizes every included exchange and
+   * would otherwise swallow the very question it is making room for. Nothing has been said or done
+   * for it yet — the overflow is caught only on the first request — so asking again repeats nothing.
+   */
+  private async recoverFromOverflow(): Promise<void> {
+    if (this.recoveringOverflow || this.turn) return;
+    const entries = this.session.entries;
+    const failed = entries[entries.length - 1];
+    if (failed?.role === "assistant" && !failed.text) this.session.drop(failed.id);
+    const question = [...this.session.entries].reverse().find((e) => e.role === "user");
+    if (!question) return;
+    const { text, context } = question;
+    this.recoveringOverflow = true;
+    try {
+      this.session.drop(question.id);
+      const compacted = await this.compact();
+      this.session.add({ role: "user", text, ...(context?.length ? { context } : {}) });
+      this.persist();
+      this.sendState();
+      if (!compacted) {
+        // Nothing earlier to summarize: this one question, with what is attached to it, is larger
+        // than the model can read. Said as such, with the two things that make it fit.
+        this.session.add({ role: "assistant", text: "" }).error = t(
+          "This question and its attachments do not fit the model's context window. Detach a file or narrow the selection, then ask again.",
+        );
+        this.persist();
+        this.sendState();
+        return;
+      }
+      await this.runTurn();
+    } finally {
+      this.recoveringOverflow = false;
     }
   }
 
