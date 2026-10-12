@@ -6,7 +6,7 @@
 // the user is having in the sidebar.
 
 import * as vscode from "vscode";
-import { en, t } from "../shared/i18n.js";
+import { t } from "../shared/i18n.js";
 import { runTurn } from "../core/agent/loop.js";
 import { isLocalEndpoint, redact, Vault } from "../core/redaction/index.js";
 import { headToTokens } from "../core/util/tokens.js";
@@ -107,7 +107,7 @@ export function registerEditorCommands(context: vscode.ExtensionContext, deps: E
       const doc = await vscode.workspace.openTextDocument(uri);
       const start = Math.max(0, diagnostic.range.start.line - 5);
       const end = Math.min(doc.lineCount - 1, diagnostic.range.end.line + 5);
-      await deps.chat.focusWithPrompt(en("Explain this problem and propose the fix: “{0}”", diagnostic.message), {
+      await deps.chat.focusWithPrompt(t("Explain this problem and propose the fix: “{0}”", diagnostic.message), {
         kind: "diagnostic",
         label: `${relative(uri)}:${diagnostic.range.start.line + 1}`,
         body: doc.getText(new vscode.Range(start, 0, end, doc.lineAt(end).text.length)),
@@ -125,7 +125,7 @@ export function registerEditorCommands(context: vscode.ExtensionContext, deps: E
         void vscode.window.showWarningMessage(t("Select some text in the terminal first."));
         return;
       }
-      await deps.chat.focusWithPrompt(en("Explain this terminal output and propose the fix."), {
+      await deps.chat.focusWithPrompt(t("Explain this terminal output and propose the fix."), {
         kind: "terminal",
         label: t("terminal output"),
         body: headToTokens(selection, attachmentTokens(readSettings())),

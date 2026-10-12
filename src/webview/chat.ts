@@ -2284,7 +2284,10 @@ function expandSlash(text: string, state?: UiState): { text: string; attach: boo
   const match = matchSlash(text, state);
   if (!match?.prompt) return undefined;
   const extra = text.slice(match.name.length).trim();
-  return { text: extra ? `${match.prompt}\n\n${extra}` : match.prompt, attach: match.attach ?? false };
+  // In the person's language: the expansion becomes THEIR message, on screen and in the transcript.
+  // The English body is what the model gets when it loads the skill itself (`use_skill`).
+  const prompt = t(match.prompt);
+  return { text: extra ? `${prompt}\n\n${extra}` : prompt, attach: match.attach ?? false };
 }
 
 function submit(area: HTMLTextAreaElement, deps: ChatDeps): void {

@@ -6,6 +6,14 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **⚠️ Régression : des textes affichés étaient repassés en anglais.** « le texte est repassé en
+  anglais […] donc c'est une régression ». En passant en anglais ce que lit le modèle, des textes
+  que **vous** lisez y étaient passés aussi : l'expansion d'une commande tapée (`/explain` devient
+  votre message), les instructions des actions sur la sélection et des commandes de l'éditeur
+  (placées dans la zone de saisie), l'en-tête du résumé. Ils suivent de nouveau votre langue ; seul
+  ce que le modèle est le seul à lire (skills qu'il charge lui-même, outils) reste en anglais. Des
+  tests vérifient désormais que chaque corps de skill garde sa traduction.
+
 - **⚠️ Une réponse coupée en plein milieu n'est plus prise pour une réponse finie.** « il coupe en
   plein milieu parfois ». Quand la connexion au modèle se ferme avant la fin (serveur redémarré,
   proxy qui coupe), le flux s'arrêtait sans le marqueur de fin (`finish_reason` / `[DONE]`) et le

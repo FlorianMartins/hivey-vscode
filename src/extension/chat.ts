@@ -29,7 +29,7 @@ import {
 import { checkCredentials, normalizeBaseUrl } from "../core/providers/credentials.js";
 import { callSignature, safeArgs } from "../core/agent/callSignature.js";
 import { knowledgeAmbient } from "./knowledge.js";
-import { en, language, t, withoutModelText } from "../shared/i18n.js";
+import { language, t, withoutModelText } from "../shared/i18n.js";
 import { runTurn, type Tool } from "../core/agent/loop.js";
 import { Permissions, commandPrefix, type PermissionStore, type Rule } from "../core/agent/permissions.js";
 import { detectLanguage, languageDirective, stablePrompt, turnDirectives } from "../core/prompts.js";
@@ -4064,7 +4064,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       // it first — it is the oldest entry the moment the next question is asked.
       this.session.add({
         role: "assistant",
-        text: `${en("**Summary of the conversation so far**")}\n\n${summary}`,
+        text: `${t("**Summary of the conversation so far**")}\n\n${summary}`,
         model,
         pinned: true,
       });
