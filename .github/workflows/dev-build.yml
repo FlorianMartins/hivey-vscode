@@ -1,0 +1,112 @@
+name: Dev build
+
+# One link that always serves the latest pushed commit as an installable .vsix:
+#
+#   https://github.com/FlorianMartins/hivey-vscode/releases/download/dev/hivey-code.vsix
+#
+# The `dev` pre-release is re-pointed and its asset replaced on every push, so the URL never
+# changes. It is a testing channel, not a release: no tests gate it (CI does that), and the
+# marketplace is never touched.
+
+on:
+  push:
+    branches-ignore:
+      - "dependabot/**"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+# The latest push wins; an older build finishing last must not overwrite a newer one.
+concurrency:
+  group: dev-build
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # create/update the `dev` release and move its tag
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install (locked)
+        run: npm ci
+
+      # ⚠️ A version of its own for every build, and numbers only. They all said 1.14.2, and the
+      # second one was refused: "The version 1.14.2 already exists and cannot be modified". A
+      # `-dev.N` suffix was then refused too: "It must be one to four numbers". So every build takes
+      # the previous dev build's number plus one patch — 1.14.3, 1.14.4, … — and never goes below
+      # the version in package.json. Each install is an upgrade; a real release bumps package.json.
+      - name: Dev version
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          base="$(node -p "require('./package.json').version")"
+          # "Dev build 1.14.7 (abc1234)" → 1.14.7; nothing yet → empty.
+          previous="$(gh release view dev --repo "$REPO" --json name --jq .name 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?' | head -1 || true)"
+          version="$(node -e '
+            const parse = (v) => { const [core, pre] = v.split("-"); return { n: core.split(".").map(Number), pre: Boolean(pre) }; };
+            const cmp = (a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
+            const base = parse(process.argv[1]).n;
+            let next = [base[0], base[1], base[2] + 1];
+            if (process.argv[2]) {
+              const prev = parse(process.argv[2]);
+              // 1.14.3-dev.8 sorts below 1.14.3, so 1.14.3 is already an upgrade over it.
+              const after = prev.pre ? prev.n : [prev.n[0], prev.n[1], prev.n[2] + 1];
+              if (cmp(after, next) > 0) next = after;
+            }
+            console.log(next.join("."));
+          ' "$base" "$previous")"
+          npm pkg set version="$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Dev build version: $version (previous: ${previous:-none}, package.json: $base)"
+
+      - name: Build and package
+        run: |
+          npm run build
+          npx --yes @vscode/vsce@3.9.2 package --no-dependencies -o hivey-code.vsix
+
+      - name: Publish to the dev release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          BRANCH: ${{ github.ref_name }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          short="${SHA:0:7}"
+          subject="$(git log -1 --format=%s "$SHA")"
+          notes="Version ${VERSION} — latest pushed commit: ${short} on ${BRANCH} — ${subject}
+
+          Install: download hivey-code.vsix, then in VS Code: Ctrl+Shift+P → Extensions: Install from VSIX…
+          (or: code --install-extension hivey-code.vsix --force)
+          Do NOT double-click the file on Windows: that opens Visual Studio's VSIX installer, which
+          cannot install a VS Code extension and rejects the version string.
+
+          Built $(date -u +%Y-%m-%dT%H:%MZ). Not a release: a testing channel replaced on every push."
+
+          # Move (or create) the tag through the API: no git credentials are kept in this job.
+          if gh api "repos/${REPO}/git/refs/tags/dev" >/dev/null 2>&1; then
+            gh api -X PATCH "repos/${REPO}/git/refs/tags/dev" -f sha="$SHA" -F force=true >/dev/null
+          else
+            gh api -X POST "repos/${REPO}/git/refs" -f ref="refs/tags/dev" -f sha="$SHA" >/dev/null
+          fi
+
+          if gh release view dev --repo "$REPO" >/dev/null 2>&1; then
+            gh release edit dev --repo "$REPO" --prerelease --title "Dev build ${VERSION} (${short})" --notes "$notes"
+          else
+            gh release create dev --repo "$REPO" --prerelease --verify-tag --title "Dev build ${VERSION} (${short})" --notes "$notes"
+          fi
+          gh release upload dev hivey-code.vsix --repo "$REPO" --clobber

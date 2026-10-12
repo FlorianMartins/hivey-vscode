@@ -22,6 +22,20 @@ import type { RouterConfig, Route, TaskKind } from "./route.js";
 import type { ProviderId } from "../providers/index.js";
 
 /**
+ * Did the server refuse the request because the conversation no longer fits its context window?
+ *
+ * llama.cpp says "request (N tokens) exceeds the available context size" or "input (N tokens) is
+ * larger than the max context size"; OpenAI-shaped APIs say `context_length_exceeded` / "maximum
+ * context length". The cure is not another endpoint — it is a shorter conversation, which is why
+ * this is separate from `isRetryable`.
+ */
+export function isContextOverflow(message: string): boolean {
+  return /exceeds the available context size|larger than the max context size|exceed_context_size|context_length_exceeded|maximum context length/i.test(
+    message,
+  );
+}
+
+/**
  * Is this a failure that another endpoint might not have?
  *
  * Deliberately narrow. Everything not listed here is treated as final, because a fallback on a

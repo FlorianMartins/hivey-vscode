@@ -19,7 +19,7 @@
 import * as vscode from "vscode";
 import { homedir } from "node:os";
 import { isAbsolute } from "node:path";
-import { t } from "../shared/i18n.js";
+import { en, t } from "../shared/i18n.js";
 import type { Tool, ToolResult } from "../core/agent/loop.js";
 import {
   agentTemplate,
@@ -294,7 +294,7 @@ export function buildDefinitionTools(deps: DefinitionDeps, definitions: Definiti
           ...(ctx.signal ? { signal: ctx.signal } : {}),
           report: ctx.report,
         });
-        return { content: answer || t("The sub-agent returned nothing.") };
+        return { content: answer || en("The sub-agent returned nothing.") };
       },
       restrict() {
         // A sub-agent in plan mode is intersected down to reading tools by `toolsForAgent`, so it

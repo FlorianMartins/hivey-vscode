@@ -37,10 +37,46 @@ function detect(): string | undefined {
   return undefined;
 }
 
+/**
+ * Structures that were translated once, at module load, and have to be rebuilt when the language
+ * changes.
+ *
+ * ⚠️ This exists because `t()` resolving at call time is NOT enough, and the gap was invisible. A
+ * module that writes `export const MODES = [{ label: t("Chat") }]` calls `t()` while the module is
+ * being evaluated — once, before the extension has read its own `language` setting, because ES
+ * modules evaluate their imports first. `setLanguage("fr")` afterwards changes nothing about an array
+ * whose strings were already produced.
+ *
+ * So the panel switched to French and the mode labels, the skill families and the 100-odd skill hints
+ * stayed in whatever `process.env.LANG` happened to say: "when you select a language in the
+ * settings, the whole extension should change language".
+ *
+ * A rebuilder mutates its own array IN PLACE, so every module that already imported it sees the new
+ * strings without being changed or re-imported. Registering one is a deliberate edit in the file that
+ * owns the structure, which is the right place to decide that a label is translated.
+ */
+const rebuilders: Array<() => void> = [];
+
+/**
+ * Rebuild this structure whenever the language changes, and once now.
+ *
+ * @param rebuild must mutate in place. Reassigning a module-level binding would leave every existing
+ *   import pointing at the old value, which is the bug this is here to fix, one level further in.
+ */
+export function onLanguageChange(rebuild: () => void): void {
+  rebuilders.push(rebuild);
+  rebuild();
+}
+
 export function setLanguage(tag: string | undefined): Lang {
   // VS Code hands out tags like `fr`, `fr-CA`, `pt-br`; only the primary subtag decides.
   const primary = (tag ?? "en").toLowerCase().split(/[-_.]/)[0];
-  current = primary === "fr" ? "fr" : "en";
+  const next = primary === "fr" ? "fr" : "en";
+  const changed = next !== current;
+  current = next;
+  // Only on a real change: rebuilding on every call would make activation quadratic in the number of
+  // registered structures for no reason, and `applyLanguage()` is called on every settings change.
+  if (changed) for (const rebuild of rebuilders) rebuild();
   return current;
 }
 
@@ -63,6 +99,42 @@ export function t(text: string, ...args: Array<string | number>): string {
     const value = args[Number(index)];
     return value === undefined ? match : String(value);
   });
+}
+
+/**
+ * The same `{0}` filling as `t()`, and NEVER translated: for text the MODEL reads.
+ *
+ * ⚠️ "all the skills, tools, etc. are in French". Skill bodies, tool results, selection
+ * instructions and context labels were written in English and passed through `t()`, so with the
+ * interface in French the model was prompted in French — and `/explain` became `/expliquer`. What
+ * a person reads follows their language; what the model reads is the product's own instructions,
+ * and stays English. The reply language is a separate, explicit directive (`languageDirective`).
+ */
+export function en(text: string, ...args: Array<string | number>): string {
+  MODEL_TEXT.add(text);
+  if (!args.length) return text;
+  return text.replace(/\{(\d+)\}/g, (match, index: string) => {
+    const value = args[Number(index)];
+    return value === undefined ? match : String(value);
+  });
+}
+
+/** Every template that has gone through `en()`. See `withoutModelText`. */
+const MODEL_TEXT = new Set<string>();
+
+/**
+ * A message with the product's own English instructions taken out — what is left is what the
+ * PERSON wrote. `/explain` typed in a French interface sends an English instruction, and reading
+ * the reply language off that would answer a French speaker in English.
+ */
+export function withoutModelText(message: string): string {
+  let out = message;
+  for (const template of MODEL_TEXT) {
+    for (const part of template.split(/\{\d+\}/)) {
+      if (part.trim().length >= 12) out = out.split(part).join(" ");
+    }
+  }
+  return out;
 }
 
 /** Every English string the French table claims to translate — used by the coverage test. */

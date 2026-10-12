@@ -33,6 +33,20 @@ export interface Skill {
   source: string;
 }
 
+/**
+ * How many steps a sub-agent gets when its definition does not say.
+ *
+ * ⚠️ Raised from 8, which was written as a bare literal in BOTH clients and was never revisited when
+ * the main turn's cap moved to 30. A sub-agent is given a narrower task, not an easier one: the
+ * explorer reads three files and searches twice before it can answer at all, and `read_file` now
+ * returns a RANGE, so a long file costs several calls where it used to cost one truncated one.
+ *
+ * Eight steps against that is a sub-agent that reports what it had got to rather than what it was
+ * asked — which is how "agents and subagents don't work" looks from the outside. Half
+ * the parent's budget, in one place both clients read.
+ */
+export const DEFAULT_AGENT_STEPS = 15;
+
 export interface AgentDefinition {
   kind: "agent";
   name: string;
@@ -43,7 +57,7 @@ export interface AgentDefinition {
   tools: string[];
   /** A model of its own, when a cheap one is enough or an expensive one is needed. */
   model?: string;
-  /** How many tool round-trips it gets before it has to answer. */
+  /** How many tool round-trips it gets before it has to answer. Defaults to `DEFAULT_AGENT_STEPS`. */
   maxSteps?: number;
   source: string;
 }
@@ -146,9 +160,9 @@ export const BUILTIN_AGENTS: AgentDefinition[] = [
  */
 export function parseDefinition(kind: "skill" | "agent", source: string, text: string): ParseResult {
   const problems: string[] = [];
-  const normalised = text.replace(/\r\n/g, "\n");
+  const normalized = text.replace(/\r\n/g, "\n");
 
-  const match = /^\s*---\n([\s\S]*?)\n---\n?([\s\S]*)$/.exec(normalised);
+  const match = /^\s*---\n([\s\S]*?)\n---\n?([\s\S]*)$/.exec(normalized);
   if (!match) {
     return {
       problems: [
@@ -251,18 +265,39 @@ function splitList(value: string): string[] {
 }
 
 /**
+ * Tools a sub-agent never gets, whatever its definition says.
+ *
+ * One entry, and it is the only one that recurses. ⚠️ `toolsForAgent` returns EVERY available tool
+ * when a definition has no `tools:` line — the right default for reading and writing, because a
+ * definition file must not be able to grant itself a tool the mode does not offer — and `run_agent`
+ * was among them. So a sub-agent defined without a restriction could dispatch sub-agents, which
+ * could dispatch sub-agents. Each level's width is bounded by its own step cap; the **depth was
+ * bounded by nothing**, and no guard or test existed anywhere in the project.
+ *
+ * The rule is the one the dispatch tool's own description already promises — *"it works on its own
+ * and returns only its conclusion"* — stated where it can be enforced: **a sub-agent is a leaf.**
+ * Not a setting, because it is a guarantee, and guarantees live in code. It costs nothing today:
+ * none of the four built-in agents asks to delegate.
+ */
+export const NEVER_DELEGATES: ReadonlySet<string> = new Set(["run_agent"]);
+
+/**
  * The tools a sub-agent actually gets.
  *
  * An intersection, never a union. The definition file may have arrived with a cloned repository, so
- * treating its `tools:` line as an authorisation would let a file grant itself `run_command` in a
+ * treating its `tools:` line as an authorization would let a file grant itself `run_command` in a
  * mode that has no `run_command` — and the mode would become a suggestion. Listing a tool the mode
  * does not offer is not an error either; it is a definition written for agent mode being used in
  * plan mode, which should quietly do less rather than refuse.
+ *
+ * And `NEVER_DELEGATES` is subtracted last, from both branches — asking explicitly is not an
+ * authorization, for the same reason the intersection exists at all.
  */
 export function toolsForAgent(definition: AgentDefinition, available: string[]): string[] {
-  if (!definition.tools.length) return available;
+  const leaf = (names: string[]) => names.filter((name) => !NEVER_DELEGATES.has(name));
+  if (!definition.tools.length) return leaf(available);
   const allowed = new Set(available);
-  return definition.tools.filter((name) => allowed.has(name));
+  return leaf(definition.tools.filter((name) => allowed.has(name)));
 }
 
 /**

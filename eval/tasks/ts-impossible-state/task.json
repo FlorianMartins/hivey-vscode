@@ -1,0 +1,7 @@
+{
+  "title": "A type that allows a loaded error with no data and no error",
+  "kind": "refactor",
+  "prompt": "The Request type in request.ts is four optional fields, so it can describe states that cannot happen — loading and failed at once, done with no data. Replace it with a discriminated union on a `status` field so those states cannot be written at all, and update render() to match. No optional field is to remain.",
+  "check": "! codeonly request.ts | grep -qE '\\?:' && codeonly request.ts | grep -qE 'status: *\"loading\"' && codeonly request.ts | grep -qE 'status: *\"failed\"' && codeonly request.ts | grep -qE 'status: *\"done\"' && grep -q 'export function render' request.ts",
+  "timeoutMs": 180000
+}

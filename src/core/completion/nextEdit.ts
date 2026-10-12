@@ -180,7 +180,7 @@ export function checkNextEdit(edit: NextEdit, text: string, cursorLine: number):
 }
 
 /** A one-line summary for the hint the editor shows, e.g. "rename to totalCents". */
-export function summarise(edit: NextEdit): string {
+export function summarize(edit: NextEdit): string {
   const from = edit.find.trim().split("\n")[0]?.trim() ?? "";
   const to = edit.replace.trim().split("\n")[0]?.trim() ?? "";
   const short = (s: string): string => (s.length > 48 ? `${s.slice(0, 47)}…` : s);

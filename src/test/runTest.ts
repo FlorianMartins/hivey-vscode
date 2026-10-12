@@ -23,6 +23,19 @@ async function main(): Promise<void> {
         "--disable-extensions",
         "--disable-gpu",
         "--disable-telemetry",
+        // ⚠️ A capture run gets its OWN profile, and the reason is a failure that looked exactly like a
+        // regression. The screenshot scenario writes settings at GLOBAL scope — an endpoint, a model,
+        // a language, an appearance — because that is the only way to photograph a configured panel.
+        // Those settings live in `.vscode-test/user-data`, which every later run reads: the next
+        // integration suite then failed on "settings read back with the defaults the manifest
+        // declares", reporting `local` where the manifest says `openai-compatible`. Nothing was
+        // broken; a previous run had left its furniture behind.
+        //
+        // A test that can be made to fail by an unrelated run is a test that will one day be
+        // disbelieved. Separate profiles, so neither can say anything about the other.
+        ...(process.env["HIVEY_CODE_SCREENSHOT"]
+          ? ["--user-data-dir", resolve(__dirname, "../../.vscode-test/user-data-shots")]
+          : []),
         // HIVEY_CODE_LOCALE=fr runs the whole suite in a French editor, which is the only way to prove
         // the translation reaches a real user rather than only a unit test.
         ...(process.env["HIVEY_CODE_LOCALE"] ? ["--locale", process.env["HIVEY_CODE_LOCALE"]] : []),

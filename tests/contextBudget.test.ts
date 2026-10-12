@@ -63,7 +63,7 @@ test("most of a large window is reachable", () => {
 test("the numbers are ones a person would say", () => {
   // An eighth of 131 072 is 16 384. Offering that is offering arithmetic, not a choice. The window
   // itself is the exception and has to be: rounding it up would offer more than the model holds,
-  // and rounding it down would print a number nobody recognises as their model's size.
+  // and rounding it down would print a number nobody recognizes as their model's size.
   for (const window of WINDOWS) {
     for (const offered of contextBudgets(window)) {
       if (offered === window) continue;

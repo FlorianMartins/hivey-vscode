@@ -16,19 +16,30 @@ jobs:
   refresh:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # This job commits and pushes the refreshed catalogue, so it keeps the
+          # token; it uploads no artifact, so the credential cannot leak through one.
+          persist-credentials: true # zizmor: ignore[artipacked]
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "20"
+          cache: npm
+      # The selection rules are in `src/core/router/curate.ts` with their tests, and this script
+      # imports the built bundle. That costs an install and a build on a daily job, and it is less
+      # than the cost of a rule nobody can test: the recency term was a rounding error for months
+      # while the file it wrote claimed recency in its header (ADR-0027).
+      - run: npm ci
+      - run: npm run build
       - run: node scripts/update-models.mjs
       - name: Commit when something moved
         run: |
           # Two generated files, one job: the price catalogue, and the Hivey presets curated from it.
-          FILES="src/core/router/catalog.generated.ts src/core/router/hivey.generated.ts"
-          if [[ -n "$(git status --porcelain $FILES)" ]]; then
+          FILES=(src/core/router/catalog.generated.ts src/core/router/hivey.generated.ts)
+          if [[ -n "$(git status --porcelain "${FILES[@]}")" ]]; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add $FILES
+            git add "${FILES[@]}"
             git commit -m "chore(models): refresh the catalogue and the Hivey presets"
             git push
           else

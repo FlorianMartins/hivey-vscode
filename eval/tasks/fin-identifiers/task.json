@@ -1,0 +1,7 @@
+{
+  "title": "Three identifiers checked by their length only",
+  "kind": "bug",
+  "prompt": "ids.py accepts an ISIN, a LEI and a BIC on their length alone, so a typed character that is wrong gets through and the trade fails at the counterparty days later. Implement the real checks: ISIN with the Luhn checksum over its letters converted to digits, LEI with the ISO 17442 mod-97-10 check, and BIC with its format. The tests say what must be accepted and refused.",
+  "check": "python3 -m unittest discover -q",
+  "timeoutMs": 180000
+}
