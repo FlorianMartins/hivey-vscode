@@ -5,6 +5,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { runTurn, type Tool } from "../src/core/agent/loop.js";
+import { RecallStore, recallTools } from "../src/core/agent/recall.js";
 import type { ChatRequest, ChatResult, Provider } from "../src/core/providers/types.js";
 
 type Scripted = { text?: string; toolCalls?: Array<{ id: string; name: string; args: string }>; truncated?: boolean; reasoning?: string; interrupted?: boolean };
@@ -42,6 +43,7 @@ function tool(name: string, opts: Partial<Tool> = {}): Tool & { calls: Array<Rec
     calls,
     schema: { name, description: name, parameters: { type: "object", properties: {} } },
     approval: opts.approval ?? (() => false),
+    ...(opts.parallel ? { parallel: opts.parallel } : {}),
     run:
       opts.run ??
       (async (args) => {
@@ -508,4 +510,85 @@ test("when nothing is left to shorten, the context error stands", async () => {
     },
   };
   await assert.rejects(runTurn({ ...base, provider }), /exceeds the available context size/);
+});
+
+test("⚠️ the same call repeated is not run again, and a model that insists is stopped", async () => {
+  // "it's been going round in circles for 12 hours on one request": the same file read, the same
+  // search run, the same answer each time — and only the step cap ever ended it.
+  const read = tool("read_file", { parallel: () => true });
+  const provider = scriptedProvider([{ toolCalls: [{ id: "1", name: "read_file", args: '{"path":"a.ts"}' }] }]);
+  const r = await runTurn({ ...base, provider, tools: [read] });
+  assert.equal(read.calls.length, 2, "run twice, then refused");
+  assert.equal(r.stoppedBecause, "max-steps", "the turn ends instead of spending all its steps");
+  assert.ok(provider.seen.length <= 6, `${provider.seen.length} requests — it should stop early, not at 30`);
+  const told = provider.seen.at(-1)!.messages.filter((m) => m.role === "tool").at(-1)!;
+  assert.match(String(told.content), /already made this exact call/);
+});
+
+test("⚠️ the test run repeated after each fix is never blocked", async () => {
+  // The legitimate repetition: an agent fixes, re-runs the same command, fixes again. A command can
+  // change things, so it is not counted — and it resets the count of the reads around it.
+  const run = tool("run_command");
+  const provider = scriptedProvider([
+    { toolCalls: [{ id: "1", name: "run_command", args: '{"command":"npm test"}' }] },
+    { toolCalls: [{ id: "2", name: "run_command", args: '{"command":"npm test"}' }] },
+    { toolCalls: [{ id: "3", name: "run_command", args: '{"command":"npm test"}' }] },
+    { toolCalls: [{ id: "4", name: "run_command", args: '{"command":"npm test"}' }] },
+    { text: "Green." },
+  ]);
+  const r = await runTurn({ ...base, provider, tools: [run] });
+  assert.equal(run.calls.length, 4, "every run happened");
+  assert.equal(r.text, "Green.");
+});
+
+test("the same tool with different arguments is never mistaken for a loop", async () => {
+  const read = tool("read_file", { parallel: () => true });
+  const provider = scriptedProvider([
+    { toolCalls: [{ id: "1", name: "read_file", args: '{"path":"a.ts"}' }] },
+    { toolCalls: [{ id: "2", name: "read_file", args: '{"path":"b.ts"}' }] },
+    { toolCalls: [{ id: "3", name: "read_file", args: '{"path":"c.ts"}' }] },
+    { toolCalls: [{ id: "4", name: "read_file", args: '{"path":"d.ts"}' }] },
+    { text: "Read all four." },
+  ]);
+  const r = await runTurn({ ...base, provider, tools: [read] });
+  assert.equal(read.calls.length, 4);
+  assert.equal(r.text, "Read all four.");
+});
+
+test("⚠️ an output shortened to fit is kept whole, and recall gives it back word for word", async () => {
+  // The memory with recall end to end: the window cannot hold both outputs, the first is shortened,
+  // the model is told its id, asks for it, and gets the exact text back.
+  const store = new RecallStore();
+  const logA = Array.from({ length: 4000 }, (_, i) => `build step ${i} ok`).join("\n");
+  const logB = Array.from({ length: 4000 }, (_, i) => `test ${i} passed`).join("\n");
+  const run = tool("run_command", { run: async (args) => ({ content: String(args["command"]) === "build" ? logA : logB }) });
+  let recalled = "";
+  const tools = [run, ...recallTools(store, () => [])];
+  let step = 0;
+  const provider: Provider = {
+    id: "fake",
+    baseUrl: "http://127.0.0.1:11434/v1",
+    isLocal: true,
+    async chat(req): Promise<ChatResult> {
+      step++;
+      const usage = { promptTokens: 1, completionTokens: 1, cachedTokens: 0 };
+      if (step === 1) return { text: "", reasoning: "", toolCalls: [{ id: "c1", name: "run_command", args: '{"command":"build"}' }], usage, stopReason: "tool_calls" };
+      if (step === 2) return { text: "", reasoning: "", toolCalls: [{ id: "c2", name: "run_command", args: '{"command":"test"}' }], usage, stopReason: "tool_calls" };
+      if (step === 3) {
+        const cut = req.messages.find((m) => m.role === "tool" && m.toolCallId === "c1")!.content;
+        const id = /recall \{"id":"(m\d+)"/.exec(cut)?.[1];
+        assert.ok(id, `the shortened output does not say how to recall it:\n${cut.slice(-300)}`);
+        return { text: "", reasoning: "", toolCalls: [{ id: "c3", name: "recall", args: JSON.stringify({ id, offset: 0, length: 20000 }) }], usage, stopReason: "tool_calls" };
+      }
+      recalled = req.messages.at(-1)!.content;
+      return { text: "Done.", reasoning: "", toolCalls: [], usage, stopReason: "stop" };
+    },
+    async listModels() {
+      return [];
+    },
+  };
+  // A window that holds one log, not two: the first one has to be shortened.
+  const r = await runTurn({ ...base, provider, tools, recall: store, contextWindow: 30_000 });
+  assert.equal(r.text, "Done.");
+  assert.ok(recalled.includes(logA.slice(0, 20000)), "recall returned the first 20 000 characters exactly");
 });

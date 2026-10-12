@@ -31,6 +31,7 @@ import { callSignature, safeArgs } from "../core/agent/callSignature.js";
 import { knowledgeAmbient } from "./knowledge.js";
 import { language, t, withoutModelText } from "../shared/i18n.js";
 import { runTurn, type Tool } from "../core/agent/loop.js";
+import { RecallStore, recallTools } from "../core/agent/recall.js";
 import { Permissions, commandPrefix, type PermissionStore, type Rule } from "../core/agent/permissions.js";
 import { detectLanguage, languageDirective, stablePrompt, turnDirectives } from "../core/prompts.js";
 import { costOf, estimateCost, makeLookup, type Price } from "../core/router/pricing.js";
@@ -213,6 +214,31 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   /** Every resolved copy of the panel. There are two: the activity bar's and the right-hand bar's. */
   private readonly views = new Set<vscode.WebviewView>();
   private session = new Session();
+
+  /**
+   * Each conversation's memory with recall — see `core/agent/recall.ts`. Keyed by conversation, so
+   * switching, reopening or starting one needs nothing reset; the last few are kept in memory.
+   */
+  private readonly recalls = new Map<string, RecallStore>();
+  private recallFor(sessionId: string): RecallStore {
+    let store = this.recalls.get(sessionId);
+    if (!store) {
+      store = new RecallStore();
+      this.recalls.set(sessionId, store);
+      while (this.recalls.size > 5) this.recalls.delete(this.recalls.keys().next().value as string);
+    }
+    return store;
+  }
+
+  /** The two memory tools for the current conversation, over its kept outputs and all its turns. */
+  private memoryTools(): Tool[] {
+    const session = this.session;
+    return recallTools(this.recallFor(session.id), () =>
+      session.entries
+        .filter((e) => e.text?.trim())
+        .map((e, i) => ({ label: `${e.role === "user" ? "user message" : "assistant message"} #${i + 1}`, text: e.text })),
+    );
+  }
   private attachments: ContextItem[] = [];
   private turn?: AbortController;
   private screen: Screen = "chat";
@@ -358,8 +384,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   }
 
   /** Ask the server for the window of the selected model, once per address and model. */
-  private async discoverWindow(s: Settings): Promise<void> {
-    if (isHivey(s.chat.model) || this.learnedWindow(s)) return;
+  private async discoverWindow(s: Settings, refresh = false): Promise<void> {
+    // A turn asks only once; the model-list refresh asks every time, because a server can be given
+    // a different window (2 × 69632 became 2 × 83968) and a remembered figure would never move.
+    if (isHivey(s.chat.model) || (!refresh && this.learnedWindow(s))) return;
     try {
       const provider = await providerFor(s, this.keys, s.chat.provider);
       const tokens = (await provider.contextWindow?.(s.chat.model)) ?? 0;
@@ -1714,7 +1742,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     try {
       const settings = readSettings();
       this.models = await listModels(settings, this.keys, settings.chat.model);
-      void this.discoverWindow(settings);
+      void this.discoverWindow(settings, true);
     } catch (err) {
       this.log.appendLine(`[models] ${(err as Error).message}`);
     } finally {
@@ -1844,6 +1872,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       // on screen, since a sub-agent streams nothing to the panel.
       maxTokens: env.settings.chat.maxOutputTokens,
       ...(this.modelWindow(env.settings) ? { contextWindow: this.modelWindow(env.settings) } : {}),
+      recall: this.recallFor(this.session.id),
       ...(run.signal ? { signal: run.signal } : {}),
       approve: (req) => this.askApproval(req),
       beforeRequest: async (msgs) => {
@@ -4348,7 +4377,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       },
       arcad: { credentials: () => this.keys.arcad() },
       mcp: this.mcp,
-    });
+    }).concat(
+      // The memory with recall — see `core/agent/recall.ts`. Read-only, so plan mode keeps it too.
+      this.memoryTools(),
+    );
     const tools = toolsForMode(allTools, mode);
 
     // What the repository defines. Read fresh: a skill you have to reload the window to try is a
@@ -4737,6 +4769,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         // Fitted before each request — see `RunTurnOptions.contextWindow`. Only for the model whose
         // window is known: a fallback model elsewhere has its own.
         ...(useModel === model && this.modelWindow(settings) ? { contextWindow: this.modelWindow(settings) } : {}),
+        recall: this.recallFor(this.session.id),
         // Never an effort a model cannot use. The control is hidden when `canReason` is false, but a
         // stored preference survives a model change — so switching to a plain model went on sending
         // `effort: "high"` to an endpoint with no idea what to do with it. Hidden is not unsent.

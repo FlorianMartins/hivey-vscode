@@ -22,6 +22,7 @@ import { coerceArgs, parseToolArgs, unknownToolMessage, validateArgs } from "./t
 import { estimateMessageTokens } from "../util/tokens.js";
 import { restoreDeep } from "../redaction/index.js";
 import { t } from "../../shared/i18n.js";
+import type { RecallStore } from "./recall.js";
 
 export interface ToolContext {
   /** Cancels when the user stops the turn. */
@@ -100,6 +101,11 @@ export interface TurnOptions {
    * grown past it gets its oldest tool outputs shortened first, rather than an error from the server.
    */
   contextWindow?: number;
+  /**
+   * Where every tool output is kept whole — see `core/agent/recall.ts`. When the turn has to shorten
+   * an old output to fit, the model is told the id that gives it back word for word.
+   */
+  recall?: RecallStore;
   temperature?: number;
   reasoning?: ReasoningEffort;
   signal?: AbortSignal;
@@ -205,6 +211,18 @@ const ANSWER_ROOM_TOKENS = 6000;
 const KEPT_HEAD_CHARS = 1500;
 
 /**
+ * The same call — same tool, same arguments — made this many times in one turn is not run again.
+ * "it's been going round in circles for 12 hours on one request": a model that re-reads the same file
+ * or re-runs the same search gets the same answer every time, and only a turn limit ever stopped it.
+ * The model is told so instead, and the turn ends if it insists past `MAX_REPEAT_NUDGES`.
+ */
+const REPEAT_LIMIT = 3;
+const MAX_REPEAT_NUDGES = 2;
+const REPEATED_CALL =
+  "You already made this exact call (same tool, same arguments) twice in this turn and have its result. " +
+  "Do not repeat it: use what you already have, try a different approach, or give your answer.";
+
+/**
  * The server's "does not fit" refusal, and by how many tokens — llama.cpp says
  * "request (69882 tokens) exceeds the available context size (69632 tokens)" or "input (N tokens)
  * is larger than the max context size (M tokens)". Other providers say less; an unknown excess is
@@ -224,7 +242,7 @@ export function contextOverflow(message: string): { excess: number } | undefined
  * read again what it needs. The latest output is left whole: it is the one the next step is about.
  * Returns whether anything was shortened.
  */
-export function shrinkToolOutputs(messages: ChatMessage[], tokens: number): boolean {
+export function shrinkToolOutputs(messages: ChatMessage[], tokens: number, keptAs?: (toolCallId: string) => string | undefined): boolean {
   const target = Math.max(tokens, 1000) * 4; // characters, at the usual ~4 per token
   const tools = messages.map((m, i) => ({ m, i })).filter(({ m }) => m.role === "tool" && m.content.length > KEPT_HEAD_CHARS + 200);
   const lastTool = messages.reduce((last, m, i) => (m.role === "tool" ? i : last), -1);
@@ -233,7 +251,12 @@ export function shrinkToolOutputs(messages: ChatMessage[], tokens: number): bool
     if (saved >= target) break;
     if (i === lastTool) continue;
     const cut = m.content.length - KEPT_HEAD_CHARS;
-    m.content = `${m.content.slice(0, KEPT_HEAD_CHARS)}\n[… ${cut} more characters of this output were removed to fit the model's context window — read it again if you need the rest.]`;
+    // Kept whole in the memory when there is one: the model is told exactly how to have it back.
+    const id = m.toolCallId ? keptAs?.(m.toolCallId) : undefined;
+    const back = id
+      ? `the full output is kept: recall {"id":"${id}","offset":${KEPT_HEAD_CHARS}} gives the rest word for word`
+      : "read it again if you need the rest";
+    m.content = `${m.content.slice(0, KEPT_HEAD_CHARS)}\n[… ${cut} more characters of this output were removed to fit the model's context window — ${back}.]`;
     saved += cut;
   }
   return saved > 0;
@@ -309,16 +332,29 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
   let continuations = 0;
   /** How many times this turn has shortened old tool outputs to fit the context window. */
   let shrinkAttempts = 0;
+  /** Which kept memory entry holds each tool output of this turn, by tool call id. */
+  const recallIds = new Map<string, string>();
+  const keptAs = (toolCallId: string): string | undefined => recallIds.get(toolCallId);
+  /** How many times each exact call (tool + arguments) was made this turn. See `REPEAT_LIMIT`. */
+  const callCounts = new Map<string, number>();
+  /** How many repeated calls were refused this turn. */
+  let repeatNudges = 0;
 
   for (let step = 0; step < maxSteps; step++) {
     if (opts.signal?.aborted) return done("cancelled");
+    // Going round in circles: told twice to stop repeating the same call and doing it again. The
+    // turn ends here rather than spending the rest of its steps — or hours — on the same thing.
+    if (repeatNudges > MAX_REPEAT_NUDGES) {
+      opts.report?.("the model kept repeating the same tool call — the turn was stopped");
+      return done("max-steps");
+    }
 
     // Fitted BEFORE it is sent, when the window is known: the estimate counts ~4 characters a
     // token and code packs tighter, so a tenth is kept in hand, plus room for the answer.
     if (opts.contextWindow && opts.contextWindow > 0) {
       const limit = Math.floor(opts.contextWindow * 0.9) - ANSWER_ROOM_TOKENS;
       const estimate = estimateMessageTokens(working);
-      if (estimate > limit && shrinkToolOutputs(working, estimate - limit)) {
+      if (estimate > limit && shrinkToolOutputs(working, estimate - limit, keptAs)) {
         opts.report?.("the turn was approaching the model's context window — older tool outputs were shortened");
       }
     }
@@ -349,7 +385,7 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
       // asked again. Bounded; when nothing is left to shorten the error stands, and the extension's
       // own recovery (summarize, ask again) handles a conversation too long before the turn began.
       const overflow = contextOverflow(String((err as Error)?.message ?? err));
-      if (overflow && shrinkAttempts < MAX_SHRINKS && shrinkToolOutputs(working, overflow.excess + ANSWER_ROOM_TOKENS)) {
+      if (overflow && shrinkAttempts < MAX_SHRINKS && shrinkToolOutputs(working, overflow.excess + ANSWER_ROOM_TOKENS, keptAs)) {
         shrinkAttempts++;
         opts.report?.("the turn no longer fit the model's context — older tool outputs were shortened");
         step--;
@@ -502,7 +538,23 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
         continue;
       }
 
-      planned.push({ call, tool, args, parallel: Boolean(tool.parallel?.(args)) });
+      const parallel = Boolean(tool.parallel?.(args));
+      // The same READ again — see `REPEAT_LIMIT`. Only reads are counted: anything that can change
+      // something (a write, an edit, a command such as the test run an agent repeats after each fix)
+      // starts the count again, because after it the same read may well say something new.
+      if (parallel) {
+        const callKey = `${call.name}\u0000${JSON.stringify(args)}`;
+        const made = (callCounts.get(callKey) ?? 0) + 1;
+        callCounts.set(callKey, made);
+        if (made >= REPEAT_LIMIT) {
+          repeatNudges++;
+          planned.push({ call, settled: REPEATED_CALL, parallel: false });
+          continue;
+        }
+      } else {
+        callCounts.clear();
+      }
+      planned.push({ call, tool, args, parallel });
     }
 
     const execute = async (item: Planned): Promise<void> => {
@@ -521,6 +573,10 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
       }
       trace.push({ call: item.call, result, approved: true });
       opts.onToolResult?.({ call: item.call, result });
+      // Kept whole, whatever happens to it in the window later — see `RunTurnOptions.recall`.
+      if (opts.recall && result.content.length > 500) {
+        recallIds.set(item.call.id, opts.recall.put(result.content, `${item.call.name} ${(item.call.args ?? "").slice(0, 120)}`.trim()));
+      }
       working.push({ role: "tool", toolCallId: item.call.id, content: result.content });
     };
 

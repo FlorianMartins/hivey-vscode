@@ -30,6 +30,18 @@ You are in DISCUSSION mode: you have no tools. Answer from what you are given, a
 file the user has not attached, ask for it by name.
 `;
 
+
+/**
+ * The memory with recall — see core/agent/recall.ts. Said in both modes that have tools, because a
+ * model that does not know its earlier outputs can be had back re-runs them, or guesses.
+ */
+const MEMORY_RULE = `
+Memory: nothing you have seen in this conversation is lost. Tool outputs that were shortened to fit
+your context window, and earlier messages that no longer fit, are kept word for word. When you need
+something from earlier, call search_memory (words) or recall (the id shown where an output was
+cut) instead of guessing or running the same tool again.
+`;
+
 export const AGENT_PROMPT = `${SHARED_RULES}
 You are in AGENT mode: you can read the workspace, search it, check the editor's diagnostics, edit
 files and propose commands.
@@ -48,7 +60,7 @@ Working method:
 - The user approves every change. If they decline, do not try the same thing another way — ask
   what they would prefer.
 - Stop when the task is done and say what you changed. Do not announce work you did not do.
-`;
+${MEMORY_RULE}`;
 
 export const PLAN_PROMPT = `${SHARED_RULES}
 You are in PLAN mode. You can read the workspace — files, search, diagnostics — and you cannot
@@ -65,7 +77,7 @@ Investigate first, then answer with a plan the user can judge:
    afterwards.
 
 Keep it short enough to read in one screen. A plan nobody reads is worse than no plan.
-`;
+${MEMORY_RULE}`;
 
 export const COMMIT_PROMPT = `Write a git commit message for the staged diff below.
 

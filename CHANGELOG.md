@@ -4,7 +4,33 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ## 1.14.2 — 2026-10-11
 
+### Ajouté
+
+- **⚠️ Mémoire avec rappel : plus rien n'est perdu quand le contexte est plein.** « un contexte de
+  64k est trop petit pour travailler […] c'est bien uniquement pour le chat pas pour les modes agent et
+  code ». Chaque résultat d'outil (lecture de fichier, recherche, commande) est désormais conservé en
+  entier, en mémoire, pour la conversation. Quand un ancien résultat doit être raccourci pour tenir
+  dans la fenêtre, le modèle reçoit l'étiquette qui le lui rend mot pour mot. Deux nouveaux outils,
+  disponibles en mode agent et en mode plan :
+  - **`recall`** : relit exactement un résultat conservé, en entier ou par tranches ;
+  - **`search_memory`** : retrouve un passage par mots-clés dans les résultats conservés **et** dans
+    tous les messages de la conversation, y compris ceux qui ne tiennent plus dans le contexte.
+  Rien n'est compressé ni résumé : la qualité des réponses est intacte, et le contexte utile devient
+  pratiquement illimité. Le modèle est informé que cette mémoire existe et l'utilise au lieu de
+  deviner ou de relancer un outil.
+
 ### Corrigé
+
+- **⚠️ Un agent qui tourne en rond est arrêté.** « il tourne en rond depuis 12h sur une requête ».
+  Seul le plafond de 30 étapes par tour arrêtait un modèle qui relisait le même fichier ou relançait
+  la même recherche. Désormais, la même lecture (même outil, mêmes arguments) faite une troisième
+  fois n'est pas refaite : le modèle est prévenu qu'il a déjà ce résultat et doit changer d'approche
+  ou répondre ; s'il insiste, le tour s'arrête. Une action qui modifie quelque chose — écriture,
+  édition, commande comme `npm test` relancé après chaque correction — remet le compte à zéro, et
+  n'est jamais bloquée.
+
+- **La taille du contexte du serveur est relue à chaque chargement des modèles**, au lieu de garder
+  l'ancienne valeur mémorisée (2 × 69 632 devenu 2 × 83 968).
 
 - **⚠️⚠️ La limite de contexte du serveur est connue, et respectée avant d'être atteinte.** « le
   auto-compact ne fonctionne clairement pas […] on ne peut pas laisser une limite comme ça ». Un
