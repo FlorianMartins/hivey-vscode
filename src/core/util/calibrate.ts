@@ -39,7 +39,7 @@ export type Calibration = Record<string, ModelCalibration>;
  *
  * An estimate that is out by more than this is not a tokenizer difference, it is a bug or a
  * provider reporting something other than what we sent — a cached prefix billed as zero, a system
- * prompt the gateway injected. Clamping means the worst case is the uncalibrated behaviour we
+ * prompt the gateway injected. Clamping means the worst case is the uncalibrated behavior we
  * already had, rather than a budget that refuses everything or lets everything through.
  */
 export const MIN_FACTOR = 0.4;

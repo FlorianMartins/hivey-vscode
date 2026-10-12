@@ -147,7 +147,7 @@ test("an absurd step budget is refused rather than clamped", () => {
 
 test("an agent's tools are an intersection with the mode, never a union", () => {
   // The point of the whole design. A definition file arrives with a cloned repository; treating its
-  // `tools:` line as an authorisation would let a file grant itself `run_command` in plan mode, and
+  // `tools:` line as an authorization would let a file grant itself `run_command` in plan mode, and
   // the mode would become a suggestion rather than a guarantee.
   const definition = agent(`---
 name: probe

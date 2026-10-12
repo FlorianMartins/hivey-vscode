@@ -6,6 +6,17 @@ export interface ToolCall {
   id: string;
   name: string;
   args: string; // raw JSON, parsed by the caller so a malformed call is a tool error, not a crash
+  /**
+   * Where the call came from, when it was not the protocol.
+   *
+   * `"text"` means the model wrote it in its message and the runtime returned no `tool_calls` — see
+   * `providers/textToolCall.ts`. Absent for an ordinary call, so no existing code changes meaning.
+   *
+   * It exists to be SHOWN. Reading a call out of prose collapses a separation the protocol keeps:
+   * with native calls, a model talking about an action cannot perform one. The user who approves is
+   * told which channel the action arrived on, because that is the part they cannot see otherwise.
+   */
+  source?: "text";
 }
 
 /**
@@ -13,7 +24,7 @@ export interface ToolCall {
  *
  * Kept beside the text rather than folded into `content` as a multimodal array, and that is a
  * deliberate narrowing. Every other part of this extension treats a message's content as a string —
- * the pseudonymiser, the budget, the transcript, the compaction — and turning it into a union would
+ * the pseudonymizer, the budget, the transcript, the compaction — and turning it into a union would
  * put a `typeof` in each of them, which is how the one place that forgot to check becomes the place
  * a credential leaves unredacted. Here the text stays text, and the image is an explicit extra that
  * each provider assembles at the last moment.
@@ -31,7 +42,7 @@ export interface ChatMessage {
   /**
    * Images the user attached to this message.
    *
-   * The honest warning that belongs with this field: an image CANNOT be pseudonymised. The whole
+   * The honest warning that belongs with this field: an image CANNOT be pseudonymized. The whole
    * privacy architecture here works on text — names, hosts, credentials, all found and replaced —
    * and none of it can touch a screenshot, which may carry a whole desktop. So an image leaving the
    * machine is a decision the user makes with that said plainly, never a side effect of pasting.
@@ -66,6 +77,12 @@ export interface ChatRequest {
   temperature?: number;
   tools?: ToolSchema[];
   reasoning?: ReasoningEffort;
+  /**
+   * A side task — an edit prediction, a commit message, a conversation summary — rather than an
+   * answer somebody is waiting to read. On a self-hosted server it is sent with thinking switched
+   * off: Qwen on llama.cpp otherwise thinks at the template's default effort for a 400-token chore.
+   */
+  chore?: boolean;
   signal?: AbortSignal;
 }
 
@@ -94,6 +111,15 @@ export interface ChatResult {
   toolCalls: ToolCall[];
   usage: Usage;
   stopReason: "stop" | "length" | "tool_calls" | "error";
+  /**
+   * The answer cap a refusal forced this request down to, when one did.
+   *
+   * Present only when a provider refused the request for its size and said what it could afford —
+   * OpenRouter's 402 names the number — and the request was repeated for that. The answer is real
+   * and may be short; a short answer returned in silence is worse than the refusal, because the user
+   * reads it as what the model thinks.
+   */
+  shortenedTo?: number;
 }
 
 export interface CompletionRequest {

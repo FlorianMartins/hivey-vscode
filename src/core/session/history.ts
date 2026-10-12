@@ -1,6 +1,6 @@
 // Searching and filtering the conversations, as pure functions over the stored sessions.
 //
-// It lives in core rather than in the panel for the usual reason — it is behaviour, and behaviour
+// It lives in core rather than in the panel for the usual reason — it is behavior, and behavior
 // gets tested — but also because the terminal client wants the same `/chercher` one day, and a
 // second implementation would drift from this one within a month.
 
@@ -32,7 +32,7 @@ export interface HistoryRow {
   excerpt?: string;
 }
 
-export function summarise(session: SessionData): HistoryRow {
+export function summarize(session: SessionData): HistoryRow {
   return {
     id: session.id,
     title: session.title || "(sans titre)",
@@ -59,7 +59,7 @@ function periodStart(period: Period, now: number): number {
 }
 
 /** Case- and accent-insensitive, because nobody types "déployé" the same way twice. */
-export function normalise(text: string): string {
+export function normalize(text: string): string {
   return text
     .toLocaleLowerCase("fr")
     .normalize("NFD")
@@ -67,7 +67,7 @@ export function normalise(text: string): string {
 }
 
 export function filterHistory(sessions: SessionData[], filter: HistoryFilter = {}, now = Date.now()): HistoryRow[] {
-  const query = filter.query?.trim() ? normalise(filter.query.trim()) : "";
+  const query = filter.query?.trim() ? normalize(filter.query.trim()) : "";
   const from = periodStart(filter.period ?? "all", now);
 
   const rows: HistoryRow[] = [];
@@ -75,13 +75,13 @@ export function filterHistory(sessions: SessionData[], filter: HistoryFilter = {
     if (session.updatedAt < from) continue;
     if (filter.mode && filter.mode !== "all" && (session.mode ?? "agent") !== filter.mode) continue;
 
-    const row = summarise(session);
+    const row = summarize(session);
     if (filter.paidOnly && row.usdCost <= 0) continue;
 
     if (query) {
-      if (!normalise(row.title).includes(query)) {
+      if (!normalize(row.title).includes(query)) {
         // Not in the title: look inside, and keep the fragment so the user sees WHY it matched.
-        const hit = session.entries.find((e) => normalise(e.text).includes(query));
+        const hit = session.entries.find((e) => normalize(e.text).includes(query));
         if (!hit) continue;
         row.excerpt = excerptAround(hit.text, filter.query!.trim());
       }
@@ -108,7 +108,7 @@ export function filterHistory(sessions: SessionData[], filter: HistoryFilter = {
 
 /** ~120 characters around the match, so a result reads as a sentence rather than as a word. */
 export function excerptAround(text: string, query: string, radius = 60): string {
-  const at = normalise(text).indexOf(normalise(query));
+  const at = normalize(text).indexOf(normalize(query));
   if (at < 0) return text.slice(0, radius * 2).replace(/\s+/g, " ");
   const start = Math.max(0, at - radius);
   const end = Math.min(text.length, at + query.length + radius);
@@ -122,11 +122,11 @@ export interface Match {
 }
 
 export function searchTranscript(session: SessionData, query: string): Match[] {
-  const q = normalise(query.trim());
+  const q = normalize(query.trim());
   if (!q) return [];
   const out: Match[] = [];
   for (const entry of session.entries) {
-    const haystack = normalise(entry.text);
+    const haystack = normalize(entry.text);
     let count = 0;
     let at = haystack.indexOf(q);
     while (at >= 0) {

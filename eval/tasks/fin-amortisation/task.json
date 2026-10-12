@@ -1,0 +1,7 @@
+{
+  "title": "A loan schedule that does not add up to the loan",
+  "kind": "bug",
+  "prompt": "The instalments produced by schedule.js do not sum to the principal: the rounding residue is dropped. The tests say what is expected. Fix schedule.js so the instalments always total the principal exactly, in whole cents, without changing the test.",
+  "check": "node --test",
+  "timeoutMs": 180000
+}

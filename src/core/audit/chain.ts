@@ -15,7 +15,7 @@
 //
 // This is also, deliberately, the only place in this project where hashing is used. Hashing the
 // data that gets SENT is the thing that sounds like security and is not: a hash of an email address
-// is an email address to anyone with a list of email addresses, which is why the pseudonymiser is
+// is an email address to anyone with a list of email addresses, which is why the pseudonymizer is
 // reversible-with-a-local-vault rather than a digest.
 
 import { createHash } from "node:crypto";

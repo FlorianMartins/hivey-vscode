@@ -1,0 +1,7 @@
+{
+  "title": "A FIX message the counterparty rejects",
+  "kind": "bug",
+  "prompt": "fix.js builds a FIX 4.4 message with a body length and a checksum that are both wrong, so the counterparty rejects every order. Fix both: the BodyLength (tag 9) counts the bytes between the end of tag 9 and the start of tag 10, and the CheckSum (tag 10) is the sum of every byte up to and including the SOH before it, modulo 256, as three digits. The tests say what is expected.",
+  "check": "node --test",
+  "timeoutMs": 180000
+}

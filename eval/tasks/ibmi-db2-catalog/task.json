@@ -1,0 +1,7 @@
+{
+  "title": "Find the columns of a table without a partition to look at",
+  "kind": "ibmi",
+  "prompt": "Write columns.sql: a Db2 for i query that lists, for the table ORDHDR in the schema DEVCFC, each column with its name, type, length, scale, whether it accepts a null and its text description, ordered as the table declares them. Use the SQL catalogue in QSYS2, not DSPFFD.",
+  "check": "test -f columns.sql && codeonly columns.sql | grep -qiE 'QSYS2\\.SYSCOLUMNS' && codeonly columns.sql | grep -qiE \"TABLE_NAME *= *'ORDHDR'\" && codeonly columns.sql | grep -qiE \"(TABLE_SCHEMA|SYSTEM_TABLE_SCHEMA) *= *'DEVCFC'\" && codeonly columns.sql | grep -qiE 'ORDER +BY +.*ORDINAL_POSITION' && codeonly columns.sql | grep -qiE 'IS_NULLABLE|NULLS'",
+  "timeoutMs": 180000
+}

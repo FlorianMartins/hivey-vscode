@@ -65,8 +65,8 @@ export function parseNote(id: string, text: string): NoteParse {
   const problems: string[] = [];
   if (!validId(id)) problems.push(`${id}: not a usable id. Lowercase letters, digits, hyphens, and / to group.`);
 
-  const normalised = text.replace(/\r\n/g, "\n");
-  const match = /^\s*---\n([\s\S]*?)\n---\n?([\s\S]*)$/.exec(normalised);
+  const normalized = text.replace(/\r\n/g, "\n");
+  const match = /^\s*---\n([\s\S]*?)\n---\n?([\s\S]*)$/.exec(normalized);
   if (!match) {
     return {
       problems: [
@@ -151,4 +151,76 @@ function unquote(value: string): string {
     return value.slice(1, -1);
   }
   return value;
+}
+
+/**
+ * A note from a folder somebody pointed this at, rather than one this extension wrote.
+ *
+ * Internal documentation is ordinary Markdown. It has no `---` header with a `title:` in it,
+ * because it was not written for this extension and nobody is going to go back and add one to four
+ * hundred wiki pages — so running it through `parseNote` returns "no header" for every file, and a
+ * share of documentation reads as an empty knowledge base with four hundred problems in it.
+ *
+ * The strict format stays where it is earned: the project and personal bases are written BY this
+ * extension, and there the header is a contract — a note with no title can never be chosen from the
+ * index, only stumbled upon. For a folder that is only read, the title is taken from the first
+ * heading, and from the file name when there is not one. Both are guesses, and a guess that lets a
+ * page be found is worth more than a rule that hides it.
+ */
+export function parseSharedNote(id: string, text: string): NoteParse {
+  const body = text.replace(/\r\n/g, "\n").trim();
+  if (!body) return { problems: [`${id}: empty.`] };
+
+  // A note written in the strict format is still read as one, wherever it lives: somebody may well
+  // keep their team's notes on a share.
+  const strict = parseNote(id, text);
+  if (strict.note) return strict;
+
+  const heading = /^#{1,3}\s+(.+?)\s*$/m.exec(body)?.[1]?.trim();
+  const fromName = (id.split("/").pop() ?? id).replace(/[-_]+/g, " ").trim();
+  return {
+    problems: [],
+    note: {
+      id,
+      title: heading || fromName,
+      body,
+      tags: [],
+      sources: [],
+      updated: "",
+    },
+  };
+}
+
+/** What a file in a shared folder is, by extension. `undefined` means "not documentation". */
+export function sharedDocKind(relativePath: string): "text" | "docx" | "pdf" | undefined {
+  const lower = relativePath.toLowerCase();
+  if (/\.(?:md|markdown|txt|text)$/.test(lower)) return "text";
+  if (lower.endsWith(".docx")) return "docx";
+  if (lower.endsWith(".pdf")) return "pdf";
+  return undefined;
+}
+
+/**
+ * An id for a file nobody named for this extension.
+ *
+ * `noteId` requires `.md` and an id that is already lowercase, hyphenated and unaccented, because
+ * the bases this extension writes are written by it. A folder of internal documentation is not: its
+ * files are called `Création d'un client.docx`, and refusing them for their name would refuse the
+ * feature. So the name is folded into an id instead of being judged against one — accents dropped,
+ * spaces and punctuation to hyphens — and the TITLE keeps the original, which is what anyone
+ * reading the index will recognize.
+ */
+export function sharedNoteId(relativePath: string): string | undefined {
+  if (!sharedDocKind(relativePath)) return undefined;
+  const withoutExtension = relativePath.replace(/\.[^./]+$/, "");
+  const id = withoutExtension
+    .replace(/\\/g, "/")
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9/]+/g, "-")
+    .replace(/-{2,}/g, "-")
+    .replace(/(^|\/)-+|-+($|\/)/g, "$1")
+    .replace(/\/{2,}/g, "/");
+  return id && validId(id) ? id : undefined;
 }

@@ -2,7 +2,7 @@
   "name": "hivey-code",
   "displayName": "Hivey Code",
   "description": "%extension.description%",
-  "version": "0.41.0",
+  "version": "1.14.2",
   "publisher": "hivey",
   "license": "Apache-2.0",
   "repository": {
@@ -90,6 +90,11 @@
         "icon": "$(add)"
       },
       {
+        "command": "hiveyCode.setMode",
+        "title": "%command.setMode.title%",
+        "category": "Hivey Code"
+      },
+      {
         "command": "hiveyCode.askAboutSelection",
         "title": "%command.askAboutSelection.title%",
         "category": "Hivey Code"
@@ -99,6 +104,11 @@
         "title": "%command.showEgress.title%",
         "category": "Hivey Code",
         "icon": "$(radio-tower)"
+      },
+      {
+        "command": "hiveyCode.auditLastPrompt",
+        "title": "%command.auditLastPrompt%",
+        "category": "Hivey Code"
       },
       {
         "command": "hiveyCode.showCosts",
@@ -233,6 +243,12 @@
         "icon": "$(plug)"
       },
       {
+        "command": "hiveyCode.chooseMicrophone",
+        "title": "%command.chooseMicrophone.title%",
+        "category": "Hivey Code",
+        "icon": "$(mic)"
+      },
+      {
         "command": "hiveyCode.moveToSecondarySideBar",
         "title": "%command.moveToSecondarySideBar.title%",
         "category": "Hivey Code",
@@ -327,6 +343,61 @@
         "title": "%command.pinLastAnswer.title%",
         "category": "Hivey Code",
         "icon": "$(pin)"
+      },
+      {
+        "command": "hiveyCode.reloadPolicy",
+        "title": "%command.reloadPolicy.title%",
+        "category": "Hivey Code"
+      },
+      {
+        "command": "hiveyCode.siemStatus",
+        "title": "%command.siemStatus.title%",
+        "category": "Hivey Code"
+      },
+      {
+        "command": "hiveyCode.sovereigntyReport",
+        "title": "%command.sovereigntyReport.title%",
+        "category": "Hivey Code"
+      },
+      {
+        "command": "hiveyCode.runInBackground",
+        "title": "%command.runInBackground.title%",
+        "category": "Hivey Code"
+      },
+      {
+        "command": "hiveyCode.backgroundTasks",
+        "title": "%command.backgroundTasks.title%",
+        "category": "Hivey Code"
+      },
+      {
+        "command": "hiveyCode.reviewBranch",
+        "title": "%command.reviewBranch.title%",
+        "category": "Hivey Code"
+      },
+      {
+        "command": "hiveyCode.corpusStatus",
+        "title": "%command.corpusStatus.title%",
+        "category": "Hivey Code"
+      },
+      {
+        "command": "hiveyCode.corpusExport",
+        "title": "%command.corpusExport.title%",
+        "category": "Hivey Code"
+      },
+      {
+        "command": "hiveyCode.corpusPurge",
+        "title": "%command.corpusPurge.title%",
+        "category": "Hivey Code"
+      },
+      {
+        "command": "hiveyCode.routingShow",
+        "title": "%command.routingShow.title%",
+        "category": "Hivey Code"
+      },
+      {
+        "command": "hiveyCode.routingForget",
+        "title": "%command.routingForget.title%",
+        "category": "Hivey Code"
       }
     ],
     "menus": {
@@ -374,12 +445,12 @@
         {
           "command": "hiveyCode.setLanguage",
           "when": "view == hiveyCode.chat || view == hiveyCode.chatSide",
-          "group": "9_settings@0"
+          "group": "9_settings@2"
         },
         {
           "command": "hiveyCode.openSettings",
           "when": "view == hiveyCode.chat || view == hiveyCode.chatSide",
-          "group": "9_settings@1"
+          "group": "9_settings@3"
         },
         {
           "command": "hiveyCode.searchConversation",
@@ -399,7 +470,12 @@
         {
           "command": "hiveyCode.setup",
           "when": "view == hiveyCode.chat || view == hiveyCode.chatSide",
-          "group": "navigation@4"
+          "group": "9_settings@0"
+        },
+        {
+          "command": "hiveyCode.chooseMicrophone",
+          "when": "view == hiveyCode.chat || view == hiveyCode.chatSide",
+          "group": "9_settings@1"
         }
       ],
       "editor/context": [
@@ -501,9 +577,9 @@
           },
           "hiveyCode.panel.minWidth": {
             "type": "number",
-            "default": 260,
+            "default": 320,
             "minimum": 0,
-            "maximum": 600,
+            "maximum": 900,
             "markdownDescription": "%config.panel.minWidth%"
           }
         }
@@ -530,6 +606,16 @@
             ],
             "default": "local",
             "markdownDescription": "%config.chat.provider%"
+          },
+          "hiveyCode.chat.maxOutputTokens": {
+            "type": "number",
+            "default": 8192,
+            "markdownDescription": "%config.chat.maxOutputTokens%"
+          },
+          "hiveyCode.chat.promptCache": {
+            "type": "boolean",
+            "default": false,
+            "markdownDescription": "%config.chat.promptCache%"
           },
           "hiveyCode.chat.model": {
             "type": "string",
@@ -566,57 +652,57 @@
           "hiveyCode.endpoints.openaiCompatible": {
             "type": "string",
             "default": "",
-            "description": "%config.endpoints.openaiCompatible%"
+            "markdownDescription": "%config.endpoints.openaiCompatible%"
           },
           "hiveyCode.endpoints.openrouter": {
             "type": "string",
             "default": "https://openrouter.ai/api/v1",
-            "description": "%config.endpoints.openrouter%"
+            "markdownDescription": "%config.endpoints.openrouter%"
           },
           "hiveyCode.endpoints.anthropic": {
             "type": "string",
             "default": "https://api.anthropic.com/v1",
-            "description": "%config.endpoints.anthropic%"
+            "markdownDescription": "%config.endpoints.anthropic%"
           },
           "hiveyCode.endpoints.openai": {
             "type": "string",
             "default": "https://api.openai.com/v1",
-            "description": "%config.endpoints.openai%"
+            "markdownDescription": "%config.endpoints.openai%"
           },
           "hiveyCode.endpoints.google": {
             "type": "string",
             "default": "https://generativelanguage.googleapis.com/v1beta/openai",
-            "description": "%config.endpoints.google%"
+            "markdownDescription": "%config.endpoints.google%"
           },
           "hiveyCode.endpoints.deepseek": {
             "type": "string",
             "default": "https://api.deepseek.com/v1",
-            "description": "%config.endpoints.deepseek%"
+            "markdownDescription": "%config.endpoints.deepseek%"
           },
           "hiveyCode.endpoints.qwen": {
             "type": "string",
             "default": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
-            "description": "%config.endpoints.qwen%"
+            "markdownDescription": "%config.endpoints.qwen%"
           },
           "hiveyCode.endpoints.mistral": {
             "type": "string",
             "default": "https://api.mistral.ai/v1",
-            "description": "%config.endpoints.mistral%"
+            "markdownDescription": "%config.endpoints.mistral%"
           },
           "hiveyCode.endpoints.xai": {
             "type": "string",
             "default": "https://api.x.ai/v1",
-            "description": "%config.endpoints.xai%"
+            "markdownDescription": "%config.endpoints.xai%"
           },
           "hiveyCode.endpoints.groq": {
             "type": "string",
             "default": "https://api.groq.com/openai/v1",
-            "description": "%config.endpoints.groq%"
+            "markdownDescription": "%config.endpoints.groq%"
           },
           "hiveyCode.endpoints.perplexity": {
             "type": "string",
             "default": "https://api.perplexity.ai",
-            "description": "%config.endpoints.perplexity%"
+            "markdownDescription": "%config.endpoints.perplexity%"
           },
           "hiveyCode.escalation.policy": {
             "type": "string",
@@ -650,6 +736,26 @@
             "type": "string",
             "default": "",
             "description": "%config.escalation.model%"
+          },
+          "hiveyCode.routing.learned": {
+            "type": "boolean",
+            "default": false,
+            "markdownDescription": "%config.routing.learned%"
+          },
+          "hiveyCode.routing.threshold": {
+            "type": "number",
+            "default": 0.8,
+            "markdownDescription": "%config.routing.threshold%"
+          },
+          "hiveyCode.routing.minAttempts": {
+            "type": "number",
+            "default": 5,
+            "markdownDescription": "%config.routing.minAttempts%"
+          },
+          "hiveyCode.routing.explore": {
+            "type": "number",
+            "default": 0.1,
+            "markdownDescription": "%config.routing.explore%"
           }
         }
       },
@@ -657,6 +763,11 @@
         "title": "%config.section.skills%",
         "order": 3,
         "properties": {
+          "hiveyCode.skills.auto": {
+            "type": "boolean",
+            "default": true,
+            "markdownDescription": "%config.skills.auto%"
+          },
           "hiveyCode.skills.groups": {
             "type": "array",
             "default": [
@@ -696,11 +807,11 @@
                     "stdio",
                     "http"
                   ],
-                  "description": "stdio runs a program locally; http talks to a server."
+                  "description": "%config.mcp.servers.type%"
                 },
                 "command": {
                   "type": "string",
-                  "description": "The program to run (stdio)."
+                  "description": "%config.mcp.servers.command%"
                 },
                 "args": {
                   "type": "array",
@@ -719,7 +830,7 @@
                 },
                 "url": {
                   "type": "string",
-                  "description": "The server URL (http)."
+                  "description": "%config.mcp.servers.url%"
                 },
                 "headers": {
                   "type": "object",
@@ -754,6 +865,11 @@
             "type": "boolean",
             "default": false,
             "description": "%config.privacy.allowUnredacted%"
+          },
+          "hiveyCode.privacy.trustSelfHosted": {
+            "type": "boolean",
+            "default": true,
+            "description": "%config.privacy.trustSelfHosted%"
           },
           "hiveyCode.privacy.blockedGlobs": {
             "type": "array",
@@ -807,13 +923,91 @@
           },
           "hiveyCode.budget.perRequestUsd": {
             "type": "number",
-            "default": 0.25,
+            "default": 2,
             "description": "%config.budget.perRequestUsd%"
+          },
+          "hiveyCode.budget.perRequestTokens": {
+            "type": "number",
+            "default": 200000,
+            "description": "%config.budget.perRequestTokens%"
           },
           "hiveyCode.budget.dailyUsd": {
             "type": "number",
-            "default": 2,
+            "default": 20,
             "description": "%config.budget.dailyUsd%"
+          },
+          "hiveyCode.siem.transport": {
+            "type": "string",
+            "enum": [
+              "off",
+              "syslog-tls",
+              "otlp"
+            ],
+            "default": "off",
+            "markdownDescription": "%config.siem.transport%"
+          },
+          "hiveyCode.siem.host": {
+            "type": "string",
+            "default": "",
+            "markdownDescription": "%config.siem.host%"
+          },
+          "hiveyCode.siem.port": {
+            "type": "number",
+            "default": 6514,
+            "markdownDescription": "%config.siem.port%"
+          },
+          "hiveyCode.siem.url": {
+            "type": "string",
+            "default": "",
+            "markdownDescription": "%config.siem.url%"
+          },
+          "hiveyCode.siem.caFile": {
+            "type": "string",
+            "default": "",
+            "markdownDescription": "%config.siem.caFile%"
+          },
+          "hiveyCode.siem.rejectUnauthorized": {
+            "type": "boolean",
+            "default": true,
+            "markdownDescription": "%config.siem.rejectUnauthorized%"
+          },
+          "hiveyCode.siem.headers": {
+            "type": "object",
+            "default": {},
+            "additionalProperties": {
+              "type": "string"
+            },
+            "markdownDescription": "%config.siem.headers%"
+          },
+          "hiveyCode.siem.userId": {
+            "type": "string",
+            "default": "",
+            "markdownDescription": "%config.siem.userId%"
+          },
+          "hiveyCode.siem.flushSeconds": {
+            "type": "number",
+            "default": 30,
+            "markdownDescription": "%config.siem.flushSeconds%"
+          },
+          "hiveyCode.audit.timestampUrl": {
+            "type": "string",
+            "default": "",
+            "markdownDescription": "%config.audit.timestampUrl%"
+          },
+          "hiveyCode.corpus.enabled": {
+            "type": "boolean",
+            "default": false,
+            "markdownDescription": "%config.corpus.enabled%"
+          },
+          "hiveyCode.corpus.retentionDays": {
+            "type": "number",
+            "default": 90,
+            "markdownDescription": "%config.corpus.retentionDays%"
+          },
+          "hiveyCode.notices.enabled": {
+            "type": "boolean",
+            "default": true,
+            "description": "%config.notices.enabled%"
           }
         }
       },
@@ -867,6 +1061,34 @@
             },
             "default": [],
             "markdownDescription": "%config.permissions.deniedCommands%"
+          },
+          "hiveyCode.hooks": {
+            "type": "array",
+            "default": [],
+            "items": {
+              "type": "object"
+            },
+            "markdownDescription": "%config.hooks%"
+          },
+          "hiveyCode.background.image": {
+            "type": "string",
+            "default": "",
+            "markdownDescription": "%config.background.image%"
+          },
+          "hiveyCode.background.cpus": {
+            "type": "number",
+            "default": 2,
+            "markdownDescription": "%config.background.cpus%"
+          },
+          "hiveyCode.background.memory": {
+            "type": "string",
+            "default": "2g",
+            "markdownDescription": "%config.background.memory%"
+          },
+          "hiveyCode.secondOpinion.enabled": {
+            "type": "boolean",
+            "default": true,
+            "markdownDescription": "%config.secondOpinion.enabled%"
           }
         }
       },
@@ -874,9 +1096,21 @@
         "title": "%config.section.context%",
         "order": 6,
         "properties": {
+          "hiveyCode.ibmi.writableLibraries": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": [],
+            "markdownDescription": "%config.ibmi.writableLibraries%"
+          },
           "hiveyCode.ibmi.integration": {
             "type": "string",
-            "enum": ["auto", "on", "off"],
+            "enum": [
+              "auto",
+              "on",
+              "off"
+            ],
             "enumDescriptions": [
               "%config.ibmi.integration.auto%",
               "%config.ibmi.integration.on%",
@@ -887,18 +1121,18 @@
           },
           "hiveyCode.context.maxTokens": {
             "type": "number",
-            "default": 8000,
+            "default": 0,
             "description": "%config.context.maxTokens%"
+          },
+          "hiveyCode.context.attachmentTokens": {
+            "type": "number",
+            "default": 16000,
+            "markdownDescription": "%config.context.attachmentTokens%"
           },
           "hiveyCode.context.repoMap": {
             "type": "boolean",
             "default": true,
             "description": "%config.context.repoMap%"
-          },
-          "hiveyCode.context.autoCompact": {
-            "type": "boolean",
-            "default": false,
-            "markdownDescription": "%config.context.autoCompact%"
           },
           "hiveyCode.knowledge.enabled": {
             "type": "boolean",
@@ -924,6 +1158,14 @@
             "type": "string",
             "default": "",
             "markdownDescription": "%config.knowledge.endpoint%"
+          },
+          "hiveyCode.knowledge.folders": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": [],
+            "markdownDescription": "%config.knowledge.folders%"
           },
           "hiveyCode.knowledge.indexTokens": {
             "type": "number",
@@ -981,6 +1223,60 @@
             "type": "boolean",
             "default": true,
             "description": "%config.completion.multiline%"
+          },
+          "hiveyCode.dictation.command": {
+            "type": "string",
+            "default": "",
+            "markdownDescription": "%config.dictation.command%"
+          },
+          "hiveyCode.dictation.endpoint": {
+            "type": "string",
+            "default": "",
+            "markdownDescription": "%config.dictation.endpoint%"
+          },
+          "hiveyCode.dictation.device": {
+            "type": "string",
+            "default": "",
+            "markdownDescription": "%config.dictation.device%"
+          },
+          "hiveyCode.dictation.recordCommand": {
+            "type": "string",
+            "default": "",
+            "markdownDescription": "%config.dictation.recordCommand%"
+          },
+          "hiveyCode.dictation.localModel": {
+            "type": "string",
+            "default": "base",
+            "enum": [
+              "base",
+              "tiny.en",
+              "base.en",
+              "small"
+            ],
+            "markdownDescription": "%config.dictation.localModel%"
+          },
+          "hiveyCode.dictation.model": {
+            "type": "string",
+            "default": "",
+            "description": "%config.dictation.model%"
+          },
+          "hiveyCode.dictation.language": {
+            "type": "string",
+            "default": "",
+            "description": "%config.dictation.language%"
+          },
+          "hiveyCode.appearance": {
+            "type": "string",
+            "enum": [
+              "editor",
+              "hivey"
+            ],
+            "enumDescriptions": [
+              "%config.appearance.editor%",
+              "%config.appearance.hivey%"
+            ],
+            "default": "editor",
+            "description": "%config.appearance%"
           }
         }
       }
@@ -1002,18 +1298,22 @@
     "build": "node esbuild.mjs",
     "watch": "node esbuild.mjs --watch",
     "typecheck": "tsc --noEmit",
-    "test": "node esbuild.mjs && node esbuild.mjs --tests && node --test dist-tests/",
+    "test": "node esbuild.mjs && node esbuild.mjs --tests && node scripts/run-tests.mjs",
     "package": "npx --yes @vscode/vsce@3.9.2 package --no-dependencies -o hivey-code.vsix",
     "models": "node scripts/update-models.mjs",
     "models:check": "node scripts/update-models.mjs --check",
     "eval": "node scripts/evaluate.mjs",
     "eval:verify": "node scripts/evaluate.mjs --verify-tasks",
+    "eval:solutions": "node scripts/evaluate.mjs --verify-solutions",
     "scan:secrets": "node scripts/scan-secrets.mjs",
+    "check:numbers": "node scripts/check-numbers.mjs",
     "test:integration": "node esbuild.mjs && node esbuild.mjs --integration && node dist-integration/runTest.js",
     "publish:vsce": "npx --yes @vscode/vsce@3.9.2 publish --no-dependencies",
     "publish:ovsx": "npx --yes ovsx publish hivey-code.vsix",
     "vsix": "npm run build && npx --yes @vscode/vsce@3.9.2 package --no-dependencies -o hivey-code.vsix",
-    "vsix:publish": "npm run vsix && gh release upload build hivey-code.vsix --clobber"
+    "vsix:publish": "npm run vsix && gh release upload build hivey-code.vsix --clobber",
+    "check:publish": "node scripts/check-publish.mjs",
+    "check:course": "node scripts/check-course.mjs"
   },
   "devDependencies": {
     "@types/node": "^18.19.0",

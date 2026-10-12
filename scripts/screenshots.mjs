@@ -11,7 +11,7 @@
 // image is the real interface; the sentence inside it is a fixture.
 //
 // Usage: node scripts/screenshots.mjs [--locale fr] [--theme "Default Light Modern"]
-//        [--suffix .light] [--out docs/images]
+//        [--suffix .light] [--appearance hivey] [--min-width 900] [--out docs/images]
 
 import { spawn, spawnSync } from "node:child_process";
 import { createServer } from "node:http";
@@ -30,7 +30,10 @@ const display = ":97";
 const HOLD = Number(args.get("hold") ?? 20_000);
 const STARTUP = Number(args.get("startup") ?? 16_000);
 const marker = join(tmpdir(), `hivey-code-shot-${process.pid}`);
-const CROP = Number(args.get("crop") ?? 1000);
+// The width of the right-hand bar in the captured frame, measured once from a real run. The
+// subject of these images is the panel, and it now sits in the auxiliary bar with everything else
+// put away, so what is kept is the right edge of the screen rather than the left.
+const CROP = Number(args.get("crop") ?? 540);
 
 mkdirSync(outDir, { recursive: true });
 
@@ -98,6 +101,40 @@ const LONG =
         "The defect in your code is none of the three: it is that `Math.round` rounds towards positive infinity. On a credit note, so on a negative amount, `-12.5` becomes `-12` rather than `-13`. The customer is refunded a cent less than they were charged, and all your tests pass because they are all on positive amounts.",
       ].join("\n");
 
+/**
+ * Plan mode, with the thinking a model streams before it answers.
+ *
+ * The only fixture that emits `reasoning` deltas, and the reason it exists: plan mode was reported
+ * as "it only does the reasoning and gives no answer", and nothing here had ever photographed a
+ * turn that thinks. A frame taken after the answer has arrived is the proof that the thinking made
+ * way for it.
+ */
+const PLAN_REASONING =
+  locale === "fr"
+    ? "Je regarde d'abord où l'arrondi se produit aujourd'hui. Le total est calculé ligne par ligne, donc la question est de savoir si l'arrondi doit rester là ou remonter au niveau de la facture."
+    : "Let me look at where the rounding happens today. The total is computed line by line, so the question is whether the rounding belongs there or at the invoice level.";
+
+const PLAN_ANSWER =
+  locale === "fr"
+    ? [
+        "**Ce que j'ai trouvé** — `totalTTC` (`totals.ts:1`) somme les lignes en pleine précision puis applique la TVA sans arrondir. Aucun test ne couvre les montants négatifs.",
+        "",
+        "**Ce que je propose**",
+        "1. `totals.ts` — arrondir le total TTC au centime, une seule fois. Réversible.",
+        "2. `totals.test.ts` — ajouter un cas d'avoir (montant négatif). Réversible.",
+        "",
+        "**Ce qui pourrait casser** — les factures déjà émises changent d'un centime si elles sont recalculées. À vérifier avant de rejouer un historique.",
+      ].join("\n")
+    : [
+        "**What I found** — `totalTTC` (`totals.ts:1`) sums the lines at full precision and then applies VAT without rounding. No test covers negative amounts.",
+        "",
+        "**What I propose**",
+        "1. `totals.ts` — round the gross total to the cent, once. Reversible.",
+        "2. `totals.test.ts` — add a credit-note case (negative amount). Reversible.",
+        "",
+        "**What could break** — invoices already issued shift by a cent if they are recomputed. Worth checking before replaying any history.",
+      ].join("\n");
+
 const MODELS = [
   { id: "qwen2.5-coder:7b", name: "Qwen2.5 Coder 7B" },
   { id: "deepseek-coder-v2:16b", name: "DeepSeek Coder V2 16B" },
@@ -130,6 +167,52 @@ const server = createServer((req, res) => {
   // Three fixtures, picked on the question's own words. The slow one exists for the frame taken
   // mid-answer; the short one keeps the boundary between two exchanges inside the conversation
   // frame. See each constant for why.
+  // A tool call, so the frame can show the card that asks permission to run it — the one thing on
+  // screen a blocked turn needs the user to act on, and the thing that used to vanish with any
+  // rebuild of the panel.
+  if (/list the files|liste les fichiers/i.test(sent)) {
+    res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });
+    res.write(
+      `data: ${JSON.stringify({
+        choices: [
+          {
+            delta: {
+              tool_calls: [
+                { index: 0, id: "call_1", function: { name: "run_command", arguments: JSON.stringify({ command: "ls -la src" }) } },
+              ],
+            },
+          },
+        ],
+      })}\n\n`,
+    );
+    res.write(`data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: "tool_calls" }] })}\n\n`);
+    res.write("data: [DONE]\n\n");
+    res.end();
+    return;
+  }
+  // Plan mode: reasoning first, then the plan. The only fixture that streams both.
+  if (/draw up a plan|propose un plan/i.test(sent)) {
+    const think = PLAN_REASONING.match(/[\s\S]{1,20}/g) ?? [];
+    const say = PLAN_ANSWER.match(/[\s\S]{1,20}/g) ?? [];
+    let k = 0;
+    const tick = setInterval(() => {
+      if (k < think.length) {
+        res.write(`data: ${JSON.stringify({ choices: [{ delta: { reasoning: think[k++] } }] })}\n\n`);
+        return;
+      }
+      const j = k - think.length;
+      if (j >= say.length) {
+        clearInterval(tick);
+        res.write(`data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: "stop" }] })}\n\n`);
+        res.write("data: [DONE]\n\n");
+        res.end();
+        return;
+      }
+      k += 1;
+      res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: say[j] } }] })}\n\n`);
+    }, 40);
+    return;
+  }
   const slow = /step by step|en détail/i.test(sent);
   const answer = slow ? LONG : /rounding of the VAT itself|arrondi de la TVA/i.test(sent) ? SHORT : ANSWER;
   const chunks = answer.match(/[\s\S]{1,24}/g) ?? [];
@@ -170,6 +253,25 @@ for (const step of [[], ["--integration"]]) {
   }
 }
 
+// ⚠️ A run that was interrupted leaves `code.lock` behind, and every later run then fails with
+// "Running extension tests from the command line is currently only supported if no other instance of
+// Code is running" — about an instance that is not running. It cost half a dozen retries before the
+// message was read closely enough to notice it describes a LOCK rather than a process.
+//
+// Removed only when nothing is actually holding it: a live editor must still be respected, or this
+// would turn a clear refusal into two editors fighting over one profile.
+// `pgrep` exits 0 when it finds something and non-zero when it does not, so "nothing is running" is
+// a non-zero status. (The first version of this line read `!spawnSync(...).status === false`, which
+// parses as `(!status) === false` and means the opposite of what it says — written while explaining
+// the fix, which is exactly when a condition goes unread.)
+if (spawnSync("pgrep", ["-f", "vscode-test/vscode"], { stdio: "ignore" }).status !== 0) {
+  rmSync(".vscode-test/user-data/code.lock", { force: true });
+  // The capture's own profile, which `runTest.ts` points the editor at. Its lock has to go too, or a
+  // run interrupted half way makes every later capture fail with "only supported if no other instance
+  // of Code is running" — which says nothing about captures and sends you looking in the wrong place.
+  rmSync(".vscode-test/user-data-shots/code.lock", { force: true });
+}
+
 const xvfb = spawn("Xvfb", [display, "-screen", "0", "1600x1000x24", "-nolisten", "tcp"], { stdio: "ignore" });
 await new Promise((r) => setTimeout(r, 1500));
 
@@ -184,6 +286,16 @@ const editor = spawn("node", ["dist-integration/runTest.js"], {
     // the default: it leaves whatever the profile had, which is how the README ended up showing a
     // deep-navy theme nobody chose. The name is verified by sampling a pixel, not by reading it.
     HIVEY_CODE_THEME: args.get("theme") ?? "Default Dark Modern",
+    // `editor` (the default) or `hivey`. The point of photographing both is that an appearance
+    // described in prose is an appearance nobody can check.
+    HIVEY_CODE_APPEARANCE: args.get("appearance") ?? "editor",
+    // `--min-width 900` photographs the panel's width floor doing its job: a floor wider than the
+    // panel makes the content overflow, which is visible, where the floor itself is not. Unset, the
+    // setting is left alone and the capture is the ordinary one.
+    ...(args.get("min-width") ? { HIVEY_CODE_MIN_WIDTH: args.get("min-width") } : {}),
+    // `--width-probe` adds two frames around five calls to the editor's own "make this view bigger",
+    // to find out whether an extension can widen its panel at all. See the probe in the suite.
+    ...(args.has("width-probe") ? { HIVEY_CODE_WIDTH_PROBE: "1" } : {}),
     HIVEY_CODE_SCREENSHOT_HOLD: String(HOLD),
     HIVEY_CODE_SCREENSHOT_MARKER: marker,
   },
@@ -195,10 +307,19 @@ function capture(name) {
   const path = `${outDir}/${name}${suffix}.png`;
   const shot = spawnSync("import", ["-display", display, "-window", "root", path], { stdio: "inherit" });
   if (shot.status !== 0) return false;
-  // Trim the window's own black margin, then crop away most of the empty editor. The subject of
-  // these images is the panel; a reader looking at a README does not need to see 700 px of unused
-  // background to understand where it lives.
-  spawnSync("convert", [path, "-trim", "+repage", "-crop", `${CROP}x0+0+0`, "+repage", path]);
+  // Trim the window's own black margin, then keep the right-hand bar and nothing else. `-gravity
+  // East` is the whole change from the previous version: the panel moved to the auxiliary bar, and
+  // a crop anchored on the left was photographing the empty editor it used to sit beside.
+  // ...then the editor's window furniture. The title bar and the status bar belong to VS Code and
+  // say nothing about this panel; leaving them in is what made the old images read as "a screenshot
+  // of somebody's editor" rather than as a picture of the thing being described.
+  spawnSync("convert", [
+    path, "-trim", "+repage",
+    "-gravity", "East", "-crop", `${CROP}x0+0+0`, "+repage",
+    "-gravity", "North", "-chop", "0x34",
+    "-gravity", "South", "-chop", "0x32",
+    path,
+  ]);
   console.log(`captured ${path}`);
   return true;
 }
@@ -214,7 +335,28 @@ function announced() {
 
 // Wait for the harness to name a screen, photograph it once it has settled, and move on. There is
 // no clock here beyond a timeout: the editor decides when it is ready, and says so.
-const SCREENS = ["conversation", "pendant", "contexte", "setup", "picker", "historique", "modeles", "permissions"];
+// ⚠️ EXACTLY the screens the harness announces, and no more. This list carried five names nobody
+// ever produced — `picker`, `historique`, `modeles`, `permissions`, and `setup` until the harness was
+// taught to announce it. Each one costs the full deadline wait and then prints "the editor never
+// announced it", which the comment below correctly says reads like a product fault. It was never
+// seen because every run so far was cut short before reaching the end of the loop.
+//
+// Two halves of one sequence in two files: when they disagree, the one that waits is the one that
+// looks broken. Adding a screen means announcing it there and naming it here, in the same change.
+const SCREENS = [
+  "premier",
+  "conversation",
+  "permissions",
+  // Only when probing: two frames around the editor's own "make this view bigger", to find out
+  // whether an extension can widen its panel at all. The suite announces them in the same place.
+  ...(args.has("width-probe") ? ["width-before", "width-after"] : []),
+  "pendant",
+  "plan",
+  "approbation",
+  "contexte",
+  "passerelle",
+  "setup",
+];
 // One hold per screen is not the budget: the fixture drives a real conversation between them, and
 // the frame taken mid-answer waits for a deliberately slow one to finish. Two screens' worth of
 // slack plus a flat minute covers the talking; a deadline that expires mid-run reports every

@@ -15,7 +15,7 @@
  * Chosen from what the box can hold rather than from a round number: the composer grows to about
  * eight lines before it starts eating the transcript, which at a typical wrapped width is roughly
  * this many characters. Below it, the paste behaves the way it does in every other text field in
- * the world — which is the behaviour nobody should have to learn.
+ * the world — which is the behavior nobody should have to learn.
  */
 export const ATTACH_TEXT_CHARS = 1200;
 
@@ -64,10 +64,13 @@ export function pastedName(given: string | undefined, mediaType: string, at = ne
 /**
  * Is this something we can hand to a model as text?
  *
- * Deliberately by what the browser says it is, not by extension. The honest boundary: a `.docx` or
- * a `.pdf` is a zip or a binary container, and reading either properly means a parser this project
- * does not ship — see ADR-0004. Attaching one as mojibake would be worse than refusing it, because
- * the model would confidently answer about the noise.
+ * Deliberately by what the browser says it is, not by extension.
+ *
+ * `.docx` and `.pdf` are not here, and that is now a narrower statement than it was: the knowledge
+ * base reads both, through extractors written in `core/docs/`. What a PASTE cannot do is ask the
+ * question those extractors answer — whether what came out is the document or is noise — because a
+ * paste has nowhere to put the answer but the conversation. Attaching mojibake would be worse than
+ * refusing it, since the model would answer about the noise with complete confidence.
  */
 export function isTextLike(mediaType: string, name = ""): boolean {
   if (mediaType.startsWith("text/")) return true;

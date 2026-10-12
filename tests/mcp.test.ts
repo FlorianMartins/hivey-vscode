@@ -203,7 +203,7 @@ test("an embedded resource contributes its text", () => {
 
 // ── Db2 for i: what runs without asking ──────────────────────────────────────────────────────
 
-test("plain reads are recognised as reads", () => {
+test("plain reads are recognized as reads", () => {
   assert.ok(isReadOnlySql("select * from qgpl.custmast"));
   assert.ok(isReadOnlySql("SELECT * FROM QSYS2.SYSTABLES FETCH FIRST 10 ROWS ONLY"));
   assert.ok(isReadOnlySql("with t as (select 1 from sysibm.sysdummy1) select * from t"));

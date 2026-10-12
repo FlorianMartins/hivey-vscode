@@ -6,7 +6,14 @@
 // rendered incrementally is the answer being streamed, because that one has to be.
 
 import { button, closeMenu, el, icon, ICON, menuIsOpen, searchInput } from "./dom.js";
-import { chatScreen, collapsible, isStreaming, planBlock, setStreaming, stepRow, type ChatDeps, captureDraft, restoreDraft } from "./chat.js";
+import { chatScreen, isStreaming, planBlock, reasoningBlock, setStreaming, stepRow, type ChatDeps, captureDraft, restoreDraft,
+  NOTE_FADE_MS,
+  setComposerNote,
+  dictationStopped,
+  dictationStarted,
+  setLevel,
+  cancelDictation,
+} from "./chat.js";
 import { atEnd, placeAfterChange, type Viewport } from "../core/ui/scroll.js";
 import { historyScreen } from "./history.js";
 import { modelsScreen } from "./models.js";
@@ -16,7 +23,7 @@ import type { ToExtension, ToPanel, UiState } from "../shared/protocol.js";
 import type { Plan } from "../core/agent/plan.js";
 import { t } from "../shared/i18n.js";
 import { usePrefStore } from "./prefs.js";
-import { closeModelCombo, openModelCombo } from "./modelCombo.js";
+import { closeModelCombo, openModelCombo, refreshModelCombo } from "./modelCombo.js";
 import { setupScreen } from "./setup.js";
 
 declare function acquireVsCodeApi(): { postMessage(m: unknown): void; getState(): unknown; setState(s: unknown): void };
@@ -47,14 +54,21 @@ function render(): void {
   // extension from erasing a half-written question.
   const draft = captureDraft();
   const place = captureScroll();
-  // The transcript belongs to the turn while a turn is running — see `chatScreen`. Held by
-  // reference before the tree is emptied, which detaches it without destroying it, and put back
-  // below. Everything else (the header, the composer, the context chips that this rebuild exists
-  // for) is rebuilt as before.
-  const keep =
-    state.screen === "chat" && isStreaming()
-      ? (document.querySelector<HTMLElement>(".transcript-wrap") ?? undefined)
-      : undefined;
+  // The one node that cannot be rebuilt: the live turn holds the typing animation's state, the
+  // buffer it has released so far and the step rows a turn has produced, none of which exists in
+  // `state`. It is carried across; everything else is drawn from the state as it always was.
+  //
+  // It is carried only while the state still says an answer is being written. A live turn kept
+  // past the end of its turn would sit there for ever, next to the finished answer the transcript
+  // now draws — and the previous attempt at this, which kept the WHOLE transcript instead, went
+  // silent for the length of a turn and stayed silent if anything left the flag set.
+  // Kept for as long as the turn it belongs to is running — NOT only while an answer is being
+  // written. The live turn exists from the moment a turn starts, and the first thing it can hold is
+  // a question; tying its survival to an answer existing yet destroyed it during exactly the window
+  // where the turn was waiting to be allowed to start.
+  const turnRunning = isStreaming() || state.session.entries.some((e) => e.streaming);
+  const liveTurn = state.screen === "chat" && turnRunning && live?.root.isConnected ? live.root : undefined;
+  if (liveTurn) liveTurn.remove();
   app.textContent = "";
   app.append(header(state));
   if (searchOpen && state.screen === "chat") app.append(searchBar(state));
@@ -63,6 +77,9 @@ function render(): void {
   // it up over the permissions screen is not a stale menu, it is a menu belonging to a screen that
   // is no longer there.
   if (state.screen !== "chat") closeModelCombo();
+  // An open picker is a floating element on <body>, so a rebuild of the panel leaves it alone —
+  // including when the state that arrived is the one it asked for.
+  else refreshModelCombo(state);
 
   switch (state.screen) {
     case "history":
@@ -79,13 +96,13 @@ function render(): void {
       break;
     case "chat":
     default:
-      app.append(chatScreen(state, deps, keep));
+      app.append(chatScreen(state, deps, liveTurn));
       break;
   }
-  // Only when the transcript was actually rebuilt. Clearing it while its nodes are still on screen
-  // is what orphaned the live turn: the next token created a second one underneath the first.
-  if (!keep) live = undefined;
-  restoreScroll(place, Boolean(keep));
+  // The live turn did not survive this render, so the object that points at its nodes must not
+  // either: the next token would otherwise be written into a subtree nobody can see.
+  if (!liveTurn) live = undefined;
+  restoreScroll(place, Boolean(liveTurn));
   restoreDraft(draft);
 }
 
@@ -100,11 +117,25 @@ function render(): void {
  *
  * Nothing is captured when the screen changes, because a scroll position in the history list means
  * nothing in a transcript.
+ *
+ * ⚠️ AND IT IS NOT ONLY THE TRANSCRIPT. This looked only at `.transcript`, on the chat screen, so
+ * every OTHER screen jumped back to the top on every rebuild — and the settings screen rebuilds on
+ * each keystroke in a key field. Reported as "when you expand a provider to enter the key, it jumps
+ * back up to the top". The reason the defect survived is that the comment above described a
+ * problem about the transcript, so that is what the code solved.
  */
-function captureScroll(): { top: number; atEnd: boolean } | undefined {
-  const list = document.querySelector(".transcript");
-  if (!list || state?.screen !== "chat") return undefined;
-  return { top: list.scrollTop, atEnd: atBottom(list) };
+function scroller(): HTMLElement | null {
+  // Whichever of the panel's scrolling containers this screen has. One list, because a screen has
+  // exactly one — and naming them here is how a new screen gets this for free.
+  return document.querySelector<HTMLElement>(".transcript, .setup, .history, .models, .screen-scroll");
+}
+
+function captureScroll(): { top: number; atEnd: boolean; screen: string } | undefined {
+  const list = scroller();
+  if (!list || !state) return undefined;
+  // `atEnd` means "follow the end" and is a property of a CONVERSATION, not of a settings page: a
+  // settings screen that happened to be scrolled to its last line must not be pinned there.
+  return { top: list.scrollTop, atEnd: state.screen === "chat" && atBottom(list), screen: state.screen };
 }
 
 /**
@@ -116,14 +147,20 @@ function captureScroll(): { top: number; atEnd: boolean } | undefined {
  * reader is not at the end" against a position nobody chose — and, the rule being what it is, stop
  * following for the rest of the answer. That was one of the two ways the follow died.
  */
-function restoreScroll(place: { top: number; atEnd: boolean } | undefined, preserved = false): void {
+function restoreScroll(place: { top: number; atEnd: boolean; screen: string } | undefined, preserved = false): void {
+  // A screen change throws the position away: where you were in the settings means nothing in a
+  // conversation. Checked against the state AFTER the rebuild, which is the new screen.
+  if (place && state && place.screen !== state.screen) {
+    scroller()?.scrollTo({ top: 0 });
+    return;
+  }
   // At the end, or arriving from another screen: the end is where a conversation is read from.
   if (!place || place.atEnd) {
     scrollToEnd(true);
     return;
   }
   const apply = (): void => {
-    const list = document.querySelector<HTMLElement>(".transcript");
+    const list = scroller();
     if (!list) return;
     list.scrollTop = place.top;
     // The rebuild dropped the button with the old DOM; the reader is still where they were, so it
@@ -177,7 +214,7 @@ function header(s: UiState): HTMLElement {
         else if (ev.key === "Escape") { ev.preventDefault(); commit(false); }
       });
       // Leaving the field keeps what was typed. Discarding an edit because focus moved is the
-      // behaviour people learn to distrust.
+      // behavior people learn to distrust.
       input.addEventListener("blur", () => commit(true));
       left.replaceChild(input, title);
       input.focus();
@@ -277,7 +314,7 @@ class LiveTurn {
   readonly root: HTMLElement;
   private readonly body: HTMLElement;
   private text?: HTMLElement;
-  private thinking?: { wrap: HTMLElement; body: HTMLElement };
+  private thinking?: { wrap: HTMLElement; body: HTMLElement; folded?: boolean };
   private buffer = "";
 
   /**
@@ -303,12 +340,28 @@ class LiveTurn {
   }
 
   appendText(chunk: string): void {
+    // The first word of the answer is the moment the thinking stops being the thing to watch.
+    //
+    // It is open while it is written — that is most of the reason for turning reasoning on, and a
+    // shut block does not grow, so the panel had nothing to follow and sat on the previous answer
+    // for the whole of it. Once the answer starts, the same block is in the way of it. So it folds
+    // itself here, exactly once: reopening it is the reader's business, and a block that shut
+    // itself again on the next token would be a block nobody can read.
+    this.foldThinking();
     this.buffer += chunk;
     if (!this.text) {
       this.text = el("div", "live-text");
       this.body.append(this.text);
     }
     this.scheduleRender();
+  }
+
+  /** Shut the reasoning, once, when the answer takes over from it. */
+  private foldThinking(): void {
+    if (!this.thinking || this.thinking.folded) return;
+    this.thinking.folded = true;
+    this.thinking.body.hidden = true;
+    this.thinking.wrap.classList.remove("open", "thinking");
   }
 
   /**
@@ -391,14 +444,46 @@ class LiveTurn {
   }
 
   appendReasoning(chunk: string): void {
-    if (!this.thinking) {
-      const wrap = collapsible(t("Reasoning"), "");
-      const body = wrap.querySelector<HTMLElement>(".collapsible-body")!;
-      this.thinking = { wrap, body };
-      this.body.prepend(wrap);
-    }
-    this.thinking.body.textContent = (this.thinking.body.textContent ?? "") + chunk;
+    // Through `following`, like the answer itself — and that was missing.
+    //
+    // While a model thinks, its reasoning is the only thing arriving, so it is the only thing that
+    // can move the page. It was appended outside the follow, and into a block that started shut and
+    // therefore did not grow at all: the panel sat on the previous answer for the whole of the
+    // thinking, and only jumped once the first word of the answer appeared. "When the model thinks,
+    // the chat does not go to the last message."
+    following(() => {
+      if (!this.thinking) {
+        const wrap = reasoningBlock("", { open: true });
+        // Lit while it is being written, like the composer's ring: the frame says "this is still
+        // going" without a word to read. Removed when the answer takes over, or the turn ends.
+        wrap.classList.add("thinking");
+        const body = wrap.querySelector<HTMLElement>(".collapsible-body")!;
+        // A reader who scrolls the box up has said where they want to be; one who scrolls it back to
+        // the bottom has said to resume. Tracked on the box rather than guessed from the content,
+        // because "did the user move this" is not answerable from the text that arrived.
+        body.addEventListener("scroll", () => {
+          // A pixel of tolerance: a fractional scrollHeight on a zoomed display never equals the sum.
+          this.followThinking = body.scrollHeight - body.scrollTop - body.clientHeight <= 2;
+        });
+        this.thinking = { wrap, body };
+        this.body.prepend(wrap);
+      }
+      this.thinking.body.textContent = (this.thinking.body.textContent ?? "") + chunk;
+    });
+    // ⚠️ And the block's OWN scroller, which `following` cannot reach. `.collapsible-body` is capped
+    // at 260px with `overflow-y: auto`, so the page can be perfectly positioned while the reasoning
+    // grows inside a box that never scrolls itself: you read the first screenful and the rest piles
+    // up out of sight. Reported as "it stays stuck at the top of its reasoning phase instead of
+    // scrolling along with it" — the page was following, the box was not.
+    //
+    // Not when the reader has scrolled it up themselves: someone re-reading an earlier line of the
+    // thinking has said where they want to be, and yanking them back is worse than not following.
+    const body = this.thinking?.body;
+    if (body && this.followThinking) body.scrollTop = body.scrollHeight;
   }
+
+  /** Whether the reasoning box still follows its own tail. False once the reader scrolls it. */
+  private followThinking = true;
 
   /**
    * The plan, redrawn in place.
@@ -458,68 +543,6 @@ class LiveTurn {
   }
 
   /** The approval card: four answers, because "yes" and "yes forever" are different decisions. */
-  appendApproval(
-    id: string,
-    tool: string,
-    description: string,
-    command?: string,
-    choices: Array<"once" | "session" | "always" | "no"> = ["once", "session", "always", "no"],
-    detail: string[] = [],
-  ): void {
-    const egress = tool === "egress";
-    const card = el("div", `approval${egress ? " egress" : ""}`);
-    const head = el("div", "approval-head");
-    head.append(icon("shield", "approval-ico"));
-    head.append(el("span", undefined, egress ? t("Leaving this machine") : t("Approval requested")));
-    card.append(head);
-    card.append(el("div", "approval-body", description));
-    if (command) card.append(el("pre", "approval-command", command));
-    for (const line of detail) card.append(el("div", "approval-detail", line));
-
-    const actions = el("div", "approval-actions");
-    const answer = (a: "once" | "session" | "always" | "no", label: string) => {
-      send({ type: "approve", id, answer: a });
-      // The class, not only the contents: the frame breathes while the question is open, and a
-      // question that has been answered is not open. Replacing the children alone left a decided
-      // card pulsing at the reader for the rest of the conversation.
-      card.classList.add("answered");
-      card.replaceChildren(el("div", "approval-done", label));
-    };
-    // Egress consent is per destination, so "this conversation" would be a promise about the wrong
-    // thing. The labels differ too: what is being agreed to is sending, not permitting an action.
-    const available: Record<string, () => HTMLElement> = {
-      once: () =>
-        button({
-          label: egress ? t("Send") : t("Allow"),
-          className: "btn primary",
-          onClick: () => answer("once", egress ? t("Sent.") : t("Allowed once.")),
-        }),
-      session: () =>
-        button({
-          label: t("Always (this conversation)"),
-          className: "btn",
-          title: t("Stop asking for {0} until the next conversation", tool),
-          onClick: () => answer("session", t("Allowed for this conversation.")),
-        }),
-      always: () =>
-        button({
-          label: egress ? t("Always to this model") : t("Always"),
-          className: "btn",
-          title: egress ? t("Stop asking before sending to this model") : t("Write a permanent rule for this action"),
-          onClick: () => answer("always", egress ? t("This model will not be asked about again.") : t("Permanent rule saved.")),
-        }),
-      no: () =>
-        button({
-          label: egress ? t("Do not send") : t("Refuse"),
-          className: "btn danger",
-          onClick: () => answer("no", egress ? t("Not sent.") : t("Refused.")),
-        }),
-    };
-    for (const choice of choices) actions.append(available[choice]!());
-    card.append(actions);
-    following(() => this.body.append(card));
-  }
-
   /** The authoritative render: the finished text, with the actions that act on it. */
   finish(): void {
     // Whatever is still queued lands at once. An answer that has finished arriving is finished, and
@@ -539,6 +562,9 @@ class LiveTurn {
       this.text = undefined;
     }
     this.root.classList.remove("streaming");
+    // A turn that ends while still thinking — stopped, or a model that never answered — leaves a
+    // record, not a block that goes on claiming to think.
+    this.thinking?.wrap.classList.remove("thinking");
   }
 }
 
@@ -546,7 +572,7 @@ class LiveTurn {
  * Close a fence the model has opened and not yet closed.
  *
  * Mid-stream, an answer is routinely cut in the middle of a code block. Handed to the renderer as
- * it stands, the opening ``` has no partner, so the block is not recognised and its contents render
+ * it stands, the opening ``` has no partner, so the block is not recognized and its contents render
  * as paragraphs — then snap into a code block the moment the closing fence arrives. Adding the
  * missing fence to the COPY being rendered (never to the buffer) means a code block appears as a
  * code block from its first line and simply grows.
@@ -752,11 +778,41 @@ watchScrolling();
 
 // ── Messages from the extension ──────────────────────────────────────────────────────────────
 
+/**
+ * Paint the panel with Hivey's palette, or with the editor's.
+ *
+ * ⚠️ TWO THINGS MEASURED FROM A CAPTURE, both of which changed what this does.
+ *
+ * First, the attribute belongs here and not only on the `<html>` the extension builds: that HTML is
+ * produced once, and a panel already open does not rebuild it, so changing the setting appeared to do
+ * nothing.
+ *
+ * Second — and this is the honest limit — the panel's BASE BACKGROUND is not painted by our
+ * stylesheet. VS Code paints the webview's own surface outside the document we control, so the Hivey
+ * appearance restyles what this stylesheet draws (surfaces, borders, accents, states) on top of the
+ * editor's base. That was found the only way it could be: the capture came back with the accents
+ * changed and the background identical.
+ *
+ * Which is why a LIGHT theme keeps the editor's appearance whatever the setting says. A palette tuned
+ * for a dark base, laid over a light one we cannot change, is not a style — it is a contrast failure,
+ * and the setting would be a way to make the panel unreadable.
+ */
+function applyAppearance(wanted: "editor" | "hivey"): void {
+  const light = document.body.classList.contains("vscode-light") || document.body.classList.contains("vscode-high-contrast-light");
+  document.documentElement.dataset["appearance"] = wanted === "hivey" && !light ? "hivey" : "editor";
+}
+
 window.addEventListener("message", (event: MessageEvent<ToPanel>) => {
   const m = event.data;
   switch (m.type) {
     case "state":
       state = m.state;
+      // ⚠️ From the page, on every state. The attribute on `<html>` is written when the HTML is
+      // BUILT, which is once — and a panel that is already open does not rebuild, so the setting
+      // appeared to do nothing. This is the half that cannot fail, and it is also what lets the
+      // appearance change without a reload.
+      applyAppearance(m.state.appearance ?? "editor");
+      applyMinWidth(m.state.panelMinWidth);
       // The extension is the authority on whether a turn is running. A panel that believed its own
       // flag could sit on a stop button for the rest of the conversation with nothing behind it.
       setStreaming(m.state.busy);
@@ -771,6 +827,9 @@ window.addEventListener("message", (event: MessageEvent<ToPanel>) => {
     case "turnEnd":
       setStreaming(false);
       live?.finish();
+      // Re-rendered, so the composer returns to rest now rather than whenever the next state
+      // message happens to arrive: the ring used to keep turning after the turn had ended.
+      render();
       refreshJumpButton();
       break;
     case "delta":
@@ -792,12 +851,44 @@ window.addEventListener("message", (event: MessageEvent<ToPanel>) => {
       if (!live && !isStreaming()) break;
       ensureLive().appendStatus(m.text, m.tool, m.ok, m.call);
       break;
-    case "approval":
-      ensureLive().appendApproval(m.id, m.tool, m.description, m.command, m.choices, m.detail);
-      break;
-    case "error":
+        case "error":
       ensureLive().appendError(m.message);
       setStreaming(false);
+      break;
+    case "dictated": {
+      dictationStopped();
+      // Into the composer, never sent. A recogniser mis-hears, and a dictated question that sends
+      // itself is a question nobody proof-read — which is also what makes a wrong transcription a
+      // non-event instead of a wasted turn.
+      setComposerNote("");
+      const area = document.querySelector<HTMLTextAreaElement>(".composer-input");
+      if (area) {
+        // Appended to what is already there, with a space: dictating a second sentence after typing
+        // the first is an ordinary thing to do, and replacing the draft would destroy it.
+        const existing = area.value.trimEnd();
+        area.value = existing ? `${existing} ${m.text}` : m.text;
+        area.focus();
+        area.setSelectionRange(area.value.length, area.value.length);
+        area.dispatchEvent(new Event("input"));
+      }
+      break;
+    }
+    // ⚠️ A one-off install of 85 MB over a home connection. A note that cannot change is
+    // indistinguishable from a hang, and somebody who has just spoken a sentence is watching it.
+    case "dictationStarted":
+      dictationStarted(m.levels);
+      break;
+    case "dictationLevel":
+      setLevel(m.level);
+      break;
+    case "dictationProgress":
+      setComposerNote(m.what);
+      break;
+    case "dictationFailed":
+      // Fades: it describes a moment that has passed, and nothing else was going to clear it — a
+      // failed dictation sends nothing more, so the line sat there for the rest of the session.
+      dictationStopped();
+      setComposerNote(m.why, NOTE_FADE_MS);
       break;
     case "restoreDraft": {
       // A rewind puts the question back where it was typed. Focused and selected, because the
@@ -831,7 +922,12 @@ window.addEventListener("message", (event: MessageEvent<ToPanel>) => {
 document.addEventListener("keydown", (ev) => {
   // The innermost thing first: a menu opened over the search bar closes before the bar does.
   if (ev.key === "Escape") {
-    if (menuIsOpen()) {
+    // A recording in flight is the innermost thing of all, and the one where Escape has to mean
+    // "throw it away": somebody who changes their mind mid-sentence has not asked for their voice to
+    // be transcribed anywhere.
+    if (cancelDictation(deps)) {
+      ev.preventDefault();
+    } else if (menuIsOpen()) {
       closeMenu();
     } else if (searchOpen) {
       closeSearch();
@@ -856,9 +952,65 @@ document.addEventListener("keydown", (ev) => {
  * the user's, via their editor settings), so it is measured rather than assumed: a constant that is
  * right on this machine is wrong on the next one, and silently.
  */
+/**
+ * The floor below which the panel scrolls sideways rather than rearranging itself.
+ *
+ * ⚠️⚠️ Applied as a style PROPERTY, from script, and the distinction is the entire bug. This used to be
+ * `<body style="min-width:…px">` in the HTML the extension builds — and `style-src` without
+ * `'unsafe-inline'` forbids exactly that, while this panel's CSP has no `'unsafe-inline'` on purpose
+ * because a model's output is rendered in this document. The floor was therefore declared in the one
+ * place the document's own policy guarantees will be discarded, and it was discarded, for a release:
+ * "you can shrink it all the way without it stopping, even though I asked for a minimum width
+ * limit". No test could see it, because the markup was exactly right.
+ *
+ * The same policy does NOT block assigning a property on `element.style`. It does block `cssText` and
+ * `setAttribute("style", …)`, which are the attribute by another name — so neither may be used here,
+ * and a guard in `tests/panelFocus.test.ts` refuses them.
+ *
+ * ⚠️ This is a floor on the CONTENT, not a lock on the side bar. VS Code offers an extension no way to
+ * set a minimum width for a view (microsoft/vscode#182201 is still open), so what this buys is that
+ * the layout stops shrinking and the panel scrolls sideways instead of silently reflowing into
+ * something unusable. Nothing in an extension can stop the divider being dragged.
+ */
+function applyMinWidth(px: number | undefined): void {
+  // Zero is a deliberate value — "let it shrink as far as it likes" — and `undefined` is an older
+  // extension host that does not send it. They must not collapse into each other.
+  if (px === undefined) return;
+  document.body.style.minWidth = `${Math.max(0, Math.round(px))}px`;
+}
+
+/**
+ * How wide the page actually is, published as a CSS variable.
+ *
+ * ⚠️ MEASURED, not computed. The composer was sized `100vw` — which counts the vertical scrollbar —
+ * and then `100vw` minus the scrollbar's measured width, which was closer and still wrong: it left
+ * 19 px of air on the right against 13 on the left, reported as "there's more space on the right
+ * than on the left". Two measurements subtracted from each other carry both their errors.
+ *
+ * `documentElement.clientWidth` is the one number that answers the question directly: the width
+ * inside the scrollbar, which is the width the composer may occupy. Re-read on resize, because that
+ * is the only time it changes.
+ */
+function publishPanelWidth(): void {
+  const set = () =>
+    document.documentElement.style.setProperty("--panel-width", `${document.documentElement.clientWidth}px`);
+  set();
+  window.addEventListener("resize", set);
+}
+publishPanelWidth();
+
 function publishScrollbarWidth(): void {
   const probe = document.createElement("div");
-  probe.style.cssText = "position:absolute;visibility:hidden;overflow-y:scroll;width:60px;height:60px";
+  // ⚠️ Property by property, not `cssText`. `cssText` is the style attribute under another name and
+  // this document's CSP forbids it, so the probe used to be a plain `<div>` of no particular size:
+  // `offsetWidth - clientWidth` was 0 - 0, the gutter was published as `0px`, and the defect this
+  // function exists to fix — the composer sitting a scrollbar's width wider than every answer above
+  // it — was never actually fixed. Two of these in one file, found by looking for the first.
+  probe.style.position = "absolute";
+  probe.style.visibility = "hidden";
+  probe.style.overflowY = "scroll";
+  probe.style.width = "60px";
+  probe.style.height = "60px";
   document.body.append(probe);
   const width = probe.offsetWidth - probe.clientWidth;
   probe.remove();

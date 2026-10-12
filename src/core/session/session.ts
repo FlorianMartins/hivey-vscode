@@ -7,18 +7,19 @@
 //
 //   • drop      — the exchange leaves the transcript for good;
 //   • exclude   — the exchange stays visible to the user and stops being sent to the model. This
-//                 is the sidebar behaviour we keep: a wrong answer can be muted without losing
+//                 is the sidebar behavior we keep: a wrong answer can be muted without losing
 //                 the trail of what was tried;
 //   • pin       — the exchange survives context trimming when the budget gets tight.
 //
 // Excluding is not cosmetic: it is the cheapest and most direct control anyone has over both the
 // quality and the price of the next turn.
 
+import type { Notice } from "./notices.js";
 import type { ChatMessage, ImagePart } from "../providers/types.js";
 import type { FileSnapshot } from "./checkpoint.js";
 import type { Plan } from "../agent/plan.js";
 import type { Mode } from "./modes.js";
-import { estimateTokens } from "../util/tokens.js";
+import { estimateTokens, headToTokens } from "../util/tokens.js";
 import { IMAGE_TOKENS } from "../models/vision.js";
 
 export type EntryRole = "user" | "assistant";
@@ -32,6 +33,15 @@ export interface ContextItem {
   body: string;
   /** Content the user did not write (a page, a log, a dependency) is fenced as untrusted. */
   untrusted?: boolean;
+  /**
+   * What was done to it on the way in — "outline of 211 symbols + head, 16 000 of 48 177 tokens".
+   *
+   * Beside the label, never inside it. It was appended to the name, which made the chip in the
+   * composer wider than the row it sits in: the cross that removes the attachment was pushed out of
+   * a box with `overflow: hidden`, so the file could not be taken out of the context at all. A name
+   * identifies a thing; what was done to it is a remark about it, and remarks belong in the tooltip.
+   */
+  note?: string;
   /**
    * An image, when the attachment is one. `body` then holds what the TRANSCRIPT says about it —
    * a name and a size — because a base64 blob in the conversation record would be unreadable, would
@@ -84,8 +94,31 @@ export interface Entry {
   checkpoint?: FileSnapshot[];
   /** True when the turn changed something too large to hold. Restoring is then incomplete, and says so. */
   checkpointPartial?: boolean;
+  /**
+   * How many shell commands this turn ran.
+   *
+   * ⚠️ A command is the hole a checkpoint cannot cover: nothing knows which files `prettier --write`
+   * or a build will rewrite before it runs, so none of them are snapshotted. Kept so the restore
+   * dialog can say what it will leave behind — see `checkpoint.ts`.
+   */
+  checkpointCommands?: number;
+  /**
+   * Files that already had uncommitted changes when this turn started.
+   *
+   * ⚠️ Recorded so a restore can tell OUR changes from the user's. A file that was clean here and is
+   * dirty now was changed by the turn, and git holds its previous state exactly; a file that was
+   * already dirty holds the user's own work, and discarding it to undo ours is the one outcome worse
+   * than not undoing ours. See `core/session/gitRestore.ts`.
+   */
+  dirtyBefore?: string[];
   /** The to-do list the agent kept while answering. Never sent back to the model. */
   plan?: Plan;
+  /**
+   * Things worth saying that nobody asked about — see `core/session/notices.ts`.
+   *
+   * Absent when there are none, which is the point: a section that is always there is furniture.
+   */
+  notices?: Notice[];
 }
 
 export interface SessionData {
@@ -275,7 +308,21 @@ export class Session {
     }
 
     const included = this.entries.filter((e) => e.included && !e.error);
-    const rendered = included.map((e) => ({ entry: e, text: renderEntry(e, opts.nonce) }));
+
+    // Rendered newest-first so that a repeated attachment is kept where it is most useful and
+    // referred to everywhere else. Identity is the label AND the body: a file that CHANGED between
+    // two turns is two different things and both are sent, because which of them the question is
+    // about is not this function's to decide. An image is never stubbed — `body` is only what the
+    // transcript says about it, so two images with the same caption are not the same image.
+    const sentBelow = new Set<string>();
+    const rendered: Array<{ entry: Entry; text: string }> = [];
+    for (let i = included.length - 1; i >= 0; i--) {
+      const entry = included[i]!;
+      const key = (c: ContextItem): string => `${c.kind}\u0000${c.label}\u0000${c.body}`;
+      const text = renderEntry(entry, opts.nonce, (c) => !c.image && sentBelow.has(key(c)));
+      for (const c of entry.context ?? []) if (!c.image) sentBelow.add(key(c));
+      rendered.unshift({ entry, text });
+    }
 
     let budget = opts.maxTokens - estimateTokens(opts.systemPrompt) - estimateTokens(opts.ambient ?? "");
     const keep: typeof rendered = [];
@@ -284,9 +331,21 @@ export class Session {
     for (let i = rendered.length - 1; i >= 0; i--) {
       const r = rendered[i]!;
       const cost = estimateTokens(r.text) + 4;
+      const newest = i === rendered.length - 1;
       if (cost <= budget || r.entry.pinned) {
         budget -= cost;
         keep.unshift(r);
+      } else if (newest) {
+        // The newest entry is the question being asked, and it is never dropped — it used to be.
+        // An entry larger than the whole budget failed the same test as an old one and was trimmed
+        // away, so a question carrying one oversized attachment was removed from the request it had
+        // just been typed into, and the model answered whatever was left. Cut instead, from the
+        // END: `renderEntry` writes the question first and the attachments after it, so what goes
+        // is context rather than the sentence the answer is supposed to address.
+        const room = Math.max(1000, budget - 4);
+        keep.unshift({ ...r, text: headToTokens(r.text, room) });
+        budget = 0;
+        trimmed.push(r.entry.id);
       } else {
         trimmed.push(r.entry.id);
       }
@@ -321,10 +380,20 @@ export class Session {
  * instruction then anything it contains reads as an instruction. A fence whose delimiter the
  * content cannot guess keeps "the user said this" and "I read this" apart by construction.
  */
-export function renderEntry(e: Entry, nonce: string): string {
+export function renderEntry(e: Entry, nonce: string, alreadyBelow?: (c: ContextItem) => boolean): string {
   if (!e.context?.length) return e.text;
   const blocks = e.context.map((c) => {
     const head = `[${c.kind}] ${c.label}`;
+    // The same file, byte for byte, attached again later in the conversation. Sent once — down
+    // there, where the newest copy is — and referred to here.
+    //
+    // This is the difference between a conversation that costs what it contains and one that costs
+    // what it contains times the number of turns. The file on screen is re-attached to every
+    // question, and a file attached by hand stays in the record of the turn it was attached to, so
+    // a five-turn conversation about one module used to carry five copies of it. Nothing is lost:
+    // the model still reads the file in full, once, in the message nearest the question — which is
+    // also the position it reads most reliably.
+    if (alreadyBelow?.(c)) return `${head}\n(unchanged, and sent in full further down this conversation)`;
     if (!c.untrusted) return `${head}\n${c.body}`;
     const body = c.body.split(`⟦${nonce}`).join("⟦removed-fence");
     return `${head}\n⟦${nonce}:begin⟧\n${body}\n⟦${nonce}:end⟧`;

@@ -20,6 +20,8 @@ import type {
 } from "./types.js";
 import { EMPTY_USAGE } from "./types.js";
 import { keepCacheMarks } from "./cache.js";
+import { isSelfHostedProvider } from "../redaction/index.js";
+import { toolCallsFromText } from "./textToolCall.js";
 
 export interface OpenAIProviderOptions {
   id: string;
@@ -31,6 +33,20 @@ export interface OpenAIProviderOptions {
   referer?: string;
   title?: string;
   timeoutMs?: number;
+  /**
+   * Ask OpenRouter for Anthropic's prompt cache, which means marking content parts.
+   *
+   * OFF by default, and the reason is worth keeping: turning it on changes the SHAPE of the
+   * request. A message's `content` stops being a string and becomes an array of parts, because that
+   * is the only place `cache_control` can go. Every provider behind OpenRouter then has to accept
+   * that shape, and not all of them do the same thing with it — one of them answered with an empty
+   * completion, billed for the prompt, and reported no error at all. The extension looked as though
+   * it had stopped working, for a week, and nothing in the request said why.
+   *
+   * The saving is real — a cache read costs a tenth of an input token — so the option stays. What
+   * does not stay is it being on for everybody by default.
+   */
+  promptCache?: boolean;
 }
 
 const trimSlash = (u: string) => u.replace(/\/+$/, "");
@@ -100,6 +116,7 @@ export class OpenAICompatibleProvider implements Provider {
    */
   private async post(body: Record<string, unknown>, signal?: AbortSignal): Promise<Response> {
     let attempt = body;
+    let waits = 0;
     for (let tries = 0; ; tries++) {
       const res = await request(`${this.baseUrl}/chat/completions`, {
         method: "POST",
@@ -109,17 +126,61 @@ export class OpenAICompatibleProvider implements Provider {
         timeoutMs: this.opts.timeoutMs ?? 180_000,
         label: "chat",
       });
-      if (res.ok || res.status !== 400 || tries >= 2) return res;
+
+      // A 402 that carries `Retry-After` is not an empty account.
+      //
+      // OpenRouter answers 402 for two unrelated things. One is the balance, which no retry fixes.
+      // The other is its in-flight spending budget: requests already in flight have provisionally
+      // reserved credit, so a funded account is briefly told it cannot pay — and their
+      // documentation is explicit that this one is a wait-and-retry case, distinguished by the
+      // header. "A 402 Payment Required without the header is not a wait-and-retry case."
+      //
+      // Everything here treated 402 as terminal, and said so in a sentence about the account
+      // balance. Somebody with a valid key and credit to spare was told their account was empty,
+      // and no retry was attempted, so the turn simply ended.
+      //
+      // The header alone decides. Reading the body for `limit_source` would consume it, and a
+      // response whose body has been drunk can no longer explain itself if the wait does not help.
+      const pause = retryAfterMs(res);
+      if (pause !== undefined && waits < 2) {
+        waits += 1;
+        await sleep(pause, signal);
+        continue;
+      }
+
+      // 400 is the server objecting to a FIELD. 402 is it objecting to the SIZE — and it says by
+      // how much: "you requested up to 4096 tokens, but can only afford 1991".
+      //
+      // ⚠️ Only 400 came here, so the one refusal that carries its own remedy was the one that never
+      // reached the code that applies remedies. A funded-but-nearly-empty account got a dead end
+      // where a shorter answer was available, and the fix to `adaptRequest` was unreachable until
+      // this line changed. Two defects, one of them hiding the other.
+      const adaptable = res.status === 400 || res.status === 402;
+      if (res.ok || !adaptable || tries >= 2) return res;
       // The body has to be read to know what it objected to, which consumes it — so a response that
       // teaches us nothing is rebuilt from what was read rather than returned half-drunk.
       const detail = await res.text();
       const fixed = adaptRequest(attempt, detail);
       if (!fixed) return new Response(detail, { status: res.status, statusText: res.statusText });
+      // What it accepted, so the answer can say it was shortened rather than let the user read a
+      // fragment as the model's opinion.
+      const capped = Number(fixed["max_tokens"] ?? fixed["max_completion_tokens"] ?? 0);
+      if (res.status === 402 && capped > 0) this.lastShortened = capped;
       attempt = fixed;
     }
   }
 
+  /**
+   * The cap a 402 forced this request down to, when one did.
+   *
+   * On the instance rather than threaded through, because the adaptation happens two layers below
+   * `chat` and the only consumer is the result it returns. Cleared at the start of every turn, so a
+   * later answer never inherits an earlier shortening.
+   */
+  private lastShortened: number | undefined;
+
   async chat(req: ChatRequest, onDelta?: (d: ChatDelta) => void): Promise<ChatResult> {
+    this.lastShortened = undefined;
     // The same ceiling of four, because the same models are behind OpenRouter — a request with five
     // breakpoints is refused by Anthropic whichever door it came through.
     const marks = keepCacheMarks(req.messages.flatMap((m, i) => (m.cacheable ? [i] : [])));
@@ -147,7 +208,7 @@ export class OpenAICompatibleProvider implements Provider {
         // whole transcript on EVERY request. That is what this extension's own cost report was
         // showing and nobody could see why: the marker existed, and only the native Anthropic
         // client ever emitted it. OpenAI's and DeepSeek's caches are automatic and ignore the field.
-        const cache = this.id === "openrouter" && marks.has(index);
+        const cache = this.opts.promptCache === true && this.id === "openrouter" && marks.has(index);
         if (m.images?.length || cache) {
           const text: Record<string, unknown> = { type: "text", text: m.content };
           if (cache) text["cache_control"] = { type: "ephemeral" };
@@ -173,7 +234,7 @@ export class OpenAICompatibleProvider implements Provider {
         function: { name: t.name, description: t.description, parameters: t.parameters },
       }));
     }
-    // Reasoning. OpenRouter normalises it under `reasoning`; OpenAI's own API and several
+    // Reasoning. OpenRouter normalizes it under `reasoning`; OpenAI's own API and several
     // gateways take `reasoning_effort`. Sending both is safe: an unknown field is dropped, and a
     // server that knows one of them gets the intent.
     if (req.reasoning && req.reasoning !== "none") {
@@ -183,13 +244,20 @@ export class OpenAICompatibleProvider implements Provider {
       // Explicitly off, so a model that thinks by default does not bill for it.
       body["reasoning"] = { exclude: true };
     }
+    // ⚠️ A side task on a self-hosted server: thinking OFF. "none" above sends nothing to
+    // llama.cpp, and nothing means the chat template's default effort — so an edit prediction or a
+    // commit message thought for longer than it took to write. Only for chores and only on the
+    // user's own server (llama.cpp reads `reasoning_effort: "none"` as enable_thinking=false); a
+    // turn somebody is waiting to read keeps its thinking, and clouds are left exactly as they were.
+    // A server that rejects the field gets the request again without it — see `adaptRequest`.
+    if (req.chore && isSelfHostedProvider(this.id)) body["reasoning_effort"] = "none";
 
     // Ask for the accounting. OpenAI-compatible servers that do not know the field ignore it.
     body["stream_options"] = { include_usage: true };
     if (this.id === "openrouter") body["usage"] = { include: true };
 
     const res = await this.post(body, req.signal);
-    if (!res.ok || !res.body) throw new Error(await describeHttpError(res));
+    if (!res.ok || !res.body) throw new Error(await describeHttpError(res, this.id));
 
     let text = "";
     let reasoning = "";
@@ -213,7 +281,7 @@ export class OpenAICompatibleProvider implements Provider {
       if (!choice) continue;
       if (choice.finish_reason === "length") stopReason = "length";
       const delta = choice.delta ?? {};
-      // DeepSeek names it reasoning_content, OpenRouter normalises to reasoning.
+      // DeepSeek names it reasoning_content, OpenRouter normalizes to reasoning.
       const r = delta.reasoning_content ?? delta.reasoning;
       if (typeof r === "string" && r) {
         reasoning += r;
@@ -237,9 +305,43 @@ export class OpenAICompatibleProvider implements Provider {
       .sort((a, b) => a[0] - b[0])
       .map(([i, t]) => ({ id: t.id || `call_${i}`, name: t.name, args: t.args || "{}" }))
       .filter((t) => t.name);
-    if (toolCalls.length) stopReason = "tool_calls";
 
-    return { text, reasoning, toolCalls, usage, stopReason };
+    // The call the model wrote in its message because its runtime does not emit the protocol one.
+    //
+    // Not an edge case: Ollama returns `qwen2.5-coder`'s tool calls as text in `content`, with
+    // `tool_calls: null` and `finish_reason: "stop"` — the model named in this project's README, on
+    // the runtime its README says to install. Agent mode therefore did nothing at all on the
+    // default local setup: the model produced correct calls and they were printed as prose.
+    //
+    // Only when the protocol returned nothing, and only when the message is nothing but the call —
+    // see `toolCallsFromText`, where the rules and the reasons live. The text is dropped when a call
+    // is recognised, because it is not an answer and showing raw JSON as one is how this was missed.
+    if (!toolCalls.length && text.trim()) {
+      const written = toolCallsFromText(text, (req.tools ?? []).map((t) => t.name));
+      if (written.length) {
+        toolCalls.push(...written);
+        text = "";
+      }
+    }
+    // ⚠️ Cut off by the output cap: a call still being written when the budget ran out is HALF a
+    // call. It used to be kept, and `stopReason` overwritten with "tool_calls" — so the turn ran a
+    // call with broken JSON, the model was told its arguments were unreadable, wrote the same huge
+    // call again and was cut again, four minutes a time on a local model, and nobody was told the
+    // budget was the reason. Complete calls are kept; an unfinished one is dropped, and "length"
+    // survives so the loop can ask for the rest. Seen live on Qwen3.8 through llama.cpp: "Here is
+    // the plan, then I'll get started:" and then nothing, 8192 tokens later.
+    const cut = stopReason === "length";
+    const usable = cut ? toolCalls.filter((c) => isCompleteJson(c.args)) : toolCalls;
+    if (usable.length && !cut) stopReason = "tool_calls";
+
+    return {
+      text,
+      reasoning,
+      toolCalls: usable,
+      usage,
+      stopReason,
+      ...(this.lastShortened ? { shortenedTo: this.lastShortened } : {}),
+    };
   }
 
   /**
@@ -268,7 +370,7 @@ export class OpenAICompatibleProvider implements Provider {
         }),
         signal: req.signal,
       });
-      if (!res.ok) throw new Error(await describeHttpError(res));
+      if (!res.ok) throw new Error(await describeHttpError(res, this.id));
       const json = (await res.json()) as { response?: string };
       return json.response ?? "";
     }
@@ -289,7 +391,7 @@ export class OpenAICompatibleProvider implements Provider {
       }),
       signal: req.signal,
     });
-    if (!res.ok) throw new Error(await describeHttpError(res));
+    if (!res.ok) throw new Error(await describeHttpError(res, this.id));
     const json = (await res.json()) as any;
     return json.choices?.[0]?.text ?? "";
   }
@@ -330,7 +432,7 @@ export class OpenAICompatibleProvider implements Provider {
     if (await this.isOllamaServer()) {
       const root = trimSlash(this.baseUrl).replace(/\/v1$/, "");
       const res = await request(`${root}/api/tags`, { timeoutMs: 15_000, label: "model list" });
-      if (!res.ok) throw new Error(await describeHttpError(res));
+      if (!res.ok) throw new Error(await describeHttpError(res, this.id));
       const json = (await res.json()) as any;
       return (json.models ?? []).map((m: any) => m.name).filter(Boolean);
     }
@@ -345,10 +447,60 @@ export class OpenAICompatibleProvider implements Provider {
  * an empty message, a content filter — because retrying those would only spend the user's time
  * twice on the same error.
  */
+/**
+ * How many tokens the provider says the balance can still afford.
+ *
+ * OpenRouter's 402 carries the answer inside the refusal:
+ *
+ *     "This request requires more credits, or fewer max_tokens.
+ *      You requested up to 4096 tokens, but can only afford 1991."
+ *
+ * and its `remedy_hint` says the same thing: add credit, **or lower `max_tokens` to fit the
+ * remaining balance**. So the request is repeatable for what is affordable, and the user gets a
+ * shorter answer where they used to get an error.
+ */
+export function affordableTokens(error: string): number | undefined {
+  const found = /can only afford\s+(\d+)/i.exec(error ?? "");
+  if (!found) return undefined;
+  const n = Number(found[1]);
+  return Number.isFinite(n) && n > 0 ? n : undefined;
+}
+
+/**
+ * Below this, there is no answer worth returning.
+ *
+ * A reply in a hundred and fifty tokens is not a short answer, it is a fragment — and a fragment
+ * returned silently is worse than the error, because the user reads it as what the model thinks.
+ * Under the floor the refusal stands and says the balance is the problem.
+ */
+const MIN_USEFUL_ANSWER = 256;
+
 export function adaptRequest(body: Record<string, unknown>, error: string): Record<string, unknown> | undefined {
   const said = error.toLowerCase();
   const next = { ...body };
   let changed = false;
+
+  // The balance, first and on its own, because the generic rule below would get this exactly
+  // backwards.
+  //
+  // ⚠️ The refusal contains the words `max_tokens` — "requires more credits, or fewer max_tokens" —
+  // so "remove whatever the server names" DELETED the cap and retried without one: asking for an
+  // unbounded answer at the moment the server said to ask for a smaller one. It was then refused
+  // again, and the user saw a dead end where a shorter answer was available.
+  const affordable = affordableTokens(error);
+  if (affordable !== undefined) {
+    const asked = Number(next["max_tokens"] ?? next["max_completion_tokens"] ?? 0);
+    // Only when it is genuinely lower. If the cap was already under what is affordable then the
+    // refusal is about the PROMPT, not the answer, and lowering it further would claim to have fixed
+    // something it has not.
+    if (affordable >= MIN_USEFUL_ANSWER && asked > affordable) {
+      if ("max_tokens" in next) next["max_tokens"] = affordable;
+      if ("max_completion_tokens" in next) next["max_completion_tokens"] = affordable;
+      return next;
+    }
+    // Nothing worth retrying for: let the refusal stand, with its own text, which names the remedy.
+    return undefined;
+  }
 
   // OpenAI's rename. Only when the server asks for it by name: elsewhere `max_tokens` is the field
   // that works, and swapping it blindly would break every server that never renamed anything.
@@ -375,22 +527,111 @@ export function isOllama(baseUrl: string): boolean {
   return /:11434(\/|$)/.test(baseUrl) || /ollama/i.test(baseUrl);
 }
 
-export async function describeHttpError(res: Response): Promise<string> {
+/**
+ * `provider` is named in the message because with a Hivey preset it is not the one the panel shows.
+ *
+ * "Check the API key" is unhelpful advice to somebody who has just checked the API key — of the
+ * provider they selected, which is not the one that answered. Naming it turns the message into
+ * something a person can act on.
+ */
+/**
+ * How long to wait before repeating a request, when the server has said it is worth repeating.
+ *
+ * Only for 402 — the documented wait-and-retry status on OpenRouter, where it means the in-flight
+ * spending budget rather than the balance. A 429 is deliberately NOT handled here: a rate limit is
+ * answered by moving to the next endpoint in the fallback chain, which is both faster and the
+ * behavior the free preset depends on.
+ *
+ * Bounded at thirty seconds. A server asking for longer than that is not asking for a retry, it is
+ * asking to be left alone, and a request that hangs for a minute with nothing on screen is
+ * indistinguishable from one that is broken.
+ */
+function retryAfterMs(res: Response): number | undefined {
+  if (res.status !== 402) return undefined;
+  const header = res.headers.get("retry-after");
+  if (!header) return undefined;
+  const seconds = Number(header.trim());
+  if (!Number.isFinite(seconds) || seconds < 0 || seconds > 30) return undefined;
+  // Zero is a legitimate answer and means "immediately"; a short floor keeps it from spinning.
+  return Math.max(250, seconds * 1000);
+}
+
+/** A wait a cancelled turn does not sit through. */
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve) => {
+    if (signal?.aborted) return resolve();
+    const timer = setTimeout(done, ms);
+    function done(): void {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", done);
+      resolve();
+    }
+    signal?.addEventListener("abort", done, { once: true });
+  });
+}
+
+export async function describeHttpError(res: Response, provider?: string): Promise<string> {
   let detail = "";
+  /**
+   * Which limit the provider says it hit, when it says so.
+   *
+   * ⚠️ Worth reading, because the alternative is two sentences contradicting each other. On a 402
+   * OpenRouter's own message said "adjust the key's monthly limit" while this client said "this is
+   * the account balance, not the API key" — and the client was right, so the key's limit was raised,
+   * twice, and nothing changed. The structured field says `openrouter_credits`, which is the one
+   * thing neither sentence established.
+   */
+  let limitSource = "";
   try {
     const body = await res.text();
     const json = JSON.parse(body);
     detail = json?.error?.message ?? json?.error ?? json?.message ?? body.slice(0, 300);
+    const source = json?.error?.metadata?.limit_source;
+    if (typeof source === "string" && source) limitSource = source;
   } catch {
     /* body already consumed or not JSON */
   }
   const hint =
     res.status === 401 || res.status === 403
-      ? " — check the API key (Hivey Code: “Store a provider key”)."
-      : res.status === 404
-        ? " — check the endpoint URL and that the model exists on it."
-        : res.status === 429
-          ? " — rate limited by the provider."
-          : "";
+      ? ` — check the API key for ${provider ?? "this provider"} (Hivey Code: “Store a provider key”).`
+      : // 402 covers two unrelated things, and saying the wrong one sends people to look at a
+        // balance that is fine. With `Retry-After` it is a temporary hold — credit reserved by
+        // requests still in flight — and it has already been waited out twice by the time this
+        // message is built. Without it, it really is the balance, and no key and no retry fix that.
+        res.status === 402
+        ? res.headers.get("retry-after")
+          ? ` — ${provider ?? "the provider"} is holding credit for requests still in flight, not refusing the key. It was retried and still said no; try again in a moment.`
+          : limitSource
+            ? // Said by the provider rather than inferred. `openrouter_credits` means the account
+              // has no money; a key or organisation limit means there IS money and something is
+              // capping it. Sending somebody to the wrong one of those costs an afternoon.
+              ` — the limit that refused this is \`${limitSource}\`. ${
+                /credit/i.test(limitSource)
+                  ? // ⚠️ Said this plainly because the obvious reading is the wrong one, and it cost an
+                    // afternoon: a key's limit is PERMISSION TO SPEND, not money. A $50 limit on an
+                    // account with a zero balance means "you may spend up to $50 of what you have",
+                    // and there is nothing to spend. What turns a limit into usable headroom is auto
+                    // top-up — so when a balance refuses a request, auto top-up either is not on, has
+                    // not reached its threshold, or its payment failed. The provider's own message
+                    // sends you to the key's limit, which changes none of those.
+                    `That is the account BALANCE, not your key's limit — a limit is permission to spend money the account has. Check the balance and auto top-up (a declined card is the usual cause); raising the key's limit does nothing.`
+                  : "That is a configured cap rather than the balance — raise it where it is set."
+              } A Hivey preset always bills your OpenRouter account, whichever provider the panel shows.`
+            : ` — this is the account balance at ${provider ?? "the provider"}, not the API key. A Hivey preset always bills your OpenRouter account, whichever provider the panel shows.`
+        : res.status === 404
+          ? " — check the endpoint URL and that the model exists on it."
+          : res.status === 429
+            ? " — rate limited by the provider."
+            : "";
   return `HTTP ${res.status} ${res.statusText}${detail ? `: ${detail}` : ""}${hint}`;
+}
+
+/** Whether a tool call's arguments are a whole JSON value — false for one the output cap cut short. */
+export function isCompleteJson(args: string): boolean {
+  try {
+    JSON.parse(args || "{}");
+    return true;
+  } catch {
+    return false;
+  }
 }
