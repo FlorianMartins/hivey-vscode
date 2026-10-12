@@ -21,6 +21,12 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **Bordure de saisie : une lumière violette qui fait le tour, lisible et fluide.** « on ne voit pas
+  bien la rotation même si j'aime bien les couleurs ». Les couleurs restent, atténuées et immobiles,
+  comme piste ; une seule lumière violette au cœur vif parcourt le contour de la zone de saisie à
+  vitesse constante, coins arrondis compris (`offset-path: border-box`, 3,5 s par tour), avec son halo.
+  Les versions précédentes tournaient autour du centre, d'où une vitesse qui s'emballait sur les côtés
+  longs et cassait aux coins. Désactivée si le système demande moins d'animations.
 - **⚠️ Plus aucune limite manuelle de contexte ou de tokens : tout suit la fenêtre du modèle choisi.**
   « supprime toutes les limites en terme de contexte ou de token même pour les modèles cloud, il faut
   s'adapter aux limites des modèles ». Les plafonds fixes des outils deviennent une part de la fenêtre
