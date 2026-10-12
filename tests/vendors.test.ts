@@ -8,6 +8,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { describeMissingEndpoint } from "../src/core/providers/endpoint.js";
 import { AnthropicProvider, makeProvider, OpenAICompatibleProvider } from "../src/core/providers/index.js";
 import {
   defaultEndpoints,
@@ -74,7 +75,7 @@ test("the dialect follows the vendor, not the caller", () => {
   for (const v of REMOTE_VENDORS.filter((x) => x.wire === "openai")) {
     const p = makeProvider({ id: v.id, baseUrl: v.baseUrl || "https://gateway.example/v1", apiKey: "k" });
     assert.ok(p instanceof OpenAICompatibleProvider, `${v.id} would be spoken to in the wrong dialect`);
-    assert.equal(p.isLocal, false, `${v.id} would skip pseudonymisation`);
+    assert.equal(p.isLocal, false, `${v.id} would skip pseudonymization`);
   }
 });
 
@@ -84,7 +85,9 @@ test("the settings spell every vendor's address, with the same default", () => {
     const declared = setting(key);
     assert.ok(declared, `${key} is not in the manifest, so the address cannot be changed`);
     assert.equal(declared.default, v.baseUrl, `${key} defaults to something else than the table says`);
-    const nlsKey = declared.description?.replace(/%/g, "");
+    // Either spelling: the endpoint settings use `markdownDescription` so that the warning about
+    // pasting a key there can be emphasised, and the rest use `description`.
+    const nlsKey = (declared.markdownDescription ?? declared.description)?.replace(/%/g, "");
     assert.ok(nls[nlsKey], `${nlsKey} has no English text`);
     assert.ok(nlsFr[nlsKey], `${nlsKey} has no French text`);
   }
@@ -111,4 +114,49 @@ test("the vendors a user pays directly are the ones asked what they serve", () =
   for (const id of ["openai", "deepseek", "qwen", "perplexity", "mistral", "google", "groq", "xai"]) {
     assert.ok(ids.includes(id as never), `${id} would never show a model in the picker`);
   }
+});
+
+test("the missing-address message names the setting it is about", () => {
+  // "Set hiveyCode.endpoints in the settings" named a prefix, not a key — and a gateway is the one
+  // provider with no default address, so this message is the whole of the instruction its user
+  // gets. Asserted against the manifest so that a renamed setting breaks the sentence rather than
+  // the user's afternoon.
+  const said = describeMissingEndpoint("openai-compatible", "hiveyCode", endpointSettingKey("openai-compatible"));
+  assert.match(said, /openaiCompatible/, said);
+  assert.match(said, /Set up a model/, "the message does not point at the screen that fills this in");
+  assert.ok(setting("hiveyCode.endpoints.openaiCompatible"), "the setting the message names is not in the manifest");
+});
+
+test("the test runner is not invoked in a way that means different things to different Nodes", () => {
+  // `node --test dist-tests/` was the obvious call and is not portable: what a positional argument
+  // MEANS to the runner changed between releases. A literal glob is not the answer either — Node 18
+  // has no glob support, and npm runs scripts through cmd.exe on Windows, which does not expand
+  // one, so the pattern would arrive as text on exactly the platform where it cannot be read.
+  const manifest = JSON.parse(readFileSync("package.json", "utf8")) as { scripts: Record<string, string> };
+  assert.doesNotMatch(
+    manifest.scripts["test"] ?? "",
+    /--test\s+\S*[/*]/,
+    "the runner is handed a directory or a glob, which is version- and platform-dependent",
+  );
+  assert.match(manifest.scripts["test"] ?? "", /run-tests\.mjs/);
+});
+
+test("every Node the manifest claims to support is actually run by CI", () => {
+  // `engines` said 18 or later while CI ran 20 alone: two of the three claims were never exercised.
+  const manifest = JSON.parse(readFileSync("package.json", "utf8")) as { engines: Record<string, string> };
+  const lowest = Number(/(\d+)/.exec(manifest.engines["node"] ?? "")?.[1]);
+  const ci = readFileSync(".github/workflows/ci.yml", "utf8");
+  const matrix = [...ci.matchAll(/node(?:-version)?:\s*\[([^\]]*)\]/g)].flatMap((m) =>
+    (m[1] ?? "").split(",").map((v) => Number(v.replace(/["'\s]/g, ""))),
+  );
+  assert.ok(matrix.includes(lowest), `engines says node >= ${lowest} and CI never runs it: ${matrix.join(", ")}`);
+  assert.ok(matrix.length >= 2, "a single version in the matrix proves nothing about a range");
+});
+
+test("the numbers the documentation claims are checked by CI", () => {
+  // The checker is the guard; this is the guard that the guard is wired. A script nobody runs is a
+  // script that goes stale alongside the thing it was meant to keep honest.
+  const manifest = JSON.parse(readFileSync("package.json", "utf8")) as { scripts: Record<string, string> };
+  assert.match(manifest.scripts["check:numbers"] ?? "", /check-numbers\.mjs/);
+  assert.match(readFileSync(".github/workflows/ci.yml", "utf8"), /npm run check:numbers/);
 });

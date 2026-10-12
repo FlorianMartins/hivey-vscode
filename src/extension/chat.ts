@@ -7,20 +7,42 @@
 // it is deliberately the only place that knows about all of them.
 
 import * as vscode from "vscode";
-import { callSignature } from "../core/agent/callSignature.js";
+import { discardChanges, dirtyPaths } from "./integrations/git.js";
+import { planGitRestore } from "../core/session/gitRestore.js";
+import { DEFAULT_AGENT_STEPS } from "../core/agent/definitions.js";
+import { changeSize, describeChangeSize } from "../core/text/diff.js";
+import { spawn } from "node:child_process";
+import { closeSync, fstatSync, openSync, readSync } from "node:fs";
+import * as fsp from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import {
+  AUDIO_EXTENSION,
+  cleanTranscript,
+  dictationMode,
+  transcriptionEndpoint,
+  transcriptionModel,
+  recogniserLanguage,
+  localCommand,
+  transcriptionBody,
+} from "../core/dictation/dictation.js";
+import { checkCredentials, normalizeBaseUrl } from "../core/providers/credentials.js";
+import { callSignature, safeArgs } from "../core/agent/callSignature.js";
 import { knowledgeAmbient } from "./knowledge.js";
-import { language, t } from "../shared/i18n.js";
+import { en, language, t, withoutModelText } from "../shared/i18n.js";
 import { runTurn, type Tool } from "../core/agent/loop.js";
 import { Permissions, commandPrefix, type PermissionStore, type Rule } from "../core/agent/permissions.js";
-import { stablePrompt, turnDirectives } from "../core/prompts.js";
-import { costOf, makeLookup, type Price } from "../core/router/pricing.js";
+import { detectLanguage, languageDirective, stablePrompt, turnDirectives } from "../core/prompts.js";
+import { costOf, estimateCost, makeLookup, type Price } from "../core/router/pricing.js";
 import { calibrate, observe, prune, type Calibration } from "../core/util/calibrate.js";
-import { handoverNote, verifyTurn, type TurnStep } from "../core/router/outcome.js";
+import { acceptsImages, IMAGE_TOKENS, isCatalogued, isImageRefusal, withoutImages } from "../core/models/vision.js";
+import { checkEndpoint } from "../core/providers/endpoint.js";
+import { handoverNote, selfCheckMessage, verifyTurn, type TurnStep } from "../core/router/outcome.js";
 import { unifiedDiff } from "../core/text/diff.js";
 import { escalationTarget, route, type Route } from "../core/router/route.js";
-import { describeFallback, fallbackChain, isRetryable } from "../core/router/fallback.js";
+import { describeFallback, fallbackChain, isContextOverflow, isRetryable } from "../core/router/fallback.js";
 import type { Provider } from "../core/providers/index.js";
-import { Session, type ContextItem, type Entry, type SessionData } from "../core/session/session.js";
+import { Session, renderEntry, type ContextItem, type Entry, type SessionData } from "../core/session/session.js";
 import { headToTokens } from "../core/util/tokens.js";
 import { matchesName } from "../core/ibmi/sql.js";
 import { arcadInstalled } from "./integrations/arcad.js";
@@ -39,9 +61,10 @@ import { compactBrief, digestEntries, sessionAsContext, shouldSuggestCompact } f
 import {
   ALWAYS_ON,
   BUILTIN_SKILLS,
-  detectGroups,
+  builtinSkillsForModel,
+  familiesInPlay,
   isSkillEnabled,
-  normaliseGroups,
+  normalizeGroups,
   SKILL_GROUPS,
   skillInvocation,
   toggleSkill,
@@ -50,6 +73,18 @@ import {
 import { capture, describeRestore, trimCheckpoints } from "../core/session/checkpoint.js";
 import type { Plan } from "../core/agent/plan.js";
 import { promptForMode, toolsForMode } from "../core/session/modes.js";
+import { Hooks } from "./hooks.js";
+import { policyState } from "./policy.js";
+import {
+  DEFAULT_TRIGGERS,
+  describeOpinion,
+  needsSecondOpinion,
+  parseObjections,
+  secondOpinionPrompt,
+} from "../core/review/second.js";
+import type { Corpus } from "./corpus.js";
+import type { LearnedRouting } from "./learned.js";
+import type { Episode } from "../core/corpus/corpus.js";
 import { detectIbmiLanguage, ibmiPrompt } from "../core/ibmi/languages.js";
 import { hiveyLabel, hiveyModel, isHivey } from "../core/router/hivey.js";
 import { parsePrompt, participantDirective, type MentionKind, type Participant } from "../core/session/mentions.js";
@@ -63,7 +98,7 @@ import { discoverLocal, rankModels, suggestPull } from "../core/providers/discov
 import { endpointSettingKey, REMOTE_VENDORS, vendor, type ProviderId } from "../core/providers/vendors.js";
 import { request } from "../core/util/http.js";
 import { estimateTokens } from "../core/util/tokens.js";
-import { isLocalEndpoint, Vault } from "../core/redaction/index.js";
+import { isLocalEndpoint, streamingRestorer, Vault } from "../core/redaction/index.js";
 import type {
   Mode,
   Reasoning,
@@ -81,11 +116,27 @@ import type {
   UiSkillGroup,
   UiWizard,
   UiState,
+  UiApproval,
 } from "../shared/protocol.js";
-import { SECTION, endpointFor, providerFor, readSettings, routerConfig, type Keys, type Settings, writeTarget } from "./config.js";
-import { EgressGate, safeHost } from "./egress.js";
-import { labelFor, listModels, openFiles, openFileUris, supportsReasoning } from "./models.js";
+import { findRecorder, inputDevices, installWhisper, installedWhisper, recordArgv, recorderAdvice, runWhisper, startRecording } from "./whisper.js";
+import { modelFor, whisperAsset } from "../core/dictation/local.js";
+import { describeWav } from "../core/dictation/wav.js";
+import { chooseDevice, isDeviceError, recorders } from "../core/dictation/capture.js";
+import { pickMicrophone } from "./microphone.js";
+import { SECTION, endpointFor, providerFor, readSettings, routerConfig, trustsSelfHosted, type Keys, type Settings, writeTarget } from "./config.js";
+import { EgressGate, safeHost, summarize } from "./egress.js";
+import { renderPromptAudit, type PromptAudit } from "../core/audit/prompt.js";
+import { youShouldKnow, type Notice } from "../core/session/notices.js";
+import { MUTATING_TOOLS, VERIFIER_TOOLS } from "../core/router/outcome.js";
+import { effortToSend, promptedThinking, splitThinkingText, thinkingMode, thinkingSplitter } from "../core/router/thinking.js";
+import { planVerdict } from "../core/agent/plan.js";
+import { contextWindow, labelFor, listModels, openFiles, openFileUris, ownModelIds, supportsReasoning } from "./models.js";
+import { servedSetChanged } from "../core/models/watch.js";
+import { billsTheUser } from "../core/router/billing.js";
+import { attachmentTokens } from "./budgets.js";
 import { loadPrices } from "./prices.js";
+import { contextBudget, repoMapBudget } from "../core/context/budget.js";
+import { perFileBudget } from "../core/util/tokens.js";
 import { buildTools } from "./tools.js";
 import { McpManager } from "./integrations/mcp.js";
 import { WorkspaceContext, relative } from "./workspace.js";
@@ -94,6 +145,8 @@ const HISTORY_KEY = "hiveyCode.sessions";
 const PERMISSIONS_KEY = "hiveyCode.permissions";
 /** Set once the user has been through the first-run screen, or dismissed it. */
 const SETUP_SEEN_KEY = "hiveyCode.setupSeen";
+const VISIONLESS_KEY = "hiveyCode.visionless";
+const VISIONLESS_TTL_MS = 24 * 60 * 60 * 1000;
 
 /**
  * The only addresses `openExternal` will open.
@@ -110,7 +163,17 @@ const ALLOWED_LINKS = [
 
 const PREFS_KEY = "hiveyCode.prefs";
 /** What each model's provider has actually been counting. See `core/util/calibrate.ts`. */
-const CALIBRATION_KEY = "hiveyCode.tokenCalibration";
+/**
+ * The stored token calibration.
+ *
+ * The key carries a generation, and this is the second. Everything under the first was learned from
+ * a measurement that compared our estimate WITHOUT the images against the provider's count WITH
+ * them, so every request carrying a screenshot taught a ratio above 1 for a reason that had nothing
+ * to do with tokenization, and the factor drifted upwards — inflating the estimate on the consent
+ * card and the figure the spending cap is checked against. Keeping that table would mean carrying
+ * the error for another ten requests. Bad measurements are discarded, not averaged out.
+ */
+const CALIBRATION_KEY = "hiveyCode.tokenCalibration.v2";
 const HISTORY_MAX = 100;
 
 interface Prefs {
@@ -127,6 +190,18 @@ class MementoPermissionStore implements PermissionStore {
     void this.memento.update(PERMISSIONS_KEY, rules);
   }
 }
+
+/**
+ * The tools whose presence means a turn was VERIFIED.
+ *
+ * A turn that ran no check is neither a success nor a failure, and recording it as either would
+ * teach the learned router from nothing — which is how a model with a perfect record turns out to
+ * have answered twenty questions nobody checked.
+ */
+// ⚠️ This was a second copy of `VERIFIERS` from `core/router/outcome.ts` — the same five names, in
+// two files, with nothing keeping them in step. Adding a verifier to the router would have silently
+// stopped the panel counting it, and the learned routing would have gone on measuring the old set.
+// One source, imported.
 
 export class ChatViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewId = "hiveyCode.chat";
@@ -145,6 +220,57 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private modelsLoading = false;
   private historyFilter: UiHistoryFilter = { query: "", period: "all", mode: "all", paidOnly: false, sort: "updated" };
   private readonly approvals = new Map<string, (answer: "once" | "session" | "always" | "no") => void>();
+
+  /**
+   * The same questions, in a form the panel can DRAW — and redraw.
+   *
+   * The map above holds what to do with an answer; this holds what the question looks like. Kept
+   * because a card that exists only as a message the panel has already consumed cannot survive a
+   * rebuild, and a lost card is a turn that waits for ever on a request that has already been paid
+   * for. Every path that adds to one of these adds to both, and every path that resolves removes
+   * from both — see `ask`.
+   */
+  private pendingApprovals: UiApproval[] = [];
+
+  /**
+   * Post a question, draw it from the state, and clean up however it is answered.
+   *
+   * One function for all three kinds — a tool asking permission, consent to send, an edit to
+   * review — because the thing that went wrong was bookkeeping, and three copies of bookkeeping is
+   * three chances to forget the line that removes the card.
+   */
+  private askInPanel(
+    request: UiApproval,
+    decide: (answer: "once" | "session" | "always" | "no") => void,
+    onAbort?: () => void,
+  ): void {
+    this.pendingApprovals = [...this.pendingApprovals, request];
+    this.approvals.set(request.id, (answer) => {
+      this.forgetApproval(request.id);
+      decide(answer);
+      // ⚠️ The panel is told the question is gone. Without this, the card stayed on screen marked
+      // "Allowed once." and "Waiting for your answer above" sat under the composer for the rest of
+      // the session — reported exactly so. It had always been true and never visible, because every
+      // approval used to happen inside a TURN, and the turn's next step sent the state a moment
+      // later. The first approval asked outside a turn — may I install a recorder? — had nothing
+      // following it, and the residue became the whole of what you could see.
+      this.sendState();
+    });
+    this.sendState();
+    // A turn that is cancelled must not leave a promise hanging for ever, nor a card on screen for
+    // a question nobody is waiting on.
+    this.turn?.signal.addEventListener("abort", () => {
+      if (!this.approvals.delete(request.id)) return;
+      this.forgetApproval(request.id);
+      onAbort?.();
+      this.sendState();
+    });
+  }
+
+  private forgetApproval(id: string): void {
+    this.approvals.delete(id);
+    this.pendingApprovals = this.pendingApprovals.filter((a) => a.id !== id);
+  }
   private readonly priceLookup = makeLookup(loadPrices());
 
   /**
@@ -163,9 +289,90 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     void this.ctx.globalState.update(CALIBRATION_KEY, this.calibration);
   }
 
+  /**
+   * How much of the conversation may reach the model this turn.
+   *
+   * The user's figure when they set one, otherwise derived from the window of the model actually
+   * selected — see `core/context/budget.ts` for why a flat 8000 was destroying answers rather than
+   * saving money.
+   */
+  private budgetTokensFor(s: Settings): number {
+    // The answer budget is passed in, because the reserve has to hold whatever this user actually
+    // asks the model to write back: somebody who raised `chat.maxOutputTokens` has made the reply
+    // bigger, and a reserve computed from a default would be short by exactly that much.
+    return contextBudget(s.context.maxTokens, this.modelWindow(s), s.chat.maxOutputTokens);
+  }
+
+  /**
+   * "For this conversation" on the spending card.
+   *
+   * A cap is a habit; a piece of work is an exception. Someone in the middle of something expensive
+   * should not have to answer the same question at every turn, nor permanently move a limit they
+   * chose on purpose. Held in memory and cleared with the conversation, which is exactly as long as
+   * the exception is meant to last.
+   */
+  private budgetWaived = false;
+
+  /**
+   * What one attached file may take of it — counting the ones already attached.
+   *
+   * The count is what was missing. Each file used to be cut to a share of the budget computed as
+   * though it were the only one, so attaching a second doubled the context and a third trebled it,
+   * with nothing putting it right before the request was priced.
+   */
+  private perFileTokens(adding = 1): number {
+    const settings = readSettings();
+    return attachmentTokens(settings, this.attachments.length + adding, this.modelWindow(settings));
+  }
+
+  /** The selected model's own window, 0 when nothing knows it. */
+  private modelWindow(s: Settings): number {
+    const id = hiveyModel(s.chat.model, "everyday");
+    // The live list first, because a provider serving its own build of a model knows its window
+    // better than a catalogue does — then the catalogue, because the live list is fetched, fails
+    // silently, and is simply absent for the first seconds of every window. Falling through to zero
+    // sends the budget back to its floor, and the only visible effect of that is an attachment cut
+    // to a fraction of what the model could have read.
+    return this.models.find((m) => m.id === id)?.context || contextWindow(id);
+  }
+
   /** An estimate corrected by what this model has been measured to do. */
   private tokensFor(model: string, estimated: number): number {
     return calibrate(this.calibration, model, estimated);
+  }
+
+  /**
+   * "Always" on the spending card: move the cap that refused, far enough that it stops asking.
+   *
+   * Twice the request that tripped it, rounded up, and never downwards — the user answered a
+   * question about one request, and the honest reading of "always" is a ceiling that this kind of
+   * request fits under rather than one glued to this exact figure. Written globally: a spending
+   * limit is a fact about the person paying, not about the folder that happens to be open.
+   */
+  private async raiseBudget(
+    reason: "per-request" | "per-request-size" | "daily",
+    estimateUsd: number,
+    promptTokens?: number,
+  ): Promise<void> {
+    const config = vscode.workspace.getConfiguration(SECTION);
+    // A size refusal raises the SIZE ceiling. Raising a dollar cap because somebody accepted a very
+    // large request would answer a question nobody asked, and would leave the ceiling that actually
+    // stopped them exactly where it was — so the next identical request asks again.
+    if (reason === "per-request-size") {
+      const current = config.get<number>("budget.perRequestTokens", 0);
+      const next = Math.max(current, Math.ceil(((promptTokens ?? 0) * 2) / 1000) * 1000);
+      if (next === current) return;
+      await config.update("budget.perRequestTokens", next, vscode.ConfigurationTarget.Global);
+      this.post({ type: "status", text: t("Size ceiling raised to {0} tokens.", next.toLocaleString()) });
+      return;
+    }
+    const key = reason === "per-request" ? "budget.perRequestUsd" : "budget.dailyUsd";
+    const current = config.get<number>(key, 0);
+    const floor = reason === "per-request" ? estimateUsd : this.gate.budget.spentToday() + estimateUsd;
+    const next = Math.max(current, Math.ceil(floor * 2 * 100) / 100);
+    if (next === current) return;
+    await config.update(key, next, vscode.ConfigurationTarget.Global);
+    this.post({ type: "status", text: t("Cap raised to ${0}.", next.toFixed(2)) });
   }
   private readonly permissions: Permissions;
 
@@ -263,13 +470,26 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     // Whichever one the user brings forward becomes the one commands act on. Without this, opening
     // the right-hand copy would leave `openSearch` and friends talking to the hidden left one.
     view.onDidChangeVisibility(() => {
-      if (view.visible) this.view = view;
+      if (!view.visible) return;
+      this.view = view;
+      // Coming back to the panel is the likeliest moment for the list to be stale: pulling a model
+      // happens in a terminal, which means somewhere else.
+      void this.checkOwnModels();
     });
     view.webview.options = {
       enableScripts: true,
       localResourceRoots: [vscode.Uri.joinPath(this.ctx.extensionUri, "media")],
     };
     view.webview.html = this.html(view.webview);
+    // One timer for the whole provider, however many copies of the panel are resolved. It does
+    // nothing while every copy is hidden and nothing while a turn is running; two minutes is slow
+    // enough to be invisible in a proxy's access log and fast enough that a model pulled during a
+    // build is there by the time anybody looks.
+    if (!this.watchingOwnModels) {
+      this.watchingOwnModels = true;
+      const timer = setInterval(() => void this.checkOwnModels(), 120_000);
+      this.ctx.subscriptions.push(new vscode.Disposable(() => clearInterval(timer)));
+    }
     view.webview.onDidReceiveMessage((m: ToExtension) => void this.onMessage(m));
     // The list of open editors is part of the UI, so it has to follow the editor.
     const refresh = () => this.screen === "chat" && this.sendState();
@@ -309,7 +529,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       `script-src 'nonce-${nonce}'`,
     ].join("; ");
     return `<!DOCTYPE html>
-<html lang="${language()}">
+<html lang="${language()}" data-appearance="${readSettings().appearance}">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="${csp}">
@@ -317,11 +537,16 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 <link rel="stylesheet" href="${uri("style.css")}">
 <title>Hivey Code</title>
 </head>
-<!-- The floor below which the panel scrolls sideways instead of rearranging itself. Dragging the
-     side bar narrow otherwise reflows every toolbar, and a layout that moves while you resize is a
-     layout nobody trusts. Set through a style attribute rather than the stylesheet because the
-     value is a setting, and the stylesheet is static. -->
-<body style="min-width:${Math.max(0, Math.round(readSettings().panel.minWidth))}px">
+<!-- ⚠️⚠️ NO style ATTRIBUTE HERE, and that is the fix rather than an omission.
+     The floor below which the panel scrolls sideways instead of rearranging itself used to be written
+     as a min-width style attribute on this very element — which is precisely what style-src without
+     'unsafe-inline' forbids, and the CSP above has no 'unsafe-inline' on purpose, because a model's
+     output is rendered in this document. So the floor was declared in the one place this document's
+     own security policy guarantees will be thrown away, and for a whole release dragging the side bar
+     narrow did nothing: reported twice, and invisible to every test because the markup was exactly
+     right. It travels in the state now (panelMinWidth) and the page applies it as a style PROPERTY,
+     which the same policy allows. See src/webview/main.ts. -->
+<body>
 <div id="app"></div>
 <script nonce="${nonce}" src="${uri("webview.js")}"></script>
 </body>
@@ -339,8 +564,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       error: e.error,
       model: e.model,
       usdCost: e.usdCost,
+      ...(e.id === this.streamingEntryId ? { streaming: true } : {}),
+      ...(e.usage ? { usage: e.usage } : {}),
       ...(e.checkpoint?.length ? { checkpointFiles: e.checkpoint.length } : {}),
       ...(e.checkpointPartial ? { checkpointPartial: true } : {}),
+      ...(e.checkpointCommands ? { checkpointCommands: e.checkpointCommands } : {}),
       ...(e.plan ? { plan: e.plan } : {}),
       reasoning: e.reasoning,
       steps: e.steps,
@@ -355,9 +583,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     // What the editor is showing, offered rather than required. Recomputed on every state send
     // because it follows the active tab; the block list applies, so a file the policy excludes
     // simply does not appear.
-    const implicit = this.workspace.activeContext(3000, s);
+    const implicit = this.workspace.activeContext(this.perFileTokens(), s);
     const contextTokens = this.contextTokens();
-    const budgetTokens = s.context.maxTokens;
+    const budgetTokens = this.budgetTokensFor(s);
 
     const state: UiState = {
       screen: this.screen,
@@ -379,30 +607,59 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         : this.models.length
           ? labelFor(this.models, s.chat.model)
           : s.chat.model,
-      provider: s.chat.provider,
+      // WHERE THE REQUEST ACTUALLY GOES, not what the setting says.
+      //
+      // A Hivey preset is a routing over OpenRouter's catalogue, so `route()` sends it to OpenRouter
+      // before it ever looks at `chat.provider`. The panel was reporting the setting — so somebody
+      // who stored an OpenAI key, chose OpenAI in the composer and kept a preset as their model saw
+      // "OpenAI" while every request went to OpenRouter, against the OpenRouter balance. When that
+      // balance ran out the error said to top up an account they had not chosen to use, and nothing
+      // on screen connected the two.
+      provider: isHivey(s.chat.model) ? "openrouter" : s.chat.provider,
       // A preset is served from the catalogue, so it is remote whatever the provider setting still
       // says. Getting this wrong would not merely mislabel a row: this flag is what the empty
       // conversation reads to promise that nothing leaves the machine.
+      // Where the answer comes from. NOT whether it costs anything — those were the same field for
+      // two releases and a gateway broke both of them at once.
       remote: isHivey(s.chat.model) || !isLocalEndpoint(baseUrl),
+      // So the panel stops promising pseudonymization the gate no longer applies there.
+      trusted: !isHivey(s.chat.model) && trustsSelfHosted(s, s.chat.provider),
+      billed: isHivey(s.chat.model) || billsTheUser(s.chat.provider),
       contextTokens,
+      ...(this.contextParts().length ? { contextParts: this.contextParts() } : {}),
+      sentTokens: this.session.plannedTokens(budgetTokens),
       contextBudget: budgetTokens,
+      contextBudgetAuto: !(typeof s.context.maxTokens === "number" && s.context.maxTokens > 0),
       // The window the chosen model actually has, straight from the catalogue. Zero when it is not
       // known — a local runtime that reports no such number, most often — and the panel then offers
       // fixed steps instead of pretending to know a ceiling.
-      modelContext: this.models.find((m) => m.id === hiveyModel(s.chat.model, "everyday"))?.context ?? 0,
+      modelContext: this.modelWindow(s),
       contextFill: budgetTokens > 0 ? Math.min(1, contextTokens / budgetTokens) : 0,
       ...(this.cacheSeen.prompt > 0 ? { cacheHitRate: this.cacheSeen.cached / this.cacheSeen.prompt } : {}),
       // Computed here rather than in the panel because the budget is a setting, and a panel that
-      // guessed at it would offer to summarise a conversation that fits comfortably.
+      // guessed at it would offer to summarize a conversation that fits comfortably.
       // No offer when it happens by itself: a banner proposing what is already scheduled to
       // happen at that exact threshold is a question with one answer.
       suggestCompact:
-        !s.context.autoCompact &&
         shouldSuggestCompact(contextTokens, budgetTokens, this.session.entries.filter((e) => e.included).length),
-      autoCompact: s.context.autoCompact,
       busy: this.turn !== undefined,
+      appearance: s.appearance,
+      panelMinWidth: Math.max(0, Math.round(s.panel.minWidth)),
+      // Only when there is somewhere to transcribe. See `core/dictation/dictation.ts`.
+      ...(() => {
+        const here = Boolean(installedWhisper(this.ctx.globalStorageUri.fsPath, process.platform, s.dictation.localModel));
+        const mode = dictationMode(s.dictation, s.chat.provider, here);
+        const offerable = Boolean(whisperAsset({ platform: process.platform, arch: process.arch }));
+        return {
+          // The button exists wherever dictation can be MADE to work, not only where it already does:
+          // the one thing it can always do is offer to install a transcriber.
+          ...(mode === "off" && !offerable ? {} : { dictation: true }),
+          ...(mode === "whisper" || (mode === "off" && offerable) ? { dictationWav: true } : {}),
+        };
+      })(),
       budget: { spentTodayUsd: this.gate.budget.spentToday(), dailyUsd: s.budget.dailyUsd },
       sessionCostUsd: this.session.totalCostUsd(),
+      pendingApprovals: this.pendingApprovals,
       skills: this.uiSkills(),
       skillGroups: this.uiSkillGroups(),
       ...(this.wizard ? { wizard: this.uiWizard() } : {}),
@@ -413,7 +670,18 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         .sort((a, b) => b.updatedAt - a.updatedAt)
         .slice(0, 10)
         .map((x) => ({ id: x.id, title: x.title, messages: x.entries.length })),
-      attachments: this.attachments.map((c) => ({ kind: c.kind, label: c.label, tokens: estimateTokens(c.body) })),
+      // An image costs what an image costs, not what the sentence describing it costs. Counting the
+      // label would tell the user an attachment is worth twelve tokens when it is worth a thousand.
+      attachments: this.attachments.map((c) => ({
+        kind: c.kind,
+        label: c.label,
+        tokens: c.image ? IMAGE_TOKENS : estimateTokens(c.body),
+        ...(c.note
+          ? { detail: c.note }
+          : c.image
+            ? { detail: c.body.replace(/^\[[^:]*:\s*/, "").replace(/\]$/, "") }
+            : {}),
+      })),
       ...(implicit ? { implicit: { kind: implicit.kind, label: implicit.label, tokens: estimateTokens(implicit.body) } } : {}),
       implicitOn: Boolean(implicit) && this.implicitDismissed !== implicit?.label,
       openFiles: openFiles(),
@@ -498,6 +766,27 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this.screen = screen;
     this.sendState();
     if (screen === "models" && !this.models.length) void this.loadModels();
+    // Opening the list is the moment being out of date actually costs something.
+    else if (screen === "models") void this.checkOwnModels();
+  }
+
+  /**
+   * Switch mode from outside the panel.
+   *
+   * It existed only as a click on the composer's own menu, which had two costs. The palette and a
+   * keybinding could not reach it — and neither could the integration suite, so PLAN MODE WAS NEVER
+   * EXERCISED BY A TEST. A mode that changes the system prompt and the whole tool set, with no test
+   * that runs a turn in it, is a mode that breaks quietly.
+   */
+  setMode(mode: Mode): void {
+    this.session.mode = mode;
+    this.savePrefs();
+    this.sendState();
+  }
+
+  /** Rebuild the model list. Used when a setting the list depends on changes under it. */
+  reloadModels(): void {
+    void this.loadModels();
   }
 
   newSession(): void {
@@ -513,9 +802,53 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this.attachments = [];
     this.screen = "chat";
     this.searchQuery = "";
-    // A new conversation starts cautious again: session-wide permissions do not carry over.
+    // A new conversation starts cautious again: session-wide permissions do not carry over, and
+    // neither does a spending exception that was granted for a particular piece of work.
     this.permissions.clearSession();
+    this.budgetWaived = false;
     this.sendState();
+  }
+
+  /**
+   * Those waiting for the current turn's answer. Resolved with the text the model produced.
+   *
+   * There is exactly one caller — the branch review, which has to PARSE the answer — and it goes
+   * through the chat view rather than its own request path because that is where the model, the
+   * budget, the egress gate and the transcript are. A review with its own path out would be a
+   * second place a request can leave the machine, and this product has one.
+   */
+  private waiting: Array<(answer: string) => void> = [];
+
+  /**
+   * The episode being assembled across an escalation, when the corpus is on.
+   *
+   * It spans two turns — the local attempt and the remote one — and it is kept only if the second
+   * verifies green. Held for exactly one turn: carrying it further would attach a diff nobody can
+   * attribute to the question that produced it.
+   */
+  private pendingEpisode: Episode | undefined;
+
+  /** Set by `activate` when the learning corpus is available. Absent means nothing is recorded. */
+  corpus: Corpus | undefined;
+
+  /** Set by `activate`. Absent means the turn uses exactly the model the user configured. */
+  learnedRouting: LearnedRouting | undefined;
+
+  /** Ask, and resolve with what came back. Empty when the turn produced nothing. */
+  async askAndWait(text: string, context?: ContextItem): Promise<string> {
+    const answer = new Promise<string>((resolve) => this.waiting.push(resolve));
+    await this.focusWithPrompt(text, context);
+    return answer;
+  }
+
+  /** Called wherever a turn ends, including when it failed or was stopped. */
+  private settle(): void {
+    if (!this.waiting.length) return;
+    const latest = [...this.session.entries].reverse().find((e) => e.role === "assistant");
+    const text = latest?.text ?? "";
+    const waiting = this.waiting;
+    this.waiting = [];
+    for (const resolve of waiting) resolve(text);
   }
 
   async focusWithPrompt(text: string, context?: ContextItem): Promise<void> {
@@ -547,7 +880,17 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           // First run: open on the setup screen rather than on a chat that cannot answer. The
           // probe starts immediately, because the useful version of this screen is the one that
           // already knows what is running by the time it is read.
-          if (!this.ctx.globalState.get<boolean>(SETUP_SEEN_KEY) || (await this.cannotAnswer())) {
+          //
+          // ⚠️ But ONLY when nothing is configured at all. "when you update the extension while you
+          // already have a configuration, it always sends you back to the setup screen".
+          // The flag is set by the setup screen's own button, so anybody who configured through the
+          // settings — a gateway, a local server, a key — never had it, and `cannotAnswer` is about
+          // the CURRENT provider's key, which a keyless gateway never has. Either sent an
+          // established user back to the first-run screen on every reload, and every update reloads.
+          // An existing configuration now counts as having seen setup, and the panel opens on chat.
+          if (await this.hasExistingSetup()) {
+            if (!this.ctx.globalState.get<boolean>(SETUP_SEEN_KEY)) await this.ctx.globalState.update(SETUP_SEEN_KEY, true);
+          } else if (!this.ctx.globalState.get<boolean>(SETUP_SEEN_KEY) || (await this.cannotAnswer())) {
             this.screen = "setup";
             await this.refreshSetup();
             void this.probeLocal();
@@ -599,7 +942,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             assistant: "Hivey Code",
             // A quarter of the turn's budget. An attachment that can fill the context is not an
             // attachment, it is a replacement for the conversation it was added to.
-            maxTokens: Math.floor(readSettings().context.maxTokens * 0.25),
+            maxTokens: Math.floor(this.budgetTokensFor(readSettings()) * 0.25),
             omittedNote: (n) => t("({0} earlier exchanges omitted.)", n),
             label: (title) => t("conversation: {0}", title || t("untitled")),
           });
@@ -644,7 +987,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             this.wizard.families = m.value as SkillGroup[];
             await config.update(
               "skills.groups",
-              normaliseGroups(this.wizard.families),
+              normalizeGroups(this.wizard.families),
               vscode.ConfigurationTarget.Global,
             );
             this.wizard.step = "skills";
@@ -653,7 +996,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             // off — which is only correct because the offer was limited to the chosen families.
             const on = new Set(m.value);
             const offered = BUILTIN_SKILLS.filter(
-              (sk) => normaliseGroups(this.wizard!.families).includes(sk.group) && !ALWAYS_ON.has(sk.name),
+              (sk) => normalizeGroups(this.wizard!.families).includes(sk.group) && !ALWAYS_ON.has(sk.name),
             );
             let disabled = readSettings().skills.disabled;
             for (const sk of offered) disabled = toggleSkill(disabled, sk.name, on.has(sk.name));
@@ -686,7 +1029,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           // questions and are stored separately for that reason.
           await config.update(
             "skills.groups",
-            normaliseGroups(m.groups as SkillGroup[]),
+            normalizeGroups(m.groups as SkillGroup[]),
             vscode.ConfigurationTarget.Global,
           );
           this.sendState();
@@ -722,6 +1065,29 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           break;
         case "setProvider": {
           const config = vscode.workspace.getConfiguration(SECTION);
+          // A preset decides its own route, so setting the provider under one changes nothing at
+          // all — the setting is written, the panel shows it, and every request still goes to
+          // OpenRouter. Saying so and offering the way out is the difference between a control that
+          // does nothing and a control that explains itself.
+          if (isHivey(readSettings().chat.model) && m.provider !== "openrouter") {
+            const pick = t("Choose a model");
+            const keep = t("Keep the preset");
+            const answer = await vscode.window.showWarningMessage(
+              t(
+                "{0} is a Hivey preset: it always answers through OpenRouter and bills your OpenRouter account. Choosing {1} will not change that until you pick one of its models.",
+                hiveyLabel(readSettings().chat.model),
+                m.provider,
+              ),
+              pick,
+              keep,
+            );
+            if (answer === pick) {
+              await config.update("chat.provider", m.provider, writeTarget());
+              this.openModelPicker();
+              break;
+            }
+            if (answer !== keep) break;
+          }
           await config.update("chat.provider", m.provider, writeTarget());
           await this.refreshSetup();
           void this.loadModels(true);
@@ -730,6 +1096,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         }
         case "restoreCheckpoint":
           await this.restoreCheckpoint(m.id);
+          break;
+        case "dictate":
+          await this.transcribe(m.audio, m.ms);
+          break;
+        case "startDictation":
+          await this.startDictation();
+          break;
+        case "stopDictation":
+          await this.stopDictation(Boolean(m.cancel));
           break;
         case "shareEntry":
           await this.shareEntry(m.id);
@@ -757,16 +1132,6 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           this.sendState();
           break;
         }
-        case "setAutoCompact": {
-          const config = vscode.workspace.getConfiguration(SECTION);
-          await config.update("context.autoCompact", m.on, writeTarget());
-          // Turning it on after one failure switched it off: the user has said, explicitly, to try
-          // again, and refusing on the strength of an earlier failure would be a setting that does
-          // nothing when set.
-          if (m.on) this.autoCompactOff = false;
-          this.sendState();
-          break;
-        }
         case "setModel": {
           const config = vscode.workspace.getConfiguration(SECTION);
           await config.update("chat.model", m.model, writeTarget());
@@ -786,6 +1151,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         }
         case "refreshModels":
           await this.loadModels(true);
+          break;
+        case "pollModels":
+          await this.checkOwnModels();
           break;
         case "setHistoryFilter":
           this.historyFilter = { ...this.historyFilter, ...m.filter };
@@ -815,6 +1183,21 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           this.sendState();
           await this.runTurn();
           break;
+        case "askAgain": {
+          const entry = this.session.get(m.id);
+          if (!entry || entry.role !== "user") break;
+          // The attachments it was asked with, not whatever is attached now. Asking the same
+          // question against different context is not asking the same question.
+          this.attachments = [...(entry.context ?? [])];
+          await this.ask(entry.text);
+          break;
+        }
+        case "compareEntry": {
+          const entry = this.session.get(m.id);
+          if (!entry || entry.role !== "user") break;
+          await this.compareAcrossModels(entry, entry.context ?? []);
+          break;
+        }
         case "retry":
           this.session.dropLastAnswer();
           this.sendState();
@@ -831,7 +1214,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           const folder = vscode.workspace.workspaceFolders?.[0];
           const absolute = /^([/\\]|[A-Za-z]:)/.test(m.path);
           const uri = absolute || !folder ? vscode.Uri.file(m.path) : vscode.Uri.joinPath(folder.uri, m.path);
-          const item = await this.workspace.fileContext(uri, readSettings());
+          const item = await this.workspace.fileContext(uri, readSettings(), this.perFileTokens());
           if (item) {
             this.attachments.push(item);
             this.remember(m.path);
@@ -841,11 +1224,39 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           this.sendState();
           break;
         }
+        case "pasteContext": {
+          const item = pastedContext(m, this.perFileTokens());
+          if (!item) {
+            void vscode.window.showWarningMessage(t("Nothing usable was pasted."));
+            break;
+          }
+          // Said once, at the moment of the gesture, rather than buried in a settings page. A model
+          // that cannot see the image will not say so — it answers about an image nobody looked at —
+          // and the person pasting is the only one who can choose a different model.
+          if (item.image) {
+            const settings = readSettings();
+            const model = settings.chat.model;
+            const providerId = isHivey(model) ? "openrouter" : settings.chat.provider;
+            // Only when it is KNOWN: listed in the catalogue without vision, or refused by this very
+            // server recently. A self-hosted model is not listed, and may well read images — Qwen on
+            // llama.cpp does once given its `--mmproj`; if it cannot, its refusal is handled at send.
+            const blind = this.isVisionless(`${providerId}::${model}`) || (isCatalogued(model) && !acceptsImages(model));
+            if (blind) {
+              void vscode.window.showWarningMessage(
+                t("{0} does not read images. It is attached, but the answer will be about the text alone.", settings.chat.model),
+              );
+            }
+          }
+          this.attachments = this.attachments.filter((a) => a.label !== item.label);
+          this.attachments.push(item);
+          this.sendState();
+          break;
+        }
         case "setImplicit":
           // Remembered by LABEL rather than as a flag. Dismissing means "not this file", and the
           // suggestion should come back when a different file is opened — which is what the editor's
           // own chat does, and what stops a single dismissal switching the feature off for ever.
-          this.implicitDismissed = m.on ? undefined : this.workspace.activeContext(3000, readSettings())?.label;
+          this.implicitDismissed = m.on ? undefined : this.workspace.activeContext(this.perFileTokens(), readSettings())?.label;
           this.sendState();
           break;
         case "removeAttachment":
@@ -934,6 +1345,58 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           break;
         }
 
+        case "saveProvider": {
+          // Both, or neither. See the protocol note: two separate saves is two chances to leave half
+          // a configuration behind, and a key stored against no address looks configured.
+          const provider = m.provider as ProviderId;
+          let baseUrl = vendor(provider)?.baseUrl ?? "";
+          if (m.url !== undefined && m.url.trim()) {
+            const checked = checkEndpoint(m.url);
+            if (!checked.url) {
+              void vscode.window.showWarningMessage(checked.problem ?? t("That address cannot be used."));
+              break;
+            }
+            baseUrl = checked.url;
+          }
+          // Checked before anything is written. A credential that is known to work is a different
+          // thing from one that has been written down, and one GET costs no tokens.
+          const check = await vscode.window.withProgress(
+            { location: vscode.ProgressLocation.Notification, title: t("Checking the key against {0}…", baseUrl) },
+            () =>
+              checkCredentials(
+                { wire: vendor(provider)?.wire ?? "openai", label: vendor(provider)?.label ?? provider },
+                baseUrl,
+                m.key,
+                fetch,
+              ),
+          );
+          if (!check.ok) {
+            const anyway = t("Store it anyway");
+            const answer = await vscode.window.showWarningMessage(
+              check.why,
+              { modal: true, detail: t("Nothing has been saved yet.") },
+              anyway,
+            );
+            if (answer !== anyway) break;
+          }
+          const config = vscode.workspace.getConfiguration(SECTION);
+          if (m.url !== undefined && m.url.trim() && baseUrl !== vendor(provider)?.baseUrl) {
+            await config.update(`endpoints.${vendor(provider)?.settingKey ?? provider}`, baseUrl, vscode.ConfigurationTarget.Global);
+          }
+          await this.keys.store(provider as Parameters<Keys["store"]>[0], m.key);
+          // Storing a key is only half the intent: somebody who pastes an OpenRouter key wants to use
+          // OpenRouter, and leaving the provider on `local` makes the key look ignored.
+          await config.update("chat.provider", provider, vscode.ConfigurationTarget.Global);
+          await this.refreshSetup();
+          void this.loadModels(true);
+          void vscode.window.showInformationMessage(
+            check.ok
+              ? t("{0} is ready. {1}", vendor(provider)?.label ?? provider, check.models ? t("{0} models available.", check.models) : t("The key works."))
+              : t("{0} key stored, unverified.", vendor(provider)?.label ?? provider),
+          );
+          break;
+        }
+
         case "clearKey": {
           await this.keys.delete(m.provider as Parameters<Keys["delete"]>[0]);
           await this.refreshSetup();
@@ -941,13 +1404,17 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         }
 
         case "addServer": {
-          const url = m.url.trim();
-          // Rejected here rather than stored and failed later: an address that is not an address
-          // would sit in the settings looking configured and probe nothing for ever.
-          if (!/^https?:\/\//i.test(url)) {
-            void vscode.window.showWarningMessage(t("A server address starts with http:// or https://."));
+          // Completed rather than refused, like every other address in the product: somebody who
+          // types `192.168.1.50:11434/v1` has said exactly one thing, and demanding they type the
+          // scheme as well is the product making them do its work. Checked here rather than stored
+          // and failed later, because an address that is not an address would sit in the settings
+          // looking configured and probe nothing for ever.
+          const checkedServer = checkEndpoint(m.url);
+          if (!checkedServer.url) {
+            void vscode.window.showWarningMessage(checkedServer.problem ?? t("That address cannot be used."));
             break;
           }
+          const url = checkedServer.url;
           const config = vscode.workspace.getConfiguration(SECTION);
           const existing = readSettings().servers;
           if (!existing.some((x) => x.url === url)) {
@@ -963,11 +1430,49 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         }
 
         case "setEndpoint": {
+          // The moment it is typed is the only moment the person who can fix it is looking. A host
+          // with no scheme is completed rather than refused — `api.openai.com/v1` has exactly one
+          // plausible reading — and anything else is rejected with its reason, here, instead of
+          // becoming "Invalid URL" on every question from now on.
+          const checked = checkEndpoint(m.url);
+          // A key pasted into the address field is not a mistake to report, it is an intention to
+          // carry out: the person meant to give this provider their key. Stored where keys go, and
+          // said afterwards — see `recoverMisplacedKeys` for the same decision in the settings.
+          if (checked.credential) {
+            await this.keys.store(m.provider as ProviderId, m.url.trim());
+            void vscode.window.showInformationMessage(t("That is a key, not an address — saved as the key."));
+            await this.refreshSetup();
+            void this.loadModels(true);
+            break;
+          }
+          if (!checked.url) {
+            void vscode.window.showWarningMessage(checked.problem ?? t("That address cannot be used."));
+            break;
+          }
+          if (checked.repaired) {
+            void vscode.window.showInformationMessage(t("Saved as {0}.", checked.url));
+          }
           const config = vscode.workspace.getConfiguration(SECTION);
           // The manifest spells `openai-compatible` differently from the provider id, because a
           // hyphen is not a legal settings key segment. The vendor table owns that translation.
-          const key = endpointSettingKey(m.provider as ProviderId);
-          await config.update(key, m.url, vscode.ConfigurationTarget.Global);
+          const provider = m.provider as ProviderId;
+          const key = endpointSettingKey(provider);
+          await config.update(key, checked.url, vscode.ConfigurationTarget.Global);
+
+          // Typing a gateway's address IS choosing the gateway.
+          //
+          // Saving a key switched the provider — "somebody who pastes an OpenRouter key wants to use
+          // OpenRouter" — and saving an address did not. Which left the one vendor that may need no
+          // key at all with no way to be selected: the user filled in their proxy's address, the
+          // composer went on saying "Local", and the models the proxy serves never appeared. "When I
+          // click on gateway it shows local."
+          //
+          // Only for a vendor whose address has no default. Editing OpenAI's base URL for an Azure
+          // deployment is a change of address, not a change of mind about which provider to use.
+          if (vendor(provider)?.needsUrl && readSettings().chat.provider !== provider) {
+            await config.update("chat.provider", provider, vscode.ConfigurationTarget.Global);
+            void this.loadModels(true);
+          }
           await this.refreshSetup();
           break;
         }
@@ -998,7 +1503,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           break;
 
         case "openSettings":
-          await vscode.commands.executeCommand("workbench.action.openSettings", SECTION);
+          // Filtered to one key when the panel named one. Dropping somebody into forty settings
+          // after telling them to change one is handing them a search task, not an answer.
+          await vscode.commands.executeCommand("workbench.action.openSettings", m.key ?? SECTION);
           break;
         case "approve": {
           const resolve = this.approvals.get(m.id);
@@ -1039,8 +1546,16 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           break;
       }
     } catch (err) {
-      this.post({ type: "error", message: (err as Error).message });
-      this.log.appendLine(`[chat] ${(err as Error).stack ?? (err as Error).message}`);
+      // Recorded, not just posted — the same lesson as the turn's own failure path. A message is
+      // consumed by the panel and destroyed by the next rebuild, so anything that went wrong while
+      // handling what the user did (attaching a file, switching model, restoring a checkpoint)
+      // showed for a fraction of a second and then never existed. An error nobody can read is an
+      // error nobody can report.
+      const message = (err as Error).message;
+      this.log.appendLine(`[chat] ${(err as Error).stack ?? message}`);
+      if (this.session.entries.length) this.session.add({ role: "assistant", text: "", model: "" }).error = message;
+      this.post({ type: "error", message });
+      this.sendState();
     }
   }
 
@@ -1049,7 +1564,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     switch (what) {
       case "active":
       case "selection": {
-        const item = this.workspace.activeContext();
+        const item = this.workspace.activeContext(this.perFileTokens());
         if (item) this.attachments.push(item);
         break;
       }
@@ -1057,14 +1572,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         // The whole file, whatever is selected. `active` hands back the selection when there is
         // one, so with three lines highlighted there was no way to attach the file they are in —
         // which is the case where you most want to.
-        const item = this.workspace.activeFileContext();
+        const item = this.workspace.activeFileContext(this.perFileTokens());
         if (item) this.attachments.push(item);
         break;
       }
       case "browse": {
         const picked = await vscode.window.showOpenDialog({ canSelectMany: true, openLabel: "Joindre" });
         for (const uri of picked ?? []) {
-          const item = await this.workspace.fileContext(uri, settings);
+          const item = await this.workspace.fileContext(uri, settings, this.perFileTokens());
           if (item) this.attachments.push(item);
         }
         break;
@@ -1081,7 +1596,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         const uris = openFileUris();
         let added = 0;
         for (const uri of uris) {
-          const item = await this.workspace.fileContext(uri, settings);
+          const item = await this.workspace.fileContext(uri, settings, this.perFileTokens());
           if (item && !this.attachments.some((a) => a.label === item.label)) {
             this.attachments.push(item);
             added += 1;
@@ -1104,6 +1619,45 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       }
     }
     this.sendState();
+  }
+
+  /**
+   * What the user's own sources were serving when we last looked. See `ownModelIds`.
+   *
+   * `undefined` until the first look, which is not the same as "nothing there": treating the first
+   * observation as a change would rebuild the list once for no reason on every window.
+   */
+  private ownSeen: string[] | undefined;
+  /** One timer for the provider, not one per resolved view. */
+  private watchingOwnModels = false;
+
+  /**
+   * Notice a model appearing on a machine the user controls.
+   *
+   * `ollama pull` is a thing people do WHILE the editor is open, and so is adding a model to an
+   * internal proxy. The list was fetched once when the panel woke up and then only when somebody
+   * pressed Refresh — a button nobody presses, because nobody knows the list is stale until they
+   * have failed to find what they just installed.
+   *
+   * Only the user's own sources are probed, and only while the panel is on screen. The vendors are
+   * left alone: those are calls against an account with a rate limit, and their catalogues change a
+   * few times a year rather than a few times an afternoon. The probe is cheap because it is against
+   * loopback or a machine on the same network, and it is silent because it does nothing at all
+   * unless the answer has changed — in which case the list is rebuilt the proper way, so the result
+   * is exactly what pressing Refresh would have given.
+   */
+  private async checkOwnModels(): Promise<void> {
+    if (this.turn) return; // A running turn has better uses for the socket and the attention.
+    if (![...this.views].some((v) => v.visible)) return;
+    let now: string[];
+    try {
+      now = await ownModelIds(readSettings(), this.keys);
+    } catch {
+      return; // A server that is down is not news. It will be there, or not, next time.
+    }
+    const changed = servedSetChanged(this.ownSeen, now);
+    this.ownSeen = now;
+    if (changed) await this.loadModels();
   }
 
   private async loadModels(force = false): Promise<void> {
@@ -1142,11 +1696,62 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    * A nested turn with a narrower tool set and its own prompt — and with the SAME approver, the
    * same egress gate and the same vault as its parent. Being called by a sub-agent is not a way
    * around a dialog: a tool that asks before writing still asks, and what leaves the machine is
-   * pseudonymised on exactly the same path.
+   * pseudonymized on exactly the same path.
    *
    * The sub-agent sees only the task it was given. That is the point of one: it starts on a clean
    * context, so a long conversation does not have to be re-read to answer a small question.
    */
+  /**
+   * What the context is made of, for the bar.
+   *
+   * Only what is knowable WITHOUT assembling a request. The conversation and the attachments are in
+   * hand; the instructions and the repository map are not — they are built during a turn, and
+   * rebuilding them on every state post would spend real work to redraw a bar. So their sizes are
+   * remembered from the last turn, and **left out entirely before the first one**: a bar that showed
+   * "instructions" before anything had been assembled would be showing a number nobody measured.
+   *
+   * The arithmetic and the rules — the floor under which parts merge, free space never negative, no
+   * share invented when the window is unknown — are in `core/context/breakdown.ts` with their tests.
+   */
+  private contextParts(): Array<{ label: string; tokens: number }> {
+    const parts: Array<{ label: string; tokens: number }> = [];
+    if (this.lastPromptTokens) parts.push({ label: t("instructions"), tokens: this.lastPromptTokens });
+    if (this.lastAmbientTokens) parts.push({ label: t("repository map"), tokens: this.lastAmbientTokens });
+
+    let conversation = 0;
+    for (const entry of this.session.entries) {
+      if (!entry.included || entry.error) continue;
+      conversation += estimateTokens(entry.text);
+      for (const item of entry.context ?? []) {
+        parts.push({ label: item.label, tokens: item.image ? IMAGE_TOKENS : estimateTokens(item.body) });
+      }
+    }
+    if (conversation > 0) parts.push({ label: t("the conversation"), tokens: conversation });
+    return parts;
+  }
+
+  /**
+   * The last request, for the audit. In memory, never on disk, cleared with the session.
+   *
+   * Not in the ledger: that file keeps metadata and only metadata, by design. See
+   * `core/audit/prompt.ts` for the three rules this holds to.
+   */
+  private lastAudit: PromptAudit | undefined;
+
+  /**
+   * The last request, rendered — or nothing, when none has been sent in this session.
+   *
+   * Returns the text rather than opening a document: the panel does not own the editor, and a method
+   * that renders is one a test can call.
+   */
+  auditLastPrompt(): string | undefined {
+    return this.lastAudit ? renderPromptAudit(this.lastAudit) : undefined;
+  }
+
+  /** Measured during a turn, because that is the only moment they are assembled. */
+  private lastPromptTokens: number | undefined;
+  private lastAmbientTokens: number | undefined;
+
   private async runSubAgent(
     run: SubAgentRun,
     env: {
@@ -1185,7 +1790,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       model,
       messages: prepared.messages,
       tools,
-      maxSteps: definition.maxSteps ?? 8,
+      maxSteps: definition.maxSteps ?? DEFAULT_AGENT_STEPS,
+      // The same cap as the turn that delegated. It had none, so on a self-hosted server a sub-agent
+      // could generate until the whole context slot was full — minutes of a "stuck" turn with nothing
+      // on screen, since a sub-agent streams nothing to the panel.
+      maxTokens: env.settings.chat.maxOutputTokens,
       ...(run.signal ? { signal: run.signal } : {}),
       approve: (req) => this.askApproval(req),
       beforeRequest: async (msgs) => {
@@ -1200,8 +1809,35 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         return again.messages;
       },
       afterResponse: (text) => env.vault.restore(text),
+      restoreArgs: (text) => env.vault.restore(text),
       report: (message) => run.report(`${definition.name}: ${message}`),
+      onUsage: (info) => this.noteUsage(info),
     });
+
+    // A sub-agent is a full turn — up to eight steps on a paid model — and its cost was recorded
+    // nowhere: not against the budget that is supposed to be able to refuse it, not in the ledger
+    // that claims to hold every request that left this machine, not in the total the panel shows.
+    // Money left and nothing counted it, which is the one kind of accounting error that cannot be
+    // argued about.
+    if (!env.isLocal) {
+      const cost = costOf(result.usage, this.priceLookup(model));
+      this.delegatedCostUsd += cost.usd;
+      this.gate.record(
+        {
+          at: Date.now(),
+          provider: env.providerId,
+          host: safeHost(env.baseUrl),
+          model,
+          promptTokens: result.usage.promptTokens,
+          completionTokens: result.usage.completionTokens,
+          cachedTokens: result.usage.cachedTokens,
+          usd: cost.usd,
+          redactions: 0,
+          redactionSummary: `${t("sub-agent")}: ${definition.name}`,
+        },
+        env.settings,
+      );
+    }
     return result.text;
   }
 
@@ -1223,6 +1859,53 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         void vscode.window.showTextDocument(vscode.Uri.joinPath(folder.uri, path));
       }
     });
+  }
+
+  /**
+   * Models seen to refuse images, as `provider::model` → when. Kept across restarts — a llama.cpp
+   * server without its `--mmproj` will refuse them tomorrow too, and finding out costs a failed
+   * request — but only for a day: the server may be given its projector, and a model remembered as
+   * blind for ever would never be shown an image again.
+   */
+  private visionlessSeen?: Map<string, number>;
+  private visionlessMap(): Map<string, number> {
+    if (!this.visionlessSeen) {
+      const stored = this.ctx.globalState.get<Record<string, number>>(VISIONLESS_KEY);
+      // An older build stored a plain list; it is simply forgotten.
+      this.visionlessSeen = new Map(stored && !Array.isArray(stored) ? Object.entries(stored) : []);
+    }
+    return this.visionlessSeen;
+  }
+
+  private isVisionless(key: string): boolean {
+    return Date.now() - (this.visionlessMap().get(key) ?? 0) < VISIONLESS_TTL_MS;
+  }
+
+  private rememberVisionless(key: string): void {
+    const seen = this.visionlessMap();
+    seen.set(key, Date.now());
+    const fresh = [...seen].filter(([, at]) => Date.now() - at < VISIONLESS_TTL_MS).slice(-50);
+    void this.ctx.globalState.update(VISIONLESS_KEY, Object.fromEntries(fresh));
+  }
+
+  /**
+   * Whether this person has configured anything at all: a key in the keychain, an endpoint or a
+   * server written in the settings, a provider or model chosen. Read from what was SET, not from
+   * the effective values — `endpoints.local` has a default, and a default is not a configuration.
+   */
+  private async hasExistingSetup(): Promise<boolean> {
+    const config = vscode.workspace.getConfiguration(SECTION);
+    const explicitly = (key: string): boolean => {
+      const seen = config.inspect(key);
+      return [seen?.globalValue, seen?.workspaceValue, seen?.workspaceFolderValue].some(
+        (v) => v !== undefined && v !== "" && !(Array.isArray(v) && v.length === 0),
+      );
+    };
+    if (["chat.provider", "chat.model", "endpoints.servers"].some(explicitly)) return true;
+    const endpoints = Object.keys(readSettings().endpoints);
+    if (endpoints.some((p) => explicitly(`endpoints.${p}`))) return true;
+    for (const v of REMOTE_VENDORS) if (await this.keys.get(v.id)) return true;
+    return false;
   }
 
   /**
@@ -1271,7 +1954,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       this.persist();
       this.sendState();
       void vscode.window.setStatusBarMessage(
-        pinned ? t("Answer pinned — it stays when the context is trimmed or summarised.") : t("Answer unpinned."),
+        pinned ? t("Answer pinned — it stays when the context is trimmed or summarized.") : t("Answer unpinned."),
         4000,
       );
       return pinned;
@@ -1324,6 +2007,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     // comes next: every callback on the turn checks the signal before posting, and the cleanup only
     // runs if the turn it belongs to is still the current one.
     this.turn = undefined;
+    this.settle();
     this.post({ type: "status", text: t("Stopped.") });
     this.post({ type: "turnEnd" });
     this.persist();
@@ -1345,6 +2029,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private endTurnEarly(ctl: AbortController): void {
     if (this.turn !== ctl) return;
     this.turn = undefined;
+    this.settle();
     this.post({ type: "turnEnd" });
     this.sendState();
   }
@@ -1375,27 +2060,6 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       .reduce((sum, e) => sum + estimateTokens(e.text) + (e.context ?? []).reduce((a, c) => a + estimateTokens(c.body), 0), 0);
   }
 
-  /** Switched off for the rest of the session after one failure, rather than failing every turn. */
-  private autoCompactOff = false;
-
-  /**
-   * Summarise before asking, when the setting says to and the conversation has grown enough.
-   *
-   * Called BEFORE the new question is recorded, and that ordering is the whole subtlety: compacting
-   * mutes everything it summarises, so a question added first would be summarised and muted in the
-   * same breath — asked, replaced by a summary of itself, and never answered.
-   *
-   * One failure switches it off for the session. The alternative is an error before every question
-   * from here on, which is a worse conversation than a full one: the thing the user came to do
-   * still works, and the thing that did not is not going to start working by being retried on a
-   * timer.
-   */
-  private async autoCompactIfFull(settings: Settings): Promise<void> {
-    if (!settings.context.autoCompact || this.autoCompactOff) return;
-    const included = this.session.entries.filter((e) => e.included).length;
-    if (!shouldSuggestCompact(this.contextTokens(), settings.context.maxTokens, included)) return;
-    if (!(await this.compact())) this.autoCompactOff = true;
-  }
 
   /**
    * One of the four lists, rewritten.
@@ -1429,7 +2093,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private skillsCache: UiSkill[] = [];
 
   private uiSkills(): UiSkill[] {
-    const policy = readSettings().skills;
+    // The families in play, not merely the chosen ones: a skill the open files switched on has to be
+    // in this list, or the model is offered a skill the person cannot see and cannot type.
+    const policy = { ...readSettings().skills, groups: this.familiesFor().groups };
     // Only the families in play. A picker listing seventy skills of which sixty belong to languages
     // this project does not contain is a picker nobody reads to the end.
     // A skill whose machinery is switched off is not offered: `/remember` with no knowledge base
@@ -1438,7 +2104,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       sk.needs !== "knowledge" || readSettings().knowledge.enabled;
     const builtins = BUILTIN_SKILLS.filter((sk) => policy.groups.includes(sk.group) && available(sk)).map((sk) => ({
       name: sk.name,
-      description: sk.hint,
+      description: t(sk.hint),
       enabled: isSkillEnabled(sk.name, policy),
       builtin: true,
       group: sk.group,
@@ -1461,9 +2127,42 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    * question is asked, never assumed, and answering it costs nothing because nothing is sent
    * anywhere to compute it.
    */
+  /**
+   * The families in play for THIS conversation, decided once and then held.
+   *
+   * ⚠️ Memoised on the conversation's id on purpose, and the reason is the bill rather than tidiness.
+   * This list is part of the cacheable prefix (`core/prompts.ts`): a prompt cache matches on a
+   * prefix and misses on everything after the first byte that differs, so a skills list that changed
+   * when the user clicked a different editor tab would throw away the whole prefix — repository map
+   * included — on every turn. "Which skills exist" is allowed to live there precisely because it is
+   * a fact about the conversation and not about the cursor.
+   *
+   * Which also means the automation's effect is felt at the START of a conversation. That is the
+   * behaviour to describe, not a limitation to hide: open the files you are working on, then ask.
+   */
+  private familiesFor(): { groups: SkillGroup[]; fromOpenFiles: SkillGroup[] } {
+    const settings = readSettings();
+    if (this.families?.session !== this.session.id) {
+      const { fromOpenFiles } = familiesInPlay(
+        settings.skills.groups,
+        openFiles().map((f) => f.language),
+        settings.skills.auto,
+      );
+      this.families = { session: this.session.id, fromOpenFiles };
+    }
+    // Only the DETECTED half is frozen, because that is the half nobody asked for. The chosen list is
+    // read fresh every time: the composer's skills button writes it, and a choice the user has just
+    // made deliberately should take effect on the next message rather than the next conversation.
+    const { fromOpenFiles } = this.families;
+    return { groups: normalizeGroups([...settings.skills.groups, ...fromOpenFiles]), fromOpenFiles };
+  }
+
+  private families: { session: string; fromOpenFiles: SkillGroup[] } | undefined;
+
   private uiSkillGroups(): UiSkillGroup[] {
-    const active = new Set(readSettings().skills.groups);
-    const suggested = new Set(detectGroups(openFiles().map((f) => f.language)));
+    const { groups, fromOpenFiles } = this.familiesFor();
+    const active = new Set(groups);
+    const suggested = new Set(fromOpenFiles);
     return SKILL_GROUPS.map((g) => ({
       id: g.id,
       label: g.label,
@@ -1491,7 +2190,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
   private uiWizard(): UiWizard {
     const w = this.wizard!;
-    const policy = { groups: normaliseGroups(w.families), disabled: readSettings().skills.disabled };
+    const policy = { groups: normalizeGroups(w.families), disabled: readSettings().skills.disabled };
     return {
       step: w.step,
       ...(w.mode ? { mode: w.mode } : {}),
@@ -1502,7 +2201,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         w.step === "skills"
           ? BUILTIN_SKILLS.filter((sk) => policy.groups.includes(sk.group) && !ALWAYS_ON.has(sk.name)).map((sk) => ({
               name: sk.name,
-              description: sk.hint,
+              description: t(sk.hint),
               enabled: isSkillEnabled(sk.name, policy),
               builtin: true,
               group: sk.group,
@@ -1565,6 +2264,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       lines.push(`## ${entry.role === "user" ? t("You") : "Hivey Code"}${entry.included ? "" : ` — ${t("out of context")}`}`);
       if (entry.role === "assistant" && entry.model) lines.push(`*${entry.model}*`, "");
       lines.push(entry.text.trim(), "");
+      // A failure is part of the record. An export that quietly drops it is a record that lies by
+      // omission — and it is the document somebody attaches when they report that nothing works.
+      if (entry.error) lines.push(`> ${t("Failed")}: ${entry.error}`, "");
       for (const step of entry.steps ?? []) lines.push(`- \`${step.tool}\` — ${step.summary}`);
       if (entry.steps?.length) lines.push("");
     }
@@ -1685,9 +2387,25 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         { location: vscode.ProgressLocation.Notification, title: t("Searching {0}…", names.join(", ")) },
         async (progress) => {
           for (const library of names) {
-            progress.report({ message: t("{0} — {1} found", library, hits.length) });
+            // What it is doing, not a count of something it has not counted yet.
+            //
+            // It reported "LIB — 0 found" once, before doing any work, and never again: with one
+            // library — which is the ordinary case — the number sat at zero from the first moment
+            // to the last while thousands of members were being read. A figure that cannot move is
+            // worse than no figure, because it reads as a search that has found nothing.
+            //
+            // Members READ, which is what is known while reading. How many of them MATCH is not
+            // known until the filtering below, and the picker says it in its own title.
+            progress.report({ message: t("{0} — reading the member list…", library) });
             try {
-              for (const member of await ibmiAllMembers(library)) {
+              const members = await ibmiAllMembers(library, (read, sourceFile) => {
+                progress.report({
+                  message: sourceFile
+                    ? t("{0}/{1} — {2} members read", library, sourceFile, read)
+                    : t("{0} — {1} members read", library, read),
+                });
+              });
+              for (const member of members) {
                 if (matchesName(member.name, pattern)) hits.push({ library, ...member });
               }
             } catch {
@@ -1793,9 +2511,18 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         { location: vscode.ProgressLocation.Notification, title: t("Looking for {0}…", pattern) },
         async (progress) => {
           for (const library of chosen) {
-            progress.report({ message: t("{0} — {1} found", library.label, hits.length) });
+            // Same counter, same defect, same fix — see the member search above. A figure reported
+            // once before any work and never again reads as a search that has found nothing.
+            progress.report({ message: t("{0} — reading the member list…", library.label) });
             try {
-              for (const member of await ibmiAllMembers(library.label)) {
+              const members = await ibmiAllMembers(library.label, (read, sourceFile) => {
+                progress.report({
+                  message: sourceFile
+                    ? t("{0}/{1} — {2} members read", library.label, sourceFile, read)
+                    : t("{0} — {1} members read", library.label, read),
+                });
+              });
+              for (const member of members) {
                 if (matchesName(member.name, pattern)) hits.push({ library: library.label, ...member });
               }
             } catch {
@@ -1900,9 +2627,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       { location: vscode.ProgressLocation.Notification, title: t("Following what {0} uses…", member) },
       () => collectMemberContext(library, sourceFile, member),
     );
-    this.pushContext({ kind: "member", label: root.ref, body: headToTokens(root.text, 6000), untrusted: true });
+    this.pushContext({ kind: "member", label: root.ref, body: headToTokens(root.text, this.perFileTokens()), untrusted: true });
     for (const dep of found) {
-      this.pushContext({ kind: "member", label: dep.ref, body: headToTokens(dep.text, 2500), untrusted: true });
+      this.pushContext({ kind: "member", label: dep.ref, body: headToTokens(dep.text, this.perFileTokens()), untrusted: true });
     }
     if (missing.length) {
       void vscode.window.showInformationMessage(
@@ -1925,7 +2652,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         { location: vscode.ProgressLocation.Window, title: t("Reading {0}…", path) },
         () => readStreamFileText(path),
       );
-      this.pushContext({ kind: "file", label: path.trim(), body: headToTokens(text, 6000), untrusted: true });
+      this.pushContext({ kind: "file", label: path.trim(), body: headToTokens(text, this.perFileTokens()), untrusted: true });
     } catch (error) {
       void vscode.window.showWarningMessage(`Hivey Code: ${(error as Error).message}`);
     }
@@ -2169,7 +2896,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     for (const row of picked) {
       const uri = byPath.get(row.path);
       if (!uri) continue;
-      const item = await this.workspace.fileContext(uri, readSettings());
+      const item = await this.workspace.fileContext(uri, readSettings(), this.perFileTokens());
       if (item && !this.attachments.some((a) => a.label === item.label)) this.attachments.push(item);
       this.remember(row.path);
     }
@@ -2188,7 +2915,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const items = await resolveMentions([{ kind, raw: `#${kind}` }], {
       workspace: this.workspace,
       settings,
-      repoMap: () => this.workspace.repoMap(Math.floor(settings.context.maxTokens * 0.4)),
+      repoMap: () => this.workspace.repoMap(repoMapBudget(this.budgetTokensFor(settings))),
+      budgetTokens: this.budgetTokensFor(settings),
+      attachmentTokens: this.perFileTokens(),
     });
     this.attachments.push(...items);
     this.sendState();
@@ -2234,7 +2963,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const skills = this.uiSkills();
     const found = await this.definitions.load();
 
-    const activeFamilies = settings.skills.groups.filter((g) => g !== "general").length;
+    const activeFamilies = this.familiesFor().groups.filter((g) => g !== "general").length;
     const skillsOn = skills.filter((sk) => sk.enabled).length;
     const agentsOn = found.agents.filter((a) => !settings.agents.disabled.includes(a.name)).length;
 
@@ -2305,11 +3034,16 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const config = vscode.workspace.getConfiguration(SECTION);
 
     if (chosen.id === "families") {
+      const auto = this.familiesFor().fromOpenFiles;
       const picked = await vscode.window.showQuickPick(
         SKILL_GROUPS.filter((g) => g.id !== "general").map((g) => ({
           label: g.label,
           description: t("{0} skills", BUILTIN_SKILLS.filter((sk) => sk.group === g.id).length),
-          detail: g.hint,
+          // ⚠️ Ticked from the CHOSEN list alone. A family the open files switched on is already in
+          // play, and pre-ticking it here would quietly write it into the setting the moment somebody
+          // pressed Enter on an unrelated row — turning a thing that lapses on its own into a
+          // permanent choice they never made. It is said instead.
+          detail: auto.includes(g.id) ? `${g.hint} · ${t("already on, from the files you have open")}` : g.hint,
           id: g.id,
           picked: settings.skills.groups.includes(g.id),
         })),
@@ -2322,7 +3056,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       if (picked) {
         await config.update(
           "skills.groups",
-          normaliseGroups(picked.map((row) => row.id)),
+          normalizeGroups(picked.map((row) => row.id)),
           vscode.ConfigurationTarget.Global,
         );
         this.sendState();
@@ -2461,7 +3195,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         // A symbol attaches the lines it occupies rather than the whole file: a 3 000-line module
         // attached to answer a question about one method is most of a context window spent on
         // material nobody asked about.
-        const item = await this.workspace.rangeContext(picked.symbol.location.uri, picked.symbol.location.range, readSettings());
+        const item = await this.workspace.rangeContext(
+          picked.symbol.location.uri,
+          picked.symbol.location.range,
+          readSettings(),
+          this.perFileTokens(),
+        );
         if (item) {
           this.attachments.push(item);
           this.sendState();
@@ -2528,6 +3267,528 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     void vscode.window.setStatusBarMessage(t("Attached here. Ask your question."), 4000);
   }
 
+  /**
+   * Turn a recording into text in the composer.
+   *
+   * Local first, and off until configured: see `core/dictation/dictation.ts` for why a recording of
+   * somebody's voice is not something to send by default. The text lands in the composer rather than
+   * in a sent question — a recogniser mis-hears, and a dictated question that sends itself is a
+   * question nobody proof-read.
+   */
+  /**
+   * Make sure there is somewhere to turn a voice into words, asking to install one if not.
+   *
+   * ⚠️ Called BEFORE the recording starts, which is the whole point. It used to live inside
+   * `transcribe`, so the question "shall I install a transcriber?" arrived only after somebody had
+   * pressed the microphone, spoken, and pressed it again — reported as "you have to click twice as
+   * if you wanted to send a message, even though the tool isn't installed". Everything a thing
+   * needs is asked for before it is done, not after.
+   */
+  private async ensureTranscriber(): Promise<"ready" | "installed" | "no"> {
+    const settings = readSettings();
+    const storage = this.ctx.globalStorageUri.fsPath;
+    const here = Boolean(installedWhisper(storage, process.platform, settings.dictation.localModel));
+    if (dictationMode(settings.dictation, settings.chat.provider, here) !== "off") return "ready";
+    if (!whisperAsset({ platform: process.platform, arch: process.arch })) {
+      this.post({
+        type: "dictationFailed",
+        why: t(
+          "Dictation needs a transcriber. The simplest way on any machine is a Groq key — its free tier is 2,000 transcriptions a day without a card — which this borrows automatically once it is your provider. A key for OpenAI is borrowed the same way. Or point hiveyCode.dictation.command at a transcriber on this machine, which sends nothing anywhere. OpenRouter and local model servers do not transcribe.",
+        ),
+      });
+      return "no";
+    }
+    const model = modelFor(settings.dictation.localModel);
+    // ⚠️ Three choices, not two. "can't you offer either to install the model, or to install
+    // ffmpeg, or to quit?" — and ffmpeg belongs on this card rather than on its own, because
+    // it is not a second requirement, it is what the SAME feature gains: a microphone you can choose
+    // when the machine has several, and an edge that follows your voice because ffmpeg writes its file
+    // as it records. Offered only where there is something to gain: not when it is already installed,
+    // and not where nothing can install it.
+    const current = findRecorder(process.platform);
+    const gains = current && !current.devices;
+    const go = await new Promise<"model" | "both" | "no">((resolve) => {
+      this.askInPanel(
+        {
+          id: randomNonce(),
+          tool: "run_command",
+          description: t("Install a transcriber on this machine? ({0} MB, once)", model.mb + 10),
+          choices: gains ? ["once", "session", "no"] : ["once", "no"],
+          labels: {
+            once: t("Install the model"),
+            // Short, because it is a button. What it actually installs is spelled out in the detail
+            // below and in the line the card prints afterwards — a label is a name, not a manifest.
+            session: t("Model + config"),
+            no: t("Not now"),
+          },
+          done: {
+            once: t("Installing the model…"),
+            session: t("Installing the model and ffmpeg…"),
+            no: t("Nothing was installed."),
+          },
+          detail: [
+            t("Your voice is then turned into words here, by whisper.cpp. Nothing is sent anywhere, ever, and it costs nothing."),
+            t("Downloaded from github.com and huggingface.co — the only addresses this extension fetches without being told to."),
+            t("Model: {0} — {1}", model.id, model.hint),
+            ...(gains
+              ? [t("With ffmpeg as well ({0}), you can choose which microphone to use and the box follows your voice while you speak. {1} can do neither.", recorderAdvice(process.platform), current!.program)]
+              : []),
+          ],
+        },
+        (answer) => resolve(answer === "once" ? "model" : answer === "session" ? "both" : "no"),
+      );
+    });
+    if (go === "both") {
+      const term = vscode.window.createTerminal({ name: "Hivey Code — ffmpeg" });
+      term.show(true);
+      term.sendText(recorderAdvice(process.platform));
+    }
+    if (go === "no") {
+      this.post({ type: "dictationFailed", why: t("Dictation needs a transcriber, and none was installed.") });
+      return "no";
+    }
+    try {
+      await installWhisper(storage, process.platform, process.arch, settings.dictation.localModel, (what) =>
+        this.post({ type: "dictationProgress", what }),
+      );
+      return "installed";
+    } catch (err) {
+      this.post({ type: "dictationFailed", why: t("The transcriber could not be installed: {0}", (err as Error).message) });
+      return "no";
+    }
+  }
+
+  /**
+   * Offer ffmpeg to somebody whose transcriber is already in place.
+   *
+   * ⚠️ Because the offer used to live on the install card and nowhere else: "if it's already
+   * installed, it doesn't offer to install ffmpeg". Somebody who set dictation up last week, or who
+   * already
+   * had a transcriber, never saw it — and they are exactly the people for whom it matters, since what
+   * ffmpeg buys is choosing a microphone when the machine has several and an edge that follows the
+   * voice.
+   *
+   * ⚠️⚠️ ASKED ONCE. A question that returns every time somebody presses a button is not an offer, it
+   * is nagging, and the honest way to refuse something is for the refusal to stick. The answer is
+   * remembered; the command and the setting stay available for anybody who changes their mind.
+   */
+  private async offerBetterRecorder(): Promise<"installed" | "no"> {
+    const KEY = "dictation.recorderOffered";
+    if (this.ctx.globalState.get<boolean>(KEY)) return "no";
+    const current = findRecorder(process.platform);
+    // Nothing to gain: either it can already choose a device and stream, or there is nothing to
+    // install on this platform.
+    if (!current || current.devices || !recorderAdvice(process.platform)) return "no";
+    const go = await new Promise<boolean>((resolve) => {
+      this.askInPanel(
+        {
+          id: randomNonce(),
+          tool: "run_command",
+          description: t("Install ffmpeg as well? {0}", recorderAdvice(process.platform)),
+          choices: ["once", "no"],
+          labels: { once: t("Install it"), no: t("Not now") },
+          done: { once: t("Installing ffmpeg…"), no: t("Left as it is.") },
+          detail: [
+            t("Dictation already works. This is what it gains: you can choose which microphone to use when the machine has several, and the box follows your voice while you speak."),
+            t("{0}, which is what records today, can do neither — it takes whatever Windows calls the default input and writes its file only when you stop.", current.program),
+            t("It runs in a terminal, where you can see it. This is asked once; `Hivey Code: Choose a microphone` stays available either way."),
+          ],
+        },
+        (answer) => resolve(answer === "once"),
+      );
+    });
+    // Remembered either way: a yes needs no second asking, and a no that came back tomorrow would be
+    // a question somebody has already answered.
+    await this.ctx.globalState.update(KEY, true);
+    if (!go) return "no";
+    const term = vscode.window.createTerminal({ name: "Hivey Code — ffmpeg" });
+    term.show(true);
+    term.sendText(recorderAdvice(process.platform));
+    this.post({ type: "dictationFailed", why: t("Installing — press the microphone again once the terminal has finished.") });
+    return "installed";
+  }
+
+  /** The recording in progress, if any. One at a time: a second microphone is a second voice. */
+  private recording:
+    | { stop: () => Promise<string>; cancel: () => void; dir: string; started: number; level: ReturnType<typeof setInterval> }
+    | undefined;
+
+  /**
+   * Start recording with a program on this machine.
+   *
+   * ⚠️ Here rather than in the panel because VS Code does not give an extension's panel a microphone
+   * — `media` is granted to the workbench and withheld from a `vscode-webview://` origin, with no
+   * prompt and no setting. Reported as "no way to enable it", and there genuinely is none.
+   */
+  private async startDictation(): Promise<void> {
+    if (this.recording) return;
+    // Everything this needs, asked for before a word is spoken rather than after.
+    //
+    // ⚠️ And a click that INSTALLED something stops there. "the first click, when the tool isn't
+    // installed, should act as an install button, and once it's installed it should behave
+    // normally". It is the right rule and not only the asked-for one: the click that answered "yes,
+    // install it" was answering a question, not starting a recording, and somebody who has just
+    // watched a download finish is not mid-sentence. Starting to listen there records the silence of
+    // somebody reading what just happened.
+    const ready = await this.ensureTranscriber();
+    if (ready === "no") return;
+    if (ready === "installed") {
+      this.post({ type: "dictationFailed", why: t("Ready. Press the microphone to speak.") });
+      return;
+    }
+    // The transcriber is there. The RECORDER may still be the one that cannot choose a microphone or
+    // report a voice — asked once, and only when there is something to gain.
+    if ((await this.offerBetterRecorder()) === "installed") return;
+    const settings = readSettings();
+    const dir = await fsp.mkdtemp(join(tmpdir(), "hivey-dictation-"));
+    const wav = join(dir, "voice.wav");
+    const configured = recordArgv(settings.dictation.recordCommand, wav);
+    let found = configured ? undefined : findRecorder(process.platform);
+    // Which input, settled BEFORE the recorder starts. See `chooseDevice`: on DirectShow there is no
+    // "default" to fall back on, so with several inputs and none chosen the person is asked — once;
+    // the answer is remembered.
+    let device = settings.dictation.device;
+    if (found?.devices === "dshow") {
+      const choice = chooseDevice(found.devices, device, inputDevices(found.devices));
+      if ("ask" in choice) {
+        const picked = await pickMicrophone(choice.ask, false);
+        if (!picked) {
+          await fsp.rm(dir, { recursive: true, force: true });
+          this.post({ type: "dictationFailed", why: t("Choose a microphone to dictate: this machine has several inputs.") });
+          return;
+        }
+        device = picked.id;
+      } else if ("device" in choice) {
+        device = choice.device;
+      } else {
+        // ffmpeg lists nothing it can open; Windows' own recorder takes whatever Windows calls the
+        // default, which is better than a recorder that cannot start.
+        found = recorders(process.platform).find((r) => r.builtin) ?? found;
+      }
+    }
+    const recorder = found;
+    const argv = configured ?? (recorder ? [recorder.program, ...recorder.args(wav, device)] : undefined);
+    if (!argv) {
+      await fsp.rm(dir, { recursive: true, force: true });
+      // ⚠️ OFFER TO INSTALL IT, rather than hand somebody a command to copy. "if a widget has to be
+      // installed, can't we make it so that clicking the mic asks for approval to run the install
+      // command in the terminal?" — and it is the right
+      // shape: this extension already asks before it runs anything, so an install is the same
+      // question it asks every day, with a card that says exactly what will run.
+      //
+      // In a TERMINAL rather than silently: an install prints what it is doing, asks its own
+      // questions sometimes, and takes a while. Somebody watching it is somebody who can stop it.
+      const advice = recorderAdvice(process.platform);
+      const go = await new Promise<boolean>((resolve) => {
+        this.askInPanel(
+          {
+            id: randomNonce(),
+            tool: "run_command",
+            description: t("Install a recorder? {0}", advice),
+            choices: ["once", "no"],
+            detail: [
+              t("Nothing on this machine can record, and the panel is not allowed a microphone of its own — the editor withholds that from every extension."),
+              t("It runs in a terminal, where you can see it. Press the microphone again when it has finished."),
+            ],
+          },
+          (answer) => resolve(answer === "once"),
+        );
+      });
+      if (go) {
+        const term = vscode.window.createTerminal({ name: "Hivey Code — recorder" });
+        term.show(true);
+        term.sendText(advice);
+      }
+      this.post({
+        type: "dictationFailed",
+        why: go
+          ? t("Installing — press the microphone again once the terminal has finished.")
+          : t("Nothing here can record. Set hiveyCode.dictation.recordCommand to a command that writes a WAV, with {file} for the file."),
+      });
+      return;
+    }
+    try {
+      const run = startRecording(argv, wav, configured ? "signal" : (found?.stop ?? "signal"));
+      // ⚠️ How loud it is, read from the file as it grows — the panel has no microphone to listen to.
+      // A recorder that only writes when it stops, which is the Windows one, sends nothing and the
+      // ring keeps its resting size: a bar that never moves beats one that invents a voice.
+      let read = 44;
+      const level = setInterval(() => {
+        try {
+          const fd = openSync(wav, "r");
+          try {
+            const size = fstatSync(fd).size;
+            if (size <= read) return;
+            const take = Math.min(size - read, 32_000);
+            const buf = Buffer.alloc(take - (take % 2));
+            readSync(fd, buf, 0, buf.length, read);
+            read = size;
+            let sum = 0;
+            for (let i = 0; i + 1 < buf.length; i += 2) {
+              const sample = buf.readInt16LE(i) / 32768;
+              sum += sample * sample;
+            }
+            const rms = buf.length ? Math.sqrt(sum / (buf.length / 2)) : 0;
+            // ⚠️ Calibrated against a real recording rather than guessed. Speech sits very low in a
+            // linear scale — an RMS of 0.01 to 0.1 — so a bar driven by it barely moves; the fourth
+            // root opens that range out. The FLOOR is the other half and the half that was missing:
+            // without it, room noise held the edge at a quarter lit and the difference between
+            // silence and a voice was invisible, which is the whole thing this is for.
+            const open = Math.pow(rms, 0.25);
+            this.post({ type: "dictationLevel", level: Math.max(0, Math.min(1, (open - 0.2) / 0.55)) });
+          } finally {
+            closeSync(fd);
+          }
+        } catch {
+          /* the file is not there yet, or is being written — the next tick will do */
+        }
+      }, 120);
+      this.recording = { ...run, dir, started: Date.now(), level };
+      // Whether the edge can follow the voice at all. A recorder that writes its file once, at the
+      // end, sends nothing to follow — and a ring left flat is indistinguishable from a broken one, so
+      // the panel is told to breathe instead of to pretend.
+      this.post({ type: "dictationStarted", levels: configured ? true : (found?.streams ?? false) });
+      this.post({ type: "dictationProgress", what: t("Listening… press again to stop.") });
+    } catch (err) {
+      await fsp.rm(dir, { recursive: true, force: true });
+      const message = (err as Error).message;
+      this.post({ type: "dictationFailed", why: t("The recorder could not be started: {0}", message) });
+      if (isDeviceError(message)) this.offerMicrophoneChoice();
+    }
+  }
+
+  private offerMicrophoneChoice(): void {
+    const choose = t("Choose a microphone");
+    void vscode.window
+      .showWarningMessage(t("The microphone could not be opened. With several inputs, pick the one to listen to."), choose)
+      .then((answer) => {
+        if (answer === choose) void vscode.commands.executeCommand("hiveyCode.chooseMicrophone");
+      });
+  }
+
+  /** Stop, and turn what was recorded into words — or throw it away. */
+  private async stopDictation(cancel: boolean): Promise<void> {
+    const run = this.recording;
+    if (!run) return;
+    this.recording = undefined;
+    clearInterval(run.level);
+    this.post({ type: "dictationLevel", level: 0 });
+    if (cancel) {
+      run.cancel();
+      await fsp.rm(run.dir, { recursive: true, force: true });
+      this.post({ type: "dictationProgress", what: "" });
+      return;
+    }
+    try {
+      const wav = await run.stop();
+      const audio = await fsp.readFile(wav);
+      // ⚠️ LOOKED AT before it is handed on. A broken recording used to reach whisper.cpp and the
+      // person got ITS error — `failed to read the frames of the audio data (Invalid argument)`
+      // followed by a temporary path. True, useless and alarming: it is a C++ reader's opinion of a
+      // file nobody asked about. What somebody can act on is "nothing was recorded", and that can
+      // only be said by opening the file here.
+      const facts = describeWav(audio);
+      if (!facts.ok) {
+        this.log.appendLine(
+          `[dictation] unusable wav: ${facts.why}, ${audio.length} bytes, ${facts.rate} Hz, ${facts.channels}ch, ${facts.bits}-bit`,
+        );
+        this.post({
+          type: "dictationFailed",
+          why: t(
+            "Nothing usable was recorded ({0}). The microphone listened to may not be the right one, or another program may be holding it: choose the microphone (Hivey Code: Choose a microphone) and try again.",
+            facts.why ?? "",
+          ),
+        });
+        // Silence is what a valid recording from the wrong input sounds like.
+        this.offerMicrophoneChoice();
+        return;
+      }
+      this.log.appendLine(`[dictation] ${facts.seconds.toFixed(1)}s, ${facts.rate} Hz, ${facts.channels}ch`);
+      this.post({ type: "dictationProgress", what: t("Transcribing…") });
+      await this.transcribe(audio.toString("base64"), Date.now() - run.started);
+    } catch (err) {
+      const message = (err as Error).message;
+      this.post({ type: "dictationFailed", why: t("The recording failed: {0}", message) });
+      // The input could not be opened: the one failure a choice of microphone fixes, so the choice
+      // is offered right there instead of being left to be found in a menu.
+      if (isDeviceError(message)) this.offerMicrophoneChoice();
+    } finally {
+      await fsp.rm(run.dir, { recursive: true, force: true });
+    }
+  }
+
+  private async transcribe(audioBase64: string, ms: number): Promise<void> {
+    const settings = readSettings();
+    const storage = this.ctx.globalStorageUri.fsPath;
+    let mode = dictationMode(
+      settings.dictation,
+      settings.chat.provider,
+      Boolean(installedWhisper(storage, process.platform, settings.dictation.localModel)),
+    );
+    if (mode === "off") {
+      this.post({
+        type: "dictationFailed",
+        // ⚠️ Says BOTH ways out, because the one that needs no account is the one people do not know
+        // about. And it no longer pretends the editor could do this for us: VS Code's own speech is a
+        // proposed API, available to its own extensions and to nobody else.
+        why: t(
+          "Dictation needs a transcriber. The simplest way on any machine is a Groq key — its free tier is 2,000 transcriptions a day without a card — which this borrows automatically once it is your provider. A key for OpenAI is borrowed the same way. Or point hiveyCode.dictation.command at a transcriber on this machine, which sends nothing anywhere. OpenRouter and local model servers do not transcribe.",
+        ),
+      });
+      return;
+    }
+    const audio = Buffer.from(audioBase64, "base64");
+    // Guarded rather than trusted: a stuck recorder can hand over a very large buffer, and the local
+    // path writes it to disk while the remote one would upload it.
+    if (audio.length > 25 * 1024 * 1024) {
+      this.post({ type: "dictationFailed", why: t("That recording is too long. Keep it under a couple of minutes.") });
+      return;
+    }
+    this.log.appendLine(`[dictation] ${mode}, ${Math.round(ms / 100) / 10}s, ${audio.length} bytes`);
+    try {
+      const text =
+        mode === "local"
+          ? await this.transcribeLocally(audio, settings)
+          : mode === "whisper"
+            ? await this.transcribeHere(audio, settings)
+            : await this.transcribeRemotely(audio, settings);
+      const clean = cleanTranscript(text);
+      if (!clean) {
+        // Distinguished from a failure on purpose: the tool worked and there was nothing to hear.
+        this.post({ type: "dictationFailed", why: t("Nothing was heard.") });
+        return;
+      }
+      this.post({ type: "dictated", text: clean });
+    } catch (err) {
+      this.post({ type: "dictationFailed", why: (err as Error).message });
+    }
+  }
+
+  /** Run the user's own transcriber. Nothing leaves the machine. */
+  private async transcribeLocally(audio: Buffer, settings: Settings): Promise<string> {
+    const dir = await fsp.mkdtemp(join(tmpdir(), "hivey-dictation-"));
+    const file = join(dir, `speech.${AUDIO_EXTENSION}`);
+    await fsp.writeFile(file, audio);
+    try {
+      const built = localCommand(settings.dictation.command, file);
+      if ("message" in built) throw new Error(built.message);
+      const [program, ...args] = built.argv;
+      return await new Promise<string>((resolve, reject) => {
+        // argv, no shell: see `localCommand`. A path with a space in it is one argument here and two
+        // to a shell, and a settings box is exactly where such a path gets typed.
+        const child = spawn(program!, args, { cwd: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath });
+        let out = "";
+        let err = "";
+        child.stdout.on("data", (chunk: Buffer) => (out += chunk.toString("utf8")));
+        child.stderr.on("data", (chunk: Buffer) => (err += chunk.toString("utf8")));
+        child.on("error", (e) => reject(new Error(t("Could not run the dictation command: {0}", e.message))));
+        const timer = setTimeout(() => {
+          child.kill();
+          reject(new Error(t("The dictation command did not finish in time.")));
+        }, 120_000);
+        child.on("close", (code) => {
+          clearTimeout(timer);
+          // stderr is where whisper.cpp writes its progress, so it is only interesting when the
+          // command failed AND printed no text.
+          if (code !== 0 && !out.trim()) reject(new Error(err.trim().split("\n").slice(-2).join(" ") || t("The dictation command failed.")));
+          else resolve(out);
+        });
+      });
+    } finally {
+      // The recording is deleted whatever happened. Leaving somebody's voice in a temp directory
+      // because the transcriber crashed is not a failure mode worth having.
+      await fsp.rm(dir, { recursive: true, force: true }).catch(() => undefined);
+    }
+  }
+
+  /**
+   * Transcribe at a configured endpoint, with consent, and in the ledger.
+   *
+   * ⚠️ Asked every time, and never remembered. Everywhere else in this product a consent can be
+   * given "always", because what leaves is code the user chose to attach. This is a recording of
+   * their voice: it cannot be pseudonymised, the user cannot see what is in it the way they can read
+   * a diff, and "always" on a microphone is the one permission this project should not offer.
+   */
+  /**
+   * Transcribe with the model this extension installed.
+   *
+   * ⚠️ The recording is a WAV here and WebM everywhere else, because whisper.cpp decodes WAV, FLAC and
+   * MP3 and not Opus. The panel is told which to record by `dictationLocal` in the state — a
+   * difference the remote services never forced anybody to notice, since they accept both.
+   *
+   * The file is written to a temporary directory and removed whatever happens. A recording of
+   * somebody's voice left on disk after it has been turned into words is a thing nobody asked for.
+   */
+  private async transcribeHere(audio: Buffer, settings: Settings): Promise<string> {
+    const storage = this.ctx.globalStorageUri.fsPath;
+    const where = installedWhisper(storage, process.platform, settings.dictation.localModel);
+    if (!where) throw new Error(t("The transcriber is not installed."));
+    const dir = await fsp.mkdtemp(join(tmpdir(), "hivey-dictation-"));
+    const wav = join(dir, "voice.wav");
+    try {
+      await fsp.writeFile(wav, audio);
+      return await runWhisper(where, wav, recogniserLanguage(settings.dictation, language()));
+    } finally {
+      await fsp.rm(dir, { recursive: true, force: true });
+    }
+  }
+
+  private async transcribeRemotely(audio: Buffer, settings: Settings): Promise<string> {
+    // The configured endpoint, or the chat provider's when it is one known to transcribe. See
+    // `transcriptionEndpoint`: nothing is borrowed on a guess.
+    const endpoint = normalizeBaseUrl(
+      transcriptionEndpoint(settings.dictation, {
+        provider: settings.chat.provider,
+        baseUrl: endpointFor(settings, settings.chat.provider),
+      }) ?? "",
+    );
+    const host = (() => {
+      try {
+        return new URL(endpoint).host;
+      } catch {
+        throw new Error(t("hiveyCode.dictation.endpoint is not an address."));
+      }
+    })();
+    const go = await new Promise<boolean>((resolve) => {
+      this.askInPanel(
+        {
+          id: randomNonce(),
+          tool: "send",
+          description: t("Send this recording of your voice to {0}?", host),
+          choices: ["once", "no"],
+          detail: [
+            t("A recording cannot be pseudonymised, the way a diff can be read before it is sent."),
+            t("About {0} s of audio, {1} kB.", Math.max(1, Math.round(audio.length / 4000)), Math.round(audio.length / 1024)),
+          ],
+        },
+        (answer) => resolve(answer === "once"),
+        () => resolve(false),
+      );
+    });
+    if (!go) throw new Error(t("Not sent."));
+
+    const { body, contentType } = transcriptionBody(audio, {
+      model: transcriptionModel(settings.dictation, settings.chat.provider),
+      // The same hint a local transcriber gets: the editor's language when nothing was chosen.
+      ...(() => {
+        const hint = recogniserLanguage(settings.dictation, language());
+        return hint ? { language: hint } : {};
+      })(),
+    });
+    // The gateway's key, when one is stored: a self-hosted transcriber usually needs none, and a
+    // missing key is not a reason to refuse — the endpoint will say so if it minds.
+    const key = await Promise.resolve(this.keys.get("openai-compatible" as never)).catch(() => undefined);
+    const res = await fetch(`${endpoint}/audio/transcriptions`, {
+      method: "POST",
+      headers: { "content-type": contentType, ...(key ? { authorization: `Bearer ${key}` } : {}) },
+      // Copied into its own buffer so the typed array handed to `fetch` is backed by a plain
+      // ArrayBuffer, which is what the DOM BodyInit type accepts.
+      body: new Uint8Array(body).buffer as ArrayBuffer,
+    });
+    if (!res.ok) throw new Error(t("The transcriber answered HTTP {0}.", res.status));
+    return await res.text();
+  }
+
   private async restoreCheckpoint(id: string): Promise<void> {
     const entry = this.session.get(id);
     if (!entry || entry.role !== "user") return;
@@ -2537,18 +3798,48 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     // wrong direction, which costs nothing on disk and everything in context.
     const snapshots = entry.checkpoint ?? [];
     const folder = vscode.workspace.workspaceFolders?.[0];
-    if (snapshots.length && !folder) {
+    if ((snapshots.length || entry.dirtyBefore?.length) && !folder) {
       void vscode.window.showWarningMessage(t("Restoring needs the folder these files belong to open."));
       return;
     }
 
+    const commands = entry.checkpointCommands ?? 0;
+    // ⚠️ What git can put back that the checkpoint cannot: files a COMMAND rewrote. Computed here
+    // rather than remembered, because "dirty now" is only knowable now — and `dirtyBefore`, recorded
+    // when the turn started, is what separates the turn's changes from the user's own.
+    const viaGit = entry.dirtyBefore
+      ? planGitRestore(entry.dirtyBefore, dirtyPaths(), snapshots.map((snap) => join(folder?.uri.fsPath ?? "", snap.path)))
+      : { restorable: [], keptBecauseYours: [] };
+    const words = {
+      files: (n: number) => t("{0} file(s) go back to how they were.", n),
+      created: (n: number) => t("{0} file(s) created by that turn are deleted.", n),
+      partial: t("Some changes were too large to record and will NOT be undone."),
+      // Named, and with the count, because the honest version of this sentence is the whole reason
+      // the count is kept: a restore that silently leaves a formatter's rewrite in place puts the
+      // repository into a state it was never in.
+      commands: (n: number) =>
+        viaGit.restorable.length
+          ? t("{0} command(s) also ran; git puts their {1} file(s) back.", n, viaGit.restorable.length)
+          : t("⚠️ {0} command(s) also ran. Whatever they changed is NOT recorded and will NOT be undone.", n),
+    };
     const detail = snapshots.length
-      ? describeRestore(snapshots, Boolean(entry.checkpointPartial), {
-          files: (n) => t("{0} file(s) go back to how they were.", n),
-          created: (n) => t("{0} file(s) created by that turn are deleted.", n),
-          partial: t("Some changes were too large to record and will NOT be undone."),
-        })
-      : t("That turn changed no file, so nothing on disk moves.");
+      ? describeRestore(snapshots, Boolean(entry.checkpointPartial), words, commands)
+      : commands
+        ? // The worst case, and the one that used to read "nothing on disk moves": the turn's only
+          // writes came from commands, so there is nothing to put back and plenty that changed.
+          //
+          // ⚠️ It names the remedy, because the message without one reads as "this feature is
+          // broken". Reported that way: "it opens a window saying it can't modify and restore the
+          // changes". The turn in question had written its files through `node -e`
+          // — because `edit_file` was failing on Windows line endings — so the checkpoint truthfully
+          // held nothing. Both halves are worth saying: what this cannot undo, and what can.
+          t(
+            "That turn called no edit tool, so there is nothing to put back — but {0} command(s) ran, and whatever they changed stays. Use git to review or undo those.",
+            commands,
+          )
+        : viaGit.restorable.length
+          ? t("That turn called no edit tool, but git can put back {0} file(s) it changed.", viaGit.restorable.length)
+          : t("That turn changed no file, so nothing on disk moves.");
     const go = t("Restore");
     const answer = await vscode.window.showWarningMessage(
       t("Go back to before “{0}”?", entry.text.trim().split("\n")[0]!.slice(0, 60)),
@@ -2563,6 +3854,18 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       go,
     );
     if (answer !== go) return;
+
+    // ⚠️ Git first, then the snapshots. The two never touch the same file — `planGitRestore` removes
+    // anything the checkpoint holds — but the order matters anyway: a failed `clean` must not leave
+    // the snapshots applied and the commands' work in place, which would be a state the repository
+    // was never in.
+    if (viaGit.restorable.length) {
+      const failed = await discardChanges(viaGit.restorable);
+      if (failed) {
+        void vscode.window.showErrorMessage(t("Git could not put those files back: {0}", failed));
+        return;
+      }
+    }
 
     const edit = new vscode.WorkspaceEdit();
     for (const snap of snapshots) {
@@ -2590,7 +3893,33 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       return;
     }
 
-    const restoredFiles = snapshots.length;
+    // ⚠️⚠️ AND SAVE. A `WorkspaceEdit` writes to the editor's in-memory documents, not to disk: the
+    // buffers show the old content while every file on disk still holds the agent's version. That
+    // is the defect Florian reported as "restore to checkpoint doesn't seem to revert the code" —
+    // and it is the worst shape a bug can take here, because the screen says it worked. Everything
+    // that reads from disk disagrees: the compiler, a watcher rebuilding a stylesheet, git, the next
+    // shell command. Worse, closing the window without saving loses the restore entirely.
+    //
+    // Saving keeps the undo stack intact, so the promise on the dialog still holds: Ctrl+Z undoes
+    // the rollback, it just needs saving again. The alternative — relying on the user's
+    // `files.refactoring.autoSave` — makes a recovery operation correct only for some settings.
+    const unsaved: string[] = [];
+    for (const snap of snapshots) {
+      if (snap.before === undefined) continue; // Deleted on purpose; there is nothing to save.
+      const uri = vscode.Uri.joinPath(folder!.uri, snap.path);
+      const doc = vscode.workspace.textDocuments.find((d) => d.uri.toString() === uri.toString());
+      if (!doc?.isDirty) continue;
+      if (!(await doc.save())) unsaved.push(snap.path);
+    }
+    if (unsaved.length) {
+      // Named, not counted. "Some files could not be saved" sends somebody looking through the whole
+      // change; the paths say exactly which ones are still showing one thing and holding another.
+      void vscode.window.showWarningMessage(
+        t("Restored in the editor but NOT saved to disk: {0}. Save them, or the files on disk still hold the change.", unsaved.join(", ")),
+      );
+    }
+
+    const restoredFiles = snapshots.length + viaGit.restorable.length;
     // The question comes back to the composer. Restoring is a rewind, not a deletion: the thing you
     // most often want next is the same question, asked differently.
     const text = this.session.rewindTo(id);
@@ -2651,7 +3980,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this.frozenMap = undefined;
     const covered = this.session.entries.filter((e) => e.included && !e.error && e.text.trim());
     if (covered.length < 2) {
-      void vscode.window.showInformationMessage(t("There is not enough conversation to summarise yet."));
+      void vscode.window.showInformationMessage(t("There is not enough conversation to summarize yet."));
       return false;
     }
 
@@ -2660,9 +3989,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const ctl = new AbortController();
     this.turn = ctl;
     this.post({ type: "turnStart" });
-    this.post({ type: "status", text: t("Summarising the conversation…") });
+    this.post({ type: "status", text: t("Summarizing the conversation…") });
 
-    // Summarising is a chore, not a conversation: it reads a transcript and writes a page of prose,
+    // Summarizing is a chore, not a conversation: it reads a transcript and writes a page of prose,
     // and a preset says so — this is exactly the traffic the cheap tier exists for. On a preset the
     // provider follows the model, because the catalogue it routes over is OpenRouter's.
     const providerId = isHivey(settings.chat.model) ? "openrouter" : settings.chat.provider;
@@ -2679,7 +4008,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         // Most of the window, since the summary is the point of the request rather than a
         // side-effect of it. What does not fit is the oldest material, which is what a summary
         // written under pressure would have compressed hardest anyway.
-        maxTokens: Math.floor(settings.context.maxTokens * 0.8),
+        maxTokens: Math.floor(this.budgetTokensFor(settings) * 0.8),
         omittedNote: (n) => t("({0} earlier exchanges omitted.)", n),
       });
 
@@ -2694,6 +4023,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       }
 
       let streamed = "";
+      // The summary streams too, so it needs the same holding as an answer does: a marker cut by a
+      // packet boundary is two halves that match nothing. Found by the guard in the redaction tests
+      // rather than by looking, which is the point of writing it as a rule over the source.
+      const live = streamingRestorer((text) => vault.restore(text));
       const result = await runTurn({
         provider,
         model,
@@ -2702,13 +4035,20 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         signal: ctl.signal,
         maxTokens: 2048,
         temperature: 0.2,
+        // Summarizing is a chore: no thinking on a self-hosted server. See `ChatRequest.chore`.
+        chore: true,
         onDelta: (d) => {
           if (!d.text || ctl.signal.aborted) return;
           streamed += d.text;
-          this.post({ type: "delta", text: vault.restore(d.text) });
+          const shown = live.push(d.text);
+          if (shown) this.post({ type: "delta", text: shown });
         },
         afterResponse: (text) => vault.restore(text),
+        restoreArgs: (text) => vault.restore(text),
       });
+
+      const rest = live.flush();
+      if (rest && !ctl.signal.aborted) this.post({ type: "delta", text: rest });
 
       const summary = (result.text || streamed).trim();
       if (!summary) {
@@ -2724,7 +4064,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       // it first — it is the oldest entry the moment the next question is asked.
       this.session.add({
         role: "assistant",
-        text: `${t("**Summary of the conversation so far**")}\n\n${summary}`,
+        text: `${en("**Summary of the conversation so far**")}\n\n${summary}`,
         model,
         pinned: true,
       });
@@ -2758,7 +4098,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       this.post({
         type: "status",
         text: t(
-          "{0} exchanges summarised: {1} → {2} tokens. Everything stays on screen.",
+          "{0} exchanges summarized: {1} → {2} tokens. Everything stays on screen.",
           covered.length,
           before,
           after,
@@ -2775,6 +4115,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       // Only if this turn is still the current one. See `runTurn` — same trap, same guard.
       if (this.turn === ctl) {
         this.turn = undefined;
+        this.settle();
+    this.settle();
         this.post({ type: "turnEnd" });
         this.sendState();
       }
@@ -2791,18 +4133,19 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const parsed = parsePrompt(text);
     this.participant = parsed.participant;
     const settings = readSettings();
-    await this.autoCompactIfFull(settings);
     const resolved = parsed.mentions.length
       ? await resolveMentions(parsed.mentions, {
           workspace: this.workspace,
           settings,
-          repoMap: () => this.workspace.repoMap(Math.floor(settings.context.maxTokens * 0.4)),
+          repoMap: () => this.workspace.repoMap(repoMapBudget(this.budgetTokensFor(settings))),
+          budgetTokens: this.budgetTokensFor(settings),
+          attachmentTokens: this.perFileTokens(),
         })
       : [];
     // The file on screen, unless the user waved it away or has already attached it by hand. It goes
     // FIRST, because it is what the question is most likely about, and because a model reads the
     // beginning of a long prompt more reliably than the middle.
-    const implicit = this.workspace.activeContext(3000, settings);
+    const implicit = this.workspace.activeContext(this.perFileTokens(), settings);
     const useImplicit =
       implicit &&
       this.implicitDismissed !== implicit.label &&
@@ -2828,6 +4171,49 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    * A second attempt at the same question, on a bigger model, because the first one is PROVEN not
    * to have worked. Carries the evidence, so the second model finishes rather than starts over.
    */
+  /**
+   * The three largest things in the request, named.
+   *
+   * Shown beside the estimate rather than instead of it. The estimate answers "how much"; this
+   * answers "because of what", which is the only one of the two a person can do anything about —
+   * detach a file, narrow a selection, lower the budget.
+   *
+   * Approximate on purpose: it measures the sources rather than the assembled messages, so the
+   * lines will not sum exactly to the total. A breakdown that has to be exact is a breakdown that
+   * has to be maintained in step with the assembly, and would be dropped the first time the two
+   * drifted. Naming the big one correctly is what matters.
+   */
+  private whereTheTokensWent(systemPrompt: string, ambient: string | undefined): string[] {
+    const parts: Array<{ label: string; tokens: number }> = [
+      { label: t("instructions"), tokens: estimateTokens(systemPrompt) },
+    ];
+    if (ambient) parts.push({ label: t("repository map"), tokens: estimateTokens(ambient) });
+
+    let conversation = 0;
+    for (const entry of this.session.entries) {
+      if (!entry.included || entry.error) continue;
+      conversation += estimateTokens(entry.text);
+      for (const item of entry.context ?? []) {
+        if (item.image) {
+          parts.push({ label: item.label, tokens: IMAGE_TOKENS });
+          continue;
+        }
+        parts.push({ label: item.label, tokens: estimateTokens(item.body) });
+      }
+    }
+    parts.push({ label: t("the conversation"), tokens: conversation });
+
+    const total = parts.reduce((sum, p) => sum + p.tokens, 0);
+    if (total <= 0) return [];
+    return parts
+      .sort((a, b) => b.tokens - a.tokens)
+      // A tenth of the request or it is not what anybody is looking for, and at most three lines:
+      // the card is a question, not a report.
+      .filter((p) => p.tokens >= total * 0.1)
+      .slice(0, 3)
+      .map((p) => t("{0} — ~{1} tokens", p.label, p.tokens));
+  }
+
   private async runTurn(handover?: { provider: ProviderId; model: string; note: string }): Promise<void> {
     const settings = readSettings();
     const mode = this.session.mode;
@@ -2836,7 +4222,16 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     // away, and threading an id through all of them would put a checkpoint concern in files that
     // have nothing to do with checkpoints.
     this.checkpointFor = [...this.session.entries].reverse().find((e) => e.role === "user")?.id;
+    // ⚠️ What was already yours before this turn. A checkpoint holds only what the edit tools wrote;
+    // a command rewrites files nothing snapshotted, and git holds THEIR previous state — but only for
+    // files that were clean when the turn began. Recorded here, once, because afterwards there is no
+    // way to tell our changes from the user's. See `core/session/gitRestore.ts`.
+    if (this.checkpointFor && mode === "agent") {
+      const entry = this.session.get(this.checkpointFor);
+      if (entry && !entry.dirtyBefore) entry.dirtyBefore = dirtyPaths();
+    }
     this.plan = undefined;
+    this.delegatedCostUsd = 0;
     this.turn?.abort();
     const ctl = new AbortController();
     this.turn = ctl;
@@ -2862,20 +4257,36 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     // model can read any file it wants, and the ranking only decides what it sees FIRST. It is
     // rebuilt when the conversation is compacted, when a new one starts, and when the user asks —
     // which are the moments where the prefix is being rewritten anyway.
+    // Rebuilt when the repository has gained or lost a file since the map was taken. Freezing it
+    // protects the cacheable prefix from a tab switch; it must not outlive the structure it
+    // describes, or the agent asks for a file it created a minute ago and is told it does not exist.
+    if (this.frozenMapAt !== this.workspace.structureVersion()) this.frozenMap = undefined;
     if (mode !== "chat" && settings.context.repoMap && !this.frozenMap) {
       // The first question of a conversation is what the map is ranked around, and it is frozen
       // there afterwards — which is the right trade: the question that opens a conversation is what
       // the conversation is about, and re-ranking on every follow-up would cost the prompt cache far
       // more than a better ordering is worth.
       const opening = [...this.session.entries].reverse().find((e) => e.role === "user")?.text;
-      this.frozenMap = await this.workspace.repoMap(Math.floor(settings.context.maxTokens * 0.4), false, opening);
+      this.frozenMap = await this.workspace.repoMap(repoMapBudget(this.budgetTokensFor(settings)), false, opening);
+      this.frozenMapAt = this.workspace.structureVersion();
     }
     const ambient = mode !== "chat" && settings.context.repoMap ? this.frozenMap : undefined;
+    // The workspace's own commands, run around every tool call. The steps they produce are pushed
+    // into the same list the tool calls are, so a failing hook reaches `verifyTurn` exactly as a
+    // failing test does — see `core/hooks/hooks.ts`.
+    const hookSteps: Array<{ tool: string; summary: string; ok: boolean; call?: string }> = [];
     const allTools: Tool[] = buildTools({
       settings: () => settings,
+      hooks: new Hooks(this.ctx.workspaceState, this.log, (step) => {
+        hookSteps.push({ tool: "hook", summary: step.summary, ok: step.ok, call: step.command });
+        if (!ctl.signal.aborted) this.post({ type: "status", text: step.summary, tool: "hook", ok: step.ok });
+      }),
       confirmEdit: (u, n) => this.confirmEdit(u, n),
       // The plan goes to the panel as it is written and onto the answer when the turn ends, so it
       // is both a live progress display and part of the record.
+        // Offered only when the section is on: a tool whose output nothing shows spends tokens for
+        // nothing, which is the rule this project already applied to the plan tool.
+        ...(readSettings().notices.enabled ? { onNotice: (notice: Notice) => turnNotices.push(notice) } : {}),
       onPlan: (plan) => {
         if (ctl.signal.aborted) return;
         this.plan = plan;
@@ -2893,6 +4304,30 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     // Not in chat mode. A skill is instructions the user wrote, but it is still a file read from
     // the repository, and chat mode's promise is that it does not read the repository. A promise
     // with an exception in it is not one.
+      // The built-in skills, offered to the model the way the repository's own are: names and one
+    // line each in the prompt, instructions on demand. They were reachable only by a user who knew
+    // the slash command to type — so forty IBM i skills and eight finance ones, every one of them
+    // backed by an evaluation task, were conditional on knowing a magic word.
+    //
+    // Filtered by what the user has actually switched on, which is also what bounds the cost: the
+    // whole catalogue is eighty-five, a typical setup enables a fraction of it, and a skill that
+    // is off must not be described either — the model would announce something the user cannot
+    // invoke.
+    // `familiesFor()` and not the raw setting: the families the open files imply are in play too, and
+    // they are the reason forty IBM i skills now reach a conversation about an RPG member without
+    // anybody having opened a settings page first.
+    const familiesNow = this.familiesFor().groups;
+    const offeredBuiltins = builtinSkillsForModel(
+      BUILTIN_SKILLS.filter(
+        (sk) => familiesNow.includes(sk.group) && isSkillEnabled(sk.name, settings.skills.disabled),
+      ),
+    );
+    const modelSkills = [
+      ...definitions.skills.filter((sk) => isSkillEnabled(skillInvocation(sk.name), settings.skills.disabled)),
+      // The repository's own first: a team that wrote a skill with the same name as a built-in one
+      // meant theirs, and `use_skill` resolves on the first match.
+      ...offeredBuiltins.filter((b) => !definitions.skills.some((sk) => skillInvocation(sk.name) === b.name)),
+    ];
     if (mode !== "chat") {
       tools.push(
         ...buildDefinitionTools(
@@ -2906,7 +4341,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             ...definitions,
             // A switched-off skill or sub-agent is not described to the model either. Filtering it
             // out of the picker alone would leave the model announcing a delegation it cannot make.
-            skills: definitions.skills.filter((sk) => isSkillEnabled(skillInvocation(sk.name), settings.skills.disabled)),
+            skills: modelSkills,
             agents: definitions.agents.filter((a) => !settings.agents.disabled.includes(a.name)),
           },
         ),
@@ -2919,29 +4354,63 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     // map included. What used to sit in it and should not: the dialect note, which is derived from
     // the attached files, and the participant directive, which is per-turn by definition. Both now
     // ride after the transcript, where they are also read last. See `stablePrompt`.
+    // The reply language, decided from the question and restated after the transcript: see
+    // `detectLanguage` for why the system prompt's own rule was not enough.
+    // Built-in skill instructions are taken out first: they are English on purpose, and `/explain`
+    // typed in a French interface must not read as a question asked in English.
+    const lastQuestion = withoutModelText([...this.session.entries].reverse().find((e) => e.role === "user")?.text ?? "");
     const directives = turnDirectives({
       dialect: dialectNote(this.attachments),
       ...(this.participant ? { participant: participantDirective(this.participant) } : {}),
+      language: languageDirective(detectLanguage(lastQuestion, language())),
     });
-    const built = this.session.build({
-      systemPrompt: stablePrompt({
+    // Named rather than inlined, because the card that asks the user to consent has to be able to
+    // say how big each of them is. A number nobody can attribute is a number nobody can act on.
+    // ⚠️ The provider's own thinking by default; the prompted kind ONLY where there is none. Asking a
+    // model that reasons natively to also deliberate in the prompt makes it think twice, pay for
+    // both, and spend the answer budget competing with its own reasoning. See `router/thinking.ts`.
+    //
+    // It belongs in the cacheable prefix because it is derived from the model and the chosen effort,
+    // neither of which follows the user around. A model change invalidates the prefix, which costs
+    // nothing: a different model has a different cache anyway.
+    //
+    // ⚠️ Decided from the CONFIGURED model, not the routed one: the prefix is assembled before
+    // `route()` picks an endpoint, and it has to be, because the prompt is part of what the routing
+    // budget is computed from. The same resolution the panel uses to decide whether to show the
+    // reasoning control at all (`reasoningAvailable`), so the control and the prompt cannot disagree.
+    // A mid-turn fallback to a different model therefore keeps this prefix — which is right: the
+    // alternative is rebuilding and re-sending the whole conversation to change one paragraph.
+    const thinkingFor = hiveyModel(settings.chat.model, "everyday");
+    const thinkingHow =
+      thinkingMode(thinkingFor, this.reasoning) === "prompted" ? promptedThinking(this.reasoning) : "";
+    const systemPrompt = stablePrompt({
         mode: promptForMode(mode),
+        ...(thinkingHow ? { thinking: thinkingHow } : {}),
         workspace: workspaceNote(),
         houseRules,
         knowledge: learned,
         skills:
           mode === "chat"
             ? ""
-            : skillsPrompt(
-                // A switched-off skill is not described to the model either. Filtering it out of the
-                // `/` list alone would leave the model announcing a skill the user cannot invoke.
-                definitions.skills.filter((sk) => isSkillEnabled(skillInvocation(sk.name), settings.skills.disabled)),
-              ),
-      }),
-      ambient: ambient ? `${ambient.text}\n\n(${ambient.files} files mapped, ${ambient.omitted} omitted)` : undefined,
-      maxTokens: settings.context.maxTokens,
+            : skillsPrompt(modelSkills),
+    });
+    const ambientText = ambient
+      ? `${ambient.text}\n\n(${ambient.files} files mapped, ${ambient.omitted} omitted)`
+      : undefined;
+    // Remembered for the context bar, which is drawn outside a turn and cannot assemble these.
+    this.lastPromptTokens = estimateTokens(systemPrompt);
+    this.lastAmbientTokens = ambientText ? estimateTokens(ambientText) : undefined;
+    const built = this.session.build({
+      systemPrompt,
+      ambient: ambientText,
+      maxTokens: this.budgetTokensFor(settings),
       nonce,
     });
+
+    // Counted once, used twice: on the card the user consents with, and in the ledger row the
+    // request leaves behind. This is the one thing in a request the redaction cannot touch —
+    // everything else has been through the pseudonymizer, and a screenshot leaves as it is.
+    const outgoingImages = built.messages.reduce((n, msg) => n + (msg.images?.length ?? 0), 0);
 
     const lastUser = [...this.session.entries].reverse().find((e) => e.role === "user");
     const decision = route(routerConfig(settings), {
@@ -2972,11 +4441,38 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       }
     }
 
+    // What this repository has actually measured, when the user asked for it. Off by default, and
+    // never to a model they have not configured — see `learned.ts`. A hand-over is left alone: it
+    // exists because a model already failed, and the learned router's opinion of that model is the
+    // opinion that just lost.
+    if (!handover) {
+      const choice = this.learnedRouting?.decide(settings, tools.map((x) => x.schema.name));
+      if (choice && choice.model !== model) {
+        model = choice.model;
+        providerId = choice.provider as ProviderId;
+        this.post({
+          type: "status",
+          text: choice.exploring
+            ? t("Trying {0}: {1}", choice.model, choice.why)
+            : t("Chose {0}: {1}", choice.model, choice.why),
+        });
+      }
+    }
+
     const baseUrl = safeUrl(settings, providerId);
     const isLocal = isLocalEndpoint(baseUrl);
     const vault = new Vault();
-    const steps: Array<{ tool: string; summary: string; ok: boolean }> = [];
+    // Shared with the hook runner above: `hookSteps` is the same array, so the order the turn
+    // actually happened in is preserved and "the last one wins" means what it says.
+    const steps: Array<{ tool: string; summary: string; ok: boolean; call?: string }> = hookSteps;
     const verifierOutput = new Map<string, string>();
+    // Asides the model recorded this turn. Cleared with the turn, because an aside about the file
+    // you were editing an hour ago is not something you should know now.
+    const turnNotices: Notice[] = [];
+    // Whether this turn's tool calls arrived through the protocol or had to be read out of the
+    // model's message. A fact about the setup, and the one the user is told about — see
+    // `providers/textToolCall.ts` for what is given up when they come from the text.
+    let usedTextToolCalls = false;
 
     // What this question will send, said before it is sent.
     //
@@ -2985,7 +4481,18 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     // the message is on that screen. "Always" switches it off for good, so anyone who does not want
     // it pays for it once. Nothing about it is a privacy control; the egress gate is separate and
     // untouched by the answer given here.
-    if (settings.privacy.confirmSend !== "never") {
+    // Asked only when there is a bill to consent to.
+    //
+    // It was asked for every turn, local ones included, where it quoted "~2 100 tokens · on this
+    // machine, nothing billed" and waited for a click. A question whose answer is always zero is
+    // not a question, it is a step — and the whole argument of running a model on your own machine
+    // is that nobody has to think about what a question costs. The gateway counts as free for the
+    // same reason it has no price in the picker: it is the user's own proxy and this extension has
+    // no price list for it. See `core/router/billing.ts`.
+    //
+    // Nothing here is a privacy control. What leaves the machine is the egress gate's question,
+    // asked separately, and untouched by this.
+    if (settings.privacy.confirmSend !== "never" && billsTheUser(providerId)) {
       const price = this.priceLookup(model);
       // Corrected by what this model has actually been counting, so the figure the user is
       // shown before sending is the one they will be billed against rather than a safe-side guess.
@@ -2994,26 +4501,29 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       const detail = [
         t("~{0} tokens", estimatedTokens),
         isLocal ? t("on this machine, nothing billed") : t("~{0} $ on {1}", cost.toFixed(4), safeHost(baseUrl)),
+        // Where they went. A single large number is not a fact anybody can act on: "468 726 tokens
+        // for one message and two files" was reported as an anomaly, and it was one — but nothing
+        // on the card said which of the two files, or whether it was the files at all. Three lines
+        // turn the figure into something that can be argued with.
+        ...this.whereTheTokensWent(systemPrompt, ambientText),
       ];
+      if (outgoingImages && !isLocal) detail.push(t("{0} image(s), sent as they are — an image cannot be pseudonymized", outgoingImages));
       const answer = await new Promise<"once" | "session" | "always" | "no">((resolve) => {
-        const id = randomNonce();
-        this.approvals.set(id, resolve);
-        this.post({
-          type: "approval",
-          id,
-          tool: "send",
-          description: t("Send this question to {0}?", model),
-          choices: ["once", "always", "no"],
-          detail,
-        });
-        // Stopping while this card is up must answer it. Without this the promise had no second way
-        // out: the abort travelled, found nothing waiting on it, and the turn stayed parked on a
-        // question nobody was going to answer — for the rest of the conversation, with the panel
-        // showing a stop button over it. The other two cards in this file always had this listener;
-        // this one, the card every question opens by default, did not.
-        ctl.signal.addEventListener("abort", () => {
-          if (this.approvals.delete(id)) resolve("no");
-        });
+        // Through the same path as the other two, which is the point: a card that exists only as a
+        // message the panel has already consumed dies with the next rebuild, and the promise behind
+        // it waits for ever — on a request that has already been sent and paid for. Stopping must
+        // also answer it, or the turn parks on a question nobody will answer.
+        this.askInPanel(
+          {
+            id: randomNonce(),
+            tool: "send",
+            description: t("Send this question to {0}?", model),
+            choices: ["once", "always", "no"],
+            detail,
+          },
+          resolve,
+          () => resolve("no"),
+        );
       });
       if (answer === "no") {
         // Answering "no" — or stopping — ends the turn here, before the block whose `finally` does
@@ -3039,6 +4549,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       ...(settings.completion.model ? { localModel: settings.completion.model } : {}),
     });
 
+    /** The server refused the FIRST request for lack of context — see `recoverFromOverflow`. */
+    let overflowed = false;
     try {
       const provider = await providerFor(settings, this.keys, providerId);
 
@@ -3057,55 +4569,165 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         return;
       }
 
-      if (!isLocal) {
+      // Held for the audit, in memory, for this session only.
+      //
+      // The ledger records that a request happened and never what it contained — a log of what you
+      // were trying to keep private is not a privacy feature, and that rule is unchanged. This
+      // answers a different question, asked at a different moment: "what, literally, did you just
+      // send?" It is the pseudonymized form, because that is the form that left; showing the
+      // original would say the client's name went out when a marker went out.
+      this.lastAudit = {
+        at: Date.now(),
+        model,
+        host: safeHost(baseUrl),
+        isLocal,
+        messages: prepared.messages.map((m) => ({
+          role: m.role,
+          content: m.content,
+          ...(m.images?.length ? { images: m.images.length } : {}),
+        })),
+        tools: tools.map((tool) => tool.schema.name),
+        redactions: summarize(prepared.findings),
+      };
+
+      // The spending guard ASKS. It used to refuse, and that is the defect that made the extension
+      // look dead.
+      //
+      // The cap is checked on an estimate, and the estimate charges the whole prompt at the input
+      // price plus a quarter of it at the output price. On a premium model that is about $34 per
+      // million tokens, so the old default cap of $0.25 was reached at around seven thousand
+      // tokens — less than what agent mode assembles before the question is even added: the
+      // repository map, the house rules, the open file. Every turn was therefore refused BEFORE
+      // anything was sent, and refused by posting a message, which the panel consumes and the next
+      // rebuild destroys. What the user saw was a red line that flashed for a fraction of a second,
+      // no answer, no card, and a conversation whose context filled up with questions nobody ever
+      // answered. Nothing in the interface said the word "budget".
+      //
+      // Two changes, and both are needed. The defaults moved to where an ordinary turn fits and a
+      // runaway prompt still does not (see `hiveyCode.budget.*`). And going over the cap is now a
+      // question in the conversation instead of a silent end: a guard whose only move is to kill
+      // the turn without a readable reason protects the user from nothing.
+      if (billsTheUser(providerId) && !this.budgetWaived) {
         const estimate = estimateCost(this.tokensFor(model, prepared.estimatedTokens), this.priceLookup(model));
-        const verdict = this.gate.budget.check(estimate);
+        const verdict = this.gate.budget.check(estimate, prepared.estimatedTokens);
         if (!verdict.ok) {
-          this.post({
-            type: "error",
-            message: t("Budget: {0}. Adjust hiveyCode.budget or stay local.", verdict.message),
+          const decision = await new Promise<"once" | "session" | "always" | "no">((resolve) => {
+            this.askInPanel(
+              {
+                id: randomNonce(),
+                tool: "budget",
+                description: t("This question is estimated at ${0}, over your cap. Send it anyway?", estimate.toFixed(3)),
+                choices: ["once", "session", "always", "no"],
+                detail: [
+                  verdict.message,
+                  t("~{0} tokens to {1}", this.tokensFor(model, prepared.estimatedTokens), safeHost(baseUrl)),
+                ],
+              },
+              resolve,
+              () => resolve("no"),
+            );
           });
-          this.post({ type: "turnEnd" });
-          return;
+          if (decision === "no") {
+            // Recorded, not posted. A refusal the user can still read after the next render is the
+            // whole point: this is the message they never got to see.
+            this.session.add({ role: "assistant", text: "", model }).error = t(
+              "Not sent — over the spending cap: {0}. Raise hiveyCode.budget.perRequestUsd or hiveyCode.budget.dailyUsd, or use a local model.",
+              verdict.message,
+            );
+            this.post({ type: "status", text: ctl.signal.aborted ? t("Stopped.") : t("Not sent.") });
+            this.endTurnEarly(ctl);
+            return;
+          }
+          // The exception lasts as long as the piece of work does, and no longer.
+          if (decision === "session") this.budgetWaived = true;
+          if (decision === "always") await this.raiseBudget(verdict.reason, estimate, prepared.estimatedTokens);
         }
       }
 
       const answer = this.session.add({ role: "assistant", text: "", model });
+      // Named so the panel can leave it to the live turn. Cleared in the `finally`, whatever
+      // happened — an answer that stays marked as in flight is an answer nothing ever draws.
+      this.streamingEntryId = answer.id;
       let streamed = "";
       let thought = "";
+      // A marker arrives split across packets — `⟨EMA` then `IL_1⟩` — and neither half matches the
+      // pattern, so restoring chunk by chunk showed the placeholder raw and then left it raw: text
+      // already on screen is never revisited. One restorer per stream, flushed when the turn ends.
+      // See `streamingRestorer`.
+      const liveText = streamingRestorer((text) => vault.restore(text));
+      const liveThought = streamingRestorer((text) => vault.restore(text));
+      // ⚠️ Prompted deliberation arrives in the TEXT channel, because a model with no native thinking
+      // has no other channel to put it in. Without this the user reads the model's working-out as its
+      // answer — the same failure shape as a tool call written into the message. Only built when the
+      // instruction was actually sent: a splitter running on a native-reasoning model would be
+      // scanning every token for delimiters nobody asked for.
+      const splitThinking = thinkingHow ? thinkingSplitter() : undefined;
 
       // One attempt, wrapped so it can be repeated against a different endpoint. See the catch below.
-      const attempt = (useProvider: Provider, useModel: string): Promise<Awaited<ReturnType<typeof runTurn>>> =>
+      // Without images for a model already seen to refuse them — see `visionless`. The images of
+      // EARLIER questions are in here too, which is why one refusal used to break every turn after.
+      const imageKey = `${providerId}::${model}`;
+      let sendMessages = this.isVisionless(imageKey) ? withoutImages(prepared.messages) : prepared.messages;
+      const attempt = (
+        useProvider: Provider,
+        useModel: string,
+        outputTokens = settings.chat.maxOutputTokens,
+      ): Promise<Awaited<ReturnType<typeof runTurn>>> =>
         runTurn({
         provider: useProvider,
         model: useModel,
-        messages: prepared.messages,
+        messages: sendMessages,
         tools,
         signal: ctl.signal,
-        maxTokens: 4096,
-        reasoning: this.reasoning,
+        maxTokens: outputTokens,
+        // Never an effort a model cannot use. The control is hidden when `canReason` is false, but a
+        // stored preference survives a model change — so switching to a plain model went on sending
+        // `effort: "high"` to an endpoint with no idea what to do with it. Hidden is not unsent.
+        reasoning: effortToSend(useModel, this.reasoning),
+        // Asked once, when the model stops calling tools: it changed files and ran nothing, so
+        // finish it. The cheap middle between telling the user and escalating to a billed model.
+        selfCheck: (trace) =>
+          selfCheckMessage(
+            trace.map((x) => ({
+              tool: x.call.name,
+              ok: !x.result.isError,
+              summary: x.result.content.split("\n")[0] ?? "",
+              // From the raw arguments the model sent: the trace keeps the call, not the coerced
+              // arguments, and naming the file is the whole difference between "you changed
+              // something" and a message somebody can act on.
+              call: callSignature(x.call.name, safeArgs(x.call.args)),
+            })),
+          ),
         // Nothing from a stopped turn reaches the panel. Cancellation unwinds through a provider
         // and a tool, and anything still in flight would otherwise stream into whatever turn is on
         // screen by then — text from the question the user gave up on, appearing under the next one.
         onDelta: (d) => {
           if (ctl.signal.aborted) return;
-          if (d.text) {
-            streamed += d.text;
+          // Split before anything else sees it, so `streamed` — which becomes the saved answer —
+          // never contains the deliberation.
+          const split = splitThinking && d.text ? splitThinking.push(d.text) : undefined;
+          const deltaText = split ? split.text : d.text;
+          const deltaThought = (d.reasoning ?? "") + (split?.reasoning ?? "");
+          if (deltaText) {
+            streamed += deltaText;
             // Kept on the entry as it arrives, not only at the end. What is on screen during a turn
             // is a live element the next redraw discards; the entry is what survives one. Without
             // this, stopping — which redraws immediately — showed an empty answer under the
             // question, and the words the model had already said came back only later, if at all.
             answer.text = vault.restore(streamed);
             // Placeholders are resolved as they stream, so the user never reads their own data
-            // through a marker.
-            this.post({ type: "delta", text: vault.restore(d.text) });
+            // through a marker — including one the packet boundary cut in two.
+            const shown = liveText.push(deltaText);
+            if (shown) this.post({ type: "delta", text: shown });
           }
-          if (d.reasoning) {
-            thought += d.reasoning;
-            this.post({ type: "reasoning", text: vault.restore(d.reasoning) });
+          if (deltaThought) {
+            thought += deltaThought;
+            const shownThought = liveThought.push(deltaThought);
+            if (shownThought) this.post({ type: "reasoning", text: shownThought });
           }
         },
         onToolResult: ({ call, result }) => {
+          if (call.source === "text") usedTextToolCalls = true;
           const summary = String(result.content).split("\n")[0]?.slice(0, 120) ?? "";
           // The whole of what a check printed, not the first line of it. The step list wants one
           // line; a model asked to fix the failure wants the error, and the error is never on the
@@ -3148,7 +4770,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           return again.messages;
         },
         afterResponse: (t) => vault.restore(t),
+        restoreArgs: (t) => vault.restore(t),
         onUsage: (info) => this.noteUsage(info),
+        ...(settings.chat.promptCache ? { promptCache: true } : {}),
         });
 
       let result: Awaited<ReturnType<typeof runTurn>>;
@@ -3160,8 +4784,94 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         // re-run the side effect. So the fallback covers exactly the case it is for — a provider
         // that refuses before it starts, which is what a rate limit and a dead network both are.
         const untouched = !streamed && !steps.length;
-        if (!untouched || ctl.signal.aborted || !isRetryable(err) || !chain.length) throw err;
-        result = await this.runFallback(chain, settings, { provider: providerId, model, why: "" }, attempt, ctl);
+        // ⚠️ A model that cannot read images, said by the server rather than by the catalogue —
+        // "image input is not supported … you may need to provide the mmproj". Asked again without
+        // them, once, and remembered, instead of a turn (and every later one) that fails outright.
+        // ⚠️ The conversation no longer fits the server's context window, and nothing has been said
+        // or done yet: summarized, then asked again — once — after this turn has ended. The server
+        // runs with less context per conversation since speculative decoding took its share of the
+        // GPU, so a long conversation that used to fit can now not.
+        if (untouched && !ctl.signal.aborted && !this.recoveringOverflow && isContextOverflow(String((err as Error)?.message ?? err))) {
+          overflowed = true;
+          throw err;
+        }
+        const hadImages = sendMessages.some((msg) => msg.images?.length);
+        if (untouched && !ctl.signal.aborted && hadImages && isImageRefusal(String((err as Error)?.message ?? err))) {
+          this.rememberVisionless(imageKey);
+          this.log.appendLine(`[turn] ${model} refused images; resending without them`);
+          this.post({ type: "status", text: t("{0} cannot read images: asked again without them.", model), ok: false });
+          sendMessages = withoutImages(sendMessages);
+          result = await attempt(provider, model);
+        } else {
+          if (!untouched || ctl.signal.aborted || !isRetryable(err) || !chain.length) throw err;
+          result = await this.runFallback(chain, settings, { provider: providerId, model, why: "" }, attempt, ctl);
+        }
+      }
+
+      // The splitter's tail, BEFORE the restorers: an unterminated deliberation goes to the reasoning
+      // channel, never to the answer. See `thinkingSplitter().flush`.
+      if (splitThinking) {
+        const tail = splitThinking.flush();
+        if (tail.text) {
+          streamed += tail.text;
+          const shown = liveText.push(tail.text);
+          if (shown && !ctl.signal.aborted) this.post({ type: "delta", text: shown });
+        }
+        if (tail.reasoning) {
+          thought += tail.reasoning;
+          const shownThought = liveThought.push(tail.reasoning);
+          if (shownThought && !ctl.signal.aborted) this.post({ type: "reasoning", text: shownThought });
+        }
+      }
+
+      // Whatever the restorers were still holding. Not lost, and not shown raw: a stream that ends
+      // mid-marker — a model that stops talking, a turn the user stops — still owes the reader the
+      // characters it was waiting on.
+      for (const [restorer, type] of [
+        [liveText, "delta"],
+        [liveThought, "reasoning"],
+      ] as const) {
+        const rest = restorer.flush();
+        if (rest && !ctl.signal.aborted) this.post({ type, text: rest });
+      }
+
+      // Thought until there was nothing left to answer with.
+      //
+      // A model that reasons is charged for its reasoning out of the SAME output budget as its
+      // reply, so a long think can consume the whole of it — and the turn then ends with a full
+      // block of thinking and not one word of answer. The provider says so, in `finish_reason`,
+      // and nothing read it: a truncated turn and a finished one were indistinguishable.
+      //
+      // Repeated once, with four times the budget, and only when there is NOTHING to show. A
+      // truncated answer that reached the user is left alone — it is imperfect and it is theirs,
+      // and asking again would bill them twice for a paragraph they can already read. This is the
+      // one case where the answer is empty, which is worth nothing at all.
+      if (result.truncated && !result.text.trim() && !ctl.signal.aborted) {
+        const roomier = settings.chat.maxOutputTokens * 4;
+        this.log.appendLine(`[turn] the answer budget ran out during reasoning; retrying at ${roomier}`);
+        this.post({ type: "status", text: t("It spent the whole answer on thinking. Asking again with more room…") });
+        thought = "";
+        streamed = "";
+        result = await attempt(provider, model, roomier);
+        // Still nothing, and now it is worth saying rather than showing an empty bubble. The
+        // reasoning is kept: it is what the model did produce, and it is the evidence for raising
+        // hiveyCode.chat.maxOutputTokens rather than guessing.
+        if (!result.text.trim()) {
+          answer.error = t(
+            "The model used its whole answer budget on reasoning and produced no reply. Raise hiveyCode.chat.maxOutputTokens, or use a lower reasoning effort.",
+          );
+        }
+      }
+
+      // ⚠️ And when there IS text but the cap still cut it — the loop's own continuations spent, or a
+      // chat turn with no tools to carry on with — it is said, not left to look finished. That was
+      // the whole of the "it stops, it is stuck" report: nothing on screen distinguished a reply
+      // that ended from one the budget ended.
+      if (result.truncated && result.text.trim() && !ctl.signal.aborted) {
+        const why = t("The reply was cut off at the output limit ({0} tokens). Raise hiveyCode.chat.maxOutputTokens, or ask it to continue.", settings.chat.maxOutputTokens);
+        this.log.appendLine(`[turn] reply cut off at max_tokens=${settings.chat.maxOutputTokens}`);
+        this.post({ type: "status", text: why, ok: false });
+        turnNotices.push({ kind: "tool", text: why });
       }
 
       // What the provider's cache actually served, accumulated across the conversation. Shown in the
@@ -3170,15 +4880,68 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       this.cacheSeen.prompt += result.usage.promptTokens;
       this.cacheSeen.cached += result.usage.cachedTokens;
 
-      answer.text = result.text || streamed;
+      // ⚠️ `result.text` is the provider's RAW reply and still carries the deliberation block; only
+      // `streamed` went through the splitter. Taking the raw field would strip the block from the
+      // screen and then write it back into the saved transcript — visible on reopening, and sent to
+      // the model on the next turn as if it were the answer.
+      if (splitThinking && result.text) {
+        const whole = splitThinkingText(result.text);
+        answer.text = whole.text || streamed;
+        if (whole.reasoning && !thought.includes(whole.reasoning)) thought = whole.reasoning;
+      } else {
+        answer.text = result.text || streamed;
+      }
       if (this.plan) answer.plan = this.plan;
+      // "À savoir": what it noticed, what it did not verify, and the state of the tool. Two of the
+      // three are derived from facts already in hand rather than asked of the model — a section that
+      // depended on the model volunteering would be absent on the models that most need it.
+      if (settings.notices.enabled) {
+        const unfinished = planVerdict(this.plan);
+        const notices = youShouldKnow({
+          reported: turnNotices,
+          changed: steps.some((x) => MUTATING_TOOLS.has(x.tool) && x.ok),
+          verified: steps.some((x) => VERIFIER_TOOLS.has(x.tool) && x.ok),
+          planLeft: unfinished.left.map((step: { title: string }) => step.title),
+          // From the budget this turn actually used, which is the figure the ring is showing.
+          ...(this.lastPromptTokens && this.budgetTokensFor(settings) > 0
+            ? { contextFill: Math.min(1, this.lastPromptTokens / this.budgetTokensFor(settings)) }
+            : {}),
+          ...(billsTheUser(providerId)
+            ? { spend: { today: this.gate.budget.spentToday(), cap: settings.budget.dailyUsd } }
+            : {}),
+          // Measured, not guessed: true when the runtime returned no tool calls through the
+          // protocol and they had to be read out of the model's message. See `textToolCall.ts`.
+          toolCallsFromText: usedTextToolCalls,
+        });
+        if (notices.length) answer.notices = notices;
+      }
       answer.usdCost = 0;
+      answer.usage = {
+        promptTokens: result.usage.promptTokens,
+        completionTokens: result.usage.completionTokens,
+        cachedTokens: result.usage.cachedTokens,
+      };
       if (thought) answer.reasoning = thought;
       if (steps.length) answer.steps = steps;
 
+      // ⚠️ What a command did is NOT in the checkpoint, and the restore dialog has to say so. The
+      // checkpoint is built in `confirmEdit`, so it holds exactly what the edit tools touched; a
+      // command is opaque, and `prettier --write`, `sed -i`, a codemod or a build that regenerates a
+      // stylesheet rewrite files nothing snapshotted. Counted here, at the end of the turn, because
+      // this is where the turn's steps exist and `checkpointFor` is still set.
+      if (this.checkpointFor) {
+        const ran = steps.filter((x) => x.tool === "run_command" && x.ok).length;
+        if (ran) {
+          const entry = this.session.get(this.checkpointFor);
+          if (entry) entry.checkpointCommands = (entry.checkpointCommands ?? 0) + ran;
+        }
+      }
+
       if (!isLocal) {
         const cost = costOf(result.usage, this.priceLookup(model));
-        answer.usdCost = cost.usd;
+        // Plus whatever this turn delegated. A sub-agent's bill belongs to the answer that ordered
+        // it, not to nobody.
+        answer.usdCost = cost.usd + this.delegatedCostUsd;
         this.gate.record(
           {
             at: Date.now(),
@@ -3191,6 +4954,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             usd: cost.usd,
             redactions: prepared.findings.length,
             redactionSummary: vault.summary().map((x) => `${x.label}×${x.count}`).join(", "),
+            // Recorded because it is the part of the request the redaction count says nothing
+            // about: "0 redactions" on a turn that sent a screenshot would be true and misleading.
+            ...(outgoingImages ? { images: outgoingImages } : {}),
           },
           settings,
         );
@@ -3207,18 +4973,68 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       if (!handover && !ctl.signal.aborted && mode !== "chat") {
         await this.escalateOnFailure(steps, verifierOutput, settings, model, providerId);
       }
+
+      // One more measurement for this repository, when the user asked for learned routing. The verdict
+      // is `verifyTurn`'s, which is the same evidence the escalation spends money on — so a turn that
+      // nothing verified counts as neither a success nor a failure and is simply not recorded.
+      {
+        const verdict = verifyTurn(steps, this.plan);
+        const verified = steps.some((x) => VERIFIER_TOOLS.has(x.tool));
+        if (verified && !ctl.signal.aborted) {
+          void this.learnedRouting?.observe(model, steps.map((x) => x.tool), verdict.kind === "none");
+        }
+      }
+
+      // The other half of the learning corpus. An episode is kept only when the verification went
+      // GREEN after the remote model — an episode whose final diff does not work is not a training
+      // example, it is two wrong answers. `handover` is true on the escalated turn itself, which is
+      // the turn whose verdict decides.
+      if (handover && this.pendingEpisode && !ctl.signal.aborted && verifyTurn(steps, this.plan).kind === "none") {
+        const episode = this.pendingEpisode;
+        this.pendingEpisode = undefined;
+        void this.corpus?.record({
+          ...episode,
+          final: { model, diff: (await this.turnDiffs()).join("\n") },
+        });
+      } else if (handover) {
+        // One chance. Carrying it into a third turn would attach a diff nobody can attribute.
+        this.pendingEpisode = undefined;
+      }
     } catch (err) {
       const message = (err as Error).message;
       this.log.appendLine(`[turn] ${message}`);
+      if (overflowed) {
+        // Not an error the user has to act on: the recovery below takes over.
+        this.post({ type: "status", text: t("The conversation no longer fits the model's context: summarizing it, then asking again…") });
+      }
       // A turn the user stopped has no error to report. Cancellation surfaces as a failure at
       // whatever layer noticed first, and showing that to someone who pressed stop tells them their
       // own decision went wrong.
-      if (!ctl.signal.aborted) {
+      else if (!ctl.signal.aborted) {
+        // Written into the conversation, ALWAYS — and this is the defect that hid every other one.
+        //
+        // It used to be recorded only when an empty assistant entry already existed, which is to
+        // say only when the turn had got as far as contacting a model. A failure before that — a
+        // bad address, a missing key, a refused request, anything while the prompt was being built
+        // — was recorded nowhere. It was posted as a message, drawn into the turn in progress, and
+        // destroyed by the next rebuild: a red line that appeared for a fraction of a second and
+        // left nothing behind. The user could see something was wrong and could not read what.
         const last = this.session.entries[this.session.entries.length - 1];
         if (last?.role === "assistant" && !last.text) last.error = message;
+        else this.session.add({ role: "assistant", text: "", model }).error = message;
         this.post({ type: "error", message });
+        // And once, out of the transcript, because a transcript can be scrolled past — and because
+        // somebody who cannot get an answer needs the text of the failure to be able to report it.
+        const open = t("Open the log");
+        void vscode.window.showErrorMessage(t("Hivey Code: {0}", message), open).then((choice) => {
+          if (choice === open) this.log.show(true);
+        });
       }
     } finally {
+      // Before anything else, and unconditionally: this is what the panel reads to decide whether
+      // an answer is somebody else's to draw. Left set by a turn that threw, it would be an answer
+      // nothing ever draws — a silent, permanent blank.
+      this.streamingEntryId = undefined;
       this.checkpointFor = undefined;
       // Old checkpoints give up their file contents here rather than at write time: the cap is
       // about what is STORED, and this is the moment just before the conversation is stored.
@@ -3238,9 +5054,56 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       // `turnEnd` over a turn that was still streaming.
       if (this.turn === ctl) {
         this.turn = undefined;
+        this.settle();
+    this.settle();
         this.post({ type: "turnEnd" });
         this.sendState();
       }
+      // After the turn is fully released, never from inside it: recovery summarizes (a turn of its
+      // own) and then asks again. See `recoverFromOverflow`.
+      if (overflowed && this.turn === undefined) setTimeout(() => void this.recoverFromOverflow(), 0);
+    }
+  }
+
+  /** Set while a recovery runs, so a conversation that still does not fit fails plainly, once. */
+  private recoveringOverflow = false;
+
+  /**
+   * The conversation stopped fitting the server's context window: summarize what came BEFORE the
+   * question, put the question back after the summary, and ask it again.
+   *
+   * The question is set aside first, because `compact()` summarizes every included exchange and
+   * would otherwise swallow the very question it is making room for. Nothing has been said or done
+   * for it yet — the overflow is caught only on the first request — so asking again repeats nothing.
+   */
+  private async recoverFromOverflow(): Promise<void> {
+    if (this.recoveringOverflow || this.turn) return;
+    const entries = this.session.entries;
+    const failed = entries[entries.length - 1];
+    if (failed?.role === "assistant" && !failed.text) this.session.drop(failed.id);
+    const question = [...this.session.entries].reverse().find((e) => e.role === "user");
+    if (!question) return;
+    const { text, context } = question;
+    this.recoveringOverflow = true;
+    try {
+      this.session.drop(question.id);
+      const compacted = await this.compact();
+      this.session.add({ role: "user", text, ...(context?.length ? { context } : {}) });
+      this.persist();
+      this.sendState();
+      if (!compacted) {
+        // Nothing earlier to summarize: this one question, with what is attached to it, is larger
+        // than the model can read. Said as such, with the two things that make it fit.
+        this.session.add({ role: "assistant", text: "" }).error = t(
+          "This question and its attachments do not fit the model's context window. Detach a file or narrow the selection, then ask again.",
+        );
+        this.persist();
+        this.sendState();
+        return;
+      }
+      await this.runTurn();
+    } finally {
+      this.recoveringOverflow = false;
     }
   }
 
@@ -3248,28 +5111,205 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    * Ask, unless the permission book already answered. The book is consulted BEFORE the panel is
    * disturbed, which is what makes "toujours autoriser" worth anything.
    */
+  /**
+   * The same question, answered by several models, one after another.
+   *
+   * Three decisions, and each is a refusal to do the obvious thing.
+   *
+   * NO SIDE-BY-SIDE. The panel is 300 px wide docked. Two columns of prose in it is one column of
+   * prose cut in half. The answers go into the conversation in sequence, each labelled with the
+   * model that wrote it, which is also where answers belong.
+   *
+   * NO TOOLS. Comparison runs in chat mode whatever the panel is set to. Three agents editing the
+   * same files to answer the same question is not a comparison, it is a collision — and the thing
+   * being compared is how the models THINK, which the first answer shows.
+   *
+   * THE PRICE IS IN THE PICKER. Comparing four models costs four answers. A feature that spends
+   * four times without saying so is a feature that gets used once and then distrusted, and the
+   * whole argument of this extension is that nothing is spent by surprise.
+   */
+  private async compareAcrossModels(question: Entry, context: ContextItem[]): Promise<void> {
+    if (this.turn) {
+      void vscode.window.showInformationMessage(t("Wait for the current answer to finish first."));
+      return;
+    }
+    const settings = readSettings();
+    const models = this.models.length ? this.models : await listModels(settings, this.keys, settings.chat.model);
+    const picked = await vscode.window.showQuickPick(
+      models.slice(0, 200).map((model) => ({
+        label: model.name || model.id,
+        description: model.local ? t("on this machine") : t("{0} $/M in · {1} $/M out", model.inUsd, model.outUsd),
+        detail: model.id,
+        model,
+      })),
+      {
+        canPickMany: true,
+        placeHolder: t("Which models should answer this? Each one costs one answer."),
+        matchOnDetail: true,
+      },
+    );
+    if (!picked?.length) return;
+
+    for (const choice of picked) {
+      if (this.turn) break;
+      // Announced before it is spent, one line per model, because a loop that bills four times
+      // should say so four times rather than once at the start.
+      this.post({ type: "status", text: t("Asking {0}…", choice.label) });
+      // A preset is a routing, not a model id: sending `hivey/free` to a provider is a 400. The
+      // model that answers an ordinary question is the one being compared.
+      const id = isHivey(choice.model.id) ? hiveyModel(choice.model.id, "everyday") : choice.model.id;
+      await this.answerWith(question, context, id, choice.model.provider as ProviderId);
+    }
+  }
+
+  /**
+   * One answer, from one named model, added to the conversation.
+   *
+   * Deliberately NOT `runTurn`: that one reads the settings to decide where a question goes, and the
+   * whole point here is that the caller has already decided. It is also chat-shaped — no tools, one
+   * request — which is what keeps a four-model comparison to four requests.
+   */
+  private async answerWith(question: Entry, context: ContextItem[], model: string, provider: ProviderId): Promise<void> {
+    const settings = readSettings();
+    const baseUrl = safeUrl(settings, provider);
+    const isLocal = isLocalEndpoint(baseUrl);
+    const vault = new Vault();
+    const entry = this.session.add({ role: "assistant", text: "", model });
+    this.sendState();
+    try {
+      // The question and its attachments, and NOTHING else — not the conversation around it.
+      //
+      // Two reasons, and they point the same way. A comparison in which one model is handed the
+      // transcript and another is handed the transcript plus the first model's answer is not a
+      // comparison. And the question being compared is already IN that transcript, so including it
+      // would send it twice. Every model gets the same input, which is the only thing that makes
+      // the answers comparable — and it is also the cheapest possible request.
+      const nonce = randomNonce();
+      const outgoing = [
+        { role: "system" as const, content: promptForMode("chat"), cacheable: true },
+        { role: "user" as const, content: renderEntry({ ...question, context } as Entry, nonce) },
+      ];
+      const prepared = isLocal
+        ? { messages: outgoing }
+        : await this.gate.prepare(outgoing, settings, { provider, model, baseUrl, isLocal }, vault);
+      if (!prepared) {
+        entry.error = t("Not sent.");
+        return;
+      }
+      const result = await runTurn({
+        provider: await providerFor(settings, this.keys, provider),
+        model,
+        messages: prepared.messages,
+        maxTokens: 2048,
+        afterResponse: (text) => vault.restore(text),
+        restoreArgs: (text) => vault.restore(text),
+        onUsage: (info) => this.noteUsage(info),
+      });
+      entry.text = result.text;
+      if (!isLocal) {
+        const cost = costOf(result.usage, this.priceLookup(model));
+        entry.usdCost = cost.usd;
+        entry.usage = {
+          promptTokens: result.usage.promptTokens,
+          completionTokens: result.usage.completionTokens,
+          cachedTokens: result.usage.cachedTokens,
+        };
+      }
+    } catch (err) {
+      // One model failing must not take the comparison down with it: the others are the point.
+      entry.error = (err as Error).message;
+    } finally {
+      this.persist();
+      this.sendState();
+    }
+  }
+
   /** Consent to send, asked as a card in the conversation. */
   private askEgress(request: { description: string; detail: string[] }): Promise<"once" | "always" | "no"> {
     if (!this.view) return Promise.resolve("no");
     const id = randomNonce();
-    this.post({
-      type: "approval",
-      id,
-      tool: "egress",
-      description: request.description,
-      detail: request.detail,
-      // No "this session": consent to a destination is per destination, and a session is not one.
-      choices: ["once", "always", "no"],
-    });
     return new Promise((resolve) => {
-      this.approvals.set(id, (answer) => resolve(answer === "no" ? "no" : answer === "always" ? "always" : "once"));
-      this.turn?.signal.addEventListener("abort", () => {
-        if (this.approvals.delete(id)) resolve("no");
-      });
+      this.askInPanel(
+        {
+          id,
+          tool: "egress",
+          description: request.description,
+          detail: request.detail,
+          // No "this session": consent to a destination is per destination, and a session is not one.
+          choices: ["once", "always", "no"],
+        },
+        (answer) => resolve(answer === "no" ? "no" : answer === "always" ? "always" : "once"),
+        () => resolve("no"),
+      );
     });
   }
 
-  private askApproval(req: { tool: string; description: string; args: Record<string, unknown> }): Promise<boolean> {
+  /**
+   * Has this action already been allowed — by a standing rule, or by the auto-approve scope?
+   *
+   * ⚠️⚠️ Extracted because the answer was computed in ONE place and needed in TWO, and the second
+   * place did not ask. `confirmEdit` opened a diff and a notification on every single edit,
+   * unconditionally, with no idea that the user had already said "Always". So the product had two
+   * approval systems that did not know about each other: one that the Always button satisfied, and
+   * one that asked again right behind it.
+   *
+   * That is both of Florian's reports at once — "agent mode does a compare instead of editing" and
+   * "it asks for permission again afterwards if you click always". Neither was
+   * a bug in the permission store, which was right all along; the second asker simply never
+   * consulted it.
+   */
+  private alreadyAllowed(tool: string, args: Record<string, unknown>): boolean {
+    const decision = this.permissions.decide(tool, args);
+    if (decision === "never") return false;
+    if (decision === "always" || decision === "session") return true;
+    const settings = readSettings();
+    const path = pathArgument(args);
+    return autoApprove(
+      {
+        scope: settings.permissions.autoApprove,
+        allowedPaths: settings.permissions.allowedPaths,
+        allowedCommands: settings.permissions.allowedCommands,
+        deniedPaths: settings.permissions.deniedPaths,
+        deniedCommands: settings.permissions.deniedCommands,
+        blockedGlobs: settings.privacy.blockedGlobs,
+      },
+      {
+        tool,
+        ...(path ? { path, insidePath: isInsideWorkspace(path) } : {}),
+        ...(tool === "run_command" ? { command: String(args["command"] ?? "") } : {}),
+      },
+      matchGlob,
+    ).allow;
+  }
+
+  /**
+   * How big the change on this card is, in lines.
+   *
+   * ⚠️ `write_file` is here as well as `edit_file`, and it is the one that needed it more: it replaces
+   * a file ENTIRELY, so "write src/guilde.js" on a card says nothing about whether four lines or four
+   * thousand are about to go. It costs one read of the file being replaced, which is a file the tool
+   * is about to overwrite anyway.
+   *
+   * Nothing for any other tool: a size on a card about running a command would be a number with no
+   * referent.
+   */
+  private async changeSizeFor(req: { tool: string; args: Record<string, unknown> }): Promise<string> {
+    if (req.tool === "edit_file") {
+      return describeChangeSize(changeSize(String(req.args["old"] ?? ""), String(req.args["new"] ?? "")));
+    }
+    if (req.tool !== "write_file") return "";
+    const path = pathArgument(req.args);
+    if (!path) return "";
+    try {
+      const before = await readOrEmpty(vscode.Uri.file(path));
+      return describeChangeSize(changeSize(before ?? "", String(req.args["content"] ?? "")));
+    } catch {
+      // A file that cannot be read is a file being created, and "+N" is still worth saying.
+      return describeChangeSize(changeSize("", String(req.args["content"] ?? "")));
+    }
+  }
+
+  private async askApproval(req: { tool: string; description: string; args: Record<string, unknown> }): Promise<boolean> {
     const decision = this.permissions.decide(req.tool, req.args);
 
     // A standing refusal comes first and is checked below; a standing ALLOWANCE and the scope
@@ -3313,19 +5353,35 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
     const id = randomNonce();
     const command = req.tool === "run_command" ? String(req.args["command"] ?? "") : undefined;
-    this.post({ type: "approval", id, tool: req.tool, description: req.description, ...(command ? { command } : {}) });
+    // ⚠️ The size of the change, on the card that decides it. The diff editor used to carry this and
+    // no longer opens — so the one fact that separates a two-line fix from a four-hundred-line
+    // rewrite has to be here, before the answer, rather than discovered afterwards.
+    const edited = await this.changeSizeFor(req);
     return new Promise<boolean>((resolve) => {
-      this.approvals.set(id, (answer) => {
-        if (answer === "session" || answer === "always") {
-          this.permissions.remember(req.tool, req.args, answer);
-          this.sendState();
-        }
-        resolve(answer !== "no");
-      });
-      // A turn that is cancelled must not leave a promise hanging forever.
-      this.turn?.signal.addEventListener("abort", () => {
-        if (this.approvals.delete(id)) resolve(false);
-      });
+      this.askInPanel(
+        {
+          id,
+          tool: req.tool,
+          description: req.description,
+          ...(command ? { command } : {}),
+          ...(edited ? { detail: [t("{0} lines", edited)] } : {}),
+          // ⚠️ Three, not four. Florian: "there should just be the Accept, always or deny button,
+          // not always for the conversation, because by default always only applies to the current
+          // conversation". He is describing a menu whose middle two entries were the same
+          // promise worded differently — and the one that said "this conversation" was the one that
+          // appeared not to work, because a SECOND asker ignored it. With that fixed, the remaining
+          // honest distinction is "this time" against "from now on, everywhere, until you change it
+          // in the settings".
+          choices: ["once", "always", "no"],
+        },
+        (answer) => {
+          if (answer === "session" || answer === "always") {
+            this.permissions.remember(req.tool, req.args, answer);
+          }
+          resolve(answer !== "no");
+        },
+        () => resolve(false),
+      );
     });
   }
 
@@ -3360,7 +5416,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     usedProvider: ProviderId,
   ): Promise<void> {
     if (settings.escalation.policy === "never") return;
-    const verdict = verifyTurn(steps);
+    const verdict = verifyTurn(steps, this.plan);
     if (verdict.kind === "none") return;
 
     const target = escalationTarget(routerConfig(settings), { provider: usedProvider, model: usedModel });
@@ -3383,6 +5439,25 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     }
 
     this.post({ type: "status", text: t("Handing over to {0}: {1}", target.model, verdict.why) });
+    // Captured BEFORE the second turn, because afterwards the local attempt's diff is indistinguishable
+    // from the remote one's: both are on disk. The files are the checkpoint's `before` state, which is
+    // exactly what a fixture needs to be a fixture.
+    if (this.corpus?.enabled()) {
+      const checkpoint = (this.checkpointFor ? this.session.get(this.checkpointFor) : undefined)?.checkpoint ?? [];
+      const asked = [...this.session.entries].reverse().find((e) => e.role === "user")?.text ?? "";
+      const failing = verdict.evidence.at(-1);
+      this.pendingEpisode = {
+        at: Date.now(),
+        request: asked,
+        files: checkpoint.map((snap) => ({ path: snap.path, before: snap.before ?? "" })),
+        local: { model: usedModel, diff: diffs.join("\n"), error: detail ?? verdict.why },
+        final: { model: "", diff: "" },
+        // The command whose exit code decided it, when one did. A verdict from the diagnostics has no
+        // command, and the export says so rather than inventing one.
+        check: failing?.tool === "run_command" ? (failing.call ?? "") : "",
+        omitted: 0,
+      };
+    }
     await this.runTurn({ ...target, note });
   }
 
@@ -3420,6 +5495,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    * rebuild. See where it is set for why a slightly stale map is cheaper than a fresh one.
    */
   private frozenMap: { text: string; files: number; omitted: number } | undefined;
+  /** The workspace structure the frozen map describes. See `WorkspaceContext.structureVersion`. */
+  private frozenMapAt = -1;
+
+  /** What sub-agents spent during the turn in progress, to be added to the answer that ordered it. */
+  private delegatedCostUsd = 0;
+
+  /** The answer a turn is writing right now, which the panel leaves to the live turn to draw. */
+  private streamingEntryId: string | undefined;
 
   /** Prompt tokens sent, and how many of them the provider served from its cache, this session. */
   private cacheSeen = { prompt: 0, cached: 0 };
@@ -3485,27 +5568,119 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     else if (result.kind !== "already") entry.checkpointPartial = true;
   }
 
+  /**
+   * Record the file's prior state, and let the edit through.
+   *
+   * ⚠️⚠️ THIS NO LONGER ASKS, and that is the fix Florian asked for three times: "agent mode
+   * shouldn't even do a diff", "it keeps doing diffs instead of editing".
+   *
+   * The approval already happened. `askApproval` put a card in the panel, named the file, and took
+   * the answer — Accept, Always or Deny. This function then opened a diff EDITOR TAB, stealing the
+   * tab the user was working in, and asked the same question again in a notification. Two askers for
+   * one decision, which is also why "Always" never seemed to take: it satisfied the first and the
+   * second carried on asking.
+   *
+   * What replaces the diff is not nothing: the approval card now carries the change's size, the step
+   * list names every file touched, the checkpoint puts them back, and the editor's own undo is
+   * unaffected. What is gone is being shown a comparison instead of being given a change.
+   *
+   * The second reader survives, because it is not an approval: it answers "does this diff do
+   * something the request did not ask for", and when it says yes about a dangerous file it still
+   * stops the edit. See `core/review/second.ts`.
+   */
   private async confirmEdit(uri: vscode.Uri, next: string): Promise<boolean> {
     const original = await readOrEmpty(uri);
-    const preview = uri.with({ scheme: "hivey-code-preview", query: Date.now().toString() });
-    previewContents.set(preview.toString(), next);
-    await vscode.commands.executeCommand(
-      "vscode.diff",
-      original === undefined ? vscode.Uri.parse("untitled:nouveau") : uri,
-      preview,
-      t("{0} — proposed by Hivey Code", relative(uri)),
-      { preview: true },
-    );
-    const answer = await vscode.window.showInformationMessage(
-      t("Apply the change to {0}?", relative(uri)),
-      { modal: false },
-      t("Apply"),
-      t("Refuse"),
-    );
-    previewContents.delete(preview.toString());
-    const apply = answer === t("Apply");
-    if (apply) this.snapshot(uri, original);
-    return apply;
+    const second = await this.secondOpinion(relative(uri), original ?? "", next);
+    if (second.blocking) {
+      // Not a dialog: the turn is running and the model is the one that has to hear this.
+      this.post({
+        type: "status",
+        text: [t("Refused by the reviewer: {0}", relative(uri)), ...second.lines].join(" — "),
+        tool: "edit_file",
+        ok: false,
+      });
+      return false;
+    }
+    // Objections that do not block are still worth saying, once, where the turn is being read.
+    if (second.lines.length) {
+      this.post({ type: "status", text: second.lines.join(" — "), tool: "edit_file", ok: true });
+    }
+    this.snapshot(uri, original);
+    return true;
+  }
+
+
+  /**
+   * What a second model says about this diff, when the diff is one of the dangerous ones.
+   *
+   * ⚠️ LOCAL BY DEFAULT, taken literally: if the second reader would be a model that bills, it is not
+   * called at all and the card says so. A second opinion that quietly doubled the price of editing a
+   * settings file would be a feature people turn off, and one that charged for it without saying so
+   * would be worse than that.
+   */
+  private async secondOpinion(
+    path: string,
+    before: string,
+    after: string,
+  ): Promise<{ lines: string[]; blocking: boolean }> {
+    const settings = readSettings();
+    if (!vscode.workspace.getConfiguration(SECTION).get<boolean>("secondOpinion.enabled", true)) {
+      return { lines: [], blocking: false };
+    }
+    const diff = unifiedDiff(path, before, after, { maxChars: 20_000 });
+    const trigger = needsSecondOpinion({ paths: [path], diff }, DEFAULT_TRIGGERS, matchGlob);
+    if (!trigger.needed) return { lines: [], blocking: false };
+
+    const state = policyState();
+    const blocking = state.kind !== "none" && state.policy.secondOpinion === "blocking";
+
+    // The local endpoint's own model, or nothing. `endpointFor` throws for a provider with no address,
+    // which is the ordinary case for somebody who only uses a paid one.
+    let localUrl = "";
+    try {
+      localUrl = endpointFor(settings, "local");
+    } catch {
+      localUrl = "";
+    }
+    if (!localUrl || !isLocalEndpoint(localUrl)) {
+      return {
+        lines: [
+          t(
+            "This change is worth a second look ({0}), and no local model is configured to give one — a paid one is not called for this.",
+            trigger.why,
+          ),
+        ],
+        blocking: false,
+      };
+    }
+
+    const model = settings.completion.model || settings.chat.model;
+    try {
+      const provider = await providerFor(settings, this.keys, "local");
+      const result = await runTurn({
+        provider,
+        model,
+        messages: [{ role: "user", content: secondOpinionPrompt(this.lastRequest(), diff) }],
+        maxTokens: 1024,
+      });
+      const opinion = parseObjections(result.text);
+      return {
+        lines: [t("Worth a second look: {0}.", trigger.why), ...describeOpinion(opinion, model, blocking)],
+        // Blocking only when the organisation asks AND there is something to resolve.
+        blocking: blocking && opinion.objections.length > 0,
+      };
+    } catch (err) {
+      this.log.appendLine(`[second] ${(err as Error).message}`);
+      return {
+        lines: [t("A second reader could not be reached ({0}), so nobody has checked this but you.", (err as Error).message.split("\n")[0] ?? "")],
+        blocking: false,
+      };
+    }
+  }
+
+  /** The question this turn is answering, for the second reader. */
+  private lastRequest(): string {
+    return [...this.session.entries].reverse().find((e) => e.role === "user")?.text ?? "";
   }
 }
 
@@ -3582,11 +5757,38 @@ async function readOrEmpty(uri: vscode.Uri): Promise<string | undefined> {
   }
 }
 
-function estimateCost(promptTokens: number, price: Price | undefined): number {
-  if (!price) return 0;
-  // Assume an answer about a quarter the size of the question: enough to catch a runaway prompt,
-  // not so pessimistic that the cap fires on ordinary turns.
-  return (promptTokens * price.in + promptTokens * 0.25 * price.out) / 1_000_000;
+/**
+ * What the clipboard gave us, as an attachment.
+ *
+ * The transcript gets a SENTENCE about the image — its name and its size — and never the base64,
+ * which would be unreadable in the record, counted as text by every budget, and written to disk
+ * with the history. The bytes ride separately, on the message, and go no further than the request.
+ */
+function pastedContext(
+  m: { name: string; text?: string; mediaType?: string; data?: string; width?: number; height?: number },
+  maxTokens: number,
+): ContextItem | undefined {
+  if (m.data && m.mediaType?.startsWith("image/")) {
+    const kb = Math.round((m.data.length * 3) / 4 / 1024);
+    const size = m.width && m.height ? `${m.width}×${m.height}, ${kb} kB` : `${kb} kB`;
+    return {
+      kind: "image",
+      label: m.name || t("pasted image"),
+      body: `[${t("image")}: ${m.name || t("pasted image")} — ${size}]`,
+      image: { mediaType: m.mediaType, data: m.data },
+    };
+  }
+  const text = (m.text ?? "").trim();
+  if (!text) return undefined;
+  return {
+    kind: "paste",
+    label: m.name || t("pasted text"),
+    body: headToTokens(text, maxTokens),
+    // Pasted text was written by somebody else — a log, a page, a colleague's message — so it goes
+    // behind the same fence as a file the agent read. The fence is the whole reason an attachment
+    // cannot give the model instructions.
+    untrusted: true,
+  };
 }
 
 function randomNonce(): string {
@@ -3626,12 +5828,12 @@ function isInsideWorkspace(path: string): boolean {
   const absolute = /^([a-zA-Z]:)?[/\\]/.test(path)
     ? path.replace(/\\/g, "/")
     : `${root}/${path.replace(/\\/g, "/")}`;
-  const resolved = normalise(absolute);
+  const resolved = normalize(absolute);
   return resolved === root || resolved.startsWith(`${root}/`);
 }
 
 /** Collapse `.` and `..` without touching the filesystem — the path may not exist yet. */
-function normalise(path: string): string {
+function normalize(path: string): string {
   const out: string[] = [];
   for (const part of path.split("/")) {
     if (!part || part === ".") continue;

@@ -1,0 +1,7 @@
+{
+  "title": "A division that takes the program down",
+  "kind": "ibmi",
+  "prompt": "RATECALC.rpgle divides by a quantity that can be zero and by a rate read from a file, so the program ends with an unhandled exception and the job log is all the user gets. Handle it with a MONITOR group: on an error, set the result to zero and the error flag on. Do not add a *PSSR subroutine.",
+  "check": "codeonly RATECALC.rpgle | grep -qi 'monitor;' && codeonly RATECALC.rpgle | grep -qi 'on-error' && codeonly RATECALC.rpgle | grep -qi 'endmon' && ! codeonly RATECALC.rpgle | grep -qi '\\*pssr' && codeonly RATECALC.rpgle | grep -qi 'inError = \\*on'",
+  "timeoutMs": 180000
+}

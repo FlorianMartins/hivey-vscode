@@ -1,0 +1,14 @@
+             PGM
+
+             DCL        VAR(&COUNT) TYPE(*DEC) LEN(7 0)
+
+/* Clear the staging file and refill it from the live one. */
+             CLRPFM     FILE(ARCSTG)
+             CPYF       FROMFILE(ORDHDR) TOFILE(ARCSTG) MBROPT(*ADD)
+
+/* Drop last month's extract. */
+             DLTF       FILE(ARCOLD)
+
+             SNDPGMMSG  MSG('Archive staged')
+
+             ENDPGM

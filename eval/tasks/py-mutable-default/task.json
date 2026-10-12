@@ -1,0 +1,7 @@
+{
+  "title": "Two baskets share one list",
+  "kind": "bug",
+  "prompt": "Two customers end up with each other's items. The tests in test_basket.py show it. Fix basket.py without changing the tests.",
+  "check": "python3 -m unittest discover -q",
+  "timeoutMs": 180000
+}

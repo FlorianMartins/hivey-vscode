@@ -4,7 +4,7 @@
 // input this file can think of: THE TOKENS REPRODUCE THE INPUT. A highlighter that loses a
 // backslash, drops a character at a fence, or swallows the tail of an unterminated string has
 // corrupted code the user is about to paste into their repository — a far worse failure than a
-// keyword rendered in the ordinary colour, and a silent one.
+// keyword rendered in the ordinary color, and a silent one.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";

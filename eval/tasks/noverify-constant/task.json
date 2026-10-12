@@ -1,0 +1,7 @@
+{
+  "title": "The VAT rate changed",
+  "kind": "noverify",
+  "prompt": "The VAT rate is now 21 % instead of 20 %. Update it.",
+  "check": "node report.js | grep -qx '121.00 121.00'",
+  "timeoutMs": 180000
+}

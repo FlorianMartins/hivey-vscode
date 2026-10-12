@@ -95,6 +95,25 @@ test("a tool call split across chunks is reassembled by index", async () => {
   assert.deepEqual(JSON.parse(r.toolCalls[0]!.args), { path: "a.ts" });
 });
 
+test("⚠️ a tool call cut off by max_tokens is dropped, and the cut is still reported", async () => {
+  // It was kept with broken JSON and `stopReason` overwritten to "tool_calls": the loop ran half a
+  // call, and nothing knew the output cap was the reason. Seen live on Qwen3.8 via llama.cpp.
+  const s = await serve((_req, res) =>
+    sse(res, [
+      { choices: [{ delta: { content: "Voici le plan, puis j'attaque :" } }] },
+      { choices: [{ delta: { tool_calls: [{ index: 0, id: "call_1", function: { name: "write_file", arguments: '{"path":"a.ts","content":"lo' } }] } }] },
+      { choices: [{ delta: {}, finish_reason: "length" }] },
+    ]),
+  );
+  const p = new OpenAICompatibleProvider({ id: "local", baseUrl: s.url, isLocal: true });
+  const r = await p.chat({ model: "m", messages: [{ role: "user", content: "go" }] });
+  await s.close();
+
+  assert.equal(r.stopReason, "length");
+  assert.equal(r.toolCalls.length, 0, "half a call is not a call");
+  assert.equal(r.text, "Voici le plan, puis j'attaque :");
+});
+
 test("reasoning tokens are separated from the answer", async () => {
   const s = await serve((_req, res) =>
     sse(res, [
@@ -129,7 +148,7 @@ test("attribution headers go to OpenRouter and nowhere else", async () => {
   await or.close();
 });
 
-test("an Ollama server on an unusual port is recognised by probing it, not by its URL", async () => {
+test("an Ollama server on an unusual port is recognized by probing it, not by its URL", async () => {
   // The whole point: this server is on a random port and still gets the fill-in-the-middle path.
   const s = await serve((req, res) => {
     if (req.url === "/api/version") {
@@ -239,8 +258,29 @@ test("Anthropic: the stable prefix is marked for the prompt cache", async () => 
   assert.equal(r.usage.completionTokens, 5);
 });
 
+test("⚠️ a side task on a self-hosted server is sent with thinking off — and only that", async () => {
+  // Qwen on llama.cpp thinks at the template's default effort unless told otherwise, so an edit
+  // prediction or a commit message spent its time thinking. A turn somebody reads keeps its thinking;
+  // a cloud is left exactly as it was.
+  const sent = async (id: string, chore: boolean): Promise<Record<string, unknown>> => {
+    const s = await serve((_req, res) => sse(res, [{ choices: [{ delta: { content: "x" } }] }]));
+    await new OpenAICompatibleProvider({ id, baseUrl: s.url, isLocal: id === "local", apiKey: "k" }).chat({
+      model: "m",
+      messages: [{ role: "user", content: "hi" }],
+      reasoning: "none",
+      ...(chore ? { chore: true } : {}),
+    });
+    await s.close();
+    return s.requests[0]!.body;
+  };
+  assert.equal((await sent("local", true)).reasoning_effort, "none", "local chore: thinking off");
+  assert.equal((await sent("openai-compatible", true)).reasoning_effort, "none", "own gateway chore: thinking off");
+  assert.equal((await sent("local", false)).reasoning_effort, undefined, "a real turn keeps the server's default");
+  assert.equal((await sent("openai", true)).reasoning_effort, undefined, "a cloud is not touched");
+});
+
 test("reasoning effort is translated per provider, not passed through", async () => {
-  // OpenRouter normalises it under `reasoning`; an OpenAI-shaped gateway takes `reasoning_effort`.
+  // OpenRouter normalizes it under `reasoning`; an OpenAI-shaped gateway takes `reasoning_effort`.
   const or = await serve((_req, res) => sse(res, [{ choices: [{ delta: { content: "x" } }] }]));
   await new OpenAICompatibleProvider({ id: "openrouter", baseUrl: or.url, isLocal: false, apiKey: "k" }).chat({
     model: "m",
@@ -366,4 +406,270 @@ test("a refusal that names no parameter is reported, not retried", async () => {
   );
   await s.close();
   assert.equal(calls, 1);
+});
+
+// The two dialects that follow disagree about everything here — the field name, the encoding, the
+// nesting — so both are checked on the body that actually leaves. The ORDER is not cosmetic either:
+// a model handed a picture before the question it is about describes the picture instead of
+// answering it.
+
+test("OpenAI: an image becomes a content array with a data URL", async () => {
+  const s = await serve((_req, res) => sse(res, [{ choices: [{ delta: { content: "a cat" } }] }]));
+  const p = new OpenAICompatibleProvider({ id: "openai", baseUrl: s.url, apiKey: "k", isLocal: false });
+  await p.chat({
+    model: "gpt-5",
+    messages: [{ role: "user", content: "what is this?", images: [{ mediaType: "image/png", data: "QUJD" }] }],
+  });
+  await s.close();
+
+  const sent = s.requests[0]!.body.messages[0];
+  assert.ok(Array.isArray(sent.content), "a message with an image must use the array form");
+  assert.equal(sent.content[0].type, "text");
+  assert.equal(sent.content[0].text, "what is this?");
+  assert.equal(sent.content[1].type, "image_url");
+  assert.equal(sent.content[1].image_url.url, "data:image/png;base64,QUJD");
+});
+
+test("OpenAI: a message with no image keeps the plain string form", async () => {
+  // Every server on the list accepts the array form, and several older gateways accept only the
+  // string. Switching everything to arrays for the sake of one feature would break them all.
+  const s = await serve((_req, res) => sse(res, [{ choices: [{ delta: { content: "ok" } }] }]));
+  const p = new OpenAICompatibleProvider({ id: "local", baseUrl: s.url, isLocal: true });
+  await p.chat({ model: "m", messages: [{ role: "user", content: "hello" }] });
+  await s.close();
+  assert.equal(s.requests[0]!.body.messages[0].content, "hello");
+});
+
+test("Anthropic: an image becomes a base64 source block, after the text", async () => {
+  const s = await serve((_req, res) => {
+    res.writeHead(200, { "Content-Type": "text/event-stream" });
+    res.write(`event: content_block_delta\ndata: ${JSON.stringify({ type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "a cat" } })}\n\n`);
+    res.write(`event: message_stop\ndata: ${JSON.stringify({ type: "message_stop" })}\n\n`);
+    res.end();
+  });
+  const p = new AnthropicProvider({ baseUrl: s.url, apiKey: "k" });
+  await p.chat({
+    model: "claude-sonnet-5",
+    messages: [{ role: "user", content: "what is this?", images: [{ mediaType: "image/png", data: "QUJD" }] }],
+  });
+  await s.close();
+
+  const blocks = s.requests[0]!.body.messages[0].content;
+  assert.equal(blocks[0].type, "text");
+  assert.equal(blocks[1].type, "image");
+  assert.equal(blocks[1].source.type, "base64");
+  assert.equal(blocks[1].source.media_type, "image/png");
+  assert.equal(blocks[1].source.data, "QUJD");
+});
+
+// ── The prompt cache, which is where the bill is actually decided ────────────────────────────────
+//
+// Anthropic's cache is not automatic: it applies only to prefixes a request explicitly marks. The
+// marker existed here from the beginning and only the NATIVE Anthropic client ever emitted it — so
+// every Claude conversation routed through OpenRouter, which is the default paid route and what the
+// Hivey presets use, paid the full input price for its system prompt, its repository map and its
+// whole transcript on every single request.
+
+test("OpenRouter: asked for it, a cacheable message carries the marker Anthropic needs", async () => {
+  const s = await serve((_req, res) => sse(res, [{ choices: [{ delta: { content: "ok" } }] }]));
+  const p = new OpenAICompatibleProvider({ id: "openrouter", baseUrl: s.url, apiKey: "k", isLocal: false, promptCache: true });
+  await p.chat({
+    model: "anthropic/claude-opus-5",
+    messages: [
+      { role: "system", content: "rules", cacheable: true },
+      { role: "user", content: "hello" },
+    ],
+  });
+  await s.close();
+
+  const sent = s.requests[0]!.body.messages;
+  assert.ok(Array.isArray(sent[0].content), "a marked message must use the content-array form");
+  assert.deepEqual(sent[0].content[0].cache_control, { type: "ephemeral" });
+  assert.equal(sent[1].content, "hello", "an unmarked message keeps the plain string form");
+});
+
+test("a gateway that is not OpenRouter is sent nothing it did not ask for", async () => {
+  // `cache_control` is an Anthropic-and-OpenRouter extension. A strict gateway answers 400 to a
+  // field it does not know, and turning every request into the array form to suit one provider
+  // would break the others.
+  const s = await serve((_req, res) => sse(res, [{ choices: [{ delta: { content: "ok" } }] }]));
+  const p = new OpenAICompatibleProvider({ id: "openai-compatible", baseUrl: s.url, apiKey: "k", isLocal: false });
+  await p.chat({ model: "m", messages: [{ role: "system", content: "rules", cacheable: true }] });
+  await s.close();
+  assert.equal(s.requests[0]!.body.messages[0].content, "rules");
+});
+
+test("never more than four breakpoints, whichever door the request goes through", async () => {
+  // Anthropic rejects the whole request beyond four, and a repository with two skills loaded plus
+  // the rolling breakpoint reaches five without anybody doing anything unusual. The LAST four win:
+  // a breakpoint caches everything before it, so a later one subsumes an earlier one.
+  const six = Array.from({ length: 6 }, (_, i) => ({ role: "user" as const, content: `m${i}`, cacheable: true }));
+
+  const a = await serve((_req, res) => sse(res, [{ choices: [{ delta: { content: "ok" } }] }]));
+  const openrouter = new OpenAICompatibleProvider({ id: "openrouter", baseUrl: a.url, apiKey: "k", isLocal: false, promptCache: true });
+  await openrouter.chat({ model: "anthropic/claude-opus-5", messages: six });
+  await a.close();
+  const marked = a.requests[0]!.body.messages.filter((m: any) => Array.isArray(m.content) && m.content[0].cache_control);
+  assert.equal(marked.length, 4);
+  assert.equal(marked[3].content[0].text, "m5", "the last message must keep its breakpoint");
+  assert.equal(marked[0].content[0].text, "m2", "the earliest ones are the ones to drop");
+});
+
+test("Anthropic: the system blocks and the messages share the same budget of four", async () => {
+  const s = await serve((_req, res) => {
+    res.writeHead(200, { "Content-Type": "text/event-stream" });
+    res.write(`event: message_stop\ndata: ${JSON.stringify({ type: "message_stop" })}\n\n`);
+    res.end();
+  });
+  const p = new AnthropicProvider({ baseUrl: s.url, apiKey: "k" });
+  await p.chat({
+    model: "claude-opus-5",
+    messages: [
+      { role: "system", content: "rules", cacheable: true },
+      { role: "system", content: "skill one", cacheable: true },
+      { role: "system", content: "skill two", cacheable: true },
+      { role: "user", content: "map", cacheable: true },
+      { role: "user", content: "question", cacheable: true },
+    ],
+  });
+  await s.close();
+
+  const body = s.requests[0]!.body;
+  const systemMarks = body.system.filter((b: any) => b.cache_control).length;
+  const messageMarks = body.messages.filter((m: any) => m.content.some((b: any) => b.cache_control)).length;
+  assert.equal(systemMarks + messageMarks, 4, "five breakpoints is a request Anthropic refuses outright");
+  assert.equal(messageMarks, 2, "the two latest — the map and the question — must be the ones kept");
+});
+
+test("an authentication or balance failure names the provider that actually answered", async () => {
+  // With a Hivey preset the panel shows one provider and OpenRouter answers. "Check the API key" is
+  // unhelpful advice to somebody who has just checked the API key — of the provider they selected.
+  const unauthorized = await serve((_req, res) => {
+    res.writeHead(401, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: { message: "No auth credentials found" } }));
+  });
+  const p = new OpenAICompatibleProvider({ id: "openrouter", baseUrl: unauthorized.url, apiKey: "k", isLocal: false });
+  await assert.rejects(() => p.chat({ model: "m", messages: [{ role: "user", content: "hi" }] }), /API key for openrouter/);
+  await unauthorized.close();
+
+  // 402 is the account, not the key, and no retry or new key fixes it. It had no hint at all, so it
+  // arrived as the provider's own sentence about credits with nothing saying whose account it meant.
+  const broke = await serve((_req, res) => {
+    res.writeHead(402, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: { message: "Insufficient credits" } }));
+  });
+  const q = new OpenAICompatibleProvider({ id: "openrouter", baseUrl: broke.url, apiKey: "k", isLocal: false });
+  const failure = await q.chat({ model: "m", messages: [{ role: "user", content: "hi" }] }).catch((e: Error) => e.message);
+  await broke.close();
+  assert.match(String(failure), /account balance at openrouter/);
+  assert.match(String(failure), /not the API key/);
+  assert.match(String(failure), /Hivey preset always bills your OpenRouter account/);
+});
+
+// ── The shape of the request is a decision, and it must not drift ───────────────────────────────
+//
+// This is the test that was missing, and its absence cost a week. Marking content parts for
+// Anthropic's prompt cache turns a message's `content` from a string into an array — and it was
+// turned on for everybody. Somewhere behind OpenRouter that shape produced an empty completion,
+// billed for the prompt, with no error: the extension looked as though it had simply stopped
+// working, and nothing in the request said why.
+//
+// Nothing about that was visible from reading the code. What made it visible was recording the body
+// the extension actually sends and diffing it against the version that worked. This test is that
+// diff, kept.
+
+test("by default every message content is a plain string, on every provider", async () => {
+  for (const id of ["openrouter", "openai", "anthropic-compatible", "local"]) {
+    const s = await serve((_req, res) => sse(res, [{ choices: [{ delta: { content: "ok" } }] }]));
+    const p = new OpenAICompatibleProvider({ id, baseUrl: s.url, apiKey: "k", isLocal: id === "local" });
+    await p.chat({
+      model: "anthropic/claude-opus-5",
+      messages: [
+        { role: "system", content: "rules", cacheable: true },
+        { role: "user", content: "map", cacheable: true },
+        { role: "assistant", content: "noted" },
+        { role: "user", content: "question" },
+      ],
+    });
+    await s.close();
+    for (const sent of s.requests[0]!.body.messages) {
+      assert.equal(
+        typeof sent.content,
+        "string",
+        `${id}: the request shape changed for a message the caller marked cacheable — that is the regression`,
+      );
+    }
+  }
+});
+
+test("an image is still the one thing that forces the array form, asked for or not", async () => {
+  // Because there is nowhere else to put it. The difference from the cache marker is that it is the
+  // user who put an image there, so the change of shape is something they did.
+  const s = await serve((_req, res) => sse(res, [{ choices: [{ delta: { content: "ok" } }] }]));
+  const p = new OpenAICompatibleProvider({ id: "openrouter", baseUrl: s.url, apiKey: "k", isLocal: false });
+  await p.chat({
+    model: "m",
+    messages: [{ role: "user", content: "what is this?", images: [{ mediaType: "image/png", data: "QUJD" }] }],
+  });
+  await s.close();
+  assert.ok(Array.isArray(s.requests[0]!.body.messages[0].content));
+});
+
+// ── 402 is two different things ─────────────────────────────────────────────────────────────────
+//
+// "The OpenRouter key gives HTTP 402 payment required even with a valid key and unlimited credit."
+//
+// It does, and the account is fine. OpenRouter answers 402 both for an empty balance and for its
+// in-flight spending budget — credit provisionally reserved by requests that have not finished —
+// and their documentation is explicit that the second is a wait-and-retry case, told apart by a
+// `Retry-After` header. Everything here treated 402 as terminal and said so in a sentence about the
+// balance, so a funded account was told it had no money and the turn ended.
+
+test("a 402 carrying Retry-After is waited out and the request repeated", async () => {
+  let calls = 0;
+  const s = await serve((_req, res) => {
+    calls += 1;
+    if (calls === 1) {
+      res.writeHead(402, { "content-type": "application/json", "retry-after": "0" });
+      res.end(JSON.stringify({ error: { message: "in-flight budget", metadata: { limit_source: "openrouter_in_flight_budget" } } }));
+      return;
+    }
+    sse(res, [{ choices: [{ delta: { content: "ok" } }] }]);
+  });
+  const p = new OpenAICompatibleProvider({ id: "openrouter", baseUrl: s.url, apiKey: "k", isLocal: false });
+  const out = await p.chat({ model: "m", messages: [{ role: "user", content: "hello" }] });
+  await s.close();
+  assert.equal(calls, 2, "the request was not repeated, so a temporary hold ended the turn");
+  assert.equal(out.text, "ok");
+});
+
+test("a 402 without Retry-After is not retried, because no retry fixes an empty account", async () => {
+  let calls = 0;
+  const s = await serve((_req, res) => {
+    calls += 1;
+    res.writeHead(402, { "content-type": "application/json" });
+    res.end(JSON.stringify({ error: { message: "Insufficient credits" } }));
+  });
+  const p = new OpenAICompatibleProvider({ id: "openrouter", baseUrl: s.url, apiKey: "k", isLocal: false });
+  const failed = await p.chat({ model: "m", messages: [{ role: "user", content: "hello" }] }).catch((e: Error) => e);
+  await s.close();
+  assert.equal(calls, 1, "an empty account was retried, which only wastes the user's time");
+  assert.ok(failed instanceof Error);
+  assert.match(failed.message, /account balance/, failed.message);
+  assert.match(failed.message, /Insufficient credits/, "the provider's own sentence was dropped");
+});
+
+test("the two 402s do not say the same thing", async () => {
+  // The whole point: one sends you to top up an account, the other tells you to wait. Saying the
+  // first when it is the second sends somebody to stare at a balance that is fine.
+  const held = await serve((_req, res) => {
+    res.writeHead(402, { "content-type": "application/json", "retry-after": "0" });
+    res.end(JSON.stringify({ error: { message: "held" } }));
+  });
+  const p = new OpenAICompatibleProvider({ id: "openrouter", baseUrl: held.url, apiKey: "k", isLocal: false });
+  const failed = await p.chat({ model: "m", messages: [{ role: "user", content: "hello" }] }).catch((e: Error) => e);
+  await held.close();
+  assert.ok(failed instanceof Error);
+  assert.doesNotMatch(failed.message, /account balance/, failed.message);
+  assert.match(failed.message, /in flight|try again/i, failed.message);
 });
