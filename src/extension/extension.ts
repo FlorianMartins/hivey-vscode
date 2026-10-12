@@ -74,7 +74,7 @@ async function explainEditorLanguage(context: vscode.ExtensionContext): Promise<
   await context.globalState.update(seenKey, combo);
   const change = t("Change VS Code's language");
   const answer = await vscode.window.showInformationMessage(
-    t("The settings descriptions, menus and command names of Hivey Code follow VS Code's own display language ({0}), not the language chosen for Hivey Code.", vscode.env.language),
+    t("Hivey Code's panel, buttons and menus now follow the language chosen for it; only the settings page and the command palette follow VS Code's own display language ({0}).", vscode.env.language),
     { modal: false, detail: t("The command palette entries and the settings page follow VS Code's own display language, which an extension cannot change.") },
     change,
   );
@@ -86,9 +86,22 @@ export function activate(context: vscode.ExtensionContext): void {
   // The editor knows which language the user reads, unless they said otherwise.
   const applyLanguage = () => {
     const choice = readSettings().language;
-    setLanguage(choice === "auto" ? vscode.env.language : choice);
+    const lang = setLanguage(choice === "auto" ? vscode.env.language : choice);
+    // Which twin of every menu entry and title-bar button is shown — see scripts/localize-menus.mjs.
+    // VS Code titles those from ITS display language; this makes them follow Hivey Code's.
+    void vscode.commands.executeCommand("setContext", "hiveyCode.l10n", lang);
   };
   applyLanguage();
+  // The twins only forward to the real command, with whatever arguments the menu passed (a resource,
+  // a source control, a terminal selection).
+  for (const declared of (context.extension.packageJSON?.contributes?.commands ?? []) as Array<{ command: string }>) {
+    const at = declared.command.indexOf(".l10n.");
+    if (at < 0) continue;
+    const target = declared.command.slice(0, at);
+    context.subscriptions.push(
+      vscode.commands.registerCommand(declared.command, (...args: unknown[]) => vscode.commands.executeCommand(target, ...args)),
+    );
+  }
   void explainEditorLanguage(context);
   const log = vscode.window.createOutputChannel("Hivey Code");
   const keys = new Keys(context.secrets);

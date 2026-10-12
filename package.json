@@ -398,126 +398,607 @@
         "command": "hiveyCode.routingForget",
         "title": "%command.routingForget.title%",
         "category": "Hivey Code"
+      },
+      {
+        "command": "hiveyCode.addSelectionToChat.l10n.en",
+        "title": "Add the selection to the conversation",
+        "category": "Hivey Code",
+        "icon": "$(add)"
+      },
+      {
+        "command": "hiveyCode.addSelectionToChat.l10n.fr",
+        "title": "Ajouter la sélection à la conversation",
+        "category": "Hivey Code",
+        "icon": "$(add)"
+      },
+      {
+        "command": "hiveyCode.askAboutSelection.l10n.en",
+        "title": "Ask about the selection",
+        "category": "Hivey Code"
+      },
+      {
+        "command": "hiveyCode.askAboutSelection.l10n.fr",
+        "title": "Interroger la sélection",
+        "category": "Hivey Code"
+      },
+      {
+        "command": "hiveyCode.chooseMicrophone.l10n.en",
+        "title": "Choose a microphone",
+        "category": "Hivey Code",
+        "icon": "$(mic)"
+      },
+      {
+        "command": "hiveyCode.chooseMicrophone.l10n.fr",
+        "title": "Choisir un micro",
+        "category": "Hivey Code",
+        "icon": "$(mic)"
+      },
+      {
+        "command": "hiveyCode.editSelection.l10n.en",
+        "title": "Edit the selection with AI",
+        "category": "Hivey Code",
+        "icon": "$(sparkle)"
+      },
+      {
+        "command": "hiveyCode.editSelection.l10n.fr",
+        "title": "Modifier la sélection avec l'IA",
+        "category": "Hivey Code",
+        "icon": "$(sparkle)"
+      },
+      {
+        "command": "hiveyCode.explainTerminalSelection.l10n.en",
+        "title": "Explain the terminal output",
+        "category": "Hivey Code"
+      },
+      {
+        "command": "hiveyCode.explainTerminalSelection.l10n.fr",
+        "title": "Expliquer la sortie du terminal",
+        "category": "Hivey Code"
+      },
+      {
+        "command": "hiveyCode.exportSession.l10n.en",
+        "title": "Export the conversation as Markdown",
+        "category": "Hivey Code",
+        "icon": "$(save)"
+      },
+      {
+        "command": "hiveyCode.exportSession.l10n.fr",
+        "title": "Exporter la conversation en Markdown",
+        "category": "Hivey Code",
+        "icon": "$(save)"
+      },
+      {
+        "command": "hiveyCode.generateCommitMessage.l10n.en",
+        "title": "Write the commit message",
+        "category": "Hivey Code",
+        "icon": "$(sparkle)"
+      },
+      {
+        "command": "hiveyCode.generateCommitMessage.l10n.fr",
+        "title": "Rédiger le message de commit",
+        "category": "Hivey Code",
+        "icon": "$(sparkle)"
+      },
+      {
+        "command": "hiveyCode.moveToSecondarySideBar.l10n.en",
+        "title": "Move the panel (left, right, or bottom)",
+        "category": "Hivey Code",
+        "icon": "$(layout-sidebar-right)"
+      },
+      {
+        "command": "hiveyCode.moveToSecondarySideBar.l10n.fr",
+        "title": "Déplacer le panneau (à gauche, à droite, ou en bas)",
+        "category": "Hivey Code",
+        "icon": "$(layout-sidebar-right)"
+      },
+      {
+        "command": "hiveyCode.newSession.l10n.en",
+        "title": "New conversation",
+        "category": "Hivey Code",
+        "icon": "$(add)"
+      },
+      {
+        "command": "hiveyCode.newSession.l10n.fr",
+        "title": "Nouvelle discussion",
+        "category": "Hivey Code",
+        "icon": "$(add)"
+      },
+      {
+        "command": "hiveyCode.newSpecialisedSession.l10n.en",
+        "title": "Specialized conversation",
+        "category": "Hivey Code",
+        "icon": "$(list-selection)"
+      },
+      {
+        "command": "hiveyCode.newSpecialisedSession.l10n.fr",
+        "title": "Conversation spécialisée",
+        "category": "Hivey Code",
+        "icon": "$(list-selection)"
+      },
+      {
+        "command": "hiveyCode.openSettings.l10n.en",
+        "title": "Open the settings",
+        "category": "Hivey Code",
+        "icon": "$(gear)"
+      },
+      {
+        "command": "hiveyCode.openSettings.l10n.fr",
+        "title": "Ouvrir les réglages",
+        "category": "Hivey Code",
+        "icon": "$(gear)"
+      },
+      {
+        "command": "hiveyCode.searchConversation.l10n.en",
+        "title": "Search this conversation",
+        "category": "Hivey Code",
+        "icon": "$(search)"
+      },
+      {
+        "command": "hiveyCode.searchConversation.l10n.fr",
+        "title": "Rechercher dans cette conversation",
+        "category": "Hivey Code",
+        "icon": "$(search)"
+      },
+      {
+        "command": "hiveyCode.selectionActions.l10n.en",
+        "title": "What to do with the selection…",
+        "category": "Hivey Code",
+        "icon": "$(sparkle)"
+      },
+      {
+        "command": "hiveyCode.selectionActions.l10n.fr",
+        "title": "Que faire de la sélection…",
+        "category": "Hivey Code",
+        "icon": "$(sparkle)"
+      },
+      {
+        "command": "hiveyCode.setLanguage.l10n.en",
+        "title": "Language of the panel",
+        "category": "Hivey Code",
+        "icon": "$(globe)"
+      },
+      {
+        "command": "hiveyCode.setLanguage.l10n.fr",
+        "title": "Langue du panneau",
+        "category": "Hivey Code",
+        "icon": "$(globe)"
+      },
+      {
+        "command": "hiveyCode.setup.l10n.en",
+        "title": "Set up a model",
+        "category": "Hivey Code",
+        "icon": "$(plug)"
+      },
+      {
+        "command": "hiveyCode.setup.l10n.fr",
+        "title": "Configurer un modèle",
+        "category": "Hivey Code",
+        "icon": "$(plug)"
+      },
+      {
+        "command": "hiveyCode.showCosts.l10n.en",
+        "title": "Show cost and budget",
+        "category": "Hivey Code",
+        "icon": "$(graph)"
+      },
+      {
+        "command": "hiveyCode.showCosts.l10n.fr",
+        "title": "Coûts et budget",
+        "category": "Hivey Code",
+        "icon": "$(graph)"
+      },
+      {
+        "command": "hiveyCode.showDefinitions.l10n.en",
+        "title": "Create or edit skills and sub-agents",
+        "category": "Hivey Code",
+        "icon": "$(list-unordered)"
+      },
+      {
+        "command": "hiveyCode.showDefinitions.l10n.fr",
+        "title": "Créer ou modifier des compétences et sous-agents",
+        "category": "Hivey Code",
+        "icon": "$(list-unordered)"
+      },
+      {
+        "command": "hiveyCode.showEgress.l10n.en",
+        "title": "Show outgoing data",
+        "category": "Hivey Code",
+        "icon": "$(radio-tower)"
+      },
+      {
+        "command": "hiveyCode.showEgress.l10n.fr",
+        "title": "Aperçu des données sortantes",
+        "category": "Hivey Code",
+        "icon": "$(radio-tower)"
+      },
+      {
+        "command": "hiveyCode.showHistory.l10n.en",
+        "title": "Conversation history",
+        "category": "Hivey Code",
+        "icon": "$(history)"
+      },
+      {
+        "command": "hiveyCode.showHistory.l10n.fr",
+        "title": "Historique des conversations",
+        "category": "Hivey Code",
+        "icon": "$(history)"
+      },
+      {
+        "command": "hiveyCode.showKnowledge.l10n.en",
+        "title": "Show the knowledge base",
+        "category": "Hivey Code",
+        "icon": "$(book)"
+      },
+      {
+        "command": "hiveyCode.showKnowledge.l10n.fr",
+        "title": "Afficher la base de connaissance",
+        "category": "Hivey Code",
+        "icon": "$(book)"
+      },
+      {
+        "command": "hiveyCode.showMcp.l10n.en",
+        "title": "Show MCP servers",
+        "category": "Hivey Code",
+        "icon": "$(plug)"
+      },
+      {
+        "command": "hiveyCode.showMcp.l10n.fr",
+        "title": "Afficher les serveurs MCP",
+        "category": "Hivey Code",
+        "icon": "$(plug)"
+      },
+      {
+        "command": "hiveyCode.showPermissions.l10n.en",
+        "title": "Agent permissions",
+        "category": "Hivey Code",
+        "icon": "$(shield)"
+      },
+      {
+        "command": "hiveyCode.showPermissions.l10n.fr",
+        "title": "Permissions de l'agent",
+        "category": "Hivey Code",
+        "icon": "$(shield)"
       }
     ],
     "menus": {
       "view/title": [
         {
           "command": "hiveyCode.exportSession",
-          "when": "view == hiveyCode.chat || view == hiveyCode.chatSide",
+          "when": "(view == hiveyCode.chat || view == hiveyCode.chatSide) && !hiveyCode.l10n",
+          "group": "1_conversation@0"
+        },
+        {
+          "command": "hiveyCode.exportSession.l10n.en",
+          "when": "(view == hiveyCode.chat || view == hiveyCode.chatSide) && hiveyCode.l10n == 'en'",
+          "group": "1_conversation@0"
+        },
+        {
+          "command": "hiveyCode.exportSession.l10n.fr",
+          "when": "(view == hiveyCode.chat || view == hiveyCode.chatSide) && hiveyCode.l10n == 'fr'",
           "group": "1_conversation@0"
         },
         {
           "command": "hiveyCode.showEgress",
-          "when": "view == hiveyCode.chat || view == hiveyCode.chatSide",
+          "when": "(view == hiveyCode.chat || view == hiveyCode.chatSide) && !hiveyCode.l10n",
+          "group": "2_inspect@0"
+        },
+        {
+          "command": "hiveyCode.showEgress.l10n.en",
+          "when": "(view == hiveyCode.chat || view == hiveyCode.chatSide) && hiveyCode.l10n == 'en'",
+          "group": "2_inspect@0"
+        },
+        {
+          "command": "hiveyCode.showEgress.l10n.fr",
+          "when": "(view == hiveyCode.chat || view == hiveyCode.chatSide) && hiveyCode.l10n == 'fr'",
           "group": "2_inspect@0"
         },
         {
           "command": "hiveyCode.showCosts",
-          "when": "view == hiveyCode.chat || view == hiveyCode.chatSide",
+          "when": "(view == hiveyCode.chat || view == hiveyCode.chatSide) && !hiveyCode.l10n",
+          "group": "2_inspect@1"
+        },
+        {
+          "command": "hiveyCode.showCosts.l10n.en",
+          "when": "(view == hiveyCode.chat || view == hiveyCode.chatSide) && hiveyCode.l10n == 'en'",
+          "group": "2_inspect@1"
+        },
+        {
+          "command": "hiveyCode.showCosts.l10n.fr",
+          "when": "(view == hiveyCode.chat || view == hiveyCode.chatSide) && hiveyCode.l10n == 'fr'",
           "group": "2_inspect@1"
         },
         {
           "command": "hiveyCode.showPermissions",
-          "when": "view == hiveyCode.chat || view == hiveyCode.chatSide",
+          "when": "(view == hiveyCode.chat || view == hiveyCode.chatSide) && !hiveyCode.l10n",
+          "group": "2_inspect@2"
+        },
+        {
+          "command": "hiveyCode.showPermissions.l10n.en",
+          "when": "(view == hiveyCode.chat || view == hiveyCode.chatSide) && hiveyCode.l10n == 'en'",
+          "group": "2_inspect@2"
+        },
+        {
+          "command": "hiveyCode.showPermissions.l10n.fr",
+          "when": "(view == hiveyCode.chat || view == hiveyCode.chatSide) && hiveyCode.l10n == 'fr'",
           "group": "2_inspect@2"
         },
         {
           "command": "hiveyCode.showDefinitions",
-          "when": "view == hiveyCode.chat || view == hiveyCode.chatSide",
+          "when": "(view == hiveyCode.chat || view == hiveyCode.chatSide) && !hiveyCode.l10n",
+          "group": "2_inspect@3"
+        },
+        {
+          "command": "hiveyCode.showDefinitions.l10n.en",
+          "when": "(view == hiveyCode.chat || view == hiveyCode.chatSide) && hiveyCode.l10n == 'en'",
+          "group": "2_inspect@3"
+        },
+        {
+          "command": "hiveyCode.showDefinitions.l10n.fr",
+          "when": "(view == hiveyCode.chat || view == hiveyCode.chatSide) && hiveyCode.l10n == 'fr'",
           "group": "2_inspect@3"
         },
         {
           "command": "hiveyCode.showKnowledge",
-          "when": "view == hiveyCode.chat || view == hiveyCode.chatSide",
+          "when": "(view == hiveyCode.chat || view == hiveyCode.chatSide) && !hiveyCode.l10n",
+          "group": "2_inspect@4"
+        },
+        {
+          "command": "hiveyCode.showKnowledge.l10n.en",
+          "when": "(view == hiveyCode.chat || view == hiveyCode.chatSide) && hiveyCode.l10n == 'en'",
+          "group": "2_inspect@4"
+        },
+        {
+          "command": "hiveyCode.showKnowledge.l10n.fr",
+          "when": "(view == hiveyCode.chat || view == hiveyCode.chatSide) && hiveyCode.l10n == 'fr'",
           "group": "2_inspect@4"
         },
         {
           "command": "hiveyCode.showMcp",
-          "when": "view == hiveyCode.chat || view == hiveyCode.chatSide",
+          "when": "(view == hiveyCode.chat || view == hiveyCode.chatSide) && !hiveyCode.l10n",
+          "group": "2_inspect@5"
+        },
+        {
+          "command": "hiveyCode.showMcp.l10n.en",
+          "when": "(view == hiveyCode.chat || view == hiveyCode.chatSide) && hiveyCode.l10n == 'en'",
+          "group": "2_inspect@5"
+        },
+        {
+          "command": "hiveyCode.showMcp.l10n.fr",
+          "when": "(view == hiveyCode.chat || view == hiveyCode.chatSide) && hiveyCode.l10n == 'fr'",
           "group": "2_inspect@5"
         },
         {
           "command": "hiveyCode.moveToSecondarySideBar",
-          "when": "view == hiveyCode.chat || view == hiveyCode.chatSide",
+          "when": "(view == hiveyCode.chat || view == hiveyCode.chatSide) && !hiveyCode.l10n",
+          "group": "3_layout@0"
+        },
+        {
+          "command": "hiveyCode.moveToSecondarySideBar.l10n.en",
+          "when": "(view == hiveyCode.chat || view == hiveyCode.chatSide) && hiveyCode.l10n == 'en'",
+          "group": "3_layout@0"
+        },
+        {
+          "command": "hiveyCode.moveToSecondarySideBar.l10n.fr",
+          "when": "(view == hiveyCode.chat || view == hiveyCode.chatSide) && hiveyCode.l10n == 'fr'",
           "group": "3_layout@0"
         },
         {
           "command": "hiveyCode.setLanguage",
-          "when": "view == hiveyCode.chat || view == hiveyCode.chatSide",
+          "when": "(view == hiveyCode.chat || view == hiveyCode.chatSide) && !hiveyCode.l10n",
+          "group": "9_settings@2"
+        },
+        {
+          "command": "hiveyCode.setLanguage.l10n.en",
+          "when": "(view == hiveyCode.chat || view == hiveyCode.chatSide) && hiveyCode.l10n == 'en'",
+          "group": "9_settings@2"
+        },
+        {
+          "command": "hiveyCode.setLanguage.l10n.fr",
+          "when": "(view == hiveyCode.chat || view == hiveyCode.chatSide) && hiveyCode.l10n == 'fr'",
           "group": "9_settings@2"
         },
         {
           "command": "hiveyCode.openSettings",
-          "when": "view == hiveyCode.chat || view == hiveyCode.chatSide",
+          "when": "(view == hiveyCode.chat || view == hiveyCode.chatSide) && !hiveyCode.l10n",
+          "group": "9_settings@3"
+        },
+        {
+          "command": "hiveyCode.openSettings.l10n.en",
+          "when": "(view == hiveyCode.chat || view == hiveyCode.chatSide) && hiveyCode.l10n == 'en'",
+          "group": "9_settings@3"
+        },
+        {
+          "command": "hiveyCode.openSettings.l10n.fr",
+          "when": "(view == hiveyCode.chat || view == hiveyCode.chatSide) && hiveyCode.l10n == 'fr'",
           "group": "9_settings@3"
         },
         {
           "command": "hiveyCode.searchConversation",
-          "when": "view == hiveyCode.chat || view == hiveyCode.chatSide",
+          "when": "(view == hiveyCode.chat || view == hiveyCode.chatSide) && !hiveyCode.l10n",
+          "group": "navigation@0"
+        },
+        {
+          "command": "hiveyCode.searchConversation.l10n.en",
+          "when": "(view == hiveyCode.chat || view == hiveyCode.chatSide) && hiveyCode.l10n == 'en'",
+          "group": "navigation@0"
+        },
+        {
+          "command": "hiveyCode.searchConversation.l10n.fr",
+          "when": "(view == hiveyCode.chat || view == hiveyCode.chatSide) && hiveyCode.l10n == 'fr'",
           "group": "navigation@0"
         },
         {
           "submenu": "hiveyCode.newConversation",
-          "when": "view == hiveyCode.chat || view == hiveyCode.chatSide",
+          "when": "(view == hiveyCode.chat || view == hiveyCode.chatSide) && !hiveyCode.l10n",
+          "group": "navigation@1"
+        },
+        {
+          "submenu": "hiveyCode.newConversation.l10n.en",
+          "when": "(view == hiveyCode.chat || view == hiveyCode.chatSide) && hiveyCode.l10n == 'en'",
+          "group": "navigation@1"
+        },
+        {
+          "submenu": "hiveyCode.newConversation.l10n.fr",
+          "when": "(view == hiveyCode.chat || view == hiveyCode.chatSide) && hiveyCode.l10n == 'fr'",
           "group": "navigation@1"
         },
         {
           "command": "hiveyCode.showHistory",
-          "when": "view == hiveyCode.chat || view == hiveyCode.chatSide",
+          "when": "(view == hiveyCode.chat || view == hiveyCode.chatSide) && !hiveyCode.l10n",
+          "group": "navigation@2"
+        },
+        {
+          "command": "hiveyCode.showHistory.l10n.en",
+          "when": "(view == hiveyCode.chat || view == hiveyCode.chatSide) && hiveyCode.l10n == 'en'",
+          "group": "navigation@2"
+        },
+        {
+          "command": "hiveyCode.showHistory.l10n.fr",
+          "when": "(view == hiveyCode.chat || view == hiveyCode.chatSide) && hiveyCode.l10n == 'fr'",
           "group": "navigation@2"
         },
         {
           "command": "hiveyCode.setup",
-          "when": "view == hiveyCode.chat || view == hiveyCode.chatSide",
+          "when": "(view == hiveyCode.chat || view == hiveyCode.chatSide) && !hiveyCode.l10n",
+          "group": "9_settings@0"
+        },
+        {
+          "command": "hiveyCode.setup.l10n.en",
+          "when": "(view == hiveyCode.chat || view == hiveyCode.chatSide) && hiveyCode.l10n == 'en'",
+          "group": "9_settings@0"
+        },
+        {
+          "command": "hiveyCode.setup.l10n.fr",
+          "when": "(view == hiveyCode.chat || view == hiveyCode.chatSide) && hiveyCode.l10n == 'fr'",
           "group": "9_settings@0"
         },
         {
           "command": "hiveyCode.chooseMicrophone",
-          "when": "view == hiveyCode.chat || view == hiveyCode.chatSide",
+          "when": "(view == hiveyCode.chat || view == hiveyCode.chatSide) && !hiveyCode.l10n",
+          "group": "9_settings@1"
+        },
+        {
+          "command": "hiveyCode.chooseMicrophone.l10n.en",
+          "when": "(view == hiveyCode.chat || view == hiveyCode.chatSide) && hiveyCode.l10n == 'en'",
+          "group": "9_settings@1"
+        },
+        {
+          "command": "hiveyCode.chooseMicrophone.l10n.fr",
+          "when": "(view == hiveyCode.chat || view == hiveyCode.chatSide) && hiveyCode.l10n == 'fr'",
           "group": "9_settings@1"
         }
       ],
       "editor/context": [
         {
           "submenu": "hiveyCode.selection",
-          "when": "editorTextFocus",
+          "when": "(editorTextFocus) && !hiveyCode.l10n",
+          "group": "hivey-code@1"
+        },
+        {
+          "submenu": "hiveyCode.selection.l10n.en",
+          "when": "(editorTextFocus) && hiveyCode.l10n == 'en'",
+          "group": "hivey-code@1"
+        },
+        {
+          "submenu": "hiveyCode.selection.l10n.fr",
+          "when": "(editorTextFocus) && hiveyCode.l10n == 'fr'",
           "group": "hivey-code@1"
         }
       ],
       "hiveyCode.selection": [
         {
           "command": "hiveyCode.editSelection",
-          "when": "editorTextFocus",
+          "when": "(editorTextFocus) && !hiveyCode.l10n",
+          "group": "1_here@0"
+        },
+        {
+          "command": "hiveyCode.editSelection.l10n.en",
+          "when": "(editorTextFocus) && hiveyCode.l10n == 'en'",
+          "group": "1_here@0"
+        },
+        {
+          "command": "hiveyCode.editSelection.l10n.fr",
+          "when": "(editorTextFocus) && hiveyCode.l10n == 'fr'",
           "group": "1_here@0"
         },
         {
           "command": "hiveyCode.askAboutSelection",
-          "when": "editorTextFocus",
+          "when": "(editorTextFocus) && !hiveyCode.l10n",
+          "group": "1_here@1"
+        },
+        {
+          "command": "hiveyCode.askAboutSelection.l10n.en",
+          "when": "(editorTextFocus) && hiveyCode.l10n == 'en'",
+          "group": "1_here@1"
+        },
+        {
+          "command": "hiveyCode.askAboutSelection.l10n.fr",
+          "when": "(editorTextFocus) && hiveyCode.l10n == 'fr'",
           "group": "1_here@1"
         },
         {
           "command": "hiveyCode.addSelectionToChat",
-          "when": "editorTextFocus",
+          "when": "(editorTextFocus) && !hiveyCode.l10n",
+          "group": "2_context@0"
+        },
+        {
+          "command": "hiveyCode.addSelectionToChat.l10n.en",
+          "when": "(editorTextFocus) && hiveyCode.l10n == 'en'",
+          "group": "2_context@0"
+        },
+        {
+          "command": "hiveyCode.addSelectionToChat.l10n.fr",
+          "when": "(editorTextFocus) && hiveyCode.l10n == 'fr'",
           "group": "2_context@0"
         },
         {
           "command": "hiveyCode.selectionActions",
-          "when": "editorTextFocus",
+          "when": "(editorTextFocus) && !hiveyCode.l10n",
+          "group": "3_more@0"
+        },
+        {
+          "command": "hiveyCode.selectionActions.l10n.en",
+          "when": "(editorTextFocus) && hiveyCode.l10n == 'en'",
+          "group": "3_more@0"
+        },
+        {
+          "command": "hiveyCode.selectionActions.l10n.fr",
+          "when": "(editorTextFocus) && hiveyCode.l10n == 'fr'",
           "group": "3_more@0"
         }
       ],
       "scm/title": [
         {
           "command": "hiveyCode.generateCommitMessage",
-          "when": "scmProvider == git",
+          "when": "(scmProvider == git) && !hiveyCode.l10n",
+          "group": "navigation"
+        },
+        {
+          "command": "hiveyCode.generateCommitMessage.l10n.en",
+          "when": "(scmProvider == git) && hiveyCode.l10n == 'en'",
+          "group": "navigation"
+        },
+        {
+          "command": "hiveyCode.generateCommitMessage.l10n.fr",
+          "when": "(scmProvider == git) && hiveyCode.l10n == 'fr'",
           "group": "navigation"
         }
       ],
       "terminal/context": [
         {
           "command": "hiveyCode.explainTerminalSelection",
-          "group": "hivey-code@1"
+          "group": "hivey-code@1",
+          "when": "!hiveyCode.l10n"
+        },
+        {
+          "command": "hiveyCode.explainTerminalSelection.l10n.en",
+          "group": "hivey-code@1",
+          "when": "hiveyCode.l10n == 'en'"
+        },
+        {
+          "command": "hiveyCode.explainTerminalSelection.l10n.fr",
+          "group": "hivey-code@1",
+          "when": "hiveyCode.l10n == 'fr'"
         }
       ],
       "commandPalette": [
@@ -528,16 +1009,282 @@
         {
           "command": "hiveyCode.explainDiagnostic",
           "when": "false"
+        },
+        {
+          "command": "hiveyCode.addSelectionToChat.l10n.en",
+          "when": "false"
+        },
+        {
+          "command": "hiveyCode.addSelectionToChat.l10n.fr",
+          "when": "false"
+        },
+        {
+          "command": "hiveyCode.askAboutSelection.l10n.en",
+          "when": "false"
+        },
+        {
+          "command": "hiveyCode.askAboutSelection.l10n.fr",
+          "when": "false"
+        },
+        {
+          "command": "hiveyCode.chooseMicrophone.l10n.en",
+          "when": "false"
+        },
+        {
+          "command": "hiveyCode.chooseMicrophone.l10n.fr",
+          "when": "false"
+        },
+        {
+          "command": "hiveyCode.editSelection.l10n.en",
+          "when": "false"
+        },
+        {
+          "command": "hiveyCode.editSelection.l10n.fr",
+          "when": "false"
+        },
+        {
+          "command": "hiveyCode.explainTerminalSelection.l10n.en",
+          "when": "false"
+        },
+        {
+          "command": "hiveyCode.explainTerminalSelection.l10n.fr",
+          "when": "false"
+        },
+        {
+          "command": "hiveyCode.exportSession.l10n.en",
+          "when": "false"
+        },
+        {
+          "command": "hiveyCode.exportSession.l10n.fr",
+          "when": "false"
+        },
+        {
+          "command": "hiveyCode.generateCommitMessage.l10n.en",
+          "when": "false"
+        },
+        {
+          "command": "hiveyCode.generateCommitMessage.l10n.fr",
+          "when": "false"
+        },
+        {
+          "command": "hiveyCode.moveToSecondarySideBar.l10n.en",
+          "when": "false"
+        },
+        {
+          "command": "hiveyCode.moveToSecondarySideBar.l10n.fr",
+          "when": "false"
+        },
+        {
+          "command": "hiveyCode.newSession.l10n.en",
+          "when": "false"
+        },
+        {
+          "command": "hiveyCode.newSession.l10n.fr",
+          "when": "false"
+        },
+        {
+          "command": "hiveyCode.newSpecialisedSession.l10n.en",
+          "when": "false"
+        },
+        {
+          "command": "hiveyCode.newSpecialisedSession.l10n.fr",
+          "when": "false"
+        },
+        {
+          "command": "hiveyCode.openSettings.l10n.en",
+          "when": "false"
+        },
+        {
+          "command": "hiveyCode.openSettings.l10n.fr",
+          "when": "false"
+        },
+        {
+          "command": "hiveyCode.searchConversation.l10n.en",
+          "when": "false"
+        },
+        {
+          "command": "hiveyCode.searchConversation.l10n.fr",
+          "when": "false"
+        },
+        {
+          "command": "hiveyCode.selectionActions.l10n.en",
+          "when": "false"
+        },
+        {
+          "command": "hiveyCode.selectionActions.l10n.fr",
+          "when": "false"
+        },
+        {
+          "command": "hiveyCode.setLanguage.l10n.en",
+          "when": "false"
+        },
+        {
+          "command": "hiveyCode.setLanguage.l10n.fr",
+          "when": "false"
+        },
+        {
+          "command": "hiveyCode.setup.l10n.en",
+          "when": "false"
+        },
+        {
+          "command": "hiveyCode.setup.l10n.fr",
+          "when": "false"
+        },
+        {
+          "command": "hiveyCode.showCosts.l10n.en",
+          "when": "false"
+        },
+        {
+          "command": "hiveyCode.showCosts.l10n.fr",
+          "when": "false"
+        },
+        {
+          "command": "hiveyCode.showDefinitions.l10n.en",
+          "when": "false"
+        },
+        {
+          "command": "hiveyCode.showDefinitions.l10n.fr",
+          "when": "false"
+        },
+        {
+          "command": "hiveyCode.showEgress.l10n.en",
+          "when": "false"
+        },
+        {
+          "command": "hiveyCode.showEgress.l10n.fr",
+          "when": "false"
+        },
+        {
+          "command": "hiveyCode.showHistory.l10n.en",
+          "when": "false"
+        },
+        {
+          "command": "hiveyCode.showHistory.l10n.fr",
+          "when": "false"
+        },
+        {
+          "command": "hiveyCode.showKnowledge.l10n.en",
+          "when": "false"
+        },
+        {
+          "command": "hiveyCode.showKnowledge.l10n.fr",
+          "when": "false"
+        },
+        {
+          "command": "hiveyCode.showMcp.l10n.en",
+          "when": "false"
+        },
+        {
+          "command": "hiveyCode.showMcp.l10n.fr",
+          "when": "false"
+        },
+        {
+          "command": "hiveyCode.showPermissions.l10n.en",
+          "when": "false"
+        },
+        {
+          "command": "hiveyCode.showPermissions.l10n.fr",
+          "when": "false"
         }
       ],
       "hiveyCode.newConversation": [
         {
           "command": "hiveyCode.newSession",
-          "group": "1_new@0"
+          "group": "1_new@0",
+          "when": "!hiveyCode.l10n"
+        },
+        {
+          "command": "hiveyCode.newSession.l10n.en",
+          "group": "1_new@0",
+          "when": "hiveyCode.l10n == 'en'"
+        },
+        {
+          "command": "hiveyCode.newSession.l10n.fr",
+          "group": "1_new@0",
+          "when": "hiveyCode.l10n == 'fr'"
         },
         {
           "command": "hiveyCode.newSpecialisedSession",
-          "group": "1_new@1"
+          "group": "1_new@1",
+          "when": "!hiveyCode.l10n"
+        },
+        {
+          "command": "hiveyCode.newSpecialisedSession.l10n.en",
+          "group": "1_new@1",
+          "when": "hiveyCode.l10n == 'en'"
+        },
+        {
+          "command": "hiveyCode.newSpecialisedSession.l10n.fr",
+          "group": "1_new@1",
+          "when": "hiveyCode.l10n == 'fr'"
+        }
+      ],
+      "hiveyCode.newConversation.l10n.en": [
+        {
+          "command": "hiveyCode.newSession.l10n.en",
+          "group": "1_new@0",
+          "when": "hiveyCode.l10n == 'en'"
+        },
+        {
+          "command": "hiveyCode.newSpecialisedSession.l10n.en",
+          "group": "1_new@1",
+          "when": "hiveyCode.l10n == 'en'"
+        }
+      ],
+      "hiveyCode.newConversation.l10n.fr": [
+        {
+          "command": "hiveyCode.newSession.l10n.fr",
+          "group": "1_new@0",
+          "when": "hiveyCode.l10n == 'fr'"
+        },
+        {
+          "command": "hiveyCode.newSpecialisedSession.l10n.fr",
+          "group": "1_new@1",
+          "when": "hiveyCode.l10n == 'fr'"
+        }
+      ],
+      "hiveyCode.selection.l10n.en": [
+        {
+          "command": "hiveyCode.editSelection.l10n.en",
+          "when": "(editorTextFocus) && hiveyCode.l10n == 'en'",
+          "group": "1_here@0"
+        },
+        {
+          "command": "hiveyCode.askAboutSelection.l10n.en",
+          "when": "(editorTextFocus) && hiveyCode.l10n == 'en'",
+          "group": "1_here@1"
+        },
+        {
+          "command": "hiveyCode.addSelectionToChat.l10n.en",
+          "when": "(editorTextFocus) && hiveyCode.l10n == 'en'",
+          "group": "2_context@0"
+        },
+        {
+          "command": "hiveyCode.selectionActions.l10n.en",
+          "when": "(editorTextFocus) && hiveyCode.l10n == 'en'",
+          "group": "3_more@0"
+        }
+      ],
+      "hiveyCode.selection.l10n.fr": [
+        {
+          "command": "hiveyCode.editSelection.l10n.fr",
+          "when": "(editorTextFocus) && hiveyCode.l10n == 'fr'",
+          "group": "1_here@0"
+        },
+        {
+          "command": "hiveyCode.askAboutSelection.l10n.fr",
+          "when": "(editorTextFocus) && hiveyCode.l10n == 'fr'",
+          "group": "1_here@1"
+        },
+        {
+          "command": "hiveyCode.addSelectionToChat.l10n.fr",
+          "when": "(editorTextFocus) && hiveyCode.l10n == 'fr'",
+          "group": "2_context@0"
+        },
+        {
+          "command": "hiveyCode.selectionActions.l10n.fr",
+          "when": "(editorTextFocus) && hiveyCode.l10n == 'fr'",
+          "group": "3_more@0"
         }
       ]
     },
@@ -1291,6 +2038,26 @@
         "id": "hiveyCode.newConversation",
         "label": "%submenu.newConversation.label%",
         "icon": "$(add)"
+      },
+      {
+        "id": "hiveyCode.newConversation.l10n.en",
+        "label": "New conversation",
+        "icon": "$(add)"
+      },
+      {
+        "id": "hiveyCode.newConversation.l10n.fr",
+        "label": "Nouvelle conversation",
+        "icon": "$(add)"
+      },
+      {
+        "id": "hiveyCode.selection.l10n.en",
+        "label": "Hivey Code",
+        "icon": "$(sparkle)"
+      },
+      {
+        "id": "hiveyCode.selection.l10n.fr",
+        "label": "Hivey Code",
+        "icon": "$(sparkle)"
       }
     ]
   },
@@ -1313,7 +2080,8 @@
     "vsix": "npm run build && npx --yes @vscode/vsce@3.9.2 package --no-dependencies -o hivey-code.vsix",
     "vsix:publish": "npm run vsix && gh release upload build hivey-code.vsix --clobber",
     "check:publish": "node scripts/check-publish.mjs",
-    "check:course": "node scripts/check-course.mjs"
+    "check:course": "node scripts/check-course.mjs",
+    "menus": "node scripts/localize-menus.mjs"
   },
   "devDependencies": {
     "@types/node": "^18.19.0",

@@ -6,6 +6,16 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **⚠️ Les boutons et menus suivent la langue choisie pour Hivey Code, même avec VS Code en
+  anglais.** « le texte des boutons en survol est encore en anglais quand on sélectionne Français —
+  "Search this conversation", "New conversation" […] quand vscode est en anglais ». Ces infobulles
+  sont dessinées par VS Code, qui prend leur texte dans `package.nls.*.json` selon SA langue
+  d'affichage, et une extension ne peut pas renommer une commande à l'exécution. Chaque commande et
+  sous-menu placés dans un menu ont donc désormais deux jumeaux aux titres écrits en toutes lettres
+  (anglais et français), et VS Code affiche celui de la langue choisie (clé de contexte
+  `hiveyCode.l10n`). Généré par `npm run menus` et vérifié par les tests. Seules la page des réglages
+  et la palette de commandes suivent encore la langue de VS Code.
+
 - **⚠️ Régression : des textes affichés étaient repassés en anglais.** « le texte est repassé en
   anglais […] donc c'est une régression ». En passant en anglais ce que lit le modèle, des textes
   que **vous** lisez y étaient passés aussi : l'expansion d'une commande tapée (`/explain` devient
