@@ -9,9 +9,30 @@ updates:
     # extension, and they are exactly the ones a supply-chain attack would target.
     commit-message:
       prefix: "chore(deps)"
+    # A release is only adopted once it has been public for a week (shared security baseline).
+    cooldown:
+      default-days: 7
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+    ignore:
+      # The type definitions describe the OLDEST runtime supported, not the newest: newer ones let
+      # code call APIs that do not exist for the people on the minimum version.
+      # - @types/vscode must not exceed engines.vscode (^1.93.0) — vsce refuses to package otherwise.
+      - dependency-name: "@types/vscode"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      # - @types/node follows engines.node (>=18).
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
       interval: weekly
     commit-message:
       prefix: "chore(ci)"
+    # Actions are pinned by commit SHA (version in a comment); Dependabot bumps both.
+    cooldown:
+      default-days: 7
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
