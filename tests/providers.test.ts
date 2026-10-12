@@ -275,8 +275,37 @@ test("⚠️ a side task on a self-hosted server is sent with thinking off — a
   };
   assert.equal((await sent("local", true)).reasoning_effort, "none", "local chore: thinking off");
   assert.equal((await sent("openai-compatible", true)).reasoning_effort, "none", "own gateway chore: thinking off");
-  assert.equal((await sent("local", false)).reasoning_effort, undefined, "a real turn keeps the server's default");
+  // ⚠️ "Direct" on the user's own server says so. Sending nothing left the chat template's default,
+  // which on Qwen3.8 is its MAXIMUM effort — "it reasons too much even for small tasks". The effort
+  // an unchosen panel sends is decided upstream (`effectiveReasoning`: Standard on a self-hosted
+  // server), so "none" here is always a choice somebody made.
+  assert.equal((await sent("local", false)).reasoning_effort, "none", "Direct on a self-hosted server: thinking off");
   assert.equal((await sent("openai", true)).reasoning_effort, undefined, "a cloud is not touched");
+  assert.equal((await sent("openai", false)).reasoning_effort, undefined, "a cloud turn on Direct is not touched either");
+});
+
+test("a self-hosted server is asked for its reading progress, and the progress reaches the caller", async () => {
+  // The queue indicator: on llama.cpp, silence after a request is the queue and progress is the
+  // reading — see core/agent/waiting.ts.
+  const run = async (id: string) => {
+    const s = await serve((_req, res) =>
+      sse(res, [
+        { choices: [{ delta: { role: "assistant", content: null } }], prompt_progress: { total: 50000, cache: 0, processed: 20000, time_ms: 9 } },
+        { choices: [{ delta: { content: "ok" }, finish_reason: "stop" }] },
+      ]),
+    );
+    const seen: unknown[] = [];
+    await new OpenAICompatibleProvider({ id, baseUrl: s.url, isLocal: id === "local", apiKey: "k" }).chat(
+      { model: "m", messages: [{ role: "user", content: "hi" }] },
+      (d) => seen.push(d),
+    );
+    await s.close();
+    return { body: s.requests[0]!.body, seen };
+  };
+  const local = await run("local");
+  assert.equal(local.body.return_progress, true);
+  assert.deepEqual(local.seen[0], { progress: { processed: 20000, total: 50000, cache: 0 } });
+  assert.equal((await run("openai")).body.return_progress, undefined, "a cloud is not asked");
 });
 
 test("⚠️ a stream that stops without ever finishing is reported as interrupted, not as an answer", async () => {

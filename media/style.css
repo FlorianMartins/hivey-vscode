@@ -582,6 +582,12 @@ mark.hit {
   min-width: 0;
   flex: 0 1 auto;
 }
+/* A wait the turn is in — the server's queue, the reading of a long conversation. In the accent
+   colour and allowed the room its sentence needs, because it is news, not decoration. */
+.entry-meta.waiting {
+  color: var(--vscode-focusBorder);
+  max-width: none;
+}
 .entry-meta.pulse {
   animation: pulse 1.5s ease-in-out infinite;
 }
@@ -3646,6 +3652,28 @@ pre.code code {
   color: var(--vscode-textLink-foreground, var(--vscode-foreground));
   opacity: 1;
 }
+/* The approval scope, drawn the same way as its neighbour: « passer l'icone et la petite flèche en
+ * couleur comme pour le choix du mode ». Muted words, a coloured shield and chevron — and the colour
+ * says how much runs unasked: green when everything is asked, blue inside the folder, the warning colour
+ * when nothing is. */
+.btn.approval-scope {
+  color: var(--muted);
+}
+.btn.approval-scope:hover {
+  color: var(--vscode-foreground);
+}
+.btn.approval-scope .ico {
+  opacity: 1;
+}
+.btn.approval-scope.perm-scope-off .ico {
+  color: var(--vscode-gitDecoration-addedResourceForeground, var(--vscode-charts-green));
+}
+.btn.approval-scope.perm-scope-workspace .ico {
+  color: var(--vscode-textLink-foreground, var(--vscode-charts-blue));
+}
+.btn.approval-scope.perm-scope-all .ico {
+  color: var(--vscode-editorWarning-foreground, #cca700);
+}
 /* No frames. These are two words and a chevron under the box, and a border around each turned the
    row into a pair of form fields — the heaviest thing on a panel whose whole surface is otherwise
    flat. What says "this is a control" is the chevron and the hover, which is what the workbench
@@ -4707,6 +4735,49 @@ pre.code code {
 }
 .collapsible.steps-folded > .collapsible-head {
   color: var(--muted);
+}
+/* While the turn runs: one line — what is inside, then what is happening now. The summary keeps its
+   width, the current action takes the rest and is cut with an ellipsis, never wrapped. */
+.collapsible.steps-live > .collapsible-head {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.collapsible.steps-live > .collapsible-head > span:not(.steps-now) {
+  flex: none;
+  order: 2;
+  margin-left: auto;
+}
+.collapsible.steps-live > .collapsible-head > span.failed {
+  color: var(--vscode-errorForeground);
+}
+.steps-now {
+  order: 1;
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  min-width: 0;
+  overflow: hidden;
+  color: var(--vscode-foreground);
+}
+.steps-now .step-call {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.steps-now-dot {
+  color: var(--vscode-focusBorder);
+  font-size: 0.7em;
+}
+.steps-now-dot.pulse {
+  animation: pulse 1.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .steps-now-dot.pulse {
+    animation: none;
+  }
 }
 
 /* A field's problem, under the field.

@@ -22,6 +22,7 @@ import { EMPTY_USAGE } from "./types.js";
 import { keepCacheMarks } from "./cache.js";
 import { isSelfHostedProvider } from "../redaction/index.js";
 import { toolCallsFromText } from "./textToolCall.js";
+import { PROBE_EFFORT } from "../router/reasoningLevels.js";
 
 export interface OpenAIProviderOptions {
   id: string;
@@ -243,6 +244,11 @@ export class OpenAICompatibleProvider implements Provider {
     } else if (req.reasoning === "none" && this.id === "openrouter") {
       // Explicitly off, so a model that thinks by default does not bill for it.
       body["reasoning"] = { exclude: true };
+    } else if (req.reasoning === "none" && isSelfHostedProvider(this.id)) {
+      // ⚠️ "Direct" means no thinking, and sending nothing did not say so: the chat template's own
+      // default applied, which on Qwen3.8 is its MAXIMUM effort. llama.cpp reads "none" as
+      // enable_thinking=false.
+      body["reasoning_effort"] = "none";
     }
     // ⚠️ A side task on a self-hosted server: thinking OFF. "none" above sends nothing to
     // llama.cpp, and nothing means the chat template's default effort — so an edit prediction or a
@@ -251,6 +257,11 @@ export class OpenAICompatibleProvider implements Provider {
     // turn somebody is waiting to read keeps its thinking, and clouds are left exactly as they were.
     // A server that rejects the field gets the request again without it — see `adaptRequest`.
     if (req.chore && isSelfHostedProvider(this.id)) body["reasoning_effort"] = "none";
+    // How far the server has read the prompt, streamed before the first token — which is also the
+    // only way to tell a request waiting in a busy server's queue from one being read. See
+    // core/agent/waiting.ts. Self-hosted only; a server that does not know it ignores it, and one
+    // that refuses it gets the request again without it (`adaptRequest`).
+    if (isSelfHostedProvider(this.id) && !isOllama(this.baseUrl)) body["return_progress"] = true;
 
     // Ask for the accounting. OpenAI-compatible servers that do not know the field ignore it.
     body["stream_options"] = { include_usage: true };
@@ -282,6 +293,10 @@ export class OpenAICompatibleProvider implements Provider {
         usage.completionTokens = payload.usage.completion_tokens ?? usage.completionTokens;
         usage.cachedTokens = payload.usage.prompt_tokens_details?.cached_tokens ?? usage.cachedTokens;
         if (typeof payload.usage.cost === "number") usage.costUsd = payload.usage.cost;
+      }
+      const pp = payload.prompt_progress;
+      if (pp && typeof pp.total === "number") {
+        onDelta?.({ progress: { processed: Number(pp.processed) || 0, total: pp.total, cache: Number(pp.cache) || 0 } });
       }
       if (!choice) continue;
       if (choice.finish_reason === "length") stopReason = "length";
@@ -446,6 +461,48 @@ export class OpenAICompatibleProvider implements Provider {
     }
   }
 
+  async probeReasoning(model: string): Promise<string | undefined> {
+    if (!isSelfHostedProvider(this.id) || isOllama(this.baseUrl)) return undefined;
+    // Only a server that says it is llama.cpp (or llama-swap in front of it): the probe is a chat
+    // request, and on any other server it would be an ordinary — if tiny — question.
+    if (!(await this.servedByLlamaCpp(model))) return undefined;
+    try {
+      const res = await request(`${this.baseUrl}/chat/completions`, {
+        method: "POST",
+        headers: { ...this.headers(), "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model,
+          max_tokens: 1,
+          reasoning_effort: PROBE_EFFORT,
+          messages: [{ role: "user", content: "." }],
+        }),
+        timeoutMs: 15_000,
+        label: "reasoning levels",
+      });
+      // Refused before generating — the refusal is the answer. A template that ignores the field
+      // answers normally (one token), and that says nothing about levels.
+      if (res.ok) {
+        await res.body?.cancel().catch(() => {});
+        return undefined;
+      }
+      return await res.text();
+    } catch {
+      return undefined;
+    }
+  }
+
+  private async servedByLlamaCpp(model: string): Promise<boolean> {
+    try {
+      const res = await request(`${this.baseUrl}/models`, { headers: this.headers(), timeoutMs: 15_000, label: "model list" });
+      if (!res.ok) return false;
+      const json = (await res.json()) as any;
+      const entry = (json.data ?? []).find((m: any) => m?.id === model);
+      return Boolean(entry && (/^(llamacpp|llama-swap|llama\.cpp)$/i.test(String(entry.owned_by ?? "")) || entry.meta?.n_ctx || entry.meta?.llamaswap));
+    } catch {
+      return false;
+    }
+  }
+
   async listModels(): Promise<string[]> {
     try {
       const res = await request(`${this.baseUrl}/models`, { headers: this.headers(), timeoutMs: 15_000, label: "model list" });
@@ -540,7 +597,7 @@ export function adaptRequest(body: Record<string, unknown>, error: string): Reco
   }
   // Anything else it names and will not take. A temperature the model fixes at 1, a reasoning field
   // this vendor spells differently, an accounting option an older gateway does not know.
-  for (const field of ["temperature", "reasoning_effort", "reasoning", "stream_options", "max_tokens", "tools"]) {
+  for (const field of ["temperature", "reasoning_effort", "reasoning", "stream_options", "max_tokens", "tools", "return_progress"]) {
     if (!(field in next)) continue;
     if (!said.includes(field)) continue;
     // `tools` is the one field whose removal changes the answer rather than the request, so it goes

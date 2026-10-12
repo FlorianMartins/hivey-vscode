@@ -6,6 +6,25 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Ajouté
 
+- **Indicateur de file d'attente.** « quand deux travaillent en même temps […] éviter d'avoir le
+  ressenti d'attendre sans rien faire ». Sur un serveur llama.cpp à une seule place, une requête
+  attend son tour pendant que celle d'une autre personne se termine. Le tour de l'IA apparaît
+  désormais tout de suite et dit ce qu'il attend : « En file d'attente… 12 s », puis « Lecture de la
+  conversation… 45 % » sur une longue conversation, puis « réfléchit… » dès que le modèle commence.
+  Le serveur signale son avancement (`return_progress`) ; un serveur qui ne le fait pas affiche
+  « En attente du serveur… ».
+- **Les niveaux de réflexion sont ceux du modèle.** « le mode de réflexion doit correspondre aux
+  modes de raisonnement des modèles utilisés ». Sur un serveur llama.cpp, l'extension demande au
+  gabarit du modèle quels niveaux il connaît (il répond en quelques millisecondes, sans rien générer)
+  et le menu n'offre que ceux-là, sous leur vrai nom, avec le défaut du modèle signalé — pour
+  Qwen3.8 : Direct, Bref · low, Standard · medium, Approfondi · xhigh (défaut du modèle).
+- **Actions repliées pendant le travail.** « ça écrit plein de lignes et du coup on doit remonter
+  pour voir la réflexion en cours ». Les étapes de l'agent tiennent sur une seule ligne repliée qui
+  montre l'action en cours (« ● run_command npm test ») et le nombre d'étapes ; un clic déplie la
+  liste complète.
+- **Bouton de permission en couleur**, comme le choix local / cloud : bouclier et flèche verts pour
+  « Ask », bleus pour « Dossier », couleur d'avertissement pour « Auto ».
+
 - **⚠️ Mémoire avec rappel : plus rien n'est perdu quand le contexte est plein.** « un contexte de
   64k est trop petit pour travailler […] c'est bien uniquement pour le chat pas pour les modes agent et
   code ». Chaque résultat d'outil (lecture de fichier, recherche, commande) est désormais conservé en
@@ -21,6 +40,14 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **⚠️ Qwen réfléchissait au maximum même pour les petites tâches.** « il semble faire trop de
+  raisonnement même pour les petites tâches […] il fait des choses parfois incompréhensibles ». Le
+  niveau « Direct » du panneau n'envoyait rien au serveur, et rien voulait dire le défaut du gabarit
+  de Qwen3.8 : son niveau MAXIMUM (« réfléchis soigneusement, envisage des alternatives
+  plausibles »). Rejoué sur une vraie requête de l'agent, le premier pas réfléchissait 56 à 72 s
+  (10 000 à 12 000 caractères) contre 8 à 11 s au niveau moyen, pour les mêmes décisions. Désormais
+  un niveau jamais choisi vaut « Standard » sur un serveur auto-hébergé (le modèle dose lui-même), et
+  « Direct » choisi exprès coupe vraiment la réflexion. Les modèles cloud ne changent pas.
 - **Bordure de saisie : une lumière violette qui fait le tour, lisible et fluide.** « on ne voit pas
   bien la rotation même si j'aime bien les couleurs ». Les couleurs restent, atténuées et immobiles,
   comme piste ; une seule lumière violette au cœur vif parcourt le contour de la zone de saisie à
