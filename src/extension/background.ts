@@ -286,7 +286,7 @@ export class Background {
           { role: "user", content: entry.task },
         ],
         tools: backgroundTools(entry.worktree, engine),
-        maxTokens: settings.chat.maxOutputTokens,
+        ...(settings.chat.maxOutputTokens > 0 ? { maxTokens: settings.chat.maxOutputTokens } : {}),
         signal: ctl.signal,
         onToolResult: ({ call, result: r }) => {
           steps.push({ tool: call.name, ok: !r.isError, summary: String(r.content).split("\n")[0]?.slice(0, 120) ?? "", call: call.args });

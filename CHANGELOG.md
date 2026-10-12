@@ -21,6 +21,16 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **⚠️ Plus de longueur maximale de réponse par défaut, et une tâche n'est plus jamais recommencée
+  depuis le début.** « Le modèle a consommé tout son budget de réponse en raisonnement… comment ça
+  alors qu'il est en local ? ». Ce n'était pas un budget : la conversation avait rempli toute la fenêtre
+  du serveur (69 631 tokens sur 69 632) en pleine réflexion, l'extension l'a pris pour une limite de
+  réponse, et a relancé **toute la tâche** depuis le début — deux fois. Désormais :
+  `hiveyCode.chat.maxOutputTokens` vaut 0 par défaut (aucune limite, rien n'est envoyé au serveur) ;
+  une réponse coupée parce que la fenêtre est pleine est jetée, les plus anciens résultats d'outils
+  sont raccourcis (gardés mot pour mot dans la mémoire avec rappel) et **la même étape** est
+  redemandée ; l'estimation de la taille de la conversation est recalée sur les chiffres réels du
+  serveur, au lieu de compter 4 caractères par token, ce qui la sous-estimait d'un cinquième sur du code.
 - **⚠️ Le mode agent n'a plus de limite d'étapes : il va au bout de la tâche.** « il ne finit pas
   les tâches […] retire cette bride, j'ai besoin que le modèle puisse faire ce qu'on lui demande de A
   à Z ». Un tour d'agent s'arrêtait d'office après 30 requêtes au modèle — en pleine refonte, après

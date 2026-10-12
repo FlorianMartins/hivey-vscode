@@ -327,7 +327,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     // The answer budget is passed in, because the reserve has to hold whatever this user actually
     // asks the model to write back: somebody who raised `chat.maxOutputTokens` has made the reply
     // bigger, and a reserve computed from a default would be short by exactly that much.
-    return contextBudget(s.context.maxTokens, this.modelWindow(s), s.chat.maxOutputTokens);
+    // Room kept for the answer: the cap when there is one, else what a long reply with thinking
+    // takes in practice.
+    return contextBudget(s.context.maxTokens, this.modelWindow(s), s.chat.maxOutputTokens || 8192);
   }
 
   /**
@@ -1867,10 +1869,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       messages: prepared.messages,
       tools,
       maxSteps: definition.maxSteps ?? DEFAULT_AGENT_STEPS,
-      // The same cap as the turn that delegated. It had none, so on a self-hosted server a sub-agent
-      // could generate until the whole context slot was full — minutes of a "stuck" turn with nothing
-      // on screen, since a sub-agent streams nothing to the panel.
-      maxTokens: env.settings.chat.maxOutputTokens,
+      // The same cap as the turn that delegated, when the user set one. With none, a reply that fills
+      // the server's window is caught by the loop, which shortens old outputs and asks again.
+      ...(env.settings.chat.maxOutputTokens > 0 ? { maxTokens: env.settings.chat.maxOutputTokens } : {}),
       ...(this.modelWindow(env.settings) ? { contextWindow: this.modelWindow(env.settings) } : {}),
       recall: this.recallFor(this.session.id),
       ...(run.signal ? { signal: run.signal } : {}),
@@ -4757,7 +4758,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       const attempt = (
         useProvider: Provider,
         useModel: string,
-        outputTokens = settings.chat.maxOutputTokens,
+        outputTokens: number | undefined = settings.chat.maxOutputTokens > 0 ? settings.chat.maxOutputTokens : undefined,
       ): Promise<Awaited<ReturnType<typeof runTurn>>> =>
         runTurn({
         provider: useProvider,
@@ -4941,7 +4942,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       // truncated answer that reached the user is left alone — it is imperfect and it is theirs,
       // and asking again would bill them twice for a paragraph they can already read. This is the
       // one case where the answer is empty, which is worth nothing at all.
-      if (result.truncated && !result.text.trim() && !ctl.signal.aborted) {
+      // ⚠️ Retried only for a cap the user set, and only on a turn that ran no tool: the retry starts
+      // the turn OVER. On an agent turn that had read, edited and tested for minutes, it threw all of
+      // it away and did it again — "it doesn't finish the tasks". Without a cap, a reply cut with
+      // nothing to show means the server's window filled and the loop could not free enough of it.
+      const capRetry = settings.chat.maxOutputTokens > 0 && result.steps === 0;
+      if (result.truncated && !result.text.trim() && !ctl.signal.aborted && !capRetry) {
+        answer.error = t("This conversation no longer fits the model's context window. Summarize it to continue, or start a new conversation.");
+      }
+      if (result.truncated && !result.text.trim() && !ctl.signal.aborted && capRetry) {
         const roomier = settings.chat.maxOutputTokens * 4;
         this.log.appendLine(`[turn] the answer budget ran out during reasoning; retrying at ${roomier}`);
         this.post({ type: "status", text: t("It spent the whole answer on thinking. Asking again with more room…") });
@@ -4970,7 +4979,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         this.post({ type: "status", text: why, ok: false });
         turnNotices.push({ kind: "tool", text: why });
       }
-      if (result.truncated && result.text.trim() && !ctl.signal.aborted) {
+      if (result.truncated && result.text.trim() && !ctl.signal.aborted && settings.chat.maxOutputTokens > 0) {
         const why = t("The reply was cut off at the output limit ({0} tokens). Raise hiveyCode.chat.maxOutputTokens, or ask it to continue.", settings.chat.maxOutputTokens);
         this.log.appendLine(`[turn] reply cut off at max_tokens=${settings.chat.maxOutputTokens}`);
         this.post({ type: "status", text: why, ok: false });

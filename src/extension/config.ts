@@ -32,7 +32,10 @@ export interface Settings {
   chat: {
     provider: ProviderId;
     model: string;
-    /** How many tokens one answer may be. A thinking model spends this on its thinking too. */
+    /**
+     * How many tokens one answer may be; 0, the default, for no cap — the model writes until it is
+     * done, and only the server's own window bounds it. A thinking model spends this on its thinking.
+     */
     maxOutputTokens: number;
     /** Ask for Anthropic's prompt cache through OpenRouter. Off: it changes the request's shape. */
     promptCache: boolean;
@@ -256,7 +259,7 @@ function readSettingsRaw(scope?: vscode.Uri): Settings {
       provider: c.get<ProviderId>("chat.provider", "local"),
       model: c.get<string>("chat.model", "qwen2.5-coder:7b"),
       promptCache: c.get<boolean>("chat.promptCache", false),
-      maxOutputTokens: c.get<number>("chat.maxOutputTokens", 8192),
+      maxOutputTokens: Math.max(0, Math.floor(c.get<number>("chat.maxOutputTokens", 0) || 0)),
     },
     agent: { maxSteps: Math.max(0, Math.floor(c.get<number>("agent.maxSteps", 0) || 0)) },
     appearance: c.get<"editor" | "hivey">("appearance", "editor"),

@@ -603,3 +603,38 @@ test("⚠️ an output shortened to fit is kept whole, and recall gives it back 
   assert.equal(r.text, "Done.");
   assert.ok(recalled.includes(logA.slice(0, 20000)), "recall returned the first 20 000 characters exactly");
 });
+
+test("a reply cut because the server's window filled is asked again after shortening old outputs — the task is not started over", async () => {
+  // "it used its whole answer budget on reasoning" on a local model with no budget: prompt and
+  // thinking reached the window, the reply was cut mid-thought, and the whole task was redone.
+  const big = "x".repeat(60_000);
+  const read = tool("read_file", { run: async () => ({ content: big }) });
+  const replies: ChatResult[] = [
+    { text: "", reasoning: "", toolCalls: [{ id: "c1", name: "read_file", args: '{"path":"a"}' }], usage: { promptTokens: 1, completionTokens: 1, cachedTokens: 0 }, stopReason: "tool_calls" },
+    { text: "", reasoning: "", toolCalls: [{ id: "c2", name: "read_file", args: '{"path":"b"}' }], usage: { promptTokens: 1, completionTokens: 1, cachedTokens: 0 }, stopReason: "tool_calls" },
+    { text: "", reasoning: "thinking…", toolCalls: [], usage: { promptTokens: 1, completionTokens: 9000, cachedTokens: 0 }, stopReason: "length" },
+    { text: "Done.", reasoning: "", toolCalls: [], usage: { promptTokens: 1, completionTokens: 1, cachedTokens: 0 }, stopReason: "stop" },
+  ];
+  const seen: ChatRequest[] = [];
+  const provider: Provider = {
+    id: "fake",
+    baseUrl: "http://127.0.0.1:11434/v1",
+    isLocal: true,
+    async chat(req) {
+      seen.push({ ...req, messages: req.messages.map((m) => ({ ...m })) });
+      return replies[seen.length - 1]!;
+    },
+    async listModels() {
+      return [];
+    },
+  };
+  const r = await runTurn({ ...base, provider, tools: [read], recall: new RecallStore() });
+  assert.equal(r.text, "Done.");
+  assert.equal(r.truncated, false, "the cut reply is not the turn's last word");
+  assert.equal(seen.length, 4, "one more request, not the whole task again");
+  const retried = seen[3]!.messages;
+  assert.equal(retried.at(-1)!.role, "tool", "the same step is asked again — the cut reply is dropped");
+  const older = retried.find((m) => m.role === "tool" && m.toolCallId === "c1")!;
+  assert.ok(older.content.length < big.length, "after the older output was shortened");
+  assert.match(older.content, /recall \{"id":"m\d+"/, "and the shortened output says how to have it back");
+});

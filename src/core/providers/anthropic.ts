@@ -48,7 +48,8 @@ export class AnthropicProvider implements Provider {
 
     const body: Record<string, unknown> = {
       model: req.model,
-      max_tokens: req.maxTokens ?? 4096,
+      // The API demands a figure. With no cap asked for, one no current model reaches by accident.
+      max_tokens: req.maxTokens ?? 32000,
       stream: true,
       messages: rest.map((m, index) => {
         if (m.role === "tool") {

@@ -211,7 +211,7 @@ const MAX_CONTINUATIONS = 2;
 /** How many times one turn shortens old tool outputs before giving up on fitting the window. */
 const MAX_SHRINKS = 3;
 /** Room left for the answer once the request fits again, in tokens. */
-const ANSWER_ROOM_TOKENS = 6000;
+const ANSWER_ROOM_TOKENS = 8192;
 /** A tool output keeps this many characters of its head when shortened. */
 const KEPT_HEAD_CHARS = 1500;
 
@@ -344,6 +344,12 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
   const callCounts = new Map<string, number>();
   /** How many repeated calls were refused this turn. */
   let repeatNudges = 0;
+  /**
+   * Real prompt tokens over estimated, from the last response. ⚠️ The estimate counts ~4 characters
+   * a token and code packs tighter: a turn the estimate put at 56k was 68k on the server, and
+   * filled the window in the middle of the model's thinking. Never below 1.
+   */
+  let tokenRatio = 1;
 
   for (let step = 0; step < maxSteps; step++) {
     if (opts.signal?.aborted) return done("cancelled");
@@ -358,7 +364,7 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
     // token and code packs tighter, so a tenth is kept in hand, plus room for the answer.
     if (opts.contextWindow && opts.contextWindow > 0) {
       const limit = Math.floor(opts.contextWindow * 0.9) - ANSWER_ROOM_TOKENS;
-      const estimate = estimateMessageTokens(working);
+      const estimate = Math.ceil(estimateMessageTokens(working) * tokenRatio);
       if (estimate > limit && shrinkToolOutputs(working, estimate - limit, keptAs)) {
         opts.report?.("the turn was approaching the model's context window — older tool outputs were shortened");
       }
@@ -403,13 +409,38 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
     // `beforeRequest` did to it. Estimating the pre-redaction messages would calibrate against text
     // no provider ever saw.
     if (res.usage.promptTokens > 0) {
-      opts.onUsage?.({ model: opts.model, estimated: estimateMessageTokens(outgoing), actual: res.usage.promptTokens });
+      const estimated = estimateMessageTokens(outgoing);
+      opts.onUsage?.({ model: opts.model, estimated, actual: res.usage.promptTokens });
+      if (estimated > 0) tokenRatio = Math.max(1, res.usage.promptTokens / estimated);
     }
 
     usage.promptTokens += res.usage.promptTokens;
     usage.completionTokens += res.usage.completionTokens;
     usage.cachedTokens += res.usage.cachedTokens;
     if (typeof res.usage.costUsd === "number") usage.costUsd = (usage.costUsd ?? 0) + res.usage.costUsd;
+
+    // ⚠️ Cut because the SERVER's window was full, not because of an answer cap: "it used its whole
+    // answer budget on reasoning" on a local model with no budget at all. Prompt and thinking
+    // together reached the window (69631 of 69632), the reply was cut mid-thought, and the
+    // extension then started the whole task over. The cut reply is dropped, older tool outputs
+    // are shortened — kept word for word in memory, see recall.ts — and the SAME step is asked
+    // again with the room that frees. Bounded with the other shrinks.
+    const windowFull =
+      res.stopReason === "length" &&
+      (!opts.maxTokens ||
+        (opts.contextWindow !== undefined &&
+          res.usage.promptTokens + res.usage.completionTokens >= opts.contextWindow * 0.97));
+    if (
+      windowFull &&
+      !res.toolCalls.length &&
+      shrinkAttempts < MAX_SHRINKS &&
+      shrinkToolOutputs(working, Math.max(res.usage.completionTokens, ANSWER_ROOM_TOKENS) + ANSWER_ROOM_TOKENS, keptAs)
+    ) {
+      shrinkAttempts++;
+      opts.report?.("the model's context window filled up mid-reply — older tool outputs were shortened and the step asked again");
+      step--;
+      continue;
+    }
 
     truncated = res.stopReason === "length";
     interrupted = Boolean(res.interrupted);
