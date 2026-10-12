@@ -432,3 +432,50 @@ test("continuing after an interruption is bounded, and the turn says it stayed i
   assert.equal(provider.seen.length, 3, "one reply and two continuations, then it stops");
   assert.equal(r.interrupted, true);
 });
+
+test("⚠️ a turn that outgrows the context mid-way shortens old tool outputs and goes on", async () => {
+  // "HTTP 400 Bad Request: request (69882 tokens) exceeds the available context size (69632
+  // tokens)" — in the MIDDLE of an agent turn: tool results piled up and nothing trimmed them.
+  const big = "line of a long build log\n".repeat(2000); // ~48 000 characters
+  const read = tool("read_file", { run: async () => ({ content: big }) });
+  let calls = 0;
+  const seen: string[][] = [];
+  const provider: Provider = {
+    id: "fake",
+    baseUrl: "http://127.0.0.1:11434/v1",
+    isLocal: true,
+    async chat(req): Promise<ChatResult> {
+      calls++;
+      seen.push(req.messages.filter((m) => m.role === "tool").map((m) => m.content));
+      const toolChars = req.messages.filter((m) => m.role === "tool").reduce((n, m) => n + m.content.length, 0);
+      if (calls <= 2) {
+        return { text: "", reasoning: "", toolCalls: [{ id: `c${calls}`, name: "read_file", args: "{}" }], usage: { promptTokens: 1, completionTokens: 1, cachedTokens: 0 }, stopReason: "tool_calls" };
+      }
+      if (toolChars > 60_000) throw new Error("HTTP 400 Bad Request: request (69882 tokens) exceeds the available context size (69632 tokens), try increasing it");
+      return { text: "Done, from what fitted.", reasoning: "", toolCalls: [], usage: { promptTokens: 1, completionTokens: 1, cachedTokens: 0 }, stopReason: "stop" };
+    },
+    async listModels() {
+      return [];
+    },
+  };
+  const r = await runTurn({ ...base, provider, tools: [read] });
+  assert.equal(r.text, "Done, from what fitted.", "the turn finished instead of dying on the error");
+  const last = seen.at(-1)!;
+  assert.match(last[0]!, /characters of this output were removed to fit/, "the OLDEST output was shortened");
+  assert.equal(last[1], big, "the latest output — the one the next step is about — is left whole");
+});
+
+test("when nothing is left to shorten, the context error stands", async () => {
+  const provider: Provider = {
+    id: "fake",
+    baseUrl: "http://127.0.0.1:11434/v1",
+    isLocal: true,
+    async chat(): Promise<ChatResult> {
+      throw new Error("HTTP 400 Bad Request: request (80000 tokens) exceeds the available context size (69632 tokens)");
+    },
+    async listModels() {
+      return [];
+    },
+  };
+  await assert.rejects(runTurn({ ...base, provider }), /exceeds the available context size/);
+});

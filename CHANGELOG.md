@@ -6,6 +6,15 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **⚠️ Un tour d'agent qui dépasse le contexte en cours de route ne s'arrête plus sur une erreur.**
+  « HTTP 400 Bad Request: request (69882 tokens) exceeds the available context size (69632
+  tokens) ». Les résultats d'outils s'accumulent dans un tour et rien ne les réduisait : un long tour
+  mourait à mi-parcours, travail à moitié fait. Les sorties d'outils les plus anciennes sont
+  maintenant raccourcies (leur début est gardé, et le modèle est prévenu qu'il lit un extrait) du
+  nombre de tokens que le serveur indique manquer, plus de quoi répondre, puis l'étape est reposée —
+  trois fois au plus. La dernière sortie reste entière. Une conversation trop longue avant même le
+  tour reste couverte par le résumé automatique.
+
 - **⚠️ Les boutons et menus suivent la langue choisie pour Hivey Code, même avec VS Code en
   anglais.** « le texte des boutons en survol est encore en anglais quand on sélectionne Français —
   "Search this conversation", "New conversation" […] quand vscode est en anglais ». Ces infobulles
