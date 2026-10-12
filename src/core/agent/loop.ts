@@ -205,6 +205,18 @@ const ANSWER_ROOM_TOKENS = 6000;
 const KEPT_HEAD_CHARS = 1500;
 
 /**
+ * The same call — same tool, same arguments — made this many times in one turn is not run again.
+ * "it's been going round in circles for 12 hours on one request": a model that re-reads the same file
+ * or re-runs the same search gets the same answer every time, and only a turn limit ever stopped it.
+ * The model is told so instead, and the turn ends if it insists past `MAX_REPEAT_NUDGES`.
+ */
+const REPEAT_LIMIT = 3;
+const MAX_REPEAT_NUDGES = 2;
+const REPEATED_CALL =
+  "You already made this exact call (same tool, same arguments) twice in this turn and have its result. " +
+  "Do not repeat it: use what you already have, try a different approach, or give your answer.";
+
+/**
  * The server's "does not fit" refusal, and by how many tokens — llama.cpp says
  * "request (69882 tokens) exceeds the available context size (69632 tokens)" or "input (N tokens)
  * is larger than the max context size (M tokens)". Other providers say less; an unknown excess is
@@ -309,9 +321,19 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
   let continuations = 0;
   /** How many times this turn has shortened old tool outputs to fit the context window. */
   let shrinkAttempts = 0;
+  /** How many times each exact call (tool + arguments) was made this turn. See `REPEAT_LIMIT`. */
+  const callCounts = new Map<string, number>();
+  /** How many repeated calls were refused this turn. */
+  let repeatNudges = 0;
 
   for (let step = 0; step < maxSteps; step++) {
     if (opts.signal?.aborted) return done("cancelled");
+    // Going round in circles: told twice to stop repeating the same call and doing it again. The
+    // turn ends here rather than spending the rest of its steps — or hours — on the same thing.
+    if (repeatNudges > MAX_REPEAT_NUDGES) {
+      opts.report?.("the model kept repeating the same tool call — the turn was stopped");
+      return done("max-steps");
+    }
 
     // Fitted BEFORE it is sent, when the window is known: the estimate counts ~4 characters a
     // token and code packs tighter, so a tenth is kept in hand, plus room for the answer.
@@ -502,7 +524,23 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
         continue;
       }
 
-      planned.push({ call, tool, args, parallel: Boolean(tool.parallel?.(args)) });
+      const parallel = Boolean(tool.parallel?.(args));
+      // The same READ again — see `REPEAT_LIMIT`. Only reads are counted: anything that can change
+      // something (a write, an edit, a command such as the test run an agent repeats after each fix)
+      // starts the count again, because after it the same read may well say something new.
+      if (parallel) {
+        const callKey = `${call.name}\u0000${JSON.stringify(args)}`;
+        const made = (callCounts.get(callKey) ?? 0) + 1;
+        callCounts.set(callKey, made);
+        if (made >= REPEAT_LIMIT) {
+          repeatNudges++;
+          planned.push({ call, settled: REPEATED_CALL, parallel: false });
+          continue;
+        }
+      } else {
+        callCounts.clear();
+      }
+      planned.push({ call, tool, args, parallel });
     }
 
     const execute = async (item: Planned): Promise<void> => {

@@ -6,6 +6,17 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **⚠️ Un agent qui tourne en rond est arrêté.** « il tourne en rond depuis 12h sur une requête ».
+  Seul le plafond de 30 étapes par tour arrêtait un modèle qui relisait le même fichier ou relançait
+  la même recherche. Désormais, la même lecture (même outil, mêmes arguments) faite une troisième
+  fois n'est pas refaite : le modèle est prévenu qu'il a déjà ce résultat et doit changer d'approche
+  ou répondre ; s'il insiste, le tour s'arrête. Une action qui modifie quelque chose — écriture,
+  édition, commande comme `npm test` relancé après chaque correction — remet le compte à zéro, et
+  n'est jamais bloquée.
+
+- **La taille du contexte du serveur est relue à chaque chargement des modèles**, au lieu de garder
+  l'ancienne valeur mémorisée (2 × 69 632 devenu 2 × 83 968).
+
 - **⚠️⚠️ La limite de contexte du serveur est connue, et respectée avant d'être atteinte.** « le
   auto-compact ne fonctionne clairement pas […] on ne peut pas laisser une limite comme ça ». Un
   modèle auto-hébergé n'est dans aucun catalogue : sa fenêtre était inconnue, le budget retombait à

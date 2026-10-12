@@ -42,6 +42,7 @@ function tool(name: string, opts: Partial<Tool> = {}): Tool & { calls: Array<Rec
     calls,
     schema: { name, description: name, parameters: { type: "object", properties: {} } },
     approval: opts.approval ?? (() => false),
+    ...(opts.parallel ? { parallel: opts.parallel } : {}),
     run:
       opts.run ??
       (async (args) => {
@@ -508,4 +509,47 @@ test("when nothing is left to shorten, the context error stands", async () => {
     },
   };
   await assert.rejects(runTurn({ ...base, provider }), /exceeds the available context size/);
+});
+
+test("⚠️ the same call repeated is not run again, and a model that insists is stopped", async () => {
+  // "it's been going round in circles for 12 hours on one request": the same file read, the same
+  // search run, the same answer each time — and only the step cap ever ended it.
+  const read = tool("read_file", { parallel: () => true });
+  const provider = scriptedProvider([{ toolCalls: [{ id: "1", name: "read_file", args: '{"path":"a.ts"}' }] }]);
+  const r = await runTurn({ ...base, provider, tools: [read] });
+  assert.equal(read.calls.length, 2, "run twice, then refused");
+  assert.equal(r.stoppedBecause, "max-steps", "the turn ends instead of spending all its steps");
+  assert.ok(provider.seen.length <= 6, `${provider.seen.length} requests — it should stop early, not at 30`);
+  const told = provider.seen.at(-1)!.messages.filter((m) => m.role === "tool").at(-1)!;
+  assert.match(String(told.content), /already made this exact call/);
+});
+
+test("⚠️ the test run repeated after each fix is never blocked", async () => {
+  // The legitimate repetition: an agent fixes, re-runs the same command, fixes again. A command can
+  // change things, so it is not counted — and it resets the count of the reads around it.
+  const run = tool("run_command");
+  const provider = scriptedProvider([
+    { toolCalls: [{ id: "1", name: "run_command", args: '{"command":"npm test"}' }] },
+    { toolCalls: [{ id: "2", name: "run_command", args: '{"command":"npm test"}' }] },
+    { toolCalls: [{ id: "3", name: "run_command", args: '{"command":"npm test"}' }] },
+    { toolCalls: [{ id: "4", name: "run_command", args: '{"command":"npm test"}' }] },
+    { text: "Green." },
+  ]);
+  const r = await runTurn({ ...base, provider, tools: [run] });
+  assert.equal(run.calls.length, 4, "every run happened");
+  assert.equal(r.text, "Green.");
+});
+
+test("the same tool with different arguments is never mistaken for a loop", async () => {
+  const read = tool("read_file", { parallel: () => true });
+  const provider = scriptedProvider([
+    { toolCalls: [{ id: "1", name: "read_file", args: '{"path":"a.ts"}' }] },
+    { toolCalls: [{ id: "2", name: "read_file", args: '{"path":"b.ts"}' }] },
+    { toolCalls: [{ id: "3", name: "read_file", args: '{"path":"c.ts"}' }] },
+    { toolCalls: [{ id: "4", name: "read_file", args: '{"path":"d.ts"}' }] },
+    { text: "Read all four." },
+  ]);
+  const r = await runTurn({ ...base, provider, tools: [read] });
+  assert.equal(read.calls.length, 4);
+  assert.equal(r.text, "Read all four.");
 });
