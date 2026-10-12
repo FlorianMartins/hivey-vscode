@@ -40,6 +40,9 @@ export const PLAN_READ_ONLY = new Set([
   "list_files",
   "search_text",
   "get_diagnostics",
+  // The memory with recall only reads what the conversation has already seen.
+  "recall",
+  "search_memory",
   // The plan is a display, not an action: it changes nothing on the machine. Plan mode is precisely
   // where watching one being built is worth the most, so leaving it out would strip the mode of the
   // thing it is named after.

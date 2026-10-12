@@ -5,6 +5,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { runTurn, type Tool } from "../src/core/agent/loop.js";
+import { RecallStore, recallTools } from "../src/core/agent/recall.js";
 import type { ChatRequest, ChatResult, Provider } from "../src/core/providers/types.js";
 
 type Scripted = { text?: string; toolCalls?: Array<{ id: string; name: string; args: string }>; truncated?: boolean; reasoning?: string; interrupted?: boolean };
@@ -552,4 +553,42 @@ test("the same tool with different arguments is never mistaken for a loop", asyn
   const r = await runTurn({ ...base, provider, tools: [read] });
   assert.equal(read.calls.length, 4);
   assert.equal(r.text, "Read all four.");
+});
+
+test("⚠️ an output shortened to fit is kept whole, and recall gives it back word for word", async () => {
+  // The memory with recall end to end: the window cannot hold both outputs, the first is shortened,
+  // the model is told its id, asks for it, and gets the exact text back.
+  const store = new RecallStore();
+  const logA = Array.from({ length: 4000 }, (_, i) => `build step ${i} ok`).join("\n");
+  const logB = Array.from({ length: 4000 }, (_, i) => `test ${i} passed`).join("\n");
+  const run = tool("run_command", { run: async (args) => ({ content: String(args["command"]) === "build" ? logA : logB }) });
+  let recalled = "";
+  const tools = [run, ...recallTools(store, () => [])];
+  let step = 0;
+  const provider: Provider = {
+    id: "fake",
+    baseUrl: "http://127.0.0.1:11434/v1",
+    isLocal: true,
+    async chat(req): Promise<ChatResult> {
+      step++;
+      const usage = { promptTokens: 1, completionTokens: 1, cachedTokens: 0 };
+      if (step === 1) return { text: "", reasoning: "", toolCalls: [{ id: "c1", name: "run_command", args: '{"command":"build"}' }], usage, stopReason: "tool_calls" };
+      if (step === 2) return { text: "", reasoning: "", toolCalls: [{ id: "c2", name: "run_command", args: '{"command":"test"}' }], usage, stopReason: "tool_calls" };
+      if (step === 3) {
+        const cut = req.messages.find((m) => m.role === "tool" && m.toolCallId === "c1")!.content;
+        const id = /recall \{"id":"(m\d+)"/.exec(cut)?.[1];
+        assert.ok(id, `the shortened output does not say how to recall it:\n${cut.slice(-300)}`);
+        return { text: "", reasoning: "", toolCalls: [{ id: "c3", name: "recall", args: JSON.stringify({ id, offset: 0, length: 20000 }) }], usage, stopReason: "tool_calls" };
+      }
+      recalled = req.messages.at(-1)!.content;
+      return { text: "Done.", reasoning: "", toolCalls: [], usage, stopReason: "stop" };
+    },
+    async listModels() {
+      return [];
+    },
+  };
+  // A window that holds one log, not two: the first one has to be shortened.
+  const r = await runTurn({ ...base, provider, tools, recall: store, contextWindow: 30_000 });
+  assert.equal(r.text, "Done.");
+  assert.ok(recalled.includes(logA.slice(0, 20000)), "recall returned the first 20 000 characters exactly");
 });

@@ -4,6 +4,21 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ## 1.14.2 — 2026-10-11
 
+### Ajouté
+
+- **⚠️ Mémoire avec rappel : plus rien n'est perdu quand le contexte est plein.** « un contexte de
+  64k est trop petit pour travailler […] c'est bien uniquement pour le chat pas pour les modes agent et
+  code ». Chaque résultat d'outil (lecture de fichier, recherche, commande) est désormais conservé en
+  entier, en mémoire, pour la conversation. Quand un ancien résultat doit être raccourci pour tenir
+  dans la fenêtre, le modèle reçoit l'étiquette qui le lui rend mot pour mot. Deux nouveaux outils,
+  disponibles en mode agent et en mode plan :
+  - **`recall`** : relit exactement un résultat conservé, en entier ou par tranches ;
+  - **`search_memory`** : retrouve un passage par mots-clés dans les résultats conservés **et** dans
+    tous les messages de la conversation, y compris ceux qui ne tiennent plus dans le contexte.
+  Rien n'est compressé ni résumé : la qualité des réponses est intacte, et le contexte utile devient
+  pratiquement illimité. Le modèle est informé que cette mémoire existe et l'utilise au lieu de
+  deviner ou de relancer un outil.
+
 ### Corrigé
 
 - **⚠️ Un agent qui tourne en rond est arrêté.** « il tourne en rond depuis 12h sur une requête ».

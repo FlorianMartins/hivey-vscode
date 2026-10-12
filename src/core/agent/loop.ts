@@ -22,6 +22,7 @@ import { coerceArgs, parseToolArgs, unknownToolMessage, validateArgs } from "./t
 import { estimateMessageTokens } from "../util/tokens.js";
 import { restoreDeep } from "../redaction/index.js";
 import { t } from "../../shared/i18n.js";
+import type { RecallStore } from "./recall.js";
 
 export interface ToolContext {
   /** Cancels when the user stops the turn. */
@@ -100,6 +101,11 @@ export interface TurnOptions {
    * grown past it gets its oldest tool outputs shortened first, rather than an error from the server.
    */
   contextWindow?: number;
+  /**
+   * Where every tool output is kept whole — see `core/agent/recall.ts`. When the turn has to shorten
+   * an old output to fit, the model is told the id that gives it back word for word.
+   */
+  recall?: RecallStore;
   temperature?: number;
   reasoning?: ReasoningEffort;
   signal?: AbortSignal;
@@ -236,7 +242,7 @@ export function contextOverflow(message: string): { excess: number } | undefined
  * read again what it needs. The latest output is left whole: it is the one the next step is about.
  * Returns whether anything was shortened.
  */
-export function shrinkToolOutputs(messages: ChatMessage[], tokens: number): boolean {
+export function shrinkToolOutputs(messages: ChatMessage[], tokens: number, keptAs?: (toolCallId: string) => string | undefined): boolean {
   const target = Math.max(tokens, 1000) * 4; // characters, at the usual ~4 per token
   const tools = messages.map((m, i) => ({ m, i })).filter(({ m }) => m.role === "tool" && m.content.length > KEPT_HEAD_CHARS + 200);
   const lastTool = messages.reduce((last, m, i) => (m.role === "tool" ? i : last), -1);
@@ -245,7 +251,12 @@ export function shrinkToolOutputs(messages: ChatMessage[], tokens: number): bool
     if (saved >= target) break;
     if (i === lastTool) continue;
     const cut = m.content.length - KEPT_HEAD_CHARS;
-    m.content = `${m.content.slice(0, KEPT_HEAD_CHARS)}\n[… ${cut} more characters of this output were removed to fit the model's context window — read it again if you need the rest.]`;
+    // Kept whole in the memory when there is one: the model is told exactly how to have it back.
+    const id = m.toolCallId ? keptAs?.(m.toolCallId) : undefined;
+    const back = id
+      ? `the full output is kept: recall {"id":"${id}","offset":${KEPT_HEAD_CHARS}} gives the rest word for word`
+      : "read it again if you need the rest";
+    m.content = `${m.content.slice(0, KEPT_HEAD_CHARS)}\n[… ${cut} more characters of this output were removed to fit the model's context window — ${back}.]`;
     saved += cut;
   }
   return saved > 0;
@@ -321,6 +332,9 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
   let continuations = 0;
   /** How many times this turn has shortened old tool outputs to fit the context window. */
   let shrinkAttempts = 0;
+  /** Which kept memory entry holds each tool output of this turn, by tool call id. */
+  const recallIds = new Map<string, string>();
+  const keptAs = (toolCallId: string): string | undefined => recallIds.get(toolCallId);
   /** How many times each exact call (tool + arguments) was made this turn. See `REPEAT_LIMIT`. */
   const callCounts = new Map<string, number>();
   /** How many repeated calls were refused this turn. */
@@ -340,7 +354,7 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
     if (opts.contextWindow && opts.contextWindow > 0) {
       const limit = Math.floor(opts.contextWindow * 0.9) - ANSWER_ROOM_TOKENS;
       const estimate = estimateMessageTokens(working);
-      if (estimate > limit && shrinkToolOutputs(working, estimate - limit)) {
+      if (estimate > limit && shrinkToolOutputs(working, estimate - limit, keptAs)) {
         opts.report?.("the turn was approaching the model's context window — older tool outputs were shortened");
       }
     }
@@ -371,7 +385,7 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
       // asked again. Bounded; when nothing is left to shorten the error stands, and the extension's
       // own recovery (summarize, ask again) handles a conversation too long before the turn began.
       const overflow = contextOverflow(String((err as Error)?.message ?? err));
-      if (overflow && shrinkAttempts < MAX_SHRINKS && shrinkToolOutputs(working, overflow.excess + ANSWER_ROOM_TOKENS)) {
+      if (overflow && shrinkAttempts < MAX_SHRINKS && shrinkToolOutputs(working, overflow.excess + ANSWER_ROOM_TOKENS, keptAs)) {
         shrinkAttempts++;
         opts.report?.("the turn no longer fit the model's context — older tool outputs were shortened");
         step--;
@@ -559,6 +573,10 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
       }
       trace.push({ call: item.call, result, approved: true });
       opts.onToolResult?.({ call: item.call, result });
+      // Kept whole, whatever happens to it in the window later — see `RunTurnOptions.recall`.
+      if (opts.recall && result.content.length > 500) {
+        recallIds.set(item.call.id, opts.recall.put(result.content, `${item.call.name} ${(item.call.args ?? "").slice(0, 120)}`.trim()));
+      }
       working.push({ role: "tool", toolCallId: item.call.id, content: result.content });
     };
 
