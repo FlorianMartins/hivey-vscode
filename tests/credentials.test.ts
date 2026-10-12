@@ -1,8 +1,8 @@
 // Adding a provider: both fields, checked, in one pass.
 //
-// Florian: « l'ajout d'une nouvelle clé API qui est bug et pas user friendly par exemple pour le
-// gateway qui demande de stocker l'adresse et ensuite de stocker la clé API plutôt que de remplir les
-// deux champs et valider ». Two faults: the address was never asked for at all, and nothing was ever
+// Florian: "adding a new API key is buggy and not user friendly, for example for the gateway, which
+// asks you to store the address and then store the API key instead of filling in both fields and
+// confirming". Two faults: the address was never asked for at all, and nothing was ever
 // checked — including against the `placeholder` the vendor table carries for exactly that purpose.
 
 import { test } from "node:test";

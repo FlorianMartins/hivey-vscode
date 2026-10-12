@@ -1,8 +1,8 @@
 // Adding a provider, in one pass instead of two.
 //
-// Florian: « l'ajout d'une nouvelle clé API qui est bug et pas user friendly par exemple pour le
-// gateway qui demande de stocker l'adresse et ensuite de stocker la clé API plutôt que de remplir les
-// deux champs et valider ».
+// Florian: "adding a new API key is buggy and not user friendly, for example for the gateway, which
+// asks you to store the address and then store the API key instead of filling in both fields and
+// confirming".
 //
 // He is describing two separate faults in the same flow:
 //

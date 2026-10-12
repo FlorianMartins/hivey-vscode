@@ -15,7 +15,7 @@
 import * as vscode from "vscode";
 import type { Tool, ToolResult } from "../core/agent/loop.js";
 import { relative } from "./workspace.js";
-import { t } from "../shared/i18n.js";
+import { en, t } from "../shared/i18n.js";
 
 const MAX_RESULTS = 200;
 
@@ -77,7 +77,7 @@ export function buildSymbolTools(): Tool[] {
         // Not "no references": a provider that answered nothing at all is a provider that is not
         // ready, and the two must not read the same.
         return {
-          content: t(
+          content: en(
             "No language server answered for {0}. That is not the same as “no references” — it may still be indexing.",
             String(args["file"]),
           ),
@@ -124,7 +124,7 @@ export function buildSymbolTools(): Tool[] {
       );
       if (!items?.length) {
         return {
-          content: t(
+          content: en(
             "No call hierarchy for {0} at {1}. Either the language server does not provide one for this language, or it is still indexing.",
             String(args["symbol"]),
             where(found.uri, found.position),
@@ -174,7 +174,7 @@ export function buildSymbolTools(): Tool[] {
       );
       if (!found) {
         return {
-          content: t("No language server answered. That is not the same as “no such symbol”."),
+          content: en("No language server answered. That is not the same as “no such symbol”."),
           isError: true,
         };
       }

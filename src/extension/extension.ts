@@ -7,6 +7,7 @@ import { announcePolicy, policySource, reloadPolicy } from "./policy.js";
 import { SiemShipper } from "./siem.js";
 import { Background } from "./background.js";
 import { findRecorder, inputDevices } from "./whisper.js";
+import { pickMicrophone } from "./microphone.js";
 import { Corpus } from "./corpus.js";
 import { LearnedRouting } from "./learned.js";
 import { ReviewDiagnostics, parseFindings, prepareReview, summarise } from "./review.js";
@@ -53,6 +54,34 @@ async function pickMode(): Promise<Mode | undefined> {
   return picked?.id;
 }
 
+/**
+ * Say, once, why some of Hivey Code stays in the editor's language.
+ *
+ * "the translation of the options' hover texts can also follow the chosen language". The
+ * settings page — descriptions and hovers — the menus and the command names come from
+ * `package.nls.*.json`, which VS Code picks from ITS display language; no API lets an extension
+ * choose otherwise. This used to be said only to somebody changing the language through the
+ * command, so a language chosen in the settings looked half-applied with no explanation. Now it is
+ * said once at startup for each mismatch, with the one button that does change it.
+ */
+async function explainEditorLanguage(context: vscode.ExtensionContext): Promise<void> {
+  const chosen = readSettings().language;
+  const editor = vscode.env.language.toLowerCase();
+  if (chosen === "auto" || editor.startsWith(chosen)) return;
+  const seenKey = "hiveyCode.editorLanguageExplained";
+  const combo = `${chosen}->${editor}`;
+  if (context.globalState.get<string>(seenKey) === combo) return;
+  await context.globalState.update(seenKey, combo);
+  const change = t("Change VS Code's language");
+  const answer = await vscode.window.showInformationMessage(
+    t("The settings descriptions, menus and command names of Hivey Code follow VS Code's own display language ({0}), not the language chosen for Hivey Code.", vscode.env.language),
+    { modal: false, detail: t("The command palette entries and the settings page follow VS Code's own display language, which an extension cannot change.") },
+    change,
+  );
+  // The editor's own picker: it lists the languages, installs the language pack and restarts.
+  if (answer === change) await vscode.commands.executeCommand("workbench.action.configureLocale");
+}
+
 export function activate(context: vscode.ExtensionContext): void {
   // The editor knows which language the user reads, unless they said otherwise.
   const applyLanguage = () => {
@@ -60,6 +89,7 @@ export function activate(context: vscode.ExtensionContext): void {
     setLanguage(choice === "auto" ? vscode.env.language : choice);
   };
   applyLanguage();
+  void explainEditorLanguage(context);
   const log = vscode.window.createOutputChannel("Hivey Code");
   const keys = new Keys(context.secrets);
   const disposables: vscode.Disposable[] = [];
@@ -355,9 +385,9 @@ export function activate(context: vscode.ExtensionContext): void {
     /**
      * Add a provider: the address and the key, in one pass, checked.
      *
-     * ⚠️ This flow had two faults and Florian named both: « l'ajout d'une nouvelle clé API qui est
-     * bug et pas user friendly par exemple pour le gateway qui demande de stocker l'adresse et
-     * ensuite de stocker la clé API plutôt que de remplir les deux champs et valider ».
+     * ⚠️ This flow had two faults and Florian named both: "adding a new API key is buggy and not
+     * user friendly, for example for the gateway, which asks you to store the address and then
+     * store the API key instead of filling in both fields and confirming".
      *
      *   • IT NEVER ASKED FOR THE ADDRESS. For the one provider whose address is the user's to supply
      *     — a gateway, Azure, LiteLLM, a corporate proxy — the key was stored and the address had to
@@ -572,7 +602,7 @@ export function activate(context: vscode.ExtensionContext): void {
      * Pick which microphone dictation listens to.
      *
      * ⚠️ It exists because of a machine with several inputs, where the default was not the one being
-     * spoken into: « son micro n'a rien entendu ». Nothing was broken — the recorder took what the
+     * spoken into: "his mic didn't hear anything". Nothing was broken — the recorder took what the
      * system calls the default, recorded a perfectly valid file of silence, and the failure surfaced
      * three steps later as a transcriber's complaint about a temporary path.
      */
@@ -606,19 +636,9 @@ export function activate(context: vscode.ExtensionContext): void {
         void vscode.window.showWarningMessage(t("{0} listed no inputs on this machine.", found.program));
         return;
       }
-      const current = vscode.workspace.getConfiguration(SECTION).get<string>("dictation.device", "");
-      const picked = await vscode.window.showQuickPick(
-        [
-          { label: t("The system default"), id: "", picked: !current },
-          ...devices.map((d) => ({ label: d.label, id: d.id, picked: d.id === current })),
-        ],
-        { placeHolder: t("Which microphone should dictation listen to?"), matchOnDetail: true },
-      );
-      if (!picked) return;
-      await vscode.workspace
-        .getConfiguration(SECTION)
-        .update("dictation.device", picked.id, vscode.ConfigurationTarget.Global);
-      void vscode.window.setStatusBarMessage(t("Dictation will listen to {0}.", picked.label), 5000);
+      // No "system default" on DirectShow: it has no device by that name, and offering it was
+      // offering "Error opening input file audio=default".
+      await pickMicrophone(devices, found.devices !== "dshow");
     }),
 
     vscode.commands.registerCommand("hiveyCode.setup", async () => {

@@ -95,7 +95,7 @@ test("an exit code the shell did not report is stated as unproven, never as succ
 });
 
 test("grep finding nothing is an answer, not a failure", () => {
-  // ⚠️ Part of why « beaucoup de ... run command ... echouent ». `grep` exits 1 when it finds
+  // ⚠️ Part of why "many ... run command ... fail". `grep` exits 1 when it finds
   // nothing, which is a perfectly good answer to "is this used anywhere?" — and that drew the step
   // as a failure, told the model the tool errored, and made `verifyTurn` count a failed check.
   // Three wrong conclusions from one correct command.

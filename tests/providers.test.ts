@@ -95,6 +95,25 @@ test("a tool call split across chunks is reassembled by index", async () => {
   assert.deepEqual(JSON.parse(r.toolCalls[0]!.args), { path: "a.ts" });
 });
 
+test("⚠️ a tool call cut off by max_tokens is dropped, and the cut is still reported", async () => {
+  // It was kept with broken JSON and `stopReason` overwritten to "tool_calls": the loop ran half a
+  // call, and nothing knew the output cap was the reason. Seen live on Qwen3.8 via llama.cpp.
+  const s = await serve((_req, res) =>
+    sse(res, [
+      { choices: [{ delta: { content: "Voici le plan, puis j'attaque :" } }] },
+      { choices: [{ delta: { tool_calls: [{ index: 0, id: "call_1", function: { name: "write_file", arguments: '{"path":"a.ts","content":"lo' } }] } }] },
+      { choices: [{ delta: {}, finish_reason: "length" }] },
+    ]),
+  );
+  const p = new OpenAICompatibleProvider({ id: "local", baseUrl: s.url, isLocal: true });
+  const r = await p.chat({ model: "m", messages: [{ role: "user", content: "go" }] });
+  await s.close();
+
+  assert.equal(r.stopReason, "length");
+  assert.equal(r.toolCalls.length, 0, "half a call is not a call");
+  assert.equal(r.text, "Voici le plan, puis j'attaque :");
+});
+
 test("reasoning tokens are separated from the answer", async () => {
   const s = await serve((_req, res) =>
     sse(res, [
@@ -237,6 +256,27 @@ test("Anthropic: the stable prefix is marked for the prompt cache", async () => 
   assert.equal(r.text, "ok");
   assert.equal(r.usage.cachedTokens, 900);
   assert.equal(r.usage.completionTokens, 5);
+});
+
+test("⚠️ a side task on a self-hosted server is sent with thinking off — and only that", async () => {
+  // Qwen on llama.cpp thinks at the template's default effort unless told otherwise, so an edit
+  // prediction or a commit message spent its time thinking. A turn somebody reads keeps its thinking;
+  // a cloud is left exactly as it was.
+  const sent = async (id: string, chore: boolean): Promise<Record<string, unknown>> => {
+    const s = await serve((_req, res) => sse(res, [{ choices: [{ delta: { content: "x" } }] }]));
+    await new OpenAICompatibleProvider({ id, baseUrl: s.url, isLocal: id === "local", apiKey: "k" }).chat({
+      model: "m",
+      messages: [{ role: "user", content: "hi" }],
+      reasoning: "none",
+      ...(chore ? { chore: true } : {}),
+    });
+    await s.close();
+    return s.requests[0]!.body;
+  };
+  assert.equal((await sent("local", true)).reasoning_effort, "none", "local chore: thinking off");
+  assert.equal((await sent("openai-compatible", true)).reasoning_effort, "none", "own gateway chore: thinking off");
+  assert.equal((await sent("local", false)).reasoning_effort, undefined, "a real turn keeps the server's default");
+  assert.equal((await sent("openai", true)).reasoning_effort, undefined, "a cloud is not touched");
 });
 
 test("reasoning effort is translated per provider, not passed through", async () => {

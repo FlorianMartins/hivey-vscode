@@ -29,7 +29,7 @@ export const TERMINAL_NAME = "Hivey Code";
  */
 // How long to wait for the shell to announce itself.
 //
-// ⚠️ This was a flat 3 s and it was the reason « beaucoup de run command ... echouent ». VS Code's
+// ⚠️ This was a flat 3 s and it was the reason "many run command ... fail". VS Code's
 // integration script runs inside the shell's own startup, so on the FIRST terminal of a session it
 // lands after the user's profile does — and a real profile is not fast: oh-my-zsh, powerlevel10k,
 // nvm, a Windows PowerShell profile, WSL. Miss the window and the command still runs but its output

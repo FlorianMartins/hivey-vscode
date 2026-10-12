@@ -20,6 +20,7 @@ import type {
 } from "./types.js";
 import { EMPTY_USAGE } from "./types.js";
 import { keepCacheMarks } from "./cache.js";
+import { isSelfHostedProvider } from "../redaction/index.js";
 import { toolCallsFromText } from "./textToolCall.js";
 
 export interface OpenAIProviderOptions {
@@ -243,6 +244,13 @@ export class OpenAICompatibleProvider implements Provider {
       // Explicitly off, so a model that thinks by default does not bill for it.
       body["reasoning"] = { exclude: true };
     }
+    // ⚠️ A side task on a self-hosted server: thinking OFF. "none" above sends nothing to
+    // llama.cpp, and nothing means the chat template's default effort — so an edit prediction or a
+    // commit message thought for longer than it took to write. Only for chores and only on the
+    // user's own server (llama.cpp reads `reasoning_effort: "none"` as enable_thinking=false); a
+    // turn somebody is waiting to read keeps its thinking, and clouds are left exactly as they were.
+    // A server that rejects the field gets the request again without it — see `adaptRequest`.
+    if (req.chore && isSelfHostedProvider(this.id)) body["reasoning_effort"] = "none";
 
     // Ask for the accounting. OpenAI-compatible servers that do not know the field ignore it.
     body["stream_options"] = { include_usage: true };
@@ -315,12 +323,21 @@ export class OpenAICompatibleProvider implements Provider {
         text = "";
       }
     }
-    if (toolCalls.length) stopReason = "tool_calls";
+    // ⚠️ Cut off by the output cap: a call still being written when the budget ran out is HALF a
+    // call. It used to be kept, and `stopReason` overwritten with "tool_calls" — so the turn ran a
+    // call with broken JSON, the model was told its arguments were unreadable, wrote the same huge
+    // call again and was cut again, four minutes a time on a local model, and nobody was told the
+    // budget was the reason. Complete calls are kept; an unfinished one is dropped, and "length"
+    // survives so the loop can ask for the rest. Seen live on Qwen3.8 through llama.cpp: "Here is
+    // the plan, then I'll get started:" and then nothing, 8192 tokens later.
+    const cut = stopReason === "length";
+    const usable = cut ? toolCalls.filter((c) => isCompleteJson(c.args)) : toolCalls;
+    if (usable.length && !cut) stopReason = "tool_calls";
 
     return {
       text,
       reasoning,
-      toolCalls,
+      toolCalls: usable,
       usage,
       stopReason,
       ...(this.lastShortened ? { shortenedTo: this.lastShortened } : {}),
@@ -607,4 +624,14 @@ export async function describeHttpError(res: Response, provider?: string): Promi
             ? " — rate limited by the provider."
             : "";
   return `HTTP ${res.status} ${res.statusText}${detail ? `: ${detail}` : ""}${hint}`;
+}
+
+/** Whether a tool call's arguments are a whole JSON value — false for one the output cap cut short. */
+export function isCompleteJson(args: string): boolean {
+  try {
+    JSON.parse(args || "{}");
+    return true;
+  } catch {
+    return false;
+  }
 }

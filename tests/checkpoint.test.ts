@@ -114,8 +114,8 @@ test("a partial checkpoint says so before the button is pressed, not after", () 
 });
 
 test("the transcript's FIRST question still offers a way back", () => {
-  // ⚠️ The defect this pins, reported by Florian: "sur le premier message d'une conversation il n'y
-  // a pas de reverse possible". The transcript drew the restore on the separating line between two
+  // ⚠️ The defect this pins, reported by Florian: "on the first message of a conversation there's
+  // no way to revert". The transcript drew the restore on the separating line between two
   // turns, and skipped that line above the first question — correctly, there being nothing above it
   // to separate. The restore went with it, so no conversation could undo its opening turn: the one
   // turn where the agent works on an untouched repository, and therefore the one most worth undoing.

@@ -92,8 +92,8 @@ function usd(value: number): string {
  * `$3.00/M`, a span for a preset, or the word that says the question does not arise.
  *
  * ⚠️ A preset gets a SPAN, because it is four models and a single figure made two different presets
- * read as identical: « comment ça se fait que les modeles Hivey pro et Hivey smart sortent le meme
- * prix ? ». The span is still the input price — that is all this badge has room for — but it is now a
+ * read as identical: "how come the Hivey Pro and Hivey Smart models come out at the same price?".
+ * The span is still the input price — that is all this badge has room for — but it is now a
  * claim the preset can keep, rather than one role's figure standing in for four.
  */
 function priceBadge(model: UiModel): string {

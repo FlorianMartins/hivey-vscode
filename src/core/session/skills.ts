@@ -14,7 +14,7 @@
 // `action`, which does something to the conversation instead. The action is a plain string rather
 // than a protocol message so that core stays free of the panel's wire format; the webview maps it.
 
-import { t, onLanguageChange } from "../../shared/i18n.js";
+import { en, t, onLanguageChange } from "../../shared/i18n.js";
 
 export interface BuiltinSkill {
   /** The invocation, `/` included. */
@@ -144,13 +144,13 @@ onLanguageChange(() => {
   BUILTIN_SKILLS.length = 0;
   BUILTIN_SKILLS.push(
   // ── Any language ────────────────────────────────────────────────────────────────────────────
-  { group: "general", name: "/compact", hint: t("summarize the conversation and free the context"), action: "compact" },
+  { group: "general", name: "/compact", hint: en("summarize the conversation and free the context"), action: "compact" },
   {
     group: "general",
     name: "/remember",
     needs: "knowledge",
-    hint: t("record what we established in the knowledge base"),
-    prompt: t(
+    hint: en("record what we established in the knowledge base"),
+    prompt: en(
       "Record in the knowledge base what this conversation established that will still be true next month.\n\n" +
         "Work like a librarian, not like a scribe:\n" +
         "1. Search first. Something on this subject may already exist, and the right move is almost always to correct it rather than to add a second note.\n" +
@@ -160,14 +160,14 @@ onLanguageChange(() => {
         "If nothing durable came out of this conversation, say so and record nothing. A base full of nearly-nothing is worse than a small one.",
     ),
   },
-  { group: "general", name: t("/explain"), hint: t("explain the file or the selection"), prompt: t("Explain this code: what it does, how it fits into the rest, and what deserves attention."), attach: true },
-  { group: "general", name: "/tests", hint: t("write tests"), prompt: t("Write tests for this code, in the style and with the tools already used in this repository. Cover the edge cases."), attach: true },
-  { group: "general", name: t("/fix"), hint: t("find and fix the problem"), prompt: t("Find the defect in this code and fix it. Say in one sentence what was wrong."), attach: true },
+  { group: "general", name: en("/explain"), hint: en("explain the file or the selection"), prompt: en("Explain this code: what it does, how it fits into the rest, and what deserves attention."), attach: true },
+  { group: "general", name: "/tests", hint: en("write tests"), prompt: en("Write tests for this code, in the style and with the tools already used in this repository. Cover the edge cases."), attach: true },
+  { group: "general", name: en("/fix"), hint: en("find and fix the problem"), prompt: en("Find the defect in this code and fix it. Say in one sentence what was wrong."), attach: true },
   {
     group: "general",
-    name: t("/review"),
-    hint: t("review: bugs, security, readability"),
-    prompt: t(
+    name: en("/review"),
+    hint: en("review: bugs, security, readability"),
+    prompt: en(
       "Review this code: bugs first, then security, then readability. Order by severity, cite the lines, " +
         "and report nothing you are unsure of.\n\n" +
         "If nothing is attached, review what THIS BRANCH changes: use git_diff against the branch point " +
@@ -178,23 +178,23 @@ onLanguageChange(() => {
     ),
     attach: true,
   },
-  { group: "general", name: "/doc", hint: t("document"), prompt: t("Document this code: a note above it, in the language and style of the file."), attach: true },
-  { group: "general", name: t("/optimize"), hint: t("make it faster, without changing what it does"), prompt: t("Make this code faster without changing its behavior. Say what the cost was before and after, and refuse if the gain is not worth the loss of clarity."), attach: true },
-  { group: "general", name: "/commit", hint: t("write the commit message"), prompt: t("Read the staged changes with git_diff and write the commit message for them. Subject line, then the why.") },
-  { group: "general", name: "/names", hint: t("better names"), prompt: t("Rename what is badly named here: names that describe the type rather than the role, abbreviations only the author understands, and booleans that read backwards. Propose each rename with the reason, and change nothing else."), attach: true },
-  { group: "general", name: "/simplify", hint: t("remove what is not needed"), prompt: t("Simplify this without changing what it does: dead branches, flags with one caller, indirection that hides rather than explains, and comments restating the code. Say what each removal costs if anything."), attach: true },
-  { group: "general", name: "/errors", hint: t("handle the failures"), prompt: t("Find every failure this code does not handle: what can throw, what can return nothing, what can time out. Propose handling that leaves the caller able to act, not a swallowed exception."), attach: true },
-  { group: "security", name: "/security", hint: t("security review"), prompt: t("Review this for security: injection through anything that reaches a query, a shell or a template; authorization checked at the boundary rather than in the caller; secrets in code or logs; unsafe deserialisation. Rank by exploitability and say what an attacker would need."), attach: true },
+  { group: "general", name: "/doc", hint: en("document"), prompt: en("Document this code: a note above it, in the language and style of the file."), attach: true },
+  { group: "general", name: en("/optimize"), hint: en("make it faster, without changing what it does"), prompt: en("Make this code faster without changing its behavior. Say what the cost was before and after, and refuse if the gain is not worth the loss of clarity."), attach: true },
+  { group: "general", name: "/commit", hint: en("write the commit message"), prompt: en("Read the staged changes with git_diff and write the commit message for them. Subject line, then the why.") },
+  { group: "general", name: "/names", hint: en("better names"), prompt: en("Rename what is badly named here: names that describe the type rather than the role, abbreviations only the author understands, and booleans that read backwards. Propose each rename with the reason, and change nothing else."), attach: true },
+  { group: "general", name: "/simplify", hint: en("remove what is not needed"), prompt: en("Simplify this without changing what it does: dead branches, flags with one caller, indirection that hides rather than explains, and comments restating the code. Say what each removal costs if anything."), attach: true },
+  { group: "general", name: "/errors", hint: en("handle the failures"), prompt: en("Find every failure this code does not handle: what can throw, what can return nothing, what can time out. Propose handling that leaves the caller able to act, not a swallowed exception."), attach: true },
+  { group: "security", name: "/security", hint: en("security review"), prompt: en("Review this for security: injection through anything that reaches a query, a shell or a template; authorization checked at the boundary rather than in the caller; secrets in code or logs; unsafe deserialisation. Rank by exploitability and say what an attacker would need."), attach: true },
 
 
   {
     group: "rpg",
     name: "/deliver",
-    hint: t("hand the change to ARCAD, ready for a person to release"),
+    hint: en("hand the change to ARCAD, ready for a person to release"),
     evalTask: "ibmi-rpg-unittest",
     // The last step is the one that does not exist, and saying so is the whole skill: an agent that
     // promotes to production is an agent nobody can let near a managed partition.
-    prompt: t(
+    prompt: en(
       "Get this change ready to hand to ARCAD.\n\n" +
         "1. Compile it with ibmi_compile. A member that does not compile has produced no object: there " +
         "is nothing to deliver and nothing to discuss.\n" +
@@ -216,9 +216,9 @@ onLanguageChange(() => {
   {
     group: "rpg",
     name: "/indicators",
-    hint: t("numbered indicators to named ones"),
+    hint: en("numbered indicators to named ones"),
     evalTask: "ibmi-rpg-indicators",
-    prompt: t(
+    prompt: en(
       "Replace the numbered indicators in this member with named indicator variables.\n" +
         "\n" +
         "1. Leave alone every indicator DDS owns: a display file's function keys and its error indicators are the screen's, not the program's. Say which ones you left and why.\n" +
@@ -231,9 +231,9 @@ onLanguageChange(() => {
   {
     group: "rpg",
     name: "/movefree",
-    hint: t("MOVE and MOVEL to explicit assignments"),
+    hint: en("MOVE and MOVEL to explicit assignments"),
     evalTask: "ibmi-rpg-move",
-    prompt: t(
+    prompt: en(
       "Replace every MOVE and MOVEL here with an explicit free-form assignment.\n" +
         "\n" +
         "1. Say which way each one aligned before you change it: MOVE takes from the right, MOVEL from the left. Getting that backwards is silent and it corrupts data.\n" +
@@ -246,9 +246,9 @@ onLanguageChange(() => {
   {
     group: "rpg",
     name: "/cycle",
-    hint: t("get out of the RPG cycle"),
+    hint: en("get out of the RPG cycle"),
     evalTask: "ibmi-rpg-freeform",
-    prompt: t(
+    prompt: en(
       "Replace the RPG cycle in this program with an explicit loop.\n" +
         "\n" +
         "1. Say what the cycle was doing for it: the primary file read, the level breaks, the total time output, the automatic LR. Each one has to be written out by hand now.\n" +
@@ -261,9 +261,9 @@ onLanguageChange(() => {
   {
     group: "rpg",
     name: "/copyproto",
-    hint: t("/COPY and prototypes instead of bare CALL"),
+    hint: en("/COPY and prototypes instead of bare CALL"),
     evalTask: "ibmi-rpg-copy-proto",
-    prompt: t(
+    prompt: en(
       "Give the called programs here real prototypes.\n" +
         "\n" +
         "1. For each bare CALL, write a prototype with EXTPGM in a copybook member, and bring it in with /COPY. One copybook per called program, named after it.\n" +
@@ -276,9 +276,9 @@ onLanguageChange(() => {
   {
     group: "rpg",
     name: "/srvpgm",
-    hint: t("monolith to modules and a service program"),
+    hint: en("monolith to modules and a service program"),
     evalTask: "ibmi-rpg-srvpgm",
-    prompt: t(
+    prompt: en(
       "Turn this into an ILE service program.\n" +
         "\n" +
         "1. Decide what belongs in it: the rules more than one program needs. A procedure used once belongs where it is used.\n" +
@@ -292,9 +292,9 @@ onLanguageChange(() => {
   {
     group: "rpg",
     name: "/validate",
-    hint: t("input validation that says what is wrong"),
+    hint: en("input validation that says what is wrong"),
     evalTask: "ibmi-rpg-indicators",
-    prompt: t(
+    prompt: en(
       "Review the input validation here.\n" +
         "\n" +
         "1. For each field, say what is actually checked and what is not: a length, a range, a date that exists, a code that is in a table, a mandatory field that is only blank-checked.\n" +
@@ -307,9 +307,9 @@ onLanguageChange(() => {
   {
     group: "rpg",
     name: "/pointers",
-    hint: t("review pointers and based storage"),
+    hint: en("review pointers and based storage"),
     evalTask: "ibmi-rpg-srvpgm",
-    prompt: t(
+    prompt: en(
       "Review the pointers and based storage here.\n" +
         "\n" +
         "1. For each pointer, state the invariant that makes it sound: what it points at, who allocated it, who frees it, and what happens on an error path in between.\n" +
@@ -322,9 +322,9 @@ onLanguageChange(() => {
   {
     group: "dds",
     name: "/lf",
-    hint: t("design the logical file"),
+    hint: en("design the logical file"),
     evalTask: "ibmi-dds-logical",
-    prompt: t(
+    prompt: en(
       "Design or review this logical file.\n" +
         "\n" +
         "1. Say what it is FOR: an access path, a subset, a projection, or a join. A logical that does all four is one nobody can reason about.\n" +
@@ -337,9 +337,9 @@ onLanguageChange(() => {
   {
     group: "dds",
     name: "/ddskeys",
-    hint: t("keys, select and omit"),
+    hint: en("keys, select and omit"),
     evalTask: "ibmi-dds-logical",
-    prompt: t(
+    prompt: en(
       "Review the keys and the select/omit here.\n" +
         "\n" +
         "1. Say what order the key gives, including the keywords that change it: DESCEND, ABSVAL, ZONE, UNIQUE, and what a duplicate key does to a write.\n" +
@@ -352,9 +352,9 @@ onLanguageChange(() => {
   {
     group: "dds",
     name: "/ddsmodern",
-    hint: t("DDS to SQL DDL"),
+    hint: en("DDS to SQL DDL"),
     evalTask: "ibmi-db2-ddl",
-    prompt: t(
+    prompt: en(
       "Write the SQL DDL equivalent of this DDS.\n" +
         "\n" +
         "1. Carry over the names, the types and the lengths exactly. A packed field is DECIMAL, a zoned one is NUMERIC, and the two are not interchangeable on disk.\n" +
@@ -368,9 +368,9 @@ onLanguageChange(() => {
   {
     group: "dds",
     name: "/subfile",
-    hint: t("review the subfile"),
+    hint: en("review the subfile"),
     evalTask: "ibmi-dds-field",
-    prompt: t(
+    prompt: en(
       "Review this subfile.\n" +
         "\n" +
         "1. Say which kind it is and why: load-all, single-page or expanding. A load-all over a file nobody bounded is a program that reads a million records to show twelve.\n" +
@@ -383,9 +383,9 @@ onLanguageChange(() => {
   {
     group: "db2i",
     name: "/indexes",
-    hint: t("which indexes this table needs"),
+    hint: en("which indexes this table needs"),
     evalTask: "ibmi-db2-catalog",
-    prompt: t(
+    prompt: en(
       "Work out which indexes this table needs, from evidence.\n" +
         "\n" +
         "1. Call ibmi_index_advice first. Without it this is a guess, and an index is a guess that costs disk and slows every write.\n" +
@@ -399,9 +399,9 @@ onLanguageChange(() => {
   {
     group: "db2i",
     name: "/isolation",
-    hint: t("the isolation level in force"),
+    hint: en("the isolation level in force"),
     evalTask: "ibmi-db2-commit",
-    prompt: t(
+    prompt: en(
       "What isolation is this running under, and what does that allow?\n" +
         "\n" +
         "1. Say where the level comes from: the COMMIT parameter on the compile, a SET TRANSACTION, the connection, or the default — and that they do not all agree.\n" +
@@ -414,9 +414,9 @@ onLanguageChange(() => {
   {
     group: "db2i",
     name: "/triggers",
-    hint: t("review the triggers on this table"),
+    hint: en("review the triggers on this table"),
     evalTask: "ibmi-db2-ddl",
-    prompt: t(
+    prompt: en(
       "Review the triggers on this table.\n" +
         "\n" +
         "1. List them with what fires them and when: before or after, insert, update or delete, row or statement. A before-trigger that writes elsewhere is a transaction nobody declared.\n" +
@@ -429,9 +429,9 @@ onLanguageChange(() => {
   {
     group: "db2i",
     name: "/sqlperf",
-    hint: t("why this query is slow"),
+    hint: en("why this query is slow"),
     evalTask: "ibmi-db2-catalog",
-    prompt: t(
+    prompt: en(
       "Why is this query slow, and what would make it fast?\n" +
         "\n" +
         "1. Call ibmi_index_advice on the tables involved before saying anything: the optimizer has already recorded what it wished it had.\n" +
@@ -444,9 +444,9 @@ onLanguageChange(() => {
   {
     group: "cl",
     name: "/clsbmjob",
-    hint: t("submit a job that can be found afterwards"),
+    hint: en("submit a job that can be found afterwards"),
     evalTask: "ibmi-cl-sbmjob",
-    prompt: t(
+    prompt: en(
       "Review this submitted job.\n" +
         "\n" +
         "1. A bare SBMJOB inherits the caller's job description, library list and output queue by accident. Make all three explicit, and qualify the JOBD by its library.\n" +
@@ -459,9 +459,9 @@ onLanguageChange(() => {
   {
     group: "cl",
     name: "/cllib",
-    hint: t("stop depending on the library list"),
+    hint: en("stop depending on the library list"),
     evalTask: "ibmi-cl-qualify",
-    prompt: t(
+    prompt: en(
       "Make this program stop depending on the job's library list.\n" +
         "\n" +
         "1. Qualify every object reference with a library. An unqualified name resolves against a list this program does not control, and in production that list starts with production.\n" +
@@ -474,9 +474,9 @@ onLanguageChange(() => {
   {
     group: "cl",
     name: "/clmsgf",
-    hint: t("send a message somebody can act on"),
+    hint: en("send a message somebody can act on"),
     evalTask: "ibmi-cl-monmsg",
-    prompt: t(
+    prompt: en(
       "Review the messages this program sends.\n" +
         "\n" +
         "1. Say what each SNDPGMMSG actually does: an informational message in a batch joblog nobody reads, or an escape message that stops the caller. Those are different programs.\n" +
@@ -489,9 +489,9 @@ onLanguageChange(() => {
   {
     group: "cl",
     name: "/clmonitor",
-    hint: t("monitor the message that can happen"),
+    hint: en("monitor the message that can happen"),
     evalTask: "ibmi-cl-monmsg",
-    prompt: t(
+    prompt: en(
       "Review the error handling in this CL program.\n" +
         "\n" +
         "1. For each command that can fail, name the message it would send and monitor THAT one. A program-level MONMSG MSGID(CPF0000) swallows an authority failure and a damaged object along with the file-not-found you were expecting.\n" +
@@ -504,9 +504,9 @@ onLanguageChange(() => {
   {
     group: "cl",
     name: "/clvalidate",
-    hint: t("check the parameters before acting"),
+    hint: en("check the parameters before acting"),
     evalTask: "ibmi-cl-qualify",
-    prompt: t(
+    prompt: en(
       "Make this program check its parameters before it does anything.\n" +
         "\n" +
         "1. For each parameter, say what an invalid value would DO: a blank library that resolves to the list, a name that does not exist, a date nobody validated that ends up in a file name.\n" +
@@ -519,9 +519,9 @@ onLanguageChange(() => {
   {
     group: "db2i",
     name: "/nulls",
-    hint: t("null handling, which DDS never had"),
+    hint: en("null handling, which DDS never had"),
     evalTask: "ibmi-db2-ddl",
-    prompt: t(
+    prompt: en(
       "Review how this handles nulls.\n" +
         "\n" +
         "1. Say which columns are actually null-capable. DDS has none unless ALWNULL says so, SQL has them by default, and a table created both ways in its lifetime has both.\n" +
@@ -536,10 +536,10 @@ onLanguageChange(() => {
   // ── Finance ─────────────────────────────────────────────────────────────────────────────────
   {
     group: "finance",
-    name: t("/rounding"),
-    hint: t("round money the way an invoice does"),
+    name: en("/rounding"),
+    hint: en("round money the way an invoice does"),
     evalTask: "js-money-rounding",
-    prompt: t(
+    prompt: en(
       "Review how this rounds money.\n" +
         "1. Say which rule is in force and which one the business needs: half away from zero (what an invoice does), half to even (what a float library does by default), or truncation. They differ on exactly one input and that input is a half cent.\n" +
         "2. Check the NEGATIVE case. `Math.round`, Python's `round` and Java's `BigDecimal.ROUND_HALF_UP` do not agree about -0.5, and a credit note that refunds a cent less than the invoice charged is a reconciliation difference nobody can find.\n" +
@@ -550,10 +550,10 @@ onLanguageChange(() => {
   },
   {
     group: "finance",
-    name: t("/decimal"),
-    hint: t("money without a float, anywhere"),
+    name: en("/decimal"),
+    hint: en("money without a float, anywhere"),
     evalTask: "py-decimal-money",
-    prompt: t(
+    prompt: en(
       "Find every place a monetary value touches a binary floating-point type here, and remove it.\n" +
         "1. A float cannot hold 0.10. Everything that follows from that — a total that is 0.30000000000000004, a comparison that fails, a cent that appears from nowhere — is not a bug to be patched, it is the type being wrong.\n" +
         "2. Use the exact type the language has: Decimal in Python, BigDecimal in Java, a packed field in RPG, an integer number of minor units in JavaScript. Say which you chose and what its precision is.\n" +
@@ -564,10 +564,10 @@ onLanguageChange(() => {
   },
   {
     group: "finance",
-    name: t("/packed"),
-    hint: t("packed and zoned decimal, sized on purpose"),
+    name: en("/packed"),
+    hint: en("packed and zoned decimal, sized on purpose"),
     evalTask: "ibmi-rpg-packed",
-    prompt: t(
+    prompt: en(
       "Review the packed and zoned fields here.\n" +
         "1. State the precision of every monetary value and WHY it is that: the ledger's currency to the cent, a rate to six decimals, a quantity with none.\n" +
         "2. Size the intermediates. A product of an 11-digit amount and a 9-digit rate does not fit in 11 digits, and RPG truncates it without saying so — which is a wrong number that balances.\n" +
@@ -578,10 +578,10 @@ onLanguageChange(() => {
   },
   {
     group: "finance",
-    name: t("/settlement"),
-    hint: t("settlement dates, T+1 and T+2"),
+    name: en("/settlement"),
+    hint: en("settlement dates, T+1 and T+2"),
     evalTask: "fin-settlement",
-    prompt: t(
+    prompt: en(
       "Work out the settlement dates here.\n" +
         "1. Skip weekends AND the holidays — and the holidays must be a PARAMETER. A calendar built into the code is wrong in another country and wrong next year, and the person who finds out is a counterparty.\n" +
         "2. Say which calendar applies: the venue's, the currency's, or both. A cross-border trade settles when both sides are open, which is not the same as either.\n" +
@@ -592,10 +592,10 @@ onLanguageChange(() => {
   },
   {
     group: "finance",
-    name: t("/markethours"),
-    hint: t("time zones and market sessions"),
+    name: en("/markethours"),
+    hint: en("time zones and market sessions"),
     evalTask: "fin-market-hours",
-    prompt: t(
+    prompt: en(
       "Review how this decides whether a venue is open.\n" +
         "1. Use the venue's OWN time zone and its session in local time. A window written in UTC is right for half the year: the exchange does not move its bell when the clocks change, so the UTC offset of the open is not a constant.\n" +
         "2. Name the time zone rather than an offset. `Europe/Paris` knows when the clocks change; `+01:00` does not, and the day it is wrong is a day somebody traded.\n" +
@@ -606,10 +606,10 @@ onLanguageChange(() => {
   },
   {
     group: "finance",
-    name: t("/identifiers"),
-    hint: t("validate ISIN, LEI and BIC properly"),
+    name: en("/identifiers"),
+    hint: en("validate ISIN, LEI and BIC properly"),
     evalTask: "fin-identifiers",
-    prompt: t(
+    prompt: en(
       "Validate these identifiers properly rather than by their length.\n" +
         "1. ISIN: twelve characters, a two-letter country code, and a Luhn check digit over the letters converted to digits — each letter becoming its position in the alphabet plus nine BEFORE the digits are concatenated. Converting afterwards gives a different number and a check that always fails.\n" +
         "2. LEI: twenty characters, ISO 17442, which is ISO 7064 MOD 97-10 — the whole string as digits, modulo 97, must be 1.\n" +
@@ -620,10 +620,10 @@ onLanguageChange(() => {
   },
   {
     group: "finance",
-    name: t("/fixmsg"),
-    hint: t("FIX messages a counterparty accepts"),
+    name: en("/fixmsg"),
+    hint: en("FIX messages a counterparty accepts"),
     evalTask: "fin-fix-message",
-    prompt: t(
+    prompt: en(
       "Review this FIX message.\n" +
         "1. BodyLength (tag 9) counts the bytes from the SOH that ends tag 9 to the start of tag 10 — not the whole message, and not the body plus the header.\n" +
         "2. CheckSum (tag 10) covers EVERYTHING before it, including `8=` and `9=`, modulo 256, as three digits ZERO-PADDED. A two-digit checksum is right ninety-nine times in a hundred, which is worse than being always wrong.\n" +
@@ -634,10 +634,10 @@ onLanguageChange(() => {
   },
   {
     group: "finance",
-    name: t("/amortise"),
-    hint: t("schedules whose parts total the whole"),
+    name: en("/amortise"),
+    hint: en("schedules whose parts total the whole"),
     evalTask: "fin-amortisation",
-    prompt: t(
+    prompt: en(
       "Review this schedule.\n" +
         "1. The instalments must total the principal EXACTLY. Rounding each one and multiplying back gives a schedule that differs from the loan by a few cents, and that difference is a reconciliation item somebody chases for an afternoon.\n" +
         "2. Say where the residue goes: spread one minor unit at a time over the first instalments, or all of it on the last. Both are defensible; only one matches the contract.\n" +
@@ -648,97 +648,97 @@ onLanguageChange(() => {
   },
 
   // ── Web ─────────────────────────────────────────────────────────────────────────────────────
-  { group: "frontend", name: "/a11y", hint: t("accessibility audit"), prompt: t("Audit this against WCAG 2.2 AA: the accessible name of every control, keyboard reachability and focus order, contrast, ARIA used where a native element would do, and what a screen reader announces. Cite the criterion for each finding and separate what is certain from what needs a browser."), attach: true },
-  { group: "frontend", name: "/semantic", hint: t("the right HTML elements"), prompt: t("Rewrite this markup with the elements that carry its meaning: landmarks, headings in order, lists for lists, buttons for actions and links for navigation. Say what each change gives a screen reader that the original did not."), attach: true },
-  { group: "frontend", name: "/css", hint: t("simplify the stylesheet"), prompt: t("Review this CSS: specificity that will be hard to override, magic numbers, layout done with hacks where the cascade or grid would do, and anything that breaks on a narrow screen or in the other color scheme. Propose the simpler version."), attach: true },
-  { group: "frontend", name: "/responsive", hint: t("make it hold at every width"), prompt: t("Find where this breaks between a phone and a wide monitor: fixed widths, text that cannot wrap, tables and code that overflow, touch targets under 44 px. Fix it with the intrinsic sizing that removes the breakpoint rather than adding one."), attach: true },
-  { group: "javascript", name: "/types", hint: t("tighten the TypeScript types"), prompt: t("Tighten the types here: replace `any` and unchecked casts with types the compiler can verify, narrow rather than assert, and make impossible states unrepresentable. Change no behavior, and say which changes would fail the build elsewhere."), attach: true },
-  { group: "javascript", name: "/jsdoc", hint: t("document the exported API"), prompt: t("Write JSDoc for what this module exports: the contract, the parameters, what is returned, what throws, and the example that removes the need to read the body. Do not restate the signature."), attach: true },
-  { group: "javascript", name: "/perf-web", hint: t("what makes the page slow"), prompt: t("Find what costs the most here: layout thrash, work on every keystroke or scroll without throttling, bundles pulled in for one function, images without dimensions. Give the cheapest fix for each and say what it is worth."), attach: true },
+  { group: "frontend", name: "/a11y", hint: en("accessibility audit"), prompt: en("Audit this against WCAG 2.2 AA: the accessible name of every control, keyboard reachability and focus order, contrast, ARIA used where a native element would do, and what a screen reader announces. Cite the criterion for each finding and separate what is certain from what needs a browser."), attach: true },
+  { group: "frontend", name: "/semantic", hint: en("the right HTML elements"), prompt: en("Rewrite this markup with the elements that carry its meaning: landmarks, headings in order, lists for lists, buttons for actions and links for navigation. Say what each change gives a screen reader that the original did not."), attach: true },
+  { group: "frontend", name: "/css", hint: en("simplify the stylesheet"), prompt: en("Review this CSS: specificity that will be hard to override, magic numbers, layout done with hacks where the cascade or grid would do, and anything that breaks on a narrow screen or in the other color scheme. Propose the simpler version."), attach: true },
+  { group: "frontend", name: "/responsive", hint: en("make it hold at every width"), prompt: en("Find where this breaks between a phone and a wide monitor: fixed widths, text that cannot wrap, tables and code that overflow, touch targets under 44 px. Fix it with the intrinsic sizing that removes the breakpoint rather than adding one."), attach: true },
+  { group: "javascript", name: "/types", hint: en("tighten the TypeScript types"), prompt: en("Tighten the types here: replace `any` and unchecked casts with types the compiler can verify, narrow rather than assert, and make impossible states unrepresentable. Change no behavior, and say which changes would fail the build elsewhere."), attach: true },
+  { group: "javascript", name: "/jsdoc", hint: en("document the exported API"), prompt: en("Write JSDoc for what this module exports: the contract, the parameters, what is returned, what throws, and the example that removes the need to read the body. Do not restate the signature."), attach: true },
+  { group: "javascript", name: "/perf-web", hint: en("what makes the page slow"), prompt: en("Find what costs the most here: layout thrash, work on every keystroke or scroll without throttling, bundles pulled in for one function, images without dimensions. Give the cheapest fix for each and say what it is worth."), attach: true },
 
   // ── Python ──────────────────────────────────────────────────────────────────────────────────
-  { group: "python", name: "/pytest", hint: t("write pytest tests"), prompt: t("Write pytest tests for this: plain functions, fixtures for the setup, parametrize for the table of cases, and a name per test saying what it asserts. Cover the boundaries and the error paths, and use no mock where a real object is cheap."), attach: true },
-  { group: "python", name: "/hints", hint: t("add type hints"), prompt: t("Add type hints complete enough for mypy in strict mode. Prefer the standard collections and `X | None` over Optional, be precise about what is mutated, and change no behavior. Say where a hint was impossible without altering the design."), attach: true },
-  { group: "python", name: "/docstring", hint: t("write the docstrings"), prompt: t("Write docstrings in the style already used in the file, or Google style if there is none: what it does, what the arguments mean, what it returns and what it raises. Do not restate the signature in prose."), attach: true },
-  { group: "python", name: "/pythonic", hint: t("make it idiomatic Python"), prompt: t("Rewrite this as a Python developer would: comprehensions where they read better than the loop, context managers for anything with a lifetime, the standard library over a hand-rolled version, dataclasses or enums where a dict stands in for a type. Refuse any change that trades clarity for cleverness."), attach: true },
-  { group: "python", name: "/asyncio", hint: t("review the async code"), prompt: t("Review this asyncio code: blocking calls on the event loop, tasks created and never awaited, cancellation that leaves state half-written, and gather where a task group would give better failure behavior."), attach: true },
+  { group: "python", name: "/pytest", hint: en("write pytest tests"), prompt: en("Write pytest tests for this: plain functions, fixtures for the setup, parametrize for the table of cases, and a name per test saying what it asserts. Cover the boundaries and the error paths, and use no mock where a real object is cheap."), attach: true },
+  { group: "python", name: "/hints", hint: en("add type hints"), prompt: en("Add type hints complete enough for mypy in strict mode. Prefer the standard collections and `X | None` over Optional, be precise about what is mutated, and change no behavior. Say where a hint was impossible without altering the design."), attach: true },
+  { group: "python", name: "/docstring", hint: en("write the docstrings"), prompt: en("Write docstrings in the style already used in the file, or Google style if there is none: what it does, what the arguments mean, what it returns and what it raises. Do not restate the signature in prose."), attach: true },
+  { group: "python", name: "/pythonic", hint: en("make it idiomatic Python"), prompt: en("Rewrite this as a Python developer would: comprehensions where they read better than the loop, context managers for anything with a lifetime, the standard library over a hand-rolled version, dataclasses or enums where a dict stands in for a type. Refuse any change that trades clarity for cleverness."), attach: true },
+  { group: "python", name: "/asyncio", hint: en("review the async code"), prompt: en("Review this asyncio code: blocking calls on the event loop, tasks created and never awaited, cancellation that leaves state half-written, and gather where a task group would give better failure behavior."), attach: true },
 
   // ── Java ────────────────────────────────────────────────────────────────────────────────────
-  { group: "java", name: "/junit", hint: t("write JUnit 5 tests"), prompt: t("Write JUnit 5 tests: @Test with @DisplayName saying what is asserted, @ParameterizedTest where the cases are data, AssertJ if the project uses it, @Nested to group the cases of one behavior. Cover the exceptions as well as the happy path."), attach: true },
-  { group: "java", name: "/javadoc", hint: t("write the Javadoc"), prompt: t("Write Javadoc: what it does and why it exists, @param, @return, @throws, @since where the project uses it. Document the contract — nullability, thread safety, what the caller owns — rather than the implementation."), attach: true },
-  { group: "java", name: "/streams", hint: t("loops to streams, where it reads better"), prompt: t("Where the Stream API reads better than the loop, rewrite it — and where it does not, say so and leave the loop. Keep laziness in mind, do not collect a stream only to iterate it, and never hide a side effect inside a map."), attach: true },
-  { group: "java", name: "/nullsafe", hint: t("find what can be null"), prompt: t("Find every path where a null can arrive unhandled. Propose the fix that removes the possibility — Optional at the boundary, an invariant enforced at construction, a validated parameter — rather than a null check at each use."), attach: true },
-  { group: "java", name: "/concurrent", hint: t("review the concurrency"), prompt: t("Review this for concurrency: shared mutable state without a happens-before edge, locks taken in different orders, collections that are not thread-safe, and executors never shut down. Say what would actually go wrong and under what load."), attach: true },
+  { group: "java", name: "/junit", hint: en("write JUnit 5 tests"), prompt: en("Write JUnit 5 tests: @Test with @DisplayName saying what is asserted, @ParameterizedTest where the cases are data, AssertJ if the project uses it, @Nested to group the cases of one behavior. Cover the exceptions as well as the happy path."), attach: true },
+  { group: "java", name: "/javadoc", hint: en("write the Javadoc"), prompt: en("Write Javadoc: what it does and why it exists, @param, @return, @throws, @since where the project uses it. Document the contract — nullability, thread safety, what the caller owns — rather than the implementation."), attach: true },
+  { group: "java", name: "/streams", hint: en("loops to streams, where it reads better"), prompt: en("Where the Stream API reads better than the loop, rewrite it — and where it does not, say so and leave the loop. Keep laziness in mind, do not collect a stream only to iterate it, and never hide a side effect inside a map."), attach: true },
+  { group: "java", name: "/nullsafe", hint: en("find what can be null"), prompt: en("Find every path where a null can arrive unhandled. Propose the fix that removes the possibility — Optional at the boundary, an invariant enforced at construction, a validated parameter — rather than a null check at each use."), attach: true },
+  { group: "java", name: "/concurrent", hint: en("review the concurrency"), prompt: en("Review this for concurrency: shared mutable state without a happens-before edge, locks taken in different orders, collections that are not thread-safe, and executors never shut down. Say what would actually go wrong and under what load."), attach: true },
 
   // ── .NET ────────────────────────────────────────────────────────────────────────────────────
-  { group: "dotnet", name: "/xmldoc", hint: t("write the XML documentation"), prompt: t("Write XML documentation comments: <summary>, <param>, <returns>, <exception>, and <remarks> for the contract the signature cannot state. Document nullability as the compiler sees it."), attach: true },
-  { group: "dotnet", name: "/linq", hint: t("loops to LINQ, where it reads better"), prompt: t("Where LINQ reads better than the loop, rewrite it — and where it does not, leave it and say why. Watch for multiple enumeration of the same sequence and for queries that hit the database once per row."), attach: true },
-  { group: "dotnet", name: "/asyncnet", hint: t("review the async/await"), prompt: t("Review this async code: async void outside an event handler, .Result or .Wait() that can deadlock, missing ConfigureAwait in library code, and CancellationToken accepted and never passed on."), attach: true },
-  { group: "dotnet", name: "/nunit", hint: t("write the tests"), prompt: t("Write tests in the framework this project already uses (xUnit, NUnit or MSTest): one behavior per test, data-driven cases where they are data, and a name that says what is asserted. Cover the exceptions."), attach: true },
+  { group: "dotnet", name: "/xmldoc", hint: en("write the XML documentation"), prompt: en("Write XML documentation comments: <summary>, <param>, <returns>, <exception>, and <remarks> for the contract the signature cannot state. Document nullability as the compiler sees it."), attach: true },
+  { group: "dotnet", name: "/linq", hint: en("loops to LINQ, where it reads better"), prompt: en("Where LINQ reads better than the loop, rewrite it — and where it does not, leave it and say why. Watch for multiple enumeration of the same sequence and for queries that hit the database once per row."), attach: true },
+  { group: "dotnet", name: "/asyncnet", hint: en("review the async/await"), prompt: en("Review this async code: async void outside an event handler, .Result or .Wait() that can deadlock, missing ConfigureAwait in library code, and CancellationToken accepted and never passed on."), attach: true },
+  { group: "dotnet", name: "/nunit", hint: en("write the tests"), prompt: en("Write tests in the framework this project already uses (xUnit, NUnit or MSTest): one behavior per test, data-driven cases where they are data, and a name that says what is asserted. Cover the exceptions."), attach: true },
 
   // ── Systems ─────────────────────────────────────────────────────────────────────────────────
-  { group: "go", name: "/gotest", hint: t("write Go table tests"), prompt: t("Write Go tests in the table style: a slice of cases with names, t.Run per case, t.Parallel where it is safe, and the standard library rather than an assertion framework. Cover the error returns."), attach: true },
-  { group: "go", name: "/goroutines", hint: t("review the goroutines"), prompt: t("Review the concurrency here: goroutines started and never joined, channels that can block for ever, a context accepted and not honoured, and shared state without a mutex or a channel. Say what would deadlock and under what conditions."), attach: true },
-  { group: "go", name: "/gomod", hint: t("review the module"), prompt: t("Review this module: dependencies pulled in for one function, versions that are not pinned where they matter, a replace directive left from local work, and packages that would be better internal. Say what each change costs."), attach: true },
-  { group: "go", name: "/goerr", hint: t("review the error handling"), prompt: t("Review the error handling: errors swallowed or logged and returned twice, missing context from %w, sentinel errors compared with == where errors.Is is needed, and defers that hide a failure to close."), attach: true },
-  { group: "rust", name: "/borrow", hint: t("review the Rust ownership"), prompt: t("Review the ownership here: clones that exist to satisfy the borrow checker rather than the design, lifetimes that could be elided, Rc/RefCell standing in for a structure that does not need shared mutation, and unwrap on a path that can fail."), attach: true },
-  { group: "rust", name: "/rusterr", hint: t("review the error handling"), prompt: t("Review the errors here: unwrap and expect on paths that can fail, a single error type doing the work of several, missing From impls that would let ? work, and errors that lose their cause. Propose the enum the caller can actually match on."), attach: true },
-  { group: "rust", name: "/rustdoc", hint: t("document the crate"), prompt: t("Write doc comments for what this crate exports: what it is for, the invariants, what panics and when, and an example that compiles. Use //! for the module and /// for items, and link other items with square brackets."), attach: true },
-  { group: "rust", name: "/unsafe", hint: t("justify or remove the unsafe"), prompt: t("For each unsafe block or raw pointer here: state the invariant that makes it sound, or show the safe construction that removes it. Treat an unsafe block without a written invariant as a defect."), attach: true },
-  { group: "cpp", name: "/raii", hint: t("make the lifetime the type's job"), prompt: t("Rewrite this C++ so ownership is expressed in types: unique_ptr or a value where a raw owning pointer is used, RAII for anything acquired and released, the rule of zero where the compiler can write the special members. Say what each change makes impossible."), attach: true },
-  { group: "cpp", name: "/undefined", hint: t("find the undefined behavior"), prompt: t("Find the undefined behavior here: reads past a bound, signed overflow, strict-aliasing violations, uninitialized reads, use after move, and lifetimes ending before the last use. For each, say what a compiler is permitted to do with it."), attach: true },
-  { group: "cpp", name: "/memory", hint: t("who owns what"), prompt: t("Trace ownership through this code: what allocates, what frees, what can be used after free or freed twice, and where a bound is checked. Propose the structure that makes the lifetime obvious rather than a comment claiming it."), attach: true },
+  { group: "go", name: "/gotest", hint: en("write Go table tests"), prompt: en("Write Go tests in the table style: a slice of cases with names, t.Run per case, t.Parallel where it is safe, and the standard library rather than an assertion framework. Cover the error returns."), attach: true },
+  { group: "go", name: "/goroutines", hint: en("review the goroutines"), prompt: en("Review the concurrency here: goroutines started and never joined, channels that can block for ever, a context accepted and not honoured, and shared state without a mutex or a channel. Say what would deadlock and under what conditions."), attach: true },
+  { group: "go", name: "/gomod", hint: en("review the module"), prompt: en("Review this module: dependencies pulled in for one function, versions that are not pinned where they matter, a replace directive left from local work, and packages that would be better internal. Say what each change costs."), attach: true },
+  { group: "go", name: "/goerr", hint: en("review the error handling"), prompt: en("Review the error handling: errors swallowed or logged and returned twice, missing context from %w, sentinel errors compared with == where errors.Is is needed, and defers that hide a failure to close."), attach: true },
+  { group: "rust", name: "/borrow", hint: en("review the Rust ownership"), prompt: en("Review the ownership here: clones that exist to satisfy the borrow checker rather than the design, lifetimes that could be elided, Rc/RefCell standing in for a structure that does not need shared mutation, and unwrap on a path that can fail."), attach: true },
+  { group: "rust", name: "/rusterr", hint: en("review the error handling"), prompt: en("Review the errors here: unwrap and expect on paths that can fail, a single error type doing the work of several, missing From impls that would let ? work, and errors that lose their cause. Propose the enum the caller can actually match on."), attach: true },
+  { group: "rust", name: "/rustdoc", hint: en("document the crate"), prompt: en("Write doc comments for what this crate exports: what it is for, the invariants, what panics and when, and an example that compiles. Use //! for the module and /// for items, and link other items with square brackets."), attach: true },
+  { group: "rust", name: "/unsafe", hint: en("justify or remove the unsafe"), prompt: en("For each unsafe block or raw pointer here: state the invariant that makes it sound, or show the safe construction that removes it. Treat an unsafe block without a written invariant as a defect."), attach: true },
+  { group: "cpp", name: "/raii", hint: en("make the lifetime the type's job"), prompt: en("Rewrite this C++ so ownership is expressed in types: unique_ptr or a value where a raw owning pointer is used, RAII for anything acquired and released, the rule of zero where the compiler can write the special members. Say what each change makes impossible."), attach: true },
+  { group: "cpp", name: "/undefined", hint: en("find the undefined behavior"), prompt: en("Find the undefined behavior here: reads past a bound, signed overflow, strict-aliasing violations, uninitialized reads, use after move, and lifetimes ending before the last use. For each, say what a compiler is permitted to do with it."), attach: true },
+  { group: "cpp", name: "/memory", hint: en("who owns what"), prompt: en("Trace ownership through this code: what allocates, what frees, what can be used after free or freed twice, and where a bound is checked. Propose the structure that makes the lifetime obvious rather than a comment claiming it."), attach: true },
 
   // ── Mobile ──────────────────────────────────────────────────────────────────────────────────
-  { group: "flutter", name: "/widget", hint: t("review the widget tree"), prompt: t("Review this widget tree: work done in build(), const constructors missing where the subtree never changes, setState rebuilding more than it needs, and layout that overflows on a small screen. Give the restructured tree."), attach: true },
-  { group: "flutter", name: "/darttest", hint: t("write the Flutter tests"), prompt: t("Write tests for this in the right kind: a unit test for pure logic, a widget test with pumpWidget and finders for the UI, a golden test where the look is the contract. Name each test for the behavior it pins."), attach: true },
-  { group: "flutter", name: "/state", hint: t("review the state management"), prompt: t("Review how state is held here: state above the widget that owns it, rebuilds wider than the change, controllers and streams never disposed, and business logic inside a widget. Propose the arrangement that fits the pattern this project already uses."), attach: true },
-  { group: "flutter", name: "/dartdoc", hint: t("document the Dart API"), prompt: t("Write doc comments for what this library exports: the contract, the parameters, what is returned, what throws, and a short example. Use /// and reference other symbols with square brackets."), attach: true },
-  { group: "flutter", name: "/adaptive", hint: t("make it hold on every device"), prompt: t("Find where this breaks between a small phone and a tablet: hard-coded sizes, text that ignores the platform scale factor, touch targets under 48 dp, and layout that assumes one orientation. Fix it with layout that adapts rather than with a device check."), attach: true },
+  { group: "flutter", name: "/widget", hint: en("review the widget tree"), prompt: en("Review this widget tree: work done in build(), const constructors missing where the subtree never changes, setState rebuilding more than it needs, and layout that overflows on a small screen. Give the restructured tree."), attach: true },
+  { group: "flutter", name: "/darttest", hint: en("write the Flutter tests"), prompt: en("Write tests for this in the right kind: a unit test for pure logic, a widget test with pumpWidget and finders for the UI, a golden test where the look is the contract. Name each test for the behavior it pins."), attach: true },
+  { group: "flutter", name: "/state", hint: en("review the state management"), prompt: en("Review how state is held here: state above the widget that owns it, rebuilds wider than the change, controllers and streams never disposed, and business logic inside a widget. Propose the arrangement that fits the pattern this project already uses."), attach: true },
+  { group: "flutter", name: "/dartdoc", hint: en("document the Dart API"), prompt: en("Write doc comments for what this library exports: the contract, the parameters, what is returned, what throws, and a short example. Use /// and reference other symbols with square brackets."), attach: true },
+  { group: "flutter", name: "/adaptive", hint: en("make it hold on every device"), prompt: en("Find where this breaks between a small phone and a tablet: hard-coded sizes, text that ignores the platform scale factor, touch targets under 48 dp, and layout that assumes one orientation. Fix it with layout that adapts rather than with a device check."), attach: true },
 
   // ── SQL & data ──────────────────────────────────────────────────────────────────────────────
-  { group: "data", name: "/query", hint: t("review the query"), prompt: t("Review this query: what it will scan, whether the predicates are sargable, joins that multiply rows, and correlated subqueries that run per row. Give the rewrite and say what you expect the plan to change to."), attach: true },
-  { group: "data", name: "/index", hint: t("which index this needs"), prompt: t("Propose the indexes this workload needs, with the column order and the reason for it. Say which existing index each new one makes redundant, and what the write cost is."), attach: true },
-  { group: "data", name: "/schema", hint: t("review the schema"), prompt: t("Review this schema: keys that do not identify, nullable columns standing in for a missing table, types that lose precision, and constraints the application is enforcing instead of the database. Propose the corrected DDL."), attach: true },
-  { group: "data", name: "/migration", hint: t("write a safe migration"), prompt: t("Write this migration so it can run against a live table: no long lock, backfill separated from the schema change, and a state where old and new code both work. Give the rollback, and say what makes it irreversible if it is."), attach: true },
+  { group: "data", name: "/query", hint: en("review the query"), prompt: en("Review this query: what it will scan, whether the predicates are sargable, joins that multiply rows, and correlated subqueries that run per row. Give the rewrite and say what you expect the plan to change to."), attach: true },
+  { group: "data", name: "/index", hint: en("which index this needs"), prompt: en("Propose the indexes this workload needs, with the column order and the reason for it. Say which existing index each new one makes redundant, and what the write cost is."), attach: true },
+  { group: "data", name: "/schema", hint: en("review the schema"), prompt: en("Review this schema: keys that do not identify, nullable columns standing in for a missing table, types that lose precision, and constraints the application is enforcing instead of the database. Propose the corrected DDL."), attach: true },
+  { group: "data", name: "/migration", hint: en("write a safe migration"), prompt: en("Write this migration so it can run against a live table: no long lock, backfill separated from the schema change, and a state where old and new code both work. Give the rollback, and say what makes it irreversible if it is."), attach: true },
 
   // ── Build & deploy ──────────────────────────────────────────────────────────────────────────
-  { group: "devops", name: "/dockerfile", hint: t("review the Dockerfile"), prompt: t("Review this Dockerfile: layer order that defeats the cache, build tools left in the final image, running as root, a tag that is not pinned, and secrets passed as build arguments. Give the corrected file."), attach: true },
-  { group: "devops", name: "/ci", hint: t("review the pipeline"), prompt: t("Review this pipeline: steps that could run in parallel, caches that never hit, a failure that does not fail the build, secrets exposed to a fork's pull request, and actions pinned to a moving tag."), attach: true },
-  { group: "devops", name: "/shell", hint: t("make the script safe"), prompt: t("Harden this shell script: set -euo pipefail, quote every expansion, handle a path with a space, avoid parsing ls, and check that each command exists before using it. Say what would have gone wrong without each change."), attach: true },
-  { group: "devops", name: "/config", hint: t("review the configuration"), prompt: t("Review this configuration: values that differ between environments and are hard-coded, secrets in the file, defaults that are unsafe in production, and settings with no effect because something later overrides them."), attach: true },
+  { group: "devops", name: "/dockerfile", hint: en("review the Dockerfile"), prompt: en("Review this Dockerfile: layer order that defeats the cache, build tools left in the final image, running as root, a tag that is not pinned, and secrets passed as build arguments. Give the corrected file."), attach: true },
+  { group: "devops", name: "/ci", hint: en("review the pipeline"), prompt: en("Review this pipeline: steps that could run in parallel, caches that never hit, a failure that does not fail the build, secrets exposed to a fork's pull request, and actions pinned to a moving tag."), attach: true },
+  { group: "devops", name: "/shell", hint: en("make the script safe"), prompt: en("Harden this shell script: set -euo pipefail, quote every expansion, handle a path with a space, avoid parsing ls, and check that each command exists before using it. Say what would have gone wrong without each change."), attach: true },
+  { group: "devops", name: "/config", hint: en("review the configuration"), prompt: en("Review this configuration: values that differ between environments and are hard-coded, secrets in the file, defaults that are unsafe in production, and settings with no effect because something later overrides them."), attach: true },
 
   // ── Design & UX ─────────────────────────────────────────────────────────────────────────────
   //
   // Not decoration: every one of these is a defect class that ships because nobody looked for it.
-  { group: "design", name: "/ux", hint: t("review the interface"), prompt: t("Review this interface: what the user is trying to do and how many steps it takes, what is unclear without a tooltip, what happens on the unhappy path, and what a first-time reader would get wrong. Rank by how often it will bite."), attach: true },
-  { group: "design", name: "/states", hint: t("the states nobody drew"), prompt: t("List the states this interface can be in — empty, loading, one item, far too many, too long a name, offline, no permission, failed — and say what it shows in each. Write the ones that are missing."), attach: true },
-  { group: "design", name: "/copy", hint: t("rewrite the wording"), prompt: t("Rewrite the text in this interface: labels that say what happens rather than what the code does, errors that say what to do next, no apologies, no jargon the user did not choose. Keep it shorter than what it replaces."), attach: true },
-  { group: "design", name: "/spacing", hint: t("the layout system"), prompt: t("Review the layout here against one scale: spacing values outside it, alignments off by a pixel or two, type sizes that are nearly the same, and whitespace that groups the wrong things together. Give the corrected values."), attach: true },
-  { group: "design", name: "/motion", hint: t("review the animation"), prompt: t("Review the motion here: durations that make the interface feel slow, easing that is linear where it should not be, animation on something the user is trying to read, and no honouring of prefers-reduced-motion."), attach: true },
+  { group: "design", name: "/ux", hint: en("review the interface"), prompt: en("Review this interface: what the user is trying to do and how many steps it takes, what is unclear without a tooltip, what happens on the unhappy path, and what a first-time reader would get wrong. Rank by how often it will bite."), attach: true },
+  { group: "design", name: "/states", hint: en("the states nobody drew"), prompt: en("List the states this interface can be in — empty, loading, one item, far too many, too long a name, offline, no permission, failed — and say what it shows in each. Write the ones that are missing."), attach: true },
+  { group: "design", name: "/copy", hint: en("rewrite the wording"), prompt: en("Rewrite the text in this interface: labels that say what happens rather than what the code does, errors that say what to do next, no apologies, no jargon the user did not choose. Keep it shorter than what it replaces."), attach: true },
+  { group: "design", name: "/spacing", hint: en("the layout system"), prompt: en("Review the layout here against one scale: spacing values outside it, alignments off by a pixel or two, type sizes that are nearly the same, and whitespace that groups the wrong things together. Give the corrected values."), attach: true },
+  { group: "design", name: "/motion", hint: en("review the animation"), prompt: en("Review the motion here: durations that make the interface feel slow, easing that is linear where it should not be, animation on something the user is trying to read, and no honouring of prefers-reduced-motion."), attach: true },
 
   // ── Security ────────────────────────────────────────────────────────────────────────────────
-  { group: "security", name: "/threats", hint: t("threat model this"), prompt: t("Threat-model this: what an attacker wants, where they can reach it from, what they need to get it, and what stops them today. Rank by how easy each path is rather than by how bad the outcome sounds."), attach: true },
-  { group: "security", name: "/authz", hint: t("check the authorization"), prompt: t("Check authorization here: whether it is enforced at the boundary or trusted from the caller, whether the object being acted on is checked and not only the action, and what a user of another tenant would be able to reach. Show the missing check."), attach: true },
-  { group: "security", name: "/crypto", hint: t("review the cryptography"), prompt: t("Review the cryptography here: primitives chosen rather than borrowed from a tutorial, key length and derivation, an IV or nonce that is unique, comparison that is constant-time, and randomness from a CSPRNG. Say what a wrong answer would cost."), attach: true },
-  { group: "security", name: "/secrets", hint: t("find the secrets"), prompt: t("Find what should not be in this code: credentials, tokens, connection strings, private keys, and anything logged that carries them. Say where each belongs instead and what has to be rotated if it is already committed."), attach: true },
-  { group: "security", name: "/deps", hint: t("review the dependencies"), prompt: t("Review these dependencies: what is unmaintained, what is pulled in for one function, what runs code at install time, and what has a known advisory. Say which could be dropped and what replacing each would cost."), attach: true },
+  { group: "security", name: "/threats", hint: en("threat model this"), prompt: en("Threat-model this: what an attacker wants, where they can reach it from, what they need to get it, and what stops them today. Rank by how easy each path is rather than by how bad the outcome sounds."), attach: true },
+  { group: "security", name: "/authz", hint: en("check the authorization"), prompt: en("Check authorization here: whether it is enforced at the boundary or trusted from the caller, whether the object being acted on is checked and not only the action, and what a user of another tenant would be able to reach. Show the missing check."), attach: true },
+  { group: "security", name: "/crypto", hint: en("review the cryptography"), prompt: en("Review the cryptography here: primitives chosen rather than borrowed from a tutorial, key length and derivation, an IV or nonce that is unique, comparison that is constant-time, and randomness from a CSPRNG. Say what a wrong answer would cost."), attach: true },
+  { group: "security", name: "/secrets", hint: en("find the secrets"), prompt: en("Find what should not be in this code: credentials, tokens, connection strings, private keys, and anything logged that carries them. Say where each belongs instead and what has to be rotated if it is already committed."), attach: true },
+  { group: "security", name: "/deps", hint: en("review the dependencies"), prompt: en("Review these dependencies: what is unmaintained, what is pulled in for one function, what runs code at install time, and what has a known advisory. Say which could be dropped and what replacing each would cost."), attach: true },
 
   // ── IBM i ───────────────────────────────────────────────────────────────────────────────────
   //
   // The largest family, and the reason the dialect rules in core exist: a model that guesses at
   // column positions produces a member that looks right, compiles into something else, and fails
   // in a spool file.
-  { group: "rpg", name: "/tofree", evalTask: "ibmi-rpg-freeform", hint: t("convert fixed-format RPG to fully free"), prompt: t("Convert this member to fully free-form RPGLE. Start with **FREE, use dcl-f/dcl-s/dcl-ds/dcl-proc, keep every comment, and change no behavior. Point out anything with no free-form equivalent instead of inventing one."), attach: true },
+  { group: "rpg", name: "/tofree", evalTask: "ibmi-rpg-freeform", hint: en("convert fixed-format RPG to fully free"), prompt: en("Convert this member to fully free-form RPGLE. Start with **FREE, use dcl-f/dcl-s/dcl-ds/dcl-proc, keep every comment, and change no behavior. Point out anything with no free-form equivalent instead of inventing one."), attach: true },
   {
     group: "db2i",
     name: "/sql",
     evalTask: "ibmi-db2-catalog",
-    hint: t("write it as Db2 for i SQL"),
+    hint: en("write it as Db2 for i SQL"),
     // The addition that matters is step 3. A model asked to make a query faster proposes an index,
     // and the proposal is a guess dressed as expertise — while the database is sitting on a record
     // of the indexes its own optimizer wished for, with counts.
-    prompt: t(
+    prompt: en(
       "Write this as Db2 for i SQL, and justify it from what the database knows.\n\n" +
         "1. Qualify the objects, use FETCH FIRST rather than LIMIT, and say which library you assumed.\n" +
         "2. Prefer the SQL the platform has: VALUES, OLAP specifications, CTEs, and the QSYS2 and " +
@@ -753,26 +753,26 @@ onLanguageChange(() => {
     ),
     attach: true,
   },
-  { group: "dds", name: "/dds", evalTask: "ibmi-dds-field", hint: t("explain this DDS"), prompt: t("Explain this DDS member: the record formats, the key fields, the keywords that change behavior, and anything that would surprise someone reading it for the first time."), attach: true },
-  { group: "dds", name: "/dspf", evalTask: "ibmi-dds-field", hint: t("review this display file"), prompt: t("Review this DSPF: the record formats and their overlay order, indicators and what each one drives, CFxx/CAxx keys and where they are handled, subfile control and whether the size is right, and the DDS keywords that will surprise the next reader."), attach: true },
-  { group: "dds", name: "/prtf", evalTask: "ibmi-dds-printer", hint: t("review this printer file"), prompt: t("Review this PRTF: page size and orientation against the form, the record formats and their line positions, overflow handling, and the editing that will change the printed value. Say what breaks if the form changes."), attach: true },
-  { group: "cl", name: "/clparm", evalTask: "ibmi-cl-qualify", hint: t("review the command definition"), prompt: t("Review this command definition: parameter types and lengths against what the program expects, defaults that hide a required choice, prompt text that says what the value is for, and validity checking done in the CMD rather than in the program."), attach: true },
-  { group: "cl", name: "/clerr", evalTask: "ibmi-cl-monmsg", hint: t("review the message handling"), prompt: t("Review the message handling here: MONMSG with no message id, escape messages resent so the caller sees them, diagnostic messages left in the job log without an escape, and the message file the program depends on. Say what the caller learns when this fails."), attach: true },
-  { group: "cl", name: "/cl", evalTask: "ibmi-cl-qualify", hint: t("review this CL"), prompt: t("Review this CL program: MONMSG placed where it can hide a real failure, unqualified object references and what the library list would resolve them to, overrides never deleted, and the return code the caller sees."), attach: true },
-  { group: "rpg", name: "/embedsql", evalTask: "ibmi-db2-commit", hint: t("review the embedded SQL"), prompt: t("Review this embedded SQL in RPG: SQLCODE and SQLSTATE checked after every statement, host variables sized to their columns, cursors closed on every path, literals that should be parameter markers, and the isolation level in force."), attach: true },
-  { group: "rpg", name: "/ile", evalTask: "ibmi-rpg-procedure", hint: t("review the ILE structure"), prompt: t("Review this as ILE: what belongs in a service program rather than in the program, the procedures that should be exported and their prototypes, the activation group and what it means for open files and commitment, and the binding directory this needs."), attach: true },
+  { group: "dds", name: "/dds", evalTask: "ibmi-dds-field", hint: en("explain this DDS"), prompt: en("Explain this DDS member: the record formats, the key fields, the keywords that change behavior, and anything that would surprise someone reading it for the first time."), attach: true },
+  { group: "dds", name: "/dspf", evalTask: "ibmi-dds-field", hint: en("review this display file"), prompt: en("Review this DSPF: the record formats and their overlay order, indicators and what each one drives, CFxx/CAxx keys and where they are handled, subfile control and whether the size is right, and the DDS keywords that will surprise the next reader."), attach: true },
+  { group: "dds", name: "/prtf", evalTask: "ibmi-dds-printer", hint: en("review this printer file"), prompt: en("Review this PRTF: page size and orientation against the form, the record formats and their line positions, overflow handling, and the editing that will change the printed value. Say what breaks if the form changes."), attach: true },
+  { group: "cl", name: "/clparm", evalTask: "ibmi-cl-qualify", hint: en("review the command definition"), prompt: en("Review this command definition: parameter types and lengths against what the program expects, defaults that hide a required choice, prompt text that says what the value is for, and validity checking done in the CMD rather than in the program."), attach: true },
+  { group: "cl", name: "/clerr", evalTask: "ibmi-cl-monmsg", hint: en("review the message handling"), prompt: en("Review the message handling here: MONMSG with no message id, escape messages resent so the caller sees them, diagnostic messages left in the job log without an escape, and the message file the program depends on. Say what the caller learns when this fails."), attach: true },
+  { group: "cl", name: "/cl", evalTask: "ibmi-cl-qualify", hint: en("review this CL"), prompt: en("Review this CL program: MONMSG placed where it can hide a real failure, unqualified object references and what the library list would resolve them to, overrides never deleted, and the return code the caller sees."), attach: true },
+  { group: "rpg", name: "/embedsql", evalTask: "ibmi-db2-commit", hint: en("review the embedded SQL"), prompt: en("Review this embedded SQL in RPG: SQLCODE and SQLSTATE checked after every statement, host variables sized to their columns, cursors closed on every path, literals that should be parameter markers, and the isolation level in force."), attach: true },
+  { group: "rpg", name: "/ile", evalTask: "ibmi-rpg-procedure", hint: en("review the ILE structure"), prompt: en("Review this as ILE: what belongs in a service program rather than in the program, the procedures that should be exported and their prototypes, the activation group and what it means for open files and commitment, and the binding directory this needs."), attach: true },
   {
     group: "rpg",
     name: "/compile",
     evalTask: "ibmi-rpg-fixed-lr",
-    hint: t("compile it and fix what the compiler says"),
+    hint: en("compile it and fix what the compiler says"),
     // The plumbing for this already existed — `ibmi_command` runs CL, and its description names
     // CRTBNDRPG — and it was still not usable, because a model asked to "compile this" invents a
     // command, a target library and a set of options, and gets one of the three wrong. What was
     // missing is not a tool, it is knowing how a shop actually compiles: from the member you are
     // looking at, into the library the source came from, with the options the previous object was
     // built with. All of that is READABLE, and reading it is cheaper than guessing.
-    prompt: t(
+    prompt: en(
       "Compile this member and fix what the compiler reports.\n\n" +
         "1. Use ibmi_compile. It picks the command from the member's type and reads the errors out of the " +
         "compile listing and the joblog for you — identifier, severity, line, text. Do not build a CRT… " +
@@ -792,11 +792,11 @@ onLanguageChange(() => {
     group: "rpg",
     name: "/rpgtest",
     evalTask: "ibmi-rpg-unittest",
-    hint: t("write RPGUnit tests, compile them and run them"),
+    hint: en("write RPGUnit tests, compile them and run them"),
     // The instruction that matters is the last one. A model asked to "write tests" writes tests and
     // declares victory, and on this platform a test source that was never compiled is not a test —
     // it is a text file in QRPGLESRC. So the skill ends on the run, and the run has a verdict.
-    prompt: t(
+    prompt: en(
       "Write RPGUnit tests for this, then compile and run them.\n\n" +
         "1. Read the member first and work out what it actually promises: the boundaries, the error paths, " +
         "and the behaviour somebody would notice if it changed. Test those, not the happy path three times.\n" +
@@ -815,11 +815,11 @@ onLanguageChange(() => {
     group: "db2i",
     name: "/impact",
     evalGap: "needs a live partition: the answer comes from DSPPGMREF over a real library, and a fixture standing in for it would be the thing under test",
-    hint: t("who uses this file, program or field"),
+    hint: en("who uses this file, program or field"),
     // Before, and the word is load-bearing. Changing a field length on this platform is a
     // five-minute edit and a four-hour search, and the search is the part that gets skipped — so
     // the skill exists to make it the first step rather than the post-mortem.
-    prompt: t(
+    prompt: en(
       "Who uses this, and what breaks if I change it? Answer BEFORE proposing any change.\n\n" +
         "1. Call ibmi_impact on the object. At object level that reads the programs' own reference lists, " +
         "which is a fact; say which libraries were looked in, because the answer is only as wide as its search.\n" +
@@ -834,14 +834,14 @@ onLanguageChange(() => {
     ),
     attach: true,
   },
-  { group: "rpg", name: "/rpgdoc", evalTask: "ibmi-rpg-doc", hint: t("document this member"), prompt: t("Document this member the way an RPG shop reads: a header saying what it is for and what calls it, a note per procedure, and the files it uses with what it does to each. Keep the column layout untouched if the member is fixed-format."), attach: true },
-  { group: "db2i", name: "/journal", evalTask: "ibmi-db2-commit", hint: t("review the journalling"), prompt: t("Review journalling here: which files are journalled and which are not, what the journal receivers cost and when they are detached, and what a recovery would actually be able to replay. Say what is lost if the system ends abnormally now."), },
+  { group: "rpg", name: "/rpgdoc", evalTask: "ibmi-rpg-doc", hint: en("document this member"), prompt: en("Document this member the way an RPG shop reads: a header saying what it is for and what calls it, a note per procedure, and the files it uses with what it does to each. Keep the column layout untouched if the member is fixed-format."), attach: true },
+  { group: "db2i", name: "/journal", evalTask: "ibmi-db2-commit", hint: en("review the journalling"), prompt: en("Review journalling here: which files are journalled and which are not, what the journal receivers cost and when they are detached, and what a recovery would actually be able to replay. Say what is lost if the system ends abnormally now."), },
   {
     group: "db2i",
     name: "/whouses",
     evalGap: "needs a live partition: the answer comes from DSPPGMREF over a real library, and a fixture standing in for it would be the thing under test",
-    hint: t("find what uses an object"),
-    prompt: t(
+    hint: en("find what uses an object"),
+    prompt: en(
       "Find everything on this system that uses the object I name — programs that call it, files it " +
         "reads or writes, logical files built over it, service programs that bind it.\n\n" +
         "Work it out rather than assuming a catalogue view exists. Try these in order and use what " +
@@ -860,9 +860,9 @@ onLanguageChange(() => {
         "for each answer. A caller you inferred from a naming convention is not a caller.",
     ),
   },
-  { group: "db2i", name: "/qsys2", evalTask: "ibmi-sql-db2", hint: t("use the catalogue instead"), prompt: t("Replace this with a QSYS2 or SYSTOOLS service where one exists — object lists, job information, journal entries, IFS objects — rather than a command whose output has to be parsed. Give the query and say what it returns that the command did not."), attach: true },
-  { group: "db2i", name: "/commitctl", evalTask: "ibmi-db2-commit", hint: t("review the commitment control"), prompt: t("Review the commitment control here: what is under commit and what is not, where COMMIT and ROLLBACK are issued, what happens on an unhandled error, and whether the activation group scope matches the unit of work.") },
-  { group: "rpg", name: "/dbmodern", evalTask: "ibmi-rpg-sql-cursor", hint: t("modernise the data access"), prompt: t("Propose the SQL replacement for these native I/O operations (CHAIN, SETLL, READE): the query, whether a cursor or a single fetch is right, and what changes about record locking and about the record format the program expects. Say where native I/O should stay."), attach: true },
+  { group: "db2i", name: "/qsys2", evalTask: "ibmi-sql-db2", hint: en("use the catalogue instead"), prompt: en("Replace this with a QSYS2 or SYSTOOLS service where one exists — object lists, job information, journal entries, IFS objects — rather than a command whose output has to be parsed. Give the query and say what it returns that the command did not."), attach: true },
+  { group: "db2i", name: "/commitctl", evalTask: "ibmi-db2-commit", hint: en("review the commitment control"), prompt: en("Review the commitment control here: what is under commit and what is not, where COMMIT and ROLLBACK are issued, what happens on an unhandled error, and whether the activation group scope matches the unit of work.") },
+  { group: "rpg", name: "/dbmodern", evalTask: "ibmi-rpg-sql-cursor", hint: en("modernise the data access"), prompt: en("Propose the SQL replacement for these native I/O operations (CHAIN, SETLL, READE): the query, whether a cursor or a single fetch is right, and what changes about record locking and about the record format the program expects. Say where native I/O should stay."), attach: true },
   );
 });
 
@@ -1017,9 +1017,9 @@ export function groupsForPaths(paths: string[]): SkillGroup[] {
  * ⚠️ `detectGroups` existed for a long time and did almost nothing with its answer — it pre-ticked a
  * box in a wizard most people never open. So somebody editing RPG with the default settings got
  * `general` and nothing else: forty IBM i skills, every one backed by an evaluation task, sat
- * switched off while the model guessed. Florian, reading a session full of mistakes: « la detection
- * automatique des programmes ouverts ne semble pas faire l'activation et desactivation des skills
- * automatisé non plus, ce qui expliqierai pourquoi il créé autant d'erreur ». The detection was
+ * switched off while the model guessed. Florian, reading a session full of mistakes: "the automatic
+ * detection of open programs doesn't seem to do the automated enabling and disabling of skills
+ * either, which would explain why it makes so many errors". The detection was
  * right; nothing acted on it. The comment in `config.ts` even claimed families "default to the ones
  * that apply whatever is open", which is what the code should have done and did not.
  *

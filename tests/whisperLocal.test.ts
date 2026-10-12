@@ -20,7 +20,7 @@ import {
   whisperUrl,
 } from "../src/core/dictation/local.js";
 import { readTar } from "../src/core/archive/tar.js";
-import { howToRecord, parseDevices, recordArgv, recorders, windowsRecorderScript } from "../src/core/dictation/capture.js";
+import { chooseDevice, howToRecord, isDeviceError, parseDevices, recordArgv, recorders, windowsRecorderScript } from "../src/core/dictation/capture.js";
 import { gzipSync } from "node:zlib";
 import { describeWav, encodeWav, SPEECH_SAMPLE_RATE, WAV_HEADER_BYTES } from "../src/core/dictation/wav.js";
 
@@ -238,7 +238,7 @@ test("a recording command the user wrote is split the way a shell would, without
 });
 
 test("⚠️ Windows records with what Windows already has", () => {
-  // Reported from a real machine: « je suis sur Windows et j'ai ce message ». Windows is the one
+  // Reported from a real machine: "I'm on Windows and I get this message". Windows is the one
   // platform that ships no command-line recorder, and "install ffmpeg before you may speak" is not
   // the brief. `winmm` has been part of every Windows for thirty years, and PowerShell can call it.
   const list = recorders("win32");
@@ -267,7 +267,8 @@ test("⚠️ the Windows recorder is stopped by a LINE, never by a signal", () =
   assert.match(win.args("x").join(" "), /ReadLine/);
   for (const platform of ["linux", "darwin"]) {
     for (const r of recorders(platform)) {
-      assert.equal(r.stop, "signal", `${platform}/${r.program} would need a different stop`);
+      // ffmpeg is the exception everywhere: `q` on its stdin — see recordStop.test.ts.
+      assert.equal(r.stop, r.program === "ffmpeg" ? "quit" : "signal", `${platform}/${r.program} would need a different stop`);
       assert.equal(r.streams, true, `${platform}/${r.program} claims not to stream, so the edge would never move`);
     }
   }
@@ -323,11 +324,10 @@ test("a recording cut short is read as far as it goes", () => {
 });
 
 test("⚠️ the microphone can be chosen, because a machine can have several", () => {
-  // « mon ami qui a plusieurs sources d'entrée de son […] son micro n'a rien entendu ». A recorder
+  // "my friend who has several sound input sources […] his mic didn't hear anything". A recorder
   // that always takes the system default works perfectly for anybody with one microphone and silently
   // records nothing for anybody with two.
   const ff = recorders("win32").find((r) => r.program === "ffmpeg")!;
-  assert.ok(ff.args("v.wav").includes("audio=default"), "no device means the system default");
   assert.ok(ff.args("v.wav", "Microphone (Realtek)").includes("audio=Microphone (Realtek)"));
   const alsa = recorders("linux").find((r) => r.program === "arecord")!;
   assert.ok(!alsa.args("v.wav").includes("-D"), "an empty device must not become an empty -D");
@@ -364,8 +364,8 @@ test("each tool's list of inputs is read the way that tool prints it", () => {
 });
 
 test("⚠️ a click that installs something does not also start recording", () => {
-  // « le premier clique quand l'outil n'est pas installé doit servir de bouton d'installation et une
-  // fois installé il doit avoir le comportement normal ». It is the right rule and not only the
+  // "the first click, when the tool isn't installed, should act as an install button, and once it's
+  // installed it should behave normally". It is the right rule and not only the
   // asked-for one: the click that answered "yes, install it" was answering a question, not starting a
   // recording, and somebody who has just watched a download finish is not mid-sentence. Listening
   // there records the silence of somebody reading what just happened.
@@ -393,4 +393,34 @@ test("⚠️ a recorder is looked for twice, because PATH can be out of date", (
   // ⚠️ `error` means "could not be spawned". A non-zero EXIT from a program that ran is still a
   // program that is there — `-version` is not a flag every recorder agrees on.
   assert.match(whisper, /return !run\.error;/);
+});
+
+test("⚠️ DirectShow is never asked for a device called \"default\"", () => {
+  // "Recording failed: Error opening input file audio=default. Error opening input files: I/O
+  // error" — DirectShow has no such device. A machine with several inputs must NAME one.
+  const two = [{ id: "Microphone (Realtek)", label: "Microphone (Realtek)" }, { id: "Casque (USB)", label: "Casque (USB)" }];
+  assert.deepEqual(chooseDevice("dshow", "", two), { ask: two }, "several and none chosen: ask");
+  assert.deepEqual(chooseDevice("dshow", "Casque (USB)", two), { device: "Casque (USB)" });
+  assert.deepEqual(chooseDevice("dshow", "Unplugged headset", two), { ask: two }, "a device that has gone is not a choice");
+  assert.deepEqual(chooseDevice("dshow", "", [two[0]!]), { device: "Microphone (Realtek)" }, "the only one needs no question");
+  assert.deepEqual(chooseDevice("dshow", "", []), { none: true });
+  // The others have a real default, so an empty choice is passed on untouched.
+  assert.deepEqual(chooseDevice("alsa", "", two), { device: "" });
+  assert.deepEqual(chooseDevice("avfoundation", "1", []), { device: "1" });
+  assert.ok(isDeviceError("Error opening input file audio=default. Error opening input files: I/O error"));
+  assert.ok(!isDeviceError("whisper: model not found"));
+});
+
+test("an older ffmpeg's DirectShow list, in sections, is read too", () => {
+  // Before ffmpeg 5 the names carry no "(audio)": they sit under a section heading instead.
+  const listed = parseDevices("dshow", [
+    "[dshow @ 0000] DirectShow video devices (some may be both video and audio devices)",
+    '[dshow @ 0000]  "Integrated Camera"',
+    '[dshow @ 0000]     Alternative name "@device_pnp_usb#vid"',
+    "[dshow @ 0000] DirectShow audio devices",
+    '[dshow @ 0000]  "Microphone (Realtek(R) Audio)"',
+    '[dshow @ 0000]     Alternative name "@device_cm_{33D9A762}\\wave_{ABC}"',
+    '[dshow @ 0000]  "Casque (Jabra Evolve)"',
+  ].join("\n"));
+  assert.deepEqual(listed.map((d) => d.id), ["Microphone (Realtek(R) Audio)", "Casque (Jabra Evolve)"]);
 });

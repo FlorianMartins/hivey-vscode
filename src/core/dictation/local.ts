@@ -4,7 +4,7 @@
 // speech API is proposed and reachable only by its own extensions; the browser's recogniser answers
 // `not-allowed` inside a webview; and the operating systems do not expose their dictation to a
 // command except on Windows, where the scriptable engine is the old desktop one. What is left that
-// works the same on all three is a model running on the machine — « oui construis le Whisper local ».
+// works the same on all three is a model running on the machine — "yes, build the local Whisper".
 //
 // whisper.cpp is the one that can be shipped this way: a single native binary with no runtime, under
 // MIT, publishing prebuilt builds for Linux and Windows. Nothing here is an npm dependency; the

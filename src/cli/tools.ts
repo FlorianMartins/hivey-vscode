@@ -287,8 +287,8 @@ export function buildCliTools(opts: CliToolOptions): Tool[] {
           // ⚠️ NOT required, and the difference is a feature the tool did not have. Deleting a snippet
           // means replacing it with nothing — and with `new` required, a model doing that either sends
           // `""` and meets a provider that drops empty arguments, or omits the field and fails schema
-          // validation. Reported from a real session in the model's own words: « Le paramètre `new`
-          // vide est refusé. » It shelled out to Node to delete two lines.
+          // validation. Reported from a real session in the model's own words: "The empty `new`
+          // parameter is rejected." It shelled out to Node to delete two lines.
           new: { type: "string", description: "The replacement. Omit it, or pass \"\", to delete the snippet." },
         },
         required: ["path", "old"],

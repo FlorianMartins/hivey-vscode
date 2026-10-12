@@ -131,8 +131,8 @@ export const HIVEY_ROLES: HiveyRole[] = ["chore", "everyday", "deep", "completio
  * What a preset routes to, role by role — and which of those a cheaper preset already reached.
  *
  * ⚠️ This exists because the panel priced a preset by ONE of its four roles, the `everyday` one, and
- * presented that figure as the preset's price. Reported as « comment ça se fait que les modeles Hivey
- * pro et Hivey smart sortent le meme prix ? le smart est censé utiliser les meilleurs modeles ». The
+ * presented that figure as the preset's price. Reported as "how come the Hivey Pro and Hivey Smart
+ * models come out at the same price? Smart is supposed to use the best models". The
  * figures were not wrong; the question they answered was not the one being asked.
  *
  * And the honest answer is that no single number separates those two presets, because on today's

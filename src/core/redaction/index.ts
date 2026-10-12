@@ -94,6 +94,16 @@ export function isLoopbackEndpoint(baseUrl: string): boolean {
   }
 }
 
+/**
+ * The providers that are the user's own infrastructure rather than somebody's cloud: the local
+ * endpoint and the user's own OpenAI-compatible gateway — by what they ARE, not by their address.
+ * Whether that earns them an exemption from pseudonymization is the caller's decision (a setting,
+ * and an organisation policy above it).
+ */
+export function isSelfHostedProvider(provider: string): boolean {
+  return provider === "local" || provider === "openai-compatible";
+}
+
 /** A local endpoint is one that cannot leave the machine or the operator's own network. */
 export function isLocalEndpoint(baseUrl: string): boolean {
   try {

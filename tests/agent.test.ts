@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { runTurn, type Tool } from "../src/core/agent/loop.js";
 import type { ChatRequest, ChatResult, Provider } from "../src/core/providers/types.js";
 
-type Scripted = { text?: string; toolCalls?: Array<{ id: string; name: string; args: string }>; truncated?: boolean };
+type Scripted = { text?: string; toolCalls?: Array<{ id: string; name: string; args: string }>; truncated?: boolean; reasoning?: string };
 
 function scriptedProvider(script: Scripted[]): Provider & { seen: ChatRequest[] } {
   let i = 0;
@@ -23,7 +23,7 @@ function scriptedProvider(script: Scripted[]): Provider & { seen: ChatRequest[] 
       if (s.text) onDelta?.({ text: s.text });
       return {
         text: s.text ?? "",
-        reasoning: "",
+        reasoning: s.reasoning ?? "",
         toolCalls: s.toolCalls ?? [],
         usage: { promptTokens: 10, completionTokens: 5, cachedTokens: 0 },
         stopReason: s.truncated ? "length" : s.toolCalls?.length ? "tool_calls" : "stop",
@@ -304,6 +304,42 @@ test("a turn that finished does not claim to have been cut off", () => {
   return runTurn({ ...base, provider, messages: [{ role: "user", content: "hello" }] }).then((result) => {
     assert.equal(result.truncated, false);
   });
+});
+
+test("⚠️ an agent reply cut off by the cap is continued, not taken for the answer", async () => {
+  // "Here is the plan, then I'll get started:" — and the turn ended there: the plan, or the call it
+  // announced, was lost to max_tokens and the loop returned the half-sentence as the answer.
+  const write = tool("write_file");
+  const provider = scriptedProvider([
+    { text: "Voici le plan, puis j'attaque :", truncated: true },
+    { toolCalls: [{ id: "1", name: "write_file", args: "{}" }] },
+    { text: "Fait." },
+  ]);
+  const r = await runTurn({ ...base, provider, tools: [write] });
+  assert.equal(write.calls.length, 1, "the call that was cut off is written again and run");
+  assert.equal(r.stoppedBecause, "answer");
+  assert.equal(r.truncated, false);
+  const asked = provider.seen[1]!.messages.at(-1)!;
+  assert.equal(asked.role, "user");
+  assert.match(String(asked.content), /cut off by the output token limit/);
+});
+
+test("a cut where only the thinking was written is left to the caller's roomier retry", async () => {
+  // Asking again at the same cap would be eaten the same way; the extension retries with four times
+  // the room, and continuing here used to pre-empt it (caught by the integration suite).
+  const provider = scriptedProvider([{ reasoning: "Thinking at length…", truncated: true }, { text: "never asked" }]);
+  const r = await runTurn({ ...base, provider, tools: [tool("read_file")] });
+  assert.equal(provider.seen.length, 1, "no continuation at the same budget");
+  assert.equal(r.truncated, true);
+  assert.equal(r.text, "");
+});
+
+test("continuing after a cut is bounded", async () => {
+  // A model that writes past any cap must not spend the whole step budget doing it.
+  const provider = scriptedProvider([{ text: "and on and on", truncated: true }]);
+  const r = await runTurn({ ...base, provider, tools: [tool("read_file")] });
+  assert.equal(provider.seen.length, 3, "one reply and two continuations, then it stops");
+  assert.equal(r.truncated, true, "and says it was cut off");
 });
 
 test("the budget the caller asked for is the budget that is sent", () => {

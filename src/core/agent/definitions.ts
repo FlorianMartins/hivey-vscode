@@ -42,7 +42,7 @@ export interface Skill {
  * returns a RANGE, so a long file costs several calls where it used to cost one truncated one.
  *
  * Eight steps against that is a sub-agent that reports what it had got to rather than what it was
- * asked — which is how « les agents et subagent ne fonctionnent pas » looks from the outside. Half
+ * asked — which is how "agents and subagents don't work" looks from the outside. Half
  * the parent's budget, in one place both clients read.
  */
 export const DEFAULT_AGENT_STEPS = 15;

@@ -1,6 +1,6 @@
 // Dictation: local by default, and a transcript nobody sends without reading.
 //
-// Florian asked for « une option pour dicter (parler) ». What shapes it is that a recording of
+// Florian asked for "an option to dictate (speak)". What shapes it is that a recording of
 // somebody's voice is one of the two things this extension cannot pseudonymise — an image is the
 // other — so sending it anywhere is a decision, never a default.
 
@@ -104,8 +104,8 @@ test("silence produces nothing, not a question made of a placeholder", () => {
 // ── Where a recording may go, and under whose name ───────────────────────────────────────────────
 
 test("⚠️ a provider is borrowed only when it is KNOWN to transcribe", () => {
-  // The request was « il faudrait que ce soit aussi simple d'utilsiation qu'un service cloud comme
-  // google mic » — so dictation should not make you configure a second service when you already have
+  // The request was "it should be as simple to use as a cloud service like Google mic" — so
+  // dictation should not make you configure a second service when you already have
   // one. But borrowing an address that does not answer `/audio/transcriptions` gives a microphone
   // that records your voice, sends it, and fails. That is worse than one that says it needs setting
   // up, because it fails AFTER you have spoken.

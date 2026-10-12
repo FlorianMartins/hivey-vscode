@@ -14,7 +14,7 @@
 // on the tool, because one tool serves both.
 
 import * as vscode from "vscode";
-import { t } from "../../shared/i18n.js";
+import { en, t } from "../../shared/i18n.js";
 import type { Tool, ToolResult } from "../../core/agent/loop.js";
 import { headToTokens } from "../../core/util/tokens.js";
 import { cell, formatRows, isReadOnlySql, matchesName, parseMemberRef } from "../../core/ibmi/sql.js";
@@ -439,7 +439,7 @@ export async function collectMemberContext(
 
   for (const want of wanted) {
     if (found.length >= limit) {
-      missing.push(`${want.name} (${t("not fetched: the limit of {0} was reached", limit)})`);
+      missing.push(`${want.name} (${en("not fetched: the limit of {0} was reached", limit)})`);
       continue;
     }
     const inLibraries = want.library ? [want.library.toUpperCase()] : [...new Set(libraries)];
@@ -736,8 +736,8 @@ export function buildIbmiTools(writable: string[] = []): Tool[] {
       ];
       if (missing.length) {
         parts.push(
-          `--- ${t("Not found on this system")}\n${missing.join(", ")}\n` +
-            t("These may be procedures local to the module, objects without source here, or in a library outside the list."),
+          `--- ${en("Not found on this system")}\n${missing.join(", ")}\n` +
+            en("These may be procedures local to the module, objects without source here, or in a library outside the list."),
         );
       }
       return { content: parts.join("\n\n") };

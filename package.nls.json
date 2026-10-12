@@ -47,6 +47,7 @@
   "config.endpoints.perplexity": "Perplexity base URL. **This is an address, not your API key** — a key goes to the editor's secret store, from the panel's setup screen or the command *Hivey Code: set the API key*. Leave this empty to use the provider's own address.",
   "config.privacy.redaction": "Pseudonymization before any **remote** request:\n- `strict`: credentials, identities, machines, paths, internal URLs, IP addresses — reversibly replaced.\n- `balanced`: credentials and identities only.\n- `off`: none (discouraged, and it requires `privacy.allowUnredacted`).",
   "config.privacy.allowUnredacted": "Actually honour the “off” level. Without this box ticked, “off” falls back to “balanced”.",
+  "config.privacy.trustSelfHosted": "Treat the local endpoint and your own OpenAI-compatible gateway as trusted environments, whatever their address: requests to them are sent as they are, without pseudonymization or send consent. Cloud providers are not affected. Ignored when an organisation policy forbids unredacted requests.",
   "config.privacy.blockedGlobs": "Files that NEVER reach a remote provider, whatever else is configured.",
   "config.privacy.egressPolicy": "Confirm before the first remote request of a session (ask-once), before every request (ask-always), or never (trust).",
   "config.privacy.auditLog": "Log every remote request locally (timestamp, provider, model, tokens, cost). Never the content.",
@@ -171,5 +172,8 @@
   "config.dictation.language": "A language hint for the recogniser, such as `fr`. Empty lets it decide.",
   "config.appearance": "How the panel is painted.",
   "config.appearance.editor": "Take the colours of your VS Code theme, so the panel belongs to the editor it is docked in.",
-  "config.appearance.hivey": "Hivey's own surfaces and accents: amber on a cool, low-contrast base. The editor still owns the window's background colour, and a light theme keeps the editor's appearance."
+  "config.appearance.hivey": "Hivey's own surfaces and accents: amber on a cool, low-contrast base. The editor still owns the window's background colour, and a light theme keeps the editor's appearance.",
+  "config.mcp.servers.type": "stdio runs a program locally; http talks to a server.",
+  "config.mcp.servers.command": "The program to run (stdio).",
+  "config.mcp.servers.url": "The server URL (http)."
 }

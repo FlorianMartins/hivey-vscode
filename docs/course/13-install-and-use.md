@@ -105,6 +105,12 @@ that cannot be granted once and for all.
 a dictated question that sent itself would be a question nobody proof-read. Escape while recording
 throws it away: changing your mind mid-sentence is not a request to transcribe.
 
+**Several microphones?** On Windows with ffmpeg, there is no "default" input to fall back on — the
+recorder has to be told a device by name. With one input it simply uses it; with several and none
+chosen, the first press of the microphone asks which one, and remembers. **Hivey Code: Choose a
+microphone** in the panel's menu changes it later, and is offered directly whenever an input cannot
+be opened.
+
 ## 4b. Changing the appearance
 
 `hiveyCode.appearance` has two values:

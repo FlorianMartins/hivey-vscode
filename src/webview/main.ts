@@ -120,8 +120,8 @@ function render(): void {
  *
  * ⚠️ AND IT IS NOT ONLY THE TRANSCRIPT. This looked only at `.transcript`, on the chat screen, so
  * every OTHER screen jumped back to the top on every rebuild — and the settings screen rebuilds on
- * each keystroke in a key field. Reported as « quand on déplie un fournisseur pour renseigner la clé
- * il remonte tout en haut ». The reason the defect survived is that the comment above described a
+ * each keystroke in a key field. Reported as "when you expand a provider to enter the key, it jumps
+ * back up to the top". The reason the defect survived is that the comment above described a
  * problem about the transcript, so that is what the code solved.
  */
 function scroller(): HTMLElement | null {
@@ -361,7 +361,7 @@ class LiveTurn {
     if (!this.thinking || this.thinking.folded) return;
     this.thinking.folded = true;
     this.thinking.body.hidden = true;
-    this.thinking.wrap.classList.remove("open");
+    this.thinking.wrap.classList.remove("open", "thinking");
   }
 
   /**
@@ -454,6 +454,9 @@ class LiveTurn {
     following(() => {
       if (!this.thinking) {
         const wrap = reasoningBlock("", { open: true });
+        // Lit while it is being written, like the composer's ring: the frame says "this is still
+        // going" without a word to read. Removed when the answer takes over, or the turn ends.
+        wrap.classList.add("thinking");
         const body = wrap.querySelector<HTMLElement>(".collapsible-body")!;
         // A reader who scrolls the box up has said where they want to be; one who scrolls it back to
         // the bottom has said to resume. Tracked on the box rather than guessed from the content,
@@ -470,8 +473,8 @@ class LiveTurn {
     // ⚠️ And the block's OWN scroller, which `following` cannot reach. `.collapsible-body` is capped
     // at 260px with `overflow-y: auto`, so the page can be perfectly positioned while the reasoning
     // grows inside a box that never scrolls itself: you read the first screenful and the rest piles
-    // up out of sight. Reported as « on reste bloqué en haut de sa phase de raisonnement au lieu de
-    // defiler avec » — the page was following, the box was not.
+    // up out of sight. Reported as "it stays stuck at the top of its reasoning phase instead of
+    // scrolling along with it" — the page was following, the box was not.
     //
     // Not when the reader has scrolled it up themselves: someone re-reading an earlier line of the
     // thinking has said where they want to be, and yanking them back is worse than not following.
@@ -559,6 +562,9 @@ class LiveTurn {
       this.text = undefined;
     }
     this.root.classList.remove("streaming");
+    // A turn that ends while still thinking — stopped, or a model that never answered — leaves a
+    // record, not a block that goes on claiming to think.
+    this.thinking?.wrap.classList.remove("thinking");
   }
 }
 
@@ -954,8 +960,8 @@ document.addEventListener("keydown", (ev) => {
  * `'unsafe-inline'` forbids exactly that, while this panel's CSP has no `'unsafe-inline'` on purpose
  * because a model's output is rendered in this document. The floor was therefore declared in the one
  * place the document's own policy guarantees will be discarded, and it was discarded, for a release:
- * « on peut la reduire au maximum sans quelle se bloque alors que j'ai demandé un bloquage de largeur
- * minimum ». No test could see it, because the markup was exactly right.
+ * "you can shrink it all the way without it stopping, even though I asked for a minimum width
+ * limit". No test could see it, because the markup was exactly right.
  *
  * The same policy does NOT block assigning a property on `element.style`. It does block `cssText` and
  * `setAttribute("style", …)`, which are the attribute by another name — so neither may be used here,
@@ -978,8 +984,8 @@ function applyMinWidth(px: number | undefined): void {
  *
  * ⚠️ MEASURED, not computed. The composer was sized `100vw` — which counts the vertical scrollbar —
  * and then `100vw` minus the scrollbar's measured width, which was closer and still wrong: it left
- * 19 px of air on the right against 13 on the left, reported as « il y a un plus d'espace a droite
- * que a gauche ». Two measurements subtracted from each other carry both their errors.
+ * 19 px of air on the right against 13 on the left, reported as "there's more space on the right
+ * than on the left". Two measurements subtracted from each other carry both their errors.
  *
  * `documentElement.clientWidth` is the one number that answers the question directly: the width
  * inside the scrollbar, which is the width the composer may occupy. Re-read on resize, because that

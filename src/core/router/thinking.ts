@@ -1,8 +1,8 @@
 // Who does the thinking: the provider, or the prompt.
 //
-// Florian's instruction, and it is the right default: *« pour le mode de raisonnement je veux
-// utiliser celui du fournisseur par défaut et pas forcer celui de deepseek sur tous, le mode de
-// reflexion deepseek doit etre uniquement sur les modeles par defaut sans raisonnement »*.
+// Florian's instruction, and it is the right default: *"for the reasoning mode I want to use the
+// provider's own by default and not force DeepSeek's on all of them; DeepSeek's thinking mode
+// should only be on the default models without reasoning"*.
 //
 // So there are two mechanisms and they are mutually exclusive:
 //

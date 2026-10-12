@@ -38,8 +38,8 @@ export interface UiApproval {
    * What each button should say, when "Allow" is not what it does.
    *
    * ⚠️ The four slots are a channel, not a vocabulary. They were named for permissions — allow once,
-   * for this conversation, always, never — and a card asking « install the model, or the model and
-   * ffmpeg, or neither? » has three real choices and none of them is "allow". Writing "Allow" on a
+   * for this conversation, always, never — and a card asking "install the model, or the model and
+   * ffmpeg, or neither?" has three real choices and none of them is "allow". Writing "Allow" on a
    * button that downloads 142 MB is the kind of small lie an interface should not tell.
    *
    * Where a card gives labels, the slot carries only the answer back; what it MEANS is here, where
@@ -151,8 +151,8 @@ export interface UiModel {
    * For a Hivey preset only: what it routes to, role by role.
    *
    * ⚠️ A preset is not a model, and pricing it as one is what made two of them look identical: the row
-   * showed the price of its `everyday` role and called that the preset's price. « comment ça se fait
-   * que les modeles Hivey pro et Hivey smart sortent le meme prix ? ». Four roles, four models, four
+   * showed the price of its `everyday` role and called that the preset's price. "how come the Hivey
+   * Pro and Hivey Smart models come out at the same price?". Four roles, four models, four
    * prices — so the interface shows a span and names what differs, instead of picking one and hoping.
    *
    * `sameAsCheaper` names the cheaper preset that already reaches this model for this role. Not a
@@ -300,6 +300,8 @@ export interface UiState {
    * gateway" appeared to do nothing at all.
    */
   remote: boolean;
+  /** Remote, but the user's own infrastructure: sent as is, without pseudonymization. */
+  trusted?: boolean;
   /** Whether this provider charges the user. Drives the cost row, and nothing else. */
   billed: boolean;
   contextTokens: number;
@@ -433,8 +435,8 @@ export interface UiState {
    * forbids — and this panel's CSP has no `'unsafe-inline'`, deliberately, because a model's output is
    * rendered here. So the floor was declared in the one place the document's own security policy
    * guarantees will be discarded, and dragging the side bar narrow went on doing nothing at all. It
-   * was reported as « on peut la reduire au maximum sans quelle se bloque alors que j'ai demandé un
-   * bloquage de largeur minimum », twice.
+   * was reported as "you can shrink it all the way without it stopping, even though I asked for a
+   * minimum width limit", twice.
    *
    * Setting a style PROPERTY from script is not blocked by the same policy — only the attribute, and
    * `cssText` and `setAttribute("style", …)` with it. So the value travels and the page applies it.
@@ -584,8 +586,8 @@ export type ToExtension =
    * The address AND the key, together, checked once.
    *
    * ⚠️ The setup screen had two buttons — "Save the address", then "Save the key" — which is the
-   * thing Florian reported: « le gateway qui demande de stocker l'adresse et ensuite de stocker la
-   * clé API plutôt que de remplir les deux champs et valider ». Two saves is also two chances to
+   * thing Florian reported: "the gateway, which asks you to store the address and then store the
+   * API key instead of filling in both fields and confirming". Two saves is also two chances to
    * leave half a configuration behind, and a stored key pointing at no address looks configured.
    */
   | { type: "saveProvider"; provider: string; url?: string; key: string }

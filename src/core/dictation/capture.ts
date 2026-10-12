@@ -4,7 +4,7 @@
 // is not configurable: an origin of `vscode-webview://` is granted {pointerLock, notifications,
 // clipboard…} and the workbench is granted {…, media, local-fonts}. An extension's panel is the first
 // list, so `getUserMedia` answers `NotAllowedError` with no prompt and no setting — which is exactly
-// what was reported, « aucun moyen d'activer ». It is also why the editor's own microphone works:
+// what was reported, "no way to enable it". It is also why the editor's own microphone works:
 // that one is not in a panel.
 //
 // So the recording is made by a program on the machine and handed over as a file. Which program is
@@ -17,8 +17,9 @@ export interface Recorder {
   /**
    * Its arguments, given the file to write and the input to listen to.
    *
-   * ⚠️ The device is the second argument because of a real machine with several inputs: « mon ami qui
-   * a plusieurs sources d'entrée de son […] son micro n'a rien entendu ». A recorder that always takes
+   * ⚠️ The device is the second argument because of a real machine with several inputs: "my friend
+   * who has several sound input sources […] his mic didn't hear anything". A recorder that always
+   * takes
    * the system default works perfectly for anybody with one microphone and silently records nothing
    * for anybody with two.
    */
@@ -32,8 +33,13 @@ export interface Recorder {
    * ones. `stdin` for the Windows one, which cannot use a signal at all: the file is written by an
    * explicit `save` call that has to RUN, and a killed process runs nothing. It waits for a line
    * instead.
+   *
+   * ⚠️⚠️ `quit` for ffmpeg, on every platform: a `q` on its standard input, which is ffmpeg's own
+   * "stop and finish the file". On Windows there IS no SIGINT — Node's `kill("SIGINT")` terminates
+   * the process outright — so ffmpeg died before writing its header and the file was not a WAV at
+   * all: "Nothing usable was recorded (that file is not a recording)".
    */
-  stop: "signal" | "stdin";
+  stop: "signal" | "stdin" | "quit";
   /** True when it is part of the system and need not be looked for on PATH. */
   builtin?: boolean;
   /**
@@ -61,7 +67,7 @@ export interface Recorder {
  * Recording on Windows, with what Windows already has.
  *
  * ⚠️ This exists because Windows ships nothing that records to a file from a command line — reported
- * from a real machine: « je suis sur Windows et j'ai ce message ». Telling somebody to install ffmpeg
+ * from a real machine: "I'm on Windows and I get this message". Telling somebody to install ffmpeg
  * before they can speak is not "as simple as a cloud service", which was the whole brief.
  *
  * `winmm` is the multimedia layer every Windows has had for thirty years, and `mciSendString` is its
@@ -121,7 +127,7 @@ export function recorders(platform: string): Recorder[] {
         program: "ffmpeg",
         // `:0` is avfoundation's first audio input; a chosen device replaces the index.
         args: (w, d) => ["-hide_banner", "-loglevel", "error", "-flush_packets", "1", "-f", "avfoundation", "-i", `:${d?.trim() || "0"}`, "-ar", "16000", "-ac", "1", "-y", w],
-        from: "ffmpeg", stop: "signal", streams: true, devices: "avfoundation",
+        from: "ffmpeg", stop: "quit", streams: true, devices: "avfoundation",
       },
     ];
   }
@@ -134,7 +140,7 @@ export function recorders(platform: string): Recorder[] {
       {
         program: "ffmpeg",
         args: (w, d) => ["-hide_banner", "-loglevel", "error", "-flush_packets", "1", "-f", "dshow", "-i", `audio=${d?.trim() || "default"}`, "-ar", "16000", "-ac", "1", "-y", w],
-        from: "ffmpeg", stop: "signal", streams: true, devices: "dshow",
+        from: "ffmpeg", stop: "quit", streams: true, devices: "dshow",
       },
       // Nothing to install before anybody can speak: `winmm` has been part of Windows for thirty
       // years, and "install ffmpeg first" was never the brief.
@@ -160,7 +166,7 @@ export function recorders(platform: string): Recorder[] {
     {
       program: "ffmpeg",
       args: (w, d) => ["-hide_banner", "-loglevel", "error", "-flush_packets", "1", "-f", "alsa", "-i", d?.trim() || "default", "-ar", "16000", "-ac", "1", "-y", w],
-      from: "ffmpeg", stop: "signal", streams: true, devices: "alsa",
+      from: "ffmpeg", stop: "quit", streams: true, devices: "alsa",
     },
   ];
 }
@@ -227,9 +233,22 @@ export function parseDevices(kind: NonNullable<Recorder["devices"]>, text: strin
   if (kind === "dshow") {
     // `[dshow @ …] "Microphone (Realtek Audio)" (audio)` — the quoted name is what `-i audio=` takes.
     // Video devices are listed the same way and are not microphones.
+    //
+    // ⚠️ Builds of ffmpeg older than 5 print no `(audio)` after the name: they print two SECTIONS,
+    // "DirectShow video devices" then "DirectShow audio devices", with bare quoted names under each.
+    // Read both, or a machine with an older ffmpeg is offered no microphone at all. The
+    // `Alternative name "@device_…"` lines are the same device again, in a form nobody can read.
+    let inAudio = false;
     for (const line of text.split("\n")) {
-      const m = /"([^"]+)"\s*\(audio\)/.exec(line);
-      if (m?.[1]) out.push({ id: m[1], label: m[1] });
+      if (/DirectShow audio devices/i.test(line)) inAudio = true;
+      else if (/DirectShow video devices/i.test(line)) inAudio = false;
+      if (/Alternative name/i.test(line)) continue;
+      const m = /"([^"]+)"\s*(\((audio|video|none)\))?/.exec(line);
+      if (!m?.[1]) continue;
+      const tagged = m[3];
+      if (tagged === "audio" || (!tagged && inAudio)) {
+        if (!out.some((d) => d.id === m[1])) out.push({ id: m[1], label: m[1] });
+      }
     }
     return out;
   }
@@ -252,4 +271,35 @@ export function parseDevices(kind: NonNullable<Recorder["devices"]>, text: strin
     out.push({ id: name.trim(), label: described ? `${name.trim()} — ${described}` : name.trim() });
   }
   return out;
+}
+
+/**
+ * Which input to record from, decided before the recorder starts.
+ *
+ * ⚠️ DirectShow has NO device called "default". `-i audio=default` is a name ffmpeg looks up and
+ * does not find, and the failure reads "Error opening input file audio=default. […] I/O error" —
+ * reported by somebody with several inputs, which is exactly the case it breaks. So on `dshow` a
+ * device must be NAMED: the one chosen, if it still exists; the only one, if there is one; otherwise
+ * the person is asked. With none listed, there is nothing ffmpeg can open and the caller falls back
+ * to a recorder that takes Windows' own default.
+ *
+ * The other recorders do have a default (`default` on ALSA, `:0` on avfoundation), so for them the
+ * choice is simply passed on, empty or not.
+ */
+export type DeviceChoice = { device: string } | { ask: InputDevice[] } | { none: true };
+
+export function chooseDevice(kind: Recorder["devices"], chosen: string, devices: InputDevice[]): DeviceChoice {
+  const wanted = chosen.trim();
+  if (kind !== "dshow") return { device: wanted };
+  // A choice that has gone — the headset unplugged, the dock left at the office — is not a choice
+  // any more. Recording from it fails the same way "default" did.
+  if (wanted && (devices.length === 0 || devices.some((d) => d.id === wanted))) return { device: wanted };
+  if (devices.length === 1) return { device: devices[0]!.id };
+  if (devices.length > 1) return { ask: devices };
+  return { none: true };
+}
+
+/** Whether a recorder's error says the INPUT could not be opened — the case a choice of device fixes. */
+export function isDeviceError(message: string): boolean {
+  return /Error opening input|Could not find audio only device|Could not (open|enumerate)|I\/O error|No such (file or )?device|audio device/i.test(message);
 }

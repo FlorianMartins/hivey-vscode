@@ -29,18 +29,18 @@ import {
 import { checkCredentials, normalizeBaseUrl } from "../core/providers/credentials.js";
 import { callSignature, safeArgs } from "../core/agent/callSignature.js";
 import { knowledgeAmbient } from "./knowledge.js";
-import { language, t } from "../shared/i18n.js";
+import { en, language, t, withoutModelText } from "../shared/i18n.js";
 import { runTurn, type Tool } from "../core/agent/loop.js";
 import { Permissions, commandPrefix, type PermissionStore, type Rule } from "../core/agent/permissions.js";
-import { stablePrompt, turnDirectives } from "../core/prompts.js";
+import { detectLanguage, languageDirective, stablePrompt, turnDirectives } from "../core/prompts.js";
 import { costOf, estimateCost, makeLookup, type Price } from "../core/router/pricing.js";
 import { calibrate, observe, prune, type Calibration } from "../core/util/calibrate.js";
-import { acceptsImages, IMAGE_TOKENS } from "../core/models/vision.js";
+import { acceptsImages, IMAGE_TOKENS, isCatalogued, isImageRefusal, withoutImages } from "../core/models/vision.js";
 import { checkEndpoint } from "../core/providers/endpoint.js";
 import { handoverNote, selfCheckMessage, verifyTurn, type TurnStep } from "../core/router/outcome.js";
 import { unifiedDiff } from "../core/text/diff.js";
 import { escalationTarget, route, type Route } from "../core/router/route.js";
-import { describeFallback, fallbackChain, isRetryable } from "../core/router/fallback.js";
+import { describeFallback, fallbackChain, isContextOverflow, isRetryable } from "../core/router/fallback.js";
 import type { Provider } from "../core/providers/index.js";
 import { Session, renderEntry, type ContextItem, type Entry, type SessionData } from "../core/session/session.js";
 import { headToTokens } from "../core/util/tokens.js";
@@ -118,10 +118,12 @@ import type {
   UiState,
   UiApproval,
 } from "../shared/protocol.js";
-import { findRecorder, installWhisper, installedWhisper, recordArgv, recorderAdvice, runWhisper, startRecording } from "./whisper.js";
+import { findRecorder, inputDevices, installWhisper, installedWhisper, recordArgv, recorderAdvice, runWhisper, startRecording } from "./whisper.js";
 import { modelFor, whisperAsset } from "../core/dictation/local.js";
 import { describeWav } from "../core/dictation/wav.js";
-import { SECTION, endpointFor, providerFor, readSettings, routerConfig, type Keys, type Settings, writeTarget } from "./config.js";
+import { chooseDevice, isDeviceError, recorders } from "../core/dictation/capture.js";
+import { pickMicrophone } from "./microphone.js";
+import { SECTION, endpointFor, providerFor, readSettings, routerConfig, trustsSelfHosted, type Keys, type Settings, writeTarget } from "./config.js";
 import { EgressGate, safeHost, summarize } from "./egress.js";
 import { renderPromptAudit, type PromptAudit } from "../core/audit/prompt.js";
 import { youShouldKnow, type Notice } from "../core/session/notices.js";
@@ -143,6 +145,8 @@ const HISTORY_KEY = "hiveyCode.sessions";
 const PERMISSIONS_KEY = "hiveyCode.permissions";
 /** Set once the user has been through the first-run screen, or dismissed it. */
 const SETUP_SEEN_KEY = "hiveyCode.setupSeen";
+const VISIONLESS_KEY = "hiveyCode.visionless";
+const VISIONLESS_TTL_MS = 24 * 60 * 60 * 1000;
 
 /**
  * The only addresses `openExternal` will open.
@@ -618,6 +622,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       // Where the answer comes from. NOT whether it costs anything — those were the same field for
       // two releases and a gateway broke both of them at once.
       remote: isHivey(s.chat.model) || !isLocalEndpoint(baseUrl),
+      // So the panel stops promising pseudonymization the gate no longer applies there.
+      trusted: !isHivey(s.chat.model) && trustsSelfHosted(s, s.chat.provider),
       billed: isHivey(s.chat.model) || billsTheUser(s.chat.provider),
       contextTokens,
       ...(this.contextParts().length ? { contextParts: this.contextParts() } : {}),
@@ -874,7 +880,17 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           // First run: open on the setup screen rather than on a chat that cannot answer. The
           // probe starts immediately, because the useful version of this screen is the one that
           // already knows what is running by the time it is read.
-          if (!this.ctx.globalState.get<boolean>(SETUP_SEEN_KEY) || (await this.cannotAnswer())) {
+          //
+          // ⚠️ But ONLY when nothing is configured at all. "when you update the extension while you
+          // already have a configuration, it always sends you back to the setup screen".
+          // The flag is set by the setup screen's own button, so anybody who configured through the
+          // settings — a gateway, a local server, a key — never had it, and `cannotAnswer` is about
+          // the CURRENT provider's key, which a keyless gateway never has. Either sent an
+          // established user back to the first-run screen on every reload, and every update reloads.
+          // An existing configuration now counts as having seen setup, and the panel opens on chat.
+          if (await this.hasExistingSetup()) {
+            if (!this.ctx.globalState.get<boolean>(SETUP_SEEN_KEY)) await this.ctx.globalState.update(SETUP_SEEN_KEY, true);
+          } else if (!this.ctx.globalState.get<boolean>(SETUP_SEEN_KEY) || (await this.cannotAnswer())) {
             this.screen = "setup";
             await this.refreshSetup();
             void this.probeLocal();
@@ -1219,7 +1235,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           // and the person pasting is the only one who can choose a different model.
           if (item.image) {
             const settings = readSettings();
-            if (!acceptsImages(settings.chat.model)) {
+            const model = settings.chat.model;
+            const providerId = isHivey(model) ? "openrouter" : settings.chat.provider;
+            // Only when it is KNOWN: listed in the catalogue without vision, or refused by this very
+            // server recently. A self-hosted model is not listed, and may well read images — Qwen on
+            // llama.cpp does once given its `--mmproj`; if it cannot, its refusal is handled at send.
+            const blind = this.isVisionless(`${providerId}::${model}`) || (isCatalogued(model) && !acceptsImages(model));
+            if (blind) {
               void vscode.window.showWarningMessage(
                 t("{0} does not read images. It is attached, but the answer will be about the text alone.", settings.chat.model),
               );
@@ -1769,6 +1791,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       messages: prepared.messages,
       tools,
       maxSteps: definition.maxSteps ?? DEFAULT_AGENT_STEPS,
+      // The same cap as the turn that delegated. It had none, so on a self-hosted server a sub-agent
+      // could generate until the whole context slot was full — minutes of a "stuck" turn with nothing
+      // on screen, since a sub-agent streams nothing to the panel.
+      maxTokens: env.settings.chat.maxOutputTokens,
       ...(run.signal ? { signal: run.signal } : {}),
       approve: (req) => this.askApproval(req),
       beforeRequest: async (msgs) => {
@@ -1833,6 +1859,53 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         void vscode.window.showTextDocument(vscode.Uri.joinPath(folder.uri, path));
       }
     });
+  }
+
+  /**
+   * Models seen to refuse images, as `provider::model` → when. Kept across restarts — a llama.cpp
+   * server without its `--mmproj` will refuse them tomorrow too, and finding out costs a failed
+   * request — but only for a day: the server may be given its projector, and a model remembered as
+   * blind for ever would never be shown an image again.
+   */
+  private visionlessSeen?: Map<string, number>;
+  private visionlessMap(): Map<string, number> {
+    if (!this.visionlessSeen) {
+      const stored = this.ctx.globalState.get<Record<string, number>>(VISIONLESS_KEY);
+      // An older build stored a plain list; it is simply forgotten.
+      this.visionlessSeen = new Map(stored && !Array.isArray(stored) ? Object.entries(stored) : []);
+    }
+    return this.visionlessSeen;
+  }
+
+  private isVisionless(key: string): boolean {
+    return Date.now() - (this.visionlessMap().get(key) ?? 0) < VISIONLESS_TTL_MS;
+  }
+
+  private rememberVisionless(key: string): void {
+    const seen = this.visionlessMap();
+    seen.set(key, Date.now());
+    const fresh = [...seen].filter(([, at]) => Date.now() - at < VISIONLESS_TTL_MS).slice(-50);
+    void this.ctx.globalState.update(VISIONLESS_KEY, Object.fromEntries(fresh));
+  }
+
+  /**
+   * Whether this person has configured anything at all: a key in the keychain, an endpoint or a
+   * server written in the settings, a provider or model chosen. Read from what was SET, not from
+   * the effective values — `endpoints.local` has a default, and a default is not a configuration.
+   */
+  private async hasExistingSetup(): Promise<boolean> {
+    const config = vscode.workspace.getConfiguration(SECTION);
+    const explicitly = (key: string): boolean => {
+      const seen = config.inspect(key);
+      return [seen?.globalValue, seen?.workspaceValue, seen?.workspaceFolderValue].some(
+        (v) => v !== undefined && v !== "" && !(Array.isArray(v) && v.length === 0),
+      );
+    };
+    if (["chat.provider", "chat.model", "endpoints.servers"].some(explicitly)) return true;
+    const endpoints = Object.keys(readSettings().endpoints);
+    if (endpoints.some((p) => explicitly(`endpoints.${p}`))) return true;
+    for (const v of REMOTE_VENDORS) if (await this.keys.get(v.id)) return true;
+    return false;
   }
 
   /**
@@ -2031,7 +2104,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       sk.needs !== "knowledge" || readSettings().knowledge.enabled;
     const builtins = BUILTIN_SKILLS.filter((sk) => policy.groups.includes(sk.group) && available(sk)).map((sk) => ({
       name: sk.name,
-      description: sk.hint,
+      description: t(sk.hint),
       enabled: isSkillEnabled(sk.name, policy),
       builtin: true,
       group: sk.group,
@@ -2128,7 +2201,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         w.step === "skills"
           ? BUILTIN_SKILLS.filter((sk) => policy.groups.includes(sk.group) && !ALWAYS_ON.has(sk.name)).map((sk) => ({
               name: sk.name,
-              description: sk.hint,
+              description: t(sk.hint),
               enabled: isSkillEnabled(sk.name, policy),
               builtin: true,
               group: sk.group,
@@ -3207,8 +3280,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    *
    * ⚠️ Called BEFORE the recording starts, which is the whole point. It used to live inside
    * `transcribe`, so the question "shall I install a transcriber?" arrived only after somebody had
-   * pressed the microphone, spoken, and pressed it again — reported as « on doit cliquer deux fois
-   * comme si on voulait envoyer un message alors que l'outil n'est pas installé ». Everything a thing
+   * pressed the microphone, spoken, and pressed it again — reported as "you have to click twice as
+   * if you wanted to send a message, even though the tool isn't installed". Everything a thing
    * needs is asked for before it is done, not after.
    */
   private async ensureTranscriber(): Promise<"ready" | "installed" | "no"> {
@@ -3226,8 +3299,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       return "no";
     }
     const model = modelFor(settings.dictation.localModel);
-    // ⚠️ Three choices, not two. « tu ne peux pas proposer soit d'installer le modèle soit d'installer
-    // le ffmpeg soit de quitter ? » — and ffmpeg belongs on this card rather than on its own, because
+    // ⚠️ Three choices, not two. "can't you offer either to install the model, or to install
+    // ffmpeg, or to quit?" — and ffmpeg belongs on this card rather than on its own, because
     // it is not a second requirement, it is what the SAME feature gains: a microphone you can choose
     // when the machine has several, and an edge that follows your voice because ffmpeg writes its file
     // as it records. Offered only where there is something to gain: not when it is already installed,
@@ -3288,8 +3361,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   /**
    * Offer ffmpeg to somebody whose transcriber is already in place.
    *
-   * ⚠️ Because the offer used to live on the install card and nowhere else: « si il est déjà installé
-   * il ne propose pas d'installer le ffmpeg ». Somebody who set dictation up last week, or who already
+   * ⚠️ Because the offer used to live on the install card and nowhere else: "if it's already
+   * installed, it doesn't offer to install ffmpeg". Somebody who set dictation up last week, or who
+   * already
    * had a transcriber, never saw it — and they are exactly the people for whom it matters, since what
    * ffmpeg buys is choosing a microphone when the machine has several and an edge that follows the
    * voice.
@@ -3344,15 +3418,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    *
    * ⚠️ Here rather than in the panel because VS Code does not give an extension's panel a microphone
    * — `media` is granted to the workbench and withheld from a `vscode-webview://` origin, with no
-   * prompt and no setting. Reported as « aucun moyen d'activer », and there genuinely is none.
+   * prompt and no setting. Reported as "no way to enable it", and there genuinely is none.
    */
   private async startDictation(): Promise<void> {
     if (this.recording) return;
     // Everything this needs, asked for before a word is spoken rather than after.
     //
-    // ⚠️ And a click that INSTALLED something stops there. « le premier clique quand l'outil n'est pas
-    // installé doit servir de bouton d'installation et une fois installé il doit avoir le comportement
-    // normal ». It is the right rule and not only the asked-for one: the click that answered "yes,
+    // ⚠️ And a click that INSTALLED something stops there. "the first click, when the tool isn't
+    // installed, should act as an install button, and once it's installed it should behave
+    // normally". It is the right rule and not only the asked-for one: the click that answered "yes,
     // install it" was answering a question, not starting a recording, and somebody who has just
     // watched a download finish is not mid-sentence. Starting to listen there records the silence of
     // somebody reading what just happened.
@@ -3369,13 +3443,36 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const dir = await fsp.mkdtemp(join(tmpdir(), "hivey-dictation-"));
     const wav = join(dir, "voice.wav");
     const configured = recordArgv(settings.dictation.recordCommand, wav);
-    const found = configured ? undefined : findRecorder(process.platform);
-    const argv = configured ?? (found ? [found.program, ...found.args(wav, settings.dictation.device)] : undefined);
+    let found = configured ? undefined : findRecorder(process.platform);
+    // Which input, settled BEFORE the recorder starts. See `chooseDevice`: on DirectShow there is no
+    // "default" to fall back on, so with several inputs and none chosen the person is asked — once;
+    // the answer is remembered.
+    let device = settings.dictation.device;
+    if (found?.devices === "dshow") {
+      const choice = chooseDevice(found.devices, device, inputDevices(found.devices));
+      if ("ask" in choice) {
+        const picked = await pickMicrophone(choice.ask, false);
+        if (!picked) {
+          await fsp.rm(dir, { recursive: true, force: true });
+          this.post({ type: "dictationFailed", why: t("Choose a microphone to dictate: this machine has several inputs.") });
+          return;
+        }
+        device = picked.id;
+      } else if ("device" in choice) {
+        device = choice.device;
+      } else {
+        // ffmpeg lists nothing it can open; Windows' own recorder takes whatever Windows calls the
+        // default, which is better than a recorder that cannot start.
+        found = recorders(process.platform).find((r) => r.builtin) ?? found;
+      }
+    }
+    const recorder = found;
+    const argv = configured ?? (recorder ? [recorder.program, ...recorder.args(wav, device)] : undefined);
     if (!argv) {
       await fsp.rm(dir, { recursive: true, force: true });
-      // ⚠️ OFFER TO INSTALL IT, rather than hand somebody a command to copy. « si il faut installer un
-      // widget on ne peut pas faire en sorte que quand on clique sur le micro qu'il demande un
-      // approuval pour faire la commande dans le terminal pour installer ? » — and it is the right
+      // ⚠️ OFFER TO INSTALL IT, rather than hand somebody a command to copy. "if a widget has to be
+      // installed, can't we make it so that clicking the mic asks for approval to run the install
+      // command in the terminal?" — and it is the right
       // shape: this extension already asks before it runs anything, so an install is the same
       // question it asks every day, with a card that says exactly what will run.
       //
@@ -3454,8 +3551,19 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       this.post({ type: "dictationProgress", what: t("Listening… press again to stop.") });
     } catch (err) {
       await fsp.rm(dir, { recursive: true, force: true });
-      this.post({ type: "dictationFailed", why: t("The recorder could not be started: {0}", (err as Error).message) });
+      const message = (err as Error).message;
+      this.post({ type: "dictationFailed", why: t("The recorder could not be started: {0}", message) });
+      if (isDeviceError(message)) this.offerMicrophoneChoice();
     }
+  }
+
+  private offerMicrophoneChoice(): void {
+    const choose = t("Choose a microphone");
+    void vscode.window
+      .showWarningMessage(t("The microphone could not be opened. With several inputs, pick the one to listen to."), choose)
+      .then((answer) => {
+        if (answer === choose) void vscode.commands.executeCommand("hiveyCode.chooseMicrophone");
+      });
   }
 
   /** Stop, and turn what was recorded into words — or throw it away. */
@@ -3487,17 +3595,23 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         this.post({
           type: "dictationFailed",
           why: t(
-            "Nothing usable was recorded ({0}). The microphone may not be this machine's default input, or another program may have it. Setting hiveyCode.dictation.recordCommand to a command that names the device is the way past that.",
+            "Nothing usable was recorded ({0}). The microphone listened to may not be the right one, or another program may be holding it: choose the microphone (Hivey Code: Choose a microphone) and try again.",
             facts.why ?? "",
           ),
         });
+        // Silence is what a valid recording from the wrong input sounds like.
+        this.offerMicrophoneChoice();
         return;
       }
       this.log.appendLine(`[dictation] ${facts.seconds.toFixed(1)}s, ${facts.rate} Hz, ${facts.channels}ch`);
       this.post({ type: "dictationProgress", what: t("Transcribing…") });
       await this.transcribe(audio.toString("base64"), Date.now() - run.started);
     } catch (err) {
-      this.post({ type: "dictationFailed", why: t("The recording failed: {0}", (err as Error).message) });
+      const message = (err as Error).message;
+      this.post({ type: "dictationFailed", why: t("The recording failed: {0}", message) });
+      // The input could not be opened: the one failure a choice of microphone fixes, so the choice
+      // is offered right there instead of being left to be found in a menu.
+      if (isDeviceError(message)) this.offerMicrophoneChoice();
     } finally {
       await fsp.rm(run.dir, { recursive: true, force: true });
     }
@@ -3715,8 +3829,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           // writes came from commands, so there is nothing to put back and plenty that changed.
           //
           // ⚠️ It names the remedy, because the message without one reads as "this feature is
-          // broken". Reported that way: « il ouvre une fenêtre qui dit qu'il ne peut pas modifier et
-          // restore les modifications ». The turn in question had written its files through `node -e`
+          // broken". Reported that way: "it opens a window saying it can't modify and restore the
+          // changes". The turn in question had written its files through `node -e`
           // — because `edit_file` was failing on Windows line endings — so the checkpoint truthfully
           // held nothing. Both halves are worth saying: what this cannot undo, and what can.
           t(
@@ -3781,7 +3895,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
     // ⚠️⚠️ AND SAVE. A `WorkspaceEdit` writes to the editor's in-memory documents, not to disk: the
     // buffers show the old content while every file on disk still holds the agent's version. That
-    // is the defect Florian reported as "le restore to checkpoint ne semble pas revert le code" —
+    // is the defect Florian reported as "restore to checkpoint doesn't seem to revert the code" —
     // and it is the worst shape a bug can take here, because the screen says it worked. Everything
     // that reads from disk disagrees: the compiler, a watcher rebuilding a stylesheet, git, the next
     // shell command. Worse, closing the window without saving loses the restore entirely.
@@ -3921,6 +4035,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         signal: ctl.signal,
         maxTokens: 2048,
         temperature: 0.2,
+        // Summarizing is a chore: no thinking on a self-hosted server. See `ChatRequest.chore`.
+        chore: true,
         onDelta: (d) => {
           if (!d.text || ctl.signal.aborted) return;
           streamed += d.text;
@@ -3948,7 +4064,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       // it first — it is the oldest entry the moment the next question is asked.
       this.session.add({
         role: "assistant",
-        text: `${t("**Summary of the conversation so far**")}\n\n${summary}`,
+        text: `${en("**Summary of the conversation so far**")}\n\n${summary}`,
         model,
         pinned: true,
       });
@@ -4238,9 +4354,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     // map included. What used to sit in it and should not: the dialect note, which is derived from
     // the attached files, and the participant directive, which is per-turn by definition. Both now
     // ride after the transcript, where they are also read last. See `stablePrompt`.
+    // The reply language, decided from the question and restated after the transcript: see
+    // `detectLanguage` for why the system prompt's own rule was not enough.
+    // Built-in skill instructions are taken out first: they are English on purpose, and `/explain`
+    // typed in a French interface must not read as a question asked in English.
+    const lastQuestion = withoutModelText([...this.session.entries].reverse().find((e) => e.role === "user")?.text ?? "");
     const directives = turnDirectives({
       dialect: dialectNote(this.attachments),
       ...(this.participant ? { participant: participantDirective(this.participant) } : {}),
+      language: languageDirective(detectLanguage(lastQuestion, language())),
     });
     // Named rather than inlined, because the card that asks the user to consent has to be able to
     // say how big each of them is. A number nobody can attribute is a number nobody can act on.
@@ -4427,6 +4549,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       ...(settings.completion.model ? { localModel: settings.completion.model } : {}),
     });
 
+    /** The server refused the FIRST request for lack of context — see `recoverFromOverflow`. */
+    let overflowed = false;
     try {
       const provider = await providerFor(settings, this.keys, providerId);
 
@@ -4540,6 +4664,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       const splitThinking = thinkingHow ? thinkingSplitter() : undefined;
 
       // One attempt, wrapped so it can be repeated against a different endpoint. See the catch below.
+      // Without images for a model already seen to refuse them — see `visionless`. The images of
+      // EARLIER questions are in here too, which is why one refusal used to break every turn after.
+      const imageKey = `${providerId}::${model}`;
+      let sendMessages = this.isVisionless(imageKey) ? withoutImages(prepared.messages) : prepared.messages;
       const attempt = (
         useProvider: Provider,
         useModel: string,
@@ -4548,7 +4676,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         runTurn({
         provider: useProvider,
         model: useModel,
-        messages: prepared.messages,
+        messages: sendMessages,
         tools,
         signal: ctl.signal,
         maxTokens: outputTokens,
@@ -4656,8 +4784,28 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         // re-run the side effect. So the fallback covers exactly the case it is for — a provider
         // that refuses before it starts, which is what a rate limit and a dead network both are.
         const untouched = !streamed && !steps.length;
-        if (!untouched || ctl.signal.aborted || !isRetryable(err) || !chain.length) throw err;
-        result = await this.runFallback(chain, settings, { provider: providerId, model, why: "" }, attempt, ctl);
+        // ⚠️ A model that cannot read images, said by the server rather than by the catalogue —
+        // "image input is not supported … you may need to provide the mmproj". Asked again without
+        // them, once, and remembered, instead of a turn (and every later one) that fails outright.
+        // ⚠️ The conversation no longer fits the server's context window, and nothing has been said
+        // or done yet: summarized, then asked again — once — after this turn has ended. The server
+        // runs with less context per conversation since speculative decoding took its share of the
+        // GPU, so a long conversation that used to fit can now not.
+        if (untouched && !ctl.signal.aborted && !this.recoveringOverflow && isContextOverflow(String((err as Error)?.message ?? err))) {
+          overflowed = true;
+          throw err;
+        }
+        const hadImages = sendMessages.some((msg) => msg.images?.length);
+        if (untouched && !ctl.signal.aborted && hadImages && isImageRefusal(String((err as Error)?.message ?? err))) {
+          this.rememberVisionless(imageKey);
+          this.log.appendLine(`[turn] ${model} refused images; resending without them`);
+          this.post({ type: "status", text: t("{0} cannot read images: asked again without them.", model), ok: false });
+          sendMessages = withoutImages(sendMessages);
+          result = await attempt(provider, model);
+        } else {
+          if (!untouched || ctl.signal.aborted || !isRetryable(err) || !chain.length) throw err;
+          result = await this.runFallback(chain, settings, { provider: providerId, model, why: "" }, attempt, ctl);
+        }
       }
 
       // The splitter's tail, BEFORE the restorers: an unterminated deliberation goes to the reasoning
@@ -4713,6 +4861,17 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             "The model used its whole answer budget on reasoning and produced no reply. Raise hiveyCode.chat.maxOutputTokens, or use a lower reasoning effort.",
           );
         }
+      }
+
+      // ⚠️ And when there IS text but the cap still cut it — the loop's own continuations spent, or a
+      // chat turn with no tools to carry on with — it is said, not left to look finished. That was
+      // the whole of the "it stops, it is stuck" report: nothing on screen distinguished a reply
+      // that ended from one the budget ended.
+      if (result.truncated && result.text.trim() && !ctl.signal.aborted) {
+        const why = t("The reply was cut off at the output limit ({0} tokens). Raise hiveyCode.chat.maxOutputTokens, or ask it to continue.", settings.chat.maxOutputTokens);
+        this.log.appendLine(`[turn] reply cut off at max_tokens=${settings.chat.maxOutputTokens}`);
+        this.post({ type: "status", text: why, ok: false });
+        turnNotices.push({ kind: "tool", text: why });
       }
 
       // What the provider's cache actually served, accumulated across the conversation. Shown in the
@@ -4844,10 +5003,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     } catch (err) {
       const message = (err as Error).message;
       this.log.appendLine(`[turn] ${message}`);
+      if (overflowed) {
+        // Not an error the user has to act on: the recovery below takes over.
+        this.post({ type: "status", text: t("The conversation no longer fits the model's context: summarizing it, then asking again…") });
+      }
       // A turn the user stopped has no error to report. Cancellation surfaces as a failure at
       // whatever layer noticed first, and showing that to someone who pressed stop tells them their
       // own decision went wrong.
-      if (!ctl.signal.aborted) {
+      else if (!ctl.signal.aborted) {
         // Written into the conversation, ALWAYS — and this is the defect that hid every other one.
         //
         // It used to be recorded only when an empty assistant entry already existed, which is to
@@ -4896,6 +5059,51 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         this.post({ type: "turnEnd" });
         this.sendState();
       }
+      // After the turn is fully released, never from inside it: recovery summarizes (a turn of its
+      // own) and then asks again. See `recoverFromOverflow`.
+      if (overflowed && this.turn === undefined) setTimeout(() => void this.recoverFromOverflow(), 0);
+    }
+  }
+
+  /** Set while a recovery runs, so a conversation that still does not fit fails plainly, once. */
+  private recoveringOverflow = false;
+
+  /**
+   * The conversation stopped fitting the server's context window: summarize what came BEFORE the
+   * question, put the question back after the summary, and ask it again.
+   *
+   * The question is set aside first, because `compact()` summarizes every included exchange and
+   * would otherwise swallow the very question it is making room for. Nothing has been said or done
+   * for it yet — the overflow is caught only on the first request — so asking again repeats nothing.
+   */
+  private async recoverFromOverflow(): Promise<void> {
+    if (this.recoveringOverflow || this.turn) return;
+    const entries = this.session.entries;
+    const failed = entries[entries.length - 1];
+    if (failed?.role === "assistant" && !failed.text) this.session.drop(failed.id);
+    const question = [...this.session.entries].reverse().find((e) => e.role === "user");
+    if (!question) return;
+    const { text, context } = question;
+    this.recoveringOverflow = true;
+    try {
+      this.session.drop(question.id);
+      const compacted = await this.compact();
+      this.session.add({ role: "user", text, ...(context?.length ? { context } : {}) });
+      this.persist();
+      this.sendState();
+      if (!compacted) {
+        // Nothing earlier to summarize: this one question, with what is attached to it, is larger
+        // than the model can read. Said as such, with the two things that make it fit.
+        this.session.add({ role: "assistant", text: "" }).error = t(
+          "This question and its attachments do not fit the model's context window. Detach a file or narrow the selection, then ask again.",
+        );
+        this.persist();
+        this.sendState();
+        return;
+      }
+      await this.runTurn();
+    } finally {
+      this.recoveringOverflow = false;
     }
   }
 
@@ -5045,8 +5253,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    * approval systems that did not know about each other: one that the Always button satisfied, and
    * one that asked again right behind it.
    *
-   * That is both of Florian's reports at once — « le mode agent fait du compare au lieu de
-   * modifier » and « il redemande les autorisations après si on clique sur toujours ». Neither was
+   * That is both of Florian's reports at once — "agent mode does a compare instead of editing" and
+   * "it asks for permission again afterwards if you click always". Neither was
    * a bug in the permission store, which was right all along; the second asker simply never
    * consulted it.
    */
@@ -5157,9 +5365,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           description: req.description,
           ...(command ? { command } : {}),
           ...(edited ? { detail: [t("{0} lines", edited)] } : {}),
-          // ⚠️ Three, not four. Florian: « il faudrait juste le bouton Accept, toujours ou deny, pas
-          // toujours pour la conversation car par défaut toujours c'est uniquement sur la
-          // conversation en cours ». He is describing a menu whose middle two entries were the same
+          // ⚠️ Three, not four. Florian: "there should just be the Accept, always or deny button,
+          // not always for the conversation, because by default always only applies to the current
+          // conversation". He is describing a menu whose middle two entries were the same
           // promise worded differently — and the one that said "this conversation" was the one that
           // appeared not to work, because a SECOND asker ignored it. With that fixed, the remaining
           // honest distinction is "this time" against "from now on, everywhere, until you change it
@@ -5363,8 +5571,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   /**
    * Record the file's prior state, and let the edit through.
    *
-   * ⚠️⚠️ THIS NO LONGER ASKS, and that is the fix Florian asked for three times: « le mode agent ne
-   * devrait même pas faire de diff », « il continue de faire les diff au lieu de modifier ».
+   * ⚠️⚠️ THIS NO LONGER ASKS, and that is the fix Florian asked for three times: "agent mode
+   * shouldn't even do a diff", "it keeps doing diffs instead of editing".
    *
    * The approval already happened. `askApproval` put a card in the panel, named the file, and took
    * the answer — Accept, Always or Deny. This function then opened a diff EDITOR TAB, stealing the

@@ -94,8 +94,8 @@ export const HIVEY_VARIANT_IDS = ["hivey/free", "hivey/smart", "hivey"] as const
 /**
  * A vendor a preset reaches for before any other.
  *
- * ⚠️ Asked for directly — « retravaille le modele Hivey Smart qui doit etre le modele le plus puissant
- * (principalememt sur anthropic […]) » — and expressed as a RULE rather than as four model ids,
+ * ⚠️ Asked for directly — "rework the Hivey Smart model, which should be the most powerful model
+ * (mainly on Anthropic […])" — and expressed as a RULE rather than as four model ids,
  * because this repository forbids itself a version number in source: a vendor is stable for years, a
  * version for weeks, and the generated table is what moves when a successor ships.
  *

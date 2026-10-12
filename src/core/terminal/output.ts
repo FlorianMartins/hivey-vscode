@@ -139,7 +139,7 @@ export function describeOutcome(outcome: CommandOutcome, maxChars = 4000): strin
 /**
  * Commands whose non-zero exit is an ANSWER rather than a failure.
  *
- * ⚠️ Part of why « beaucoup de ... run command ... echouent ». `grep` exits 1 when it finds nothing,
+ * ⚠️ Part of why "many ... run command ... fail". `grep` exits 1 when it finds nothing,
  * which is a perfectly good answer to "is this used anywhere?" — and the step was drawn as a failure,
  * the model was told the tool errored, and `verifyTurn` counted a check that had failed. Three
  * different wrong conclusions from one correct command.

@@ -1212,6 +1212,67 @@ suite("Hivey Code", () => {
   });
 
   /**
+   * A conversation that outgrew the server's context window is summarized and asked again.
+   *
+   * The self-hosted server runs with less context per conversation since speculative decoding took
+   * its share of the GPU, so a conversation that used to fit can be refused — "request (N tokens)
+   * exceeds the available context size". That must not end the turn on an error: the history before
+   * the question is summarized, the question is put back after the summary, and it is answered.
+   */
+  test("a conversation that no longer fits the context is summarized, then the question is answered", async () => {
+    const ext = vscode.extensions.getExtension(ID)!;
+    await ext.activate();
+
+    const stub = await scriptedStub([
+      { text: "First answer." },
+      { text: "Second answer." },
+      { status: 400, error: "request (80000 tokens) exceeds the available context size (69632 tokens), try increasing it" },
+      { text: "The user asked two things, both answered." },
+      { text: "Third answer, after the summary." },
+    ]);
+    const config = vscode.workspace.getConfiguration(SECTION);
+    const before = {
+      provider: config.get("chat.provider"),
+      model: config.get("chat.model"),
+      local: config.get("endpoints.local"),
+      confirm: config.get("privacy.confirmSend"),
+    };
+    await config.update("chat.provider", "local", vscode.ConfigurationTarget.Global);
+    await config.update("chat.model", "stub-model", vscode.ConfigurationTarget.Global);
+    await config.update("endpoints.local", `http://127.0.0.1:${stub.port}/v1`, vscode.ConfigurationTarget.Global);
+    await config.update("privacy.confirmSend", "never", vscode.ConfigurationTarget.Global);
+
+    try {
+      await vscode.commands.executeCommand("hiveyCode.newSession");
+      await vscode.commands.executeCommand("hiveyCode.askWith", "First question?");
+      await vscode.commands.executeCommand("hiveyCode.askWith", "Second question?");
+      await vscode.commands.executeCommand("hiveyCode.askWith", "Third question?");
+
+      // The recovery runs after the refused turn has ended: wait for the request it makes.
+      for (let i = 0; i < 100 && stub.bodies().length < 5; i++) await new Promise((r) => setTimeout(r, 100));
+      await new Promise((r) => setTimeout(r, 300));
+
+      await vscode.commands.executeCommand("hiveyCode.exportSession");
+      const exported = vscode.window.activeTextEditor?.document.getText() ?? "";
+      await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
+      assert.equal(stub.bodies().length, 5, `expected refusal, summary, retry — got ${stub.bodies().length} requests`);
+      assert.match(exported, /Third answer, after the summary\./, `the question was not answered after recovery:\n${exported.slice(0, 1200)}`);
+      assert.doesNotMatch(exported, /exceeds the available context size/, "the refusal was shown as an error instead of being recovered");
+      // The retried request carries the question, after the summary, and not the old exchanges.
+      const retried = stub.bodies()[4]!;
+      assert.match(retried, /Third question\?/);
+      assert.match(retried, /Summary of the conversation so far/);
+      assert.doesNotMatch(retried, /First answer\./, "the summarized exchanges were sent again in full");
+    } finally {
+      await config.update("chat.provider", before.provider, vscode.ConfigurationTarget.Global);
+      await config.update("chat.model", before.model, vscode.ConfigurationTarget.Global);
+      await config.update("endpoints.local", before.local, vscode.ConfigurationTarget.Global);
+      await config.update("privacy.confirmSend", before.confirm, vscode.ConfigurationTarget.Global);
+      stub.close();
+    }
+  });
+
+  /**
    * A gateway offers ITS models, and you can switch between them.
    *
    * "When a gateway is configured it should offer only the models the proxy serves." It offered
@@ -1780,8 +1841,8 @@ suite("Hivey Code", () => {
       // ⚠️ NO review, and that is the fix rather than a regression. This test sets
       // `permissions.autoApprove: "all"`, and `confirmEdit` used to open a diff and a notification
       // ANYWAY — unconditionally, with no idea the user had already granted the edit. Two approval
-      // systems that did not know about each other, reported as « le mode agent fait du compare au
-      // lieu de modifier » and « il redemande les autorisations après si on clique sur toujours ».
+      // systems that did not know about each other, reported as "agent mode does a compare instead
+      // of editing" and "it asks for permission again afterwards if you click always".
       //
       // The review surface still exists and still appears when approval is actually needed; what it
       // must not do is re-ask a question already answered. Asserted as an absence, because an
@@ -2148,7 +2209,8 @@ suite("Screenshot", () => {
       await announce("conversation");
 
       // ⚠️ The permissions screen, photographed for the first time. It was the one surface with no
-      // picture of it anywhere, and it is also the one reported as « incomprehensible » — which is not
+      // picture of it anywhere, and it is also the one reported as "incomprehensible" — which is
+      // not
       // a coincidence: a screen nobody photographs is a screen nobody looks at as a whole. Nine
       // stacked sections and six separate lists are obvious in a frame and invisible in the source,
       // where each section is a tidy twelve lines.
@@ -2281,7 +2343,7 @@ suite("Screenshot", () => {
       await announce("passerelle");
 
       // ⚠️ The provider screen, with a card open. It was photographed by NOTHING, and it is the one
-      // Florian singled out — « c'est toujours aussi compliqué de comprendre les menus, settings ».
+      // Florian singled out — "the menus and settings are still just as hard to understand".
       // So it was changed blind, twice, and the scroll-jump it had (every keystroke in a key field
       // rebuilt the screen and returned it to the top) is exactly the kind of defect a photograph
       // catches and a unit test cannot: nothing is wrong with the DOM, the reader is just somewhere
@@ -2336,7 +2398,7 @@ function delay(ms: number): Promise<void> {
  * end and the code under test gets to look at what happened.
  */
 async function scriptedStub(
-  replies: Array<{ tool?: { name: string; args: unknown }; text?: string; reasoning?: string; truncated?: boolean; status?: number }>,
+  replies: Array<{ tool?: { name: string; args: unknown }; text?: string; reasoning?: string; truncated?: boolean; status?: number; error?: string }>,
 ): Promise<{
   port: number;
   asked: () => string[];
@@ -2363,7 +2425,7 @@ async function scriptedStub(
       const reply = replies[Math.min(asked.length - 1, replies.length - 1)] ?? {};
       if (reply.status && reply.status >= 400) {
         res.writeHead(reply.status, { "content-type": "application/json" });
-        res.end(JSON.stringify({ error: { message: "rate limited" } }));
+        res.end(JSON.stringify({ error: { message: reply.error ?? "rate limited" } }));
         return;
       }
       res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });

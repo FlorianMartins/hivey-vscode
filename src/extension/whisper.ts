@@ -235,16 +235,18 @@ export interface Recording {
  * these tools finalises its WAV header on SIGINT and leaves a truncated, unreadable file on SIGKILL.
  * The header holds the sample count, so a file that was never closed says it is empty.
  */
-export function startRecording(argv: string[], wav: string, how: "signal" | "stdin" = "signal"): Recording {
+export function startRecording(argv: string[], wav: string, how: "signal" | "stdin" | "quit" = "signal"): Recording {
   const [program, ...args] = argv;
   // stdin is a pipe whatever the recorder, because the Windows one is stopped by a line on it.
   const child = spawn(program!, args, { stdio: ["pipe", "ignore", "pipe"] });
   let why = "";
   child.stderr?.on("data", (d: Buffer) => (why += d.toString("utf8")));
   let code: number | null = null;
+  let closed = false;
   const ended = new Promise<void>((resolve) =>
     child.on("close", (status) => {
       code = status;
+      closed = true;
       resolve();
     }),
   );
@@ -254,8 +256,15 @@ export function startRecording(argv: string[], wav: string, how: "signal" | "std
       // with an explicit `mciSendString('save …')`, and a process that has been killed never reaches
       // it — the recording would be lost at exactly the moment somebody finished speaking.
       if (how === "stdin") child.stdin?.end("\n");
+      else if (how === "quit") child.stdin?.end("q\n");
       else child.kill("SIGINT");
       await Promise.race([ended, new Promise((r) => setTimeout(r, 4000))]);
+      // Still running after four seconds: it did not listen. Ended the hard way, so the turn is not
+      // held by a recorder that will never return — the file is checked afterwards either way.
+      if (!closed && how === "quit") {
+        child.kill();
+        await Promise.race([ended, new Promise((r) => setTimeout(r, 1000))]);
+      }
       // ⚠️ The recorder's own words, when it had any. They used to be collected and dropped, so a
       // microphone that could not be opened — no input device, or another program holding it — ended
       // as a file with a header and no frames, and the person was shown a transcriber's complaint
@@ -267,6 +276,7 @@ export function startRecording(argv: string[], wav: string, how: "signal" | "std
     },
     cancel: () => {
       // Killed outright: there is nothing to save, and the file is removed either way.
+      if (how === "quit") child.stdin?.end("q\n");
       child.kill("SIGINT");
       void ended.then(() => rm(wav, { force: true }));
     },

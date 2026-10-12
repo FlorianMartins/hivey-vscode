@@ -2,7 +2,7 @@
   "name": "hivey-code",
   "displayName": "Hivey Code",
   "description": "%extension.description%",
-  "version": "1.14.1",
+  "version": "1.14.2",
   "publisher": "hivey",
   "license": "Apache-2.0",
   "repository": {
@@ -807,11 +807,11 @@
                     "stdio",
                     "http"
                   ],
-                  "description": "stdio runs a program locally; http talks to a server."
+                  "description": "%config.mcp.servers.type%"
                 },
                 "command": {
                   "type": "string",
-                  "description": "The program to run (stdio)."
+                  "description": "%config.mcp.servers.command%"
                 },
                 "args": {
                   "type": "array",
@@ -830,7 +830,7 @@
                 },
                 "url": {
                   "type": "string",
-                  "description": "The server URL (http)."
+                  "description": "%config.mcp.servers.url%"
                 },
                 "headers": {
                   "type": "object",
@@ -865,6 +865,11 @@
             "type": "boolean",
             "default": false,
             "description": "%config.privacy.allowUnredacted%"
+          },
+          "hiveyCode.privacy.trustSelfHosted": {
+            "type": "boolean",
+            "default": true,
+            "description": "%config.privacy.trustSelfHosted%"
           },
           "hiveyCode.privacy.blockedGlobs": {
             "type": "array",

@@ -76,7 +76,7 @@ export interface SearchPattern {
 /**
  * Compile a search pattern the way a model means it, which is not always as a regular expression.
  *
- * ⚠️ `search_text` was regex-only, and that is why « beaucoup de search text ... echouent ». A model
+ * ⚠️ `search_text` was regex-only, and that is why "many search text ... fail". A model
  * looking for where a function is called types `total(`. As a regular expression that is
  * `Unterminated group`, so the call failed and returned nothing useful. The same for `cost.usd(`,
  * `?.length`, `C++`, `foo)` — five of eight patterns taken from ordinary code search fail to

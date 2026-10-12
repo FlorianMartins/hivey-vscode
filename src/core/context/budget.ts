@@ -31,8 +31,8 @@ export const CONTEXT_FLOOR_TOKENS = 8000;
  * watch spending — `budget.perRequestUsd`, `budget.dailyUsd`, `budget.perRequestTokens` — and those
  * ASK before sending. The context ceiling did the same job by silently withholding the model's own
  * window, which is the version the user cannot see, cannot answer, and cannot weigh. Florian asked
- * for the obvious thing: « j'aimerais que par défaut la fenêtre de contexte soit sur la valeur la
- * plus élevée du modèle sélectionné (si le modèle propose 1M, prendre le 1M plutôt que 64k) ».
+ * for the obvious thing: "I'd like the context window to default to the highest value the selected
+ * model has (if the model offers 1M, take the 1M rather than 64k)".
  *
  * So the money question moves entirely to the caps that ask it out loud, and the budget becomes what
  * it should always have been: the window, less what the turn still needs.

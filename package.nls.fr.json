@@ -47,6 +47,7 @@
   "config.endpoints.perplexity": "URL de base Perplexity. **Ceci est une adresse, pas votre clé d'API** — une clé va dans le coffre de l'éditeur, depuis l'écran de configuration du panneau ou la commande *Hivey Code : renseigner la clé d'API*. Laissez vide pour utiliser l'adresse du fournisseur.",
   "config.privacy.redaction": "Anonymisation avant tout envoi **distant** :\n- `strict` : secrets, identités, machines, chemins, URL internes, adresses IP — pseudonymisés de façon réversible.\n- `balanced` : secrets et identités seulement.\n- `off` : aucune (déconseillé, exige `privacy.allowUnredacted`).",
   "config.privacy.allowUnredacted": "Autorise réellement le mode « off ». Sans cette case, « off » retombe sur « balanced ».",
+  "config.privacy.trustSelfHosted": "Considère l'endpoint local et votre propre gateway compatible OpenAI comme des environnements sûrs, quelle que soit leur adresse : les requêtes y partent telles quelles, sans pseudonymisation ni confirmation d'envoi. Les fournisseurs cloud ne sont pas concernés. Ignoré si une politique d'organisation interdit les envois non pseudonymisés.",
   "config.privacy.blockedGlobs": "Fichiers qui ne partent JAMAIS vers un fournisseur distant, quoi qu'il arrive.",
   "config.privacy.egressPolicy": "Confirmation avant le premier envoi distant d'une session (ask-once), avant chaque envoi (ask-always), ou jamais (trust).",
   "config.privacy.auditLog": "Journaliser localement chaque envoi distant (horodatage, fournisseur, modèle, empreinte, jetons, coût). Aucun contenu.",
@@ -171,5 +172,8 @@
   "config.dictation.language": "Un indice de langue pour le reconnaisseur, par exemple `fr`. Vide le laisse décider.",
   "config.appearance": "Comment le panneau est peint.",
   "config.appearance.editor": "Reprendre les couleurs de votre thème VS Code, pour que le panneau appartienne à l’éditeur dans lequel il est ancré.",
-  "config.appearance.hivey": "Les surfaces et accents propres à Hivey : ambre sur une base froide et peu contrastée. L’éditeur garde la couleur de fond de la fenêtre, et un thème clair conserve l’apparence de l’éditeur."
+  "config.appearance.hivey": "Les surfaces et accents propres à Hivey : ambre sur une base froide et peu contrastée. L’éditeur garde la couleur de fond de la fenêtre, et un thème clair conserve l’apparence de l’éditeur.",
+  "config.mcp.servers.type": "stdio lance un programme sur cette machine ; http parle à un serveur.",
+  "config.mcp.servers.command": "Le programme à lancer (stdio).",
+  "config.mcp.servers.url": "L'adresse du serveur (http)."
 }

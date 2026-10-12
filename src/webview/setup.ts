@@ -388,8 +388,8 @@ function gatewayCard(gateway: Gateway, state: UiState, send: (m: ToExtension) =>
   card.append(el("p", "setup-card-hint", gatewayHint(gateway.id)));
 
   // ⚠️ ONE form, one button. This screen had two saves — "Save the address", then "Save the key" —
-  // which is exactly what Florian reported: « le gateway qui demande de stocker l'adresse et ensuite
-  // de stocker la clé API plutôt que de remplir les deux champs et valider ». Two saves is also two
+  // which is exactly what Florian reported: "the gateway, which asks you to store the address and
+  // then store the API key instead of filling in both fields and confirming". Two saves is also two
   // chances to leave half a configuration behind, and a key stored against no address looks
   // configured until the first question fails.
   //

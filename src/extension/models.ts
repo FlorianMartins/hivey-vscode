@@ -140,8 +140,8 @@ export async function listModels(settings: Settings, keys: Keys, current: string
   //    "the row cannot carry four prices, and that is the one a user meets most often". The reasoning
   //    was sound and the result was indefensible: Hivey Smart and Hivey Pro came out at the SAME
   //    price, because their two everyday models happen to charge the same $2/M to read. Reported as
-  //    « comment ça se fait que les modeles Hivey pro et Hivey smart sortent le meme prix ? le smart
-  //    est censé utiliser les meilleurs modeles ».
+  // "how come the Hivey Pro and Hivey Smart models come out at the same price? Smart is supposed to
+  // use the best models".
   //
   //    The row now carries what is TRUE of the whole preset rather than one quarter of it:
   //      • `inUsd`/`outUsd` — the DEAREST role, because that is what the preset can cost you and a

@@ -45,8 +45,8 @@ test("a model the catalogue has never heard of is UNKNOWN, not refused", () => {
   // ⚠️⚠️ This test used to assert `!canReason("llama2:7b")` — a confident "no" about a model nothing
   // in this repository knows anything about. The catalogue is OpenRouter's: it cannot answer for a
   // model served through somebody's gateway or running on their own machine, and answering "no"
-  // there hid the thinking control on two entire providers. Reported as « avec le modèle Gateway on
-  // ne peut pas changer le mode de réflexion et ça doit être pareil avec un modèle local ».
+  // there hid the thinking control on two entire providers. Reported as "with the Gateway model you
+  // can't change the thinking mode, and it must be the same with a local model".
   //
   // Guessing "no" cannot be corrected by anybody — the control is simply not there. Guessing "yes"
   // costs one request that the server answers with a 400, which `adaptRequest` already handles.

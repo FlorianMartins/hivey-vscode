@@ -77,6 +77,12 @@ export interface ChatRequest {
   temperature?: number;
   tools?: ToolSchema[];
   reasoning?: ReasoningEffort;
+  /**
+   * A side task — an edit prediction, a commit message, a conversation summary — rather than an
+   * answer somebody is waiting to read. On a self-hosted server it is sent with thinking switched
+   * off: Qwen on llama.cpp otherwise thinks at the template's default effort for a 400-token chore.
+   */
+  chore?: boolean;
   signal?: AbortSignal;
 }
 

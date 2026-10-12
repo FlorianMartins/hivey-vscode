@@ -2,6 +2,136 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## 1.14.2 — 2026-10-11
+
+### Corrigé
+
+- **Une conversation trop longue pour le contexte du serveur est résumée, puis la question est
+  reposée — au lieu de finir en erreur.** Le serveur local tourne désormais avec un peu moins de
+  contexte par conversation (le décodage spéculatif qui double la vitesse occupe une part de la
+  carte graphique). Quand il refuse une requête pour cette raison (« exceeds the available context
+  size »), l'historique AVANT la question est résumé, la question est remise après le résumé et
+  posée de nouveau, une fois. Si la question seule ne tient pas, le message dit quoi retirer.
+
+- **⚠️ Les tâches annexes ne font plus réfléchir le modèle auto-hébergé.** La prédiction d'édition,
+  le message de commit et le résumé de conversation demandaient « pas de réflexion », mais rien
+  n'était envoyé à llama.cpp — qui appliquait alors l'effort par défaut de son modèle (le maximum,
+  pour Qwen3.8). Ces trois tâches partent maintenant avec `reasoning_effort: "none"` vers le modèle
+  local et votre propre gateway. Les réponses que vous lisez gardent leur réflexion, et les
+  fournisseurs cloud ne sont pas touchés.
+
+- **⚠️ La lueur fait vraiment le tour du cadre.** « il fait gauche, haut, droite, bas et pas le tour
+  proprement ». C'était un dégradé conique tournant autour du **centre** : sur un cadre quatre fois
+  plus large que haut, un angle n'est pas une distance, et l'arc filait sur les petits côtés et se
+  traînait sur les grands. La lumière suit maintenant le **périmètre** (`offset-path: border-box`),
+  coins arrondis compris, à vitesse constante : un cœur lumineux sur le trait et un halo doux à
+  l'extérieur, jamais par-dessus le texte. Immobile si le système demande moins d'animations.
+
+- **Le bouton Stop est rouge.** Rempli, carré blanc sur rouge, pendant que l'IA raisonne, agit ou
+  répond — la seule couleur qui ne peut pas se lire comme « envoyer ».
+
+- **⚠️ Ce que lit le modèle est en anglais, quelle que soit la langue de l'interface.** « tous les
+  skills, tools, etc sont en Français […] passer tout en anglais ». Les corps des skills, leurs noms
+  et descriptions côté modèle, les instructions des actions sur la sélection, les invites des
+  commandes de l'éditeur et plusieurs résultats d'outils passaient par la traduction de l'interface :
+  avec l'interface en français, le modèle était instruit en français, et `/explain` devenait
+  `/expliquer`. Ils passent désormais par `en()`, qui ne traduit jamais ; seul ce qu'une personne lit
+  (description d'un skill dans le panneau, libellés) suit sa langue. La langue de **réponse** reste
+  celle de l'utilisateur, par la directive dédiée — et les instructions du produit sont retirées de la
+  question avant de détecter sa langue, pour que `/explain` tapé en français reçoive une réponse en
+  français. Un skill désactivé sous son ancien nom français le reste. 148 traductions devenues
+  inutiles sont retirées.
+
+- **⚠️ Plus de pseudonymisation vers le modèle local ni vers votre propre gateway.** « les
+  anonymisations des données s'appliquent également sur les modèles locaux et gateway […] c'est des
+  environnements sûrs ». « Local » était décidé par l'**adresse** seule (localhost, plages privées,
+  `.lan`) : l'endpoint local atteint par un nom public, ou la gateway de l'équipe, passaient pour un
+  cloud — noms et hôtes remplacés par des marqueurs, confirmation d'envoi, réponses moins bonnes.
+  Ces deux fournisseurs sont désormais des environnements de confiance par défaut
+  (`hiveyCode.privacy.trustSelfHosted`, désactivable) ; une politique d'organisation qui interdit les
+  envois non pseudonymisés l'emporte. Les fournisseurs cloud restent pseudonymisés, et le panneau dit
+  maintenant « envoyé tel quel » au lieu de promettre une pseudonymisation qui n'a plus lieu.
+
+- **⚠️ Plus d'écran de configuration après une mise à jour quand quelque chose est déjà configuré.**
+  « quand on fait une update […] il renvoie toujours sur l'écran de configuration ». L'écran
+  s'ouvrait tant que son propre bouton « terminer » n'avait jamais été pressé, ou dès que le
+  fournisseur courant n'avait pas de clé — donc à chaque rechargement pour qui avait configuré par
+  les réglages, ou utilisait une gateway sans clé. Une clé dans le trousseau, un endpoint ou un
+  serveur renseigné, un fournisseur ou un modèle choisi suffisent maintenant : le panneau s'ouvre sur
+  le chat.
+
+- **⚠️ Une image jointe ne casse plus le tour sur un modèle qui ne lit pas les images.**
+  « HTTP 500 Internal Server Error: image input is not supported - hint: […] provide the mmproj ».
+  Le refus est reconnu, la question est renvoyée **sans les images** (le modèle est prévenu qu'elles
+  ont été retirées), et le modèle est retenu comme « sans vision » : les images — y compris celles
+  des questions précédentes, qui faisaient échouer chaque tour suivant — ne lui sont plus envoyées
+  (pendant 24 h : le serveur peut entre-temps recevoir son `--mmproj`). Et l'avertissement « ne lit
+  pas les images » à l'ajout d'une image n'apparaît plus que quand c'est **su** — modèle du catalogue
+  sans vision, ou refus récent de ce serveur : un modèle auto-hébergé n'est dans aucun catalogue, et
+  Qwen sur llama.cpp lit très bien les images une fois son projecteur chargé.
+
+- **⚠️ Le modèle ne bascule plus en anglais.** La consigne « réponds dans la langue de
+  l'utilisateur » n'était qu'en tête du prompt système ; après quelques écrans de code et de sorties
+  d'outils en anglais, un modèle local suivait le texte le plus récent. La langue est maintenant
+  déduite de la question (repli : la langue de l'interface) et **réaffirmée après la conversation à
+  chaque tour**, là où le modèle la lit en dernier.
+
+- **⚠️ Dictée : « that file is not a recording ».** Sous Windows il n'existe pas de SIGINT : Node
+  **tue** le processus, et ffmpeg mourait avant d'écrire l'en-tête WAV. ffmpeg est maintenant arrêté
+  comme il l'entend, par un `q` sur son entrée standard, sur toutes les plateformes (vérifié par un
+  vrai enregistrement dans les tests). Le message d'erreur propose de choisir le micro au lieu de
+  renvoyer vers `recordCommand`.
+
+- **Langue des réglages et menus.** Les descriptions des réglages, les menus et les noms de commandes
+  suivent la langue d'affichage de VS Code — aucune API ne permet à une extension de la changer.
+  C'est maintenant expliqué une fois au démarrage quand les deux langues diffèrent, avec le bouton
+  qui change celle de VS Code. Trois descriptions des serveurs MCP, écrites en dur en anglais, sont
+  traduites.
+
+- **⚠️⚠️ L'agent qui « se bloque » : la réponse coupée par `maxOutputTokens` était prise pour une
+  réponse finie.** « il ne fait ni le plan ni l'action […] il ne va pas jusqu'à la fin ».
+
+  Vu en direct sur Qwen3.8 (llama.cpp) : 8192 tokens générés en 4 min 40, `finish_reason: "length"`,
+  puis plus aucune requête. Le texte s'arrêtait sur « Voici le plan, puis j'attaque : » — le plan ou
+  l'appel d'outil annoncé avait été mangé par la limite, et la boucle rendait la demi-phrase comme
+  réponse, sans rien dire. Désormais :
+  - un appel d'outil **inachevé** au moment de la coupure est écarté (il était exécuté avec un JSON
+    cassé, et `length` était écrasé par `tool_calls`, si bien que personne ne savait pourquoi) — dans
+    le client OpenAI-compatible comme dans le client Anthropic ;
+  - en mode agent, une réponse coupée sans rien à exécuter est **poursuivie** : le modèle reçoit
+    « continue là où tu t'es arrêté, et découpe les gros fichiers en plusieurs appels » — au plus deux
+    fois par tour ;
+  - si la réponse reste coupée, c'est **dit** dans le panneau, avec le réglage à augmenter ;
+  - les sous-agents reçoivent la même limite de sortie que le tour (ils n'en avaient aucune).
+
+- **⚠️ L'anneau qui tourne autour de la zone de saisie est visible dès le début du tour, réflexion
+  comprise.** « rajouter cet effet dès le début de la réponse (aussi lors du raisonnement) ».
+
+  L'anneau était bien allumé dès `turnStart` — et caché. La zone garde le focus après Entrée, et le
+  contour de focus (même position, même épaisseur, 70 % de la même couleur) recouvrait l'arc qui
+  tourne : on ne le voyait qu'une fois le focus parti ailleurs, typiquement en cliquant dans la
+  réponse. Pendant un tour, le contour descend à une piste discrète (18 %) ; la taille du cadre ne
+  bouge pas, et c'est l'arc qu'on voit.
+
+- **⚠️ Dictée sous Windows avec plusieurs entrées audio : plus de `audio=default`.** « L'enregistrement
+  a échoué : Error opening input file audio=default. Error opening input files: I/O error ».
+
+  DirectShow n'a **aucun** périphérique nommé « default » : sans micro choisi, ffmpeg cherchait un nom
+  qui n'existe pas. L'entrée est maintenant fixée avant d'enregistrer : celle choisie si elle existe
+  encore, la seule s'il n'y en a qu'une, sinon **la question est posée une fois** et la réponse
+  retenue. Aucune entrée listée : on se rabat sur l'enregistreur intégré de Windows. Le sélecteur ne
+  propose plus « le périphérique par défaut » sous DirectShow, les listes au format des anciens ffmpeg
+  (par sections) sont lues, et une entrée impossible à ouvrir — ou un enregistrement silencieux —
+  propose directement **Choisir un micro**.
+
+### Ajouté
+
+- **Le cadre du raisonnement a sa couleur.** Bordure teintée et liseré à gauche — le violet des
+  graphiques de l'éditeur, ou le cyan de l'apparence Hivey — pour qu'il ne se lise plus comme une
+  liste d'étapes repliée. Tant que le modèle réfléchit, le cadre « respire » doucement ; il s'arrête
+  dès que la réponse commence (ou que le tour se termine). Immobile si le système demande moins
+  d'animations.
+
 ## 1.14.1 — 2026-10-06
 
 ### Corrigé
