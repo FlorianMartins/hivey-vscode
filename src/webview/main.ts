@@ -6,7 +6,7 @@
 // rendered incrementally is the answer being streamed, because that one has to be.
 
 import { button, closeMenu, el, icon, ICON, menuIsOpen, searchInput } from "./dom.js";
-import { chatScreen, isStreaming, planBlock, reasoningBlock, setStreaming, stepRow, type ChatDeps, captureDraft, restoreDraft,
+import { chatScreen, isStreaming, planBlock, reasoningBlock, setStreaming, stepRow, stepSummary, collapsible, type ChatDeps, captureDraft, restoreDraft,
   NOTE_FADE_MS,
   setComposerNote,
   dictationStopped,
@@ -313,6 +313,7 @@ function searchBar(s: UiState): HTMLElement {
 class LiveTurn {
   readonly root: HTMLElement;
   private readonly body: HTMLElement;
+  private readonly activity: HTMLElement;
   private text?: HTMLElement;
   private thinking?: { wrap: HTMLElement; body: HTMLElement; folded?: boolean };
   private buffer = "";
@@ -329,7 +330,8 @@ class LiveTurn {
     this.root = el("article", "entry assistant streaming");
     const head = el("div", "entry-head");
     head.append(el("span", "entry-who", "Hivey Code"));
-    head.append(el("span", "entry-meta pulse", t("thinking…")));
+    this.activity = el("span", "entry-meta pulse", t("thinking…"));
+    head.append(this.activity);
     this.root.append(head);
     this.body = el("div", "entry-body");
     this.root.append(this.body);
@@ -337,6 +339,14 @@ class LiveTurn {
 
   attach(): void {
     this.list.append(this.root);
+  }
+
+  /** What the turn is waiting for, in place of "thinking…"; "" puts "thinking…" back. */
+  setActivity(text: string, hint?: string): void {
+    this.activity.textContent = text || t("thinking…");
+    this.activity.classList.toggle("waiting", Boolean(text));
+    // Short enough for a docked panel; the explanation is one hover away.
+    this.activity.title = hint ?? "";
   }
 
   appendText(chunk: string): void {
@@ -514,28 +524,86 @@ class LiveTurn {
    * nothing shifts.
    */
   private steps?: HTMLElement;
+  /**
+   * ⚠️ « ça écrit plein de lignes et du coup on doit remonter pour voir la réflexion en cours ».
+   * Every step was a row, and on a long turn the rows pushed the model's live thinking off the
+   * screen. So the steps are FOLDED while the turn runs, into one line that says what is inside and
+   * what is happening now — "9 steps · 2 edits — run_command npm test" — and opens on a click to the
+   * full list. A failed step is said on that line too; opening it is the reader's business.
+   */
+  private stepsTitle?: HTMLElement;
+  private stepsNow?: HTMLElement;
+  private stepsDone: Array<{ tool: string; ok: boolean }> = [];
 
   private stepsHost(): HTMLElement {
     if (!this.steps) {
       this.steps = el("div", "steps");
-      if (this.text) this.body.insertBefore(this.steps, this.text);
-      else this.body.append(this.steps);
+      const block = collapsible("", this.steps, { open: false });
+      block.classList.add("steps-folded", "steps-live");
+      const head = block.querySelector<HTMLElement>(".collapsible-head")!;
+      this.stepsTitle = head.querySelector<HTMLElement>(":scope > span:not(.ico)") ?? head.appendChild(el("span"));
+      this.stepsNow = el("span", "steps-now");
+      head.append(this.stepsNow);
+      if (this.text) this.body.insertBefore(block, this.text);
+      else this.body.append(block);
+      this.renderStepsHead();
     }
     return this.steps;
   }
 
+  private renderStepsHead(): void {
+    if (!this.stepsTitle) return;
+    // Short, at the end of the line: the action under way is what the line is for, and in a docked
+    // panel the full summary pushed it out of sight. The whole summary is the line's tooltip.
+    const failed = this.stepsDone.filter((s) => !s.ok).length;
+    this.stepsTitle.textContent = this.stepsDone.length
+      ? t("{0} steps", this.stepsDone.length) + (failed ? ` · ${t("{0} failed", failed)}` : "")
+      : t("Working…");
+    this.stepsTitle.classList.toggle("failed", failed > 0);
+    const head = this.stepsTitle.parentElement;
+    if (head) head.title = this.stepsDone.length ? stepSummary(this.stepsDone) : "";
+  }
+
+  /** The action under way, on the folded line. */
+  toolStart(tool: string, call?: string, count?: number): void {
+    this.stepsHost();
+    if (!this.stepsNow) return;
+    this.stepsNow.replaceChildren(
+      el("span", "steps-now-dot pulse", "●"),
+      el("span", "step-tool", tool),
+      ...(call ? [el("code", "step-call", call)] : []),
+      ...(count && count > 1 ? [el("span", "step-summary", t("+{0} in parallel", count - 1))] : []),
+    );
+    this.stepsNow.title = [tool, call].filter(Boolean).join(" ");
+  }
+
   appendStatus(text: string, tool?: string, ok?: boolean, call?: string): void {
     if (!tool) {
-      // Progress from a tool that is still running, not the result of one. It is a passing remark,
-      // so it replaces the last one rather than stacking.
+      // Progress from a tool that is still running, not the result of one: a passing remark, shown
+      // on the folded line where the current action is, and kept in the list.
       const row = el("div", "step");
       row.append(el("span", "step-ico dot", "·"));
       row.append(el("span", "step-summary", text));
       following(() => this.stepsHost().append(row));
+      if (this.stepsNow) {
+        this.stepsNow.replaceChildren(el("span", "steps-now-dot pulse", "●"), el("span", "step-summary", text));
+        this.stepsNow.title = text;
+      }
       return;
     }
     const row = stepRow({ tool, summary: text, ok: ok !== false, ...(call ? { call } : {}) });
     following(() => this.stepsHost().append(row));
+    this.stepsDone.push({ tool, ok: ok !== false });
+    this.renderStepsHead();
+    // Done: the line shows what was last done until the next action starts.
+    if (this.stepsNow) {
+      this.stepsNow.replaceChildren(
+        icon(ok === false ? "cross" : "check", `step-ico${ok === false ? " failed" : ""}`),
+        el("span", "step-tool", tool),
+        ...(call ? [el("code", "step-call", call)] : []),
+      );
+      this.stepsNow.title = [tool, call, text].filter(Boolean).join("\n");
+    }
   }
 
   appendError(message: string): void {
@@ -842,6 +910,16 @@ window.addEventListener("message", (event: MessageEvent<ToPanel>) => {
       break;
     case "plan":
       ensureLive().setPlan(m.plan);
+      break;
+    case "toolStart":
+      if (live) live.toolStart(m.tool, m.call, m.count);
+      break;
+    case "activity":
+      // ⚠️ A wait CREATES the turn when it is the first news of it. The turn's block used to appear
+      // with the first word — so a request queued behind somebody else's showed nothing at all for
+      // as long as it waited, which is the whole complaint. Only during a turn, as for "status".
+      if (live) live.setActivity(m.text, m.hint);
+      else if (m.text && isStreaming()) ensureLive().setActivity(m.text, m.hint);
       break;
     case "status":
       // Only into a turn that exists. `ensureLive()` CREATES one when there is none, so a message on

@@ -142,6 +142,9 @@ import { buildTools } from "./tools.js";
 import { McpManager } from "./integrations/mcp.js";
 import { WorkspaceContext, relative } from "./workspace.js";
 import { setActiveWindow } from "../core/context/scale.js";
+import { WaitWatch, type WaitLabel } from "../core/agent/waiting.js";
+import { isSelfHostedProvider } from "../core/redaction/index.js";
+import { choicesFor, levelsFromRefusal, type ModelReasoning } from "../core/router/reasoningLevels.js";
 
 const HISTORY_KEY = "hiveyCode.sessions";
 const PERMISSIONS_KEY = "hiveyCode.permissions";
@@ -182,6 +185,8 @@ const HISTORY_MAX = 100;
 interface Prefs {
   mode: Mode;
   reasoning: Reasoning;
+  /** The effort was picked in the panel, rather than left at the default. See `effectiveReasoning`. */
+  reasoningChosen?: boolean;
 }
 
 class MementoPermissionStore implements PermissionStore {
@@ -343,6 +348,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    */
   private budgetWaived = false;
 
+  /** The thinking levels each self-hosted model said it has, by address and model. */
+  private readonly reasoningLevelsSeen = new Map<string, ModelReasoning>();
+
+  /** Servers that have reported reading progress, so their silence can be called a queue. */
+  private readonly progressServers = new Set<string>();
+
   /**
    * What one attached file may take of it — counting the ones already attached.
    *
@@ -395,6 +406,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       const provider = await providerFor(s, this.keys, s.chat.provider);
       const tokens = (await provider.contextWindow?.(s.chat.model)) ?? 0;
       if (tokens > 0) this.learnWindow(this.windowKey(s), tokens);
+      // And which thinking levels it has, on the same refresh: a server can be given another model.
+      const refusal = await provider.probeReasoning?.(s.chat.model);
+      const levels = refusal ? levelsFromRefusal(refusal) : undefined;
+      const key = this.windowKey(s);
+      if (levels) this.reasoningLevelsSeen.set(key, levels);
+      else this.reasoningLevelsSeen.delete(key);
+      // A template answered the probe: this is llama.cpp, which reports its reading progress — so its
+      // silence is a queue from the very first request, not only after one has shown progress.
+      if (refusal) this.progressServers.add(safeUrl(s, s.chat.provider));
     } catch {
       /* the server did not say; the refusal, if one comes, will */
     }
@@ -479,6 +499,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const prefs = ctx.globalState.get<Prefs>(PREFS_KEY);
     this.session.mode = prefs?.mode ?? "agent";
     this.reasoning = prefs?.reasoning ?? "none";
+    this.reasoningChosen = prefs?.reasoningChosen === true;
   }
 
   /**
@@ -541,6 +562,32 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   }
 
   private reasoning: Reasoning = "none";
+  private reasoningChosen = false;
+
+  /**
+   * The effort a turn actually uses.
+   *
+   * ⚠️ "it reasons too much even for small tasks, and sometimes does things outside the request".
+   * "Direct" — the default — sent NOTHING to a self-hosted server, and nothing means the chat
+   * template's own default, which on Qwen3.8 is its maximum: "think carefully, validate key
+   * assumptions, consider plausible alternatives". Replayed on a real agent request, the first step
+   * thought for 56–72 s (10–12k characters) at that default and 8–11 s at "medium", for the same
+   * plan and the same calls. So an effort nobody picked is "Standard" on the user's own server — the
+   * model sizes its own thinking — and "Direct" picked on purpose really is direct. Clouds keep the
+   * default they had: an effort there is billed.
+   */
+  private effectiveReasoning(s: Settings): Reasoning {
+    const known = this.reasoningLevelsSeen.get(this.windowKey(s));
+    const offered = known ? choicesFor(known) : undefined;
+    if (!this.reasoningChosen && this.reasoning === "none" && isSelfHostedProvider(s.chat.provider)) {
+      // Standard when the model has it; otherwise the model's own default rather than a level it lacks.
+      if (!offered || offered.some((c) => c.id === "medium")) return "medium";
+      return offered.find((c) => c.isDefault)?.id ?? "none";
+    }
+    // A level picked for another model that this one does not have: its own default instead.
+    if (offered && !offered.some((c) => c.id === this.reasoning)) return offered.find((c) => c.isDefault)?.id ?? "none";
+    return this.reasoning;
+  }
 
   /** What the first-run screen knows. Rebuilt by a probe, never persisted — it goes stale. */
   private setup: UiSetup = { probing: false, runtimes: [], hasKey: {}, endpoints: {} };
@@ -681,11 +728,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         entries: this.session.entries.map((e) => this.uiEntry(e)),
       },
       mode: this.session.mode,
-      reasoning: this.reasoning,
+      reasoning: this.effectiveReasoning(s),
       // A preset is not a model, so everything the panel wants to know about "the model" has to be
       // asked of the one that would answer an ordinary turn — its window, whether it thinks, what
       // it costs. The NAME stays the preset's: that is what the user chose and what they can act on.
       reasoningAvailable: supportsReasoning(hiveyModel(s.chat.model, "everyday")),
+      ...(this.reasoningLevelsSeen.get(this.windowKey(s))
+        ? { reasoningLevels: choicesFor(this.reasoningLevelsSeen.get(this.windowKey(s))!) }
+        : {}),
       model: s.chat.model,
       modelLabel: isHivey(s.chat.model)
         ? hiveyLabel(s.chat.model)
@@ -817,7 +867,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   }
 
   private savePrefs(): void {
-    void this.ctx.globalState.update(PREFS_KEY, { mode: this.session.mode, reasoning: this.reasoning } satisfies Prefs);
+    void this.ctx.globalState.update(PREFS_KEY, {
+      mode: this.session.mode,
+      reasoning: this.reasoning,
+      ...(this.reasoningChosen ? { reasoningChosen: true } : {}),
+    } satisfies Prefs);
   }
 
   /** Rebuild the panel after a change it cannot re-render on its own, such as the language. */
@@ -1208,6 +1262,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           break;
         case "setReasoning":
           this.reasoning = m.reasoning;
+          this.reasoningChosen = true;
           this.savePrefs();
           this.sendState();
           break;
@@ -4477,7 +4532,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     // alternative is rebuilding and re-sending the whole conversation to change one paragraph.
     const thinkingFor = hiveyModel(settings.chat.model, "everyday");
     const thinkingHow =
-      thinkingMode(thinkingFor, this.reasoning) === "prompted" ? promptedThinking(this.reasoning) : "";
+      thinkingMode(thinkingFor, this.effectiveReasoning(settings)) === "prompted" ? promptedThinking(this.effectiveReasoning(settings)) : "";
     const systemPrompt = stablePrompt({
         mode: promptForMode(mode),
         ...(thinkingHow ? { thinking: thinkingHow } : {}),
@@ -4763,6 +4818,20 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       // EARLIER questions are in here too, which is why one refusal used to break every turn after.
       const imageKey = `${providerId}::${model}`;
       let sendMessages = this.isVisionless(imageKey) ? withoutImages(prepared.messages) : prepared.messages;
+      // What each request is waiting for, beside "thinking…" — see core/agent/waiting.ts.
+      const wait = new WaitWatch(
+        (label) => {
+          if (ctl.signal.aborted) return;
+          this.post({
+            type: "activity",
+            text: waitText(label),
+            ...(label.kind === "queued" ? { hint: t("The server is finishing another request; this one starts right after.") } : {}),
+          });
+        },
+        () => this.progressServers.has(baseUrl),
+        () => this.progressServers.add(baseUrl),
+      );
+      const watched = (...args: Parameters<typeof attempt>) => attempt(...args).finally(() => wait.stop());
       const attempt = (
         useProvider: Provider,
         useModel: string,
@@ -4787,7 +4856,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         // Never an effort a model cannot use. The control is hidden when `canReason` is false, but a
         // stored preference survives a model change — so switching to a plain model went on sending
         // `effort: "high"` to an endpoint with no idea what to do with it. Hidden is not unsent.
-        reasoning: effortToSend(useModel, this.reasoning),
+        reasoning: effortToSend(useModel, this.effectiveReasoning(settings)),
         // Asked once, when the model stops calling tools: it changed files and ran nothing, so
         // finish it. The cheap middle between telling the user and escalating to a billed model.
         selfCheck: (trace) =>
@@ -4807,6 +4876,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         // screen by then — text from the question the user gave up on, appearing under the next one.
         onDelta: (d) => {
           if (ctl.signal.aborted) return;
+          wait.delta(d);
           // Split before anything else sees it, so `streamed` — which becomes the saved answer —
           // never contains the deliberation.
           const split = splitThinking && d.text ? splitThinking.push(d.text) : undefined;
@@ -4829,6 +4899,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             const shownThought = liveThought.push(deltaThought);
             if (shownThought) this.post({ type: "reasoning", text: shownThought });
           }
+        },
+        // The action under way, for the folded step list — a command that runs for a minute is the
+        // one thing worth seeing while it runs, and its result arrives only when it is over.
+        onStep: ({ toolCalls }) => {
+          if (ctl.signal.aborted || !toolCalls.length) return;
+          const first = toolCalls[0]!;
+          const call = callSignature(first.name, safeArgs(first.args));
+          this.post({ type: "toolStart", tool: first.name, ...(call ? { call } : {}), ...(toolCalls.length > 1 ? { count: toolCalls.length } : {}) });
         },
         onToolResult: ({ call, result }) => {
           if (call.source === "text") usedTextToolCalls = true;
@@ -4868,6 +4946,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         // A refusal here must ABORT the turn. Falling back to the original messages would send the
         // unredacted text precisely when the user said no.
         beforeRequest: async (messages) => {
+          wait.request();
           if (isLocal) return messages;
           const again = await this.gate.prepare(messages, settings, { provider: providerId, model, baseUrl, isLocal }, vault);
           if (!again) throw new Error(t("Request refused: the rest of the turn was not sent."));
@@ -4881,7 +4960,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
       let result: Awaited<ReturnType<typeof runTurn>>;
       try {
-        result = await attempt(provider, model);
+        result = await watched(provider, model);
       } catch (err) {
         // Only while nothing has reached the user. A turn that has already streamed a sentence or
         // run a tool cannot be moved elsewhere: the second model would repeat the sentence and
@@ -4905,7 +4984,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           this.log.appendLine(`[turn] ${model} refused images; resending without them`);
           this.post({ type: "status", text: t("{0} cannot read images: asked again without them.", model), ok: false });
           sendMessages = withoutImages(sendMessages);
-          result = await attempt(provider, model);
+          result = await watched(provider, model);
         } else {
           if (!untouched || ctl.signal.aborted || !isRetryable(err) || !chain.length) throw err;
           result = await this.runFallback(chain, settings, { provider: providerId, model, why: "" }, attempt, ctl);
@@ -4964,7 +5043,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         this.post({ type: "status", text: t("It spent the whole answer on thinking. Asking again with more room…") });
         thought = "";
         streamed = "";
-        result = await attempt(provider, model, roomier);
+        result = await watched(provider, model, roomier);
         // Still nothing, and now it is worth saying rather than showing an empty bubble. The
         // reasoning is kept: it is what the model did produce, and it is the evidence for raising
         // hiveyCode.chat.maxOutputTokens rather than guessing.
@@ -6006,4 +6085,18 @@ function activeEditor(): UiActiveEditor | undefined {
     hasSelection: !selection.isEmpty,
     selectedLines: selection.isEmpty ? 0 : selection.end.line - selection.start.line + 1,
   };
+}
+
+/** The words for a wait — see core/agent/waiting.ts. */
+function waitText(label: WaitLabel): string {
+  switch (label.kind) {
+    case "queued":
+      return t("In the queue… {0} s", label.seconds);
+    case "waiting":
+      return t("Waiting for the server… {0} s", label.seconds);
+    case "reading":
+      return t("Reading the conversation… {0} %", label.percent);
+    default:
+      return "";
+  }
 }

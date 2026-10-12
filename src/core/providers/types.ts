@@ -103,6 +103,11 @@ export interface ToolSchema {
 export interface ChatDelta {
   text?: string;
   reasoning?: string;
+  /**
+   * How far a self-hosted server has read the prompt (llama.cpp `return_progress`). Arrives before
+   * any token, so it is also the first sign the request has left the server's queue.
+   */
+  progress?: { processed: number; total: number; cache: number };
 }
 
 export interface ChatResult {
@@ -148,6 +153,11 @@ export interface Provider {
   listModels(): Promise<string[]>;
   /** The runtime context window the server gives this model, 0 when it does not say. */
   contextWindow?(model: string): Promise<number>;
+  /**
+   * What the model's chat template says when asked for a thinking effort it does not know — the
+   * refusal text, which lists the efforts it does know. Self-hosted only. See core/router/reasoningLevels.ts.
+   */
+  probeReasoning?(model: string): Promise<string | undefined>;
 }
 
 export const EMPTY_USAGE: Usage = { promptTokens: 0, completionTokens: 0, cachedTokens: 0 };

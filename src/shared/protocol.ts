@@ -288,6 +288,8 @@ export interface UiState {
   reasoning: Reasoning;
   /** True when the selected chat model can think — drives whether the control is offered. */
   reasoningAvailable: boolean;
+  /** The thinking levels the selected model really has, when its server said — see core/router/reasoningLevels.ts. */
+  reasoningLevels?: Array<{ id: Reasoning; native: string; isDefault?: boolean }>;
   model: string;
   modelLabel: string;
   provider: string;
@@ -605,6 +607,10 @@ export type ToPanel =
   | { type: "delta"; text: string }
   | { type: "reasoning"; text: string }
   | { type: "status"; text: string; tool?: string; ok?: boolean; call?: string }
+  /** A tool is starting: what the folded step list shows as "in progress". `count` > 1 for a parallel batch. */
+  | { type: "toolStart"; tool: string; call?: string; count?: number }
+  /** What the live turn is waiting for — the server's queue, the reading of the conversation — or "" when it is not. */
+  | { type: "activity"; text: string; hint?: string }
   | { type: "turnStart" }
   | { type: "turnEnd" }
   | {

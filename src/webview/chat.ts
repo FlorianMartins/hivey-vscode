@@ -2137,7 +2137,21 @@ function roundTokens(n: number): number {
 }
 
 function reasoningButton(state: UiState, deps: ChatDeps): HTMLElement {
-  const current = REASONING.find((r) => r.id === state.reasoning) ?? REASONING[0]!;
+  // The model's own levels when its server said which it has — « le mode de réflexion doit
+  // correspondre aux modes de raisonnement des modèles utilisés » — each with the name the model
+  // gives it and its default marked; the usual four otherwise.
+  const levels = state.reasoningLevels;
+  const offered = levels
+    ? REASONING.filter((r) => levels.some((l) => l.id === r.id)).map((r) => {
+        const own = levels.find((l) => l.id === r.id)!;
+        return {
+          ...r,
+          label: r.id === "none" ? r.label : `${r.label} · ${own.native}`,
+          hint: own.isDefault ? `${r.hint} ${t("The model's own default.")}` : r.hint,
+        };
+      })
+    : REASONING;
+  const current = offered.find((r) => r.id === state.reasoning) ?? offered[0]!;
   const b = button({
     // ⚠️ A leading glyph, because the closed button shows only its VALUE. "Agent · qwen2.5-coder ·
     // Direct" gives no clue that the third one is about thinking — reported as "the menus are still
@@ -2153,7 +2167,7 @@ function reasoningButton(state: UiState, deps: ChatDeps): HTMLElement {
         const panel = el("div", "menu-list");
         if (state.reasoningAvailable) {
           panel.append(menuTitle(t("Thinking budget")));
-          for (const r of REASONING) {
+          for (const r of offered) {
             panel.append(
               menuItem({
                 label: r.label,
