@@ -1,0 +1,7 @@
+{
+  "title": "Prices are added up in binary floating point",
+  "kind": "bug",
+  "prompt": "The tests in test_money.py fail: the totals are a cent out and the type is wrong. Money must be exact and must round half away from zero, the way an invoice does. Fix money.py. Do not change the tests.",
+  "check": "python3 -m unittest discover -q",
+  "timeoutMs": 180000
+}

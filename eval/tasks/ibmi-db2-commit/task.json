@@ -1,0 +1,7 @@
+{
+  "title": "A transfer that can debit without crediting",
+  "kind": "ibmi",
+  "prompt": "TRANSFER.sqlrpgle debits one account and credits another as two independent statements, so a failure between them leaves the money nowhere. Put both under commitment control: commit when both succeeded, roll back and set the error flag otherwise. Check SQLCODE after each statement rather than assuming it worked.",
+  "check": "codeonly TRANSFER.sqlrpgle | grep -qiE 'exec +sql +commit' && codeonly TRANSFER.sqlrpgle | grep -qiE 'exec +sql +rollback' && [ $(codeonly TRANSFER.sqlrpgle | grep -ciE 'sqlcode') -ge 2 ] && codeonly TRANSFER.sqlrpgle | grep -qiE 'commit *\\( *\\*(chg|all|cs|rr) *\\)'",
+  "timeoutMs": 180000
+}

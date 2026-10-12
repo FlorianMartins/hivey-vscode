@@ -56,7 +56,7 @@ export interface McpServerStatus {
 /**
  * The configured servers, from the workspace file first and the settings second.
  *
- * `.vscode/mcp.json` is the file VS Code itself standardised on, so a team that already has one
+ * `.vscode/mcp.json` is the file VS Code itself standardized on, so a team that already has one
  * gets their servers here without writing anything twice. A name defined in both places resolves to
  * the settings entry, because the setting is the one the user typed themselves.
  */
@@ -70,19 +70,19 @@ export async function readMcpConfig(): Promise<McpServerConfig[]> {
       const parsed = JSON.parse(stripJsonComments(new TextDecoder().decode(bytes))) as {
         servers?: Record<string, Partial<McpServerConfig>>;
       };
-      for (const [name, entry] of Object.entries(parsed.servers ?? {})) byName.set(name, normalise(name, entry));
+      for (const [name, entry] of Object.entries(parsed.servers ?? {})) byName.set(name, normalize(name, entry));
     } catch {
       // No file, or a file being edited into a broken state. Neither is worth an error banner.
     }
   }
 
   const fromSettings = vscode.workspace.getConfiguration(SECTION).get<Record<string, Partial<McpServerConfig>>>("mcp.servers") ?? {};
-  for (const [name, entry] of Object.entries(fromSettings)) byName.set(name, normalise(name, entry));
+  for (const [name, entry] of Object.entries(fromSettings)) byName.set(name, normalize(name, entry));
 
   return [...byName.values()].filter((s) => !s.disabled);
 }
 
-function normalise(name: string, entry: Partial<McpServerConfig>): McpServerConfig {
+function normalize(name: string, entry: Partial<McpServerConfig>): McpServerConfig {
   const type = entry.type ?? (entry.url ? "http" : "stdio");
   return { ...entry, name, type } as McpServerConfig;
 }

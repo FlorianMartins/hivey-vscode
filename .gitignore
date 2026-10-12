@@ -9,3 +9,8 @@ media/webview.js.map
 dist-integration/
 .vscode-test/
 eval/results/
+# The report a run writes beside its results: generated, per-machine, and full of temporary paths
+# that a secret scanner reads as high entropy (78 findings, all of them a `/tmp/hivey-eval-…`
+# directory name). The artefact that belongs in the repository is `eval/QUALITY.md`, which is the
+# table — not the raw run it was computed from.
+eval/report/

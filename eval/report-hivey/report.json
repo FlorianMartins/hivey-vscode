@@ -1,0 +1,1697 @@
+{
+  "at": "2026-10-03T11:53:09.585Z",
+  "endpoint": "https://openrouter.ai/api/v1",
+  "models": [
+    "hivey"
+  ],
+  "outcomes": [
+    {
+      "task": "feature-cli-flag",
+      "kind": "feature",
+      "model": "hivey",
+      "passed": true,
+      "seconds": 50.5,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "openai/gpt-6.1-sol-pro",
+          "steps": 9,
+          "promptTokens": 53935,
+          "completionTokens": 2097,
+          "usd": 0.0696671,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "update_plan": 4,
+            "list_files": 1,
+            "read_file": 2,
+            "edit_file": 1,
+            "run_command": 1
+          },
+          "ms": 50286,
+          "planLeft": 0
+        }
+      ]
+    },
+    {
+      "task": "feature-validate",
+      "kind": "feature",
+      "model": "hivey",
+      "passed": true,
+      "seconds": 52.5,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "openai/gpt-6.1-sol-pro",
+          "steps": 10,
+          "promptTokens": 58576,
+          "completionTokens": 1646,
+          "usd": 0.0673421,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "update_plan": 4,
+            "list_files": 1,
+            "read_file": 3,
+            "edit_file": 1,
+            "run_command": 1
+          },
+          "ms": 52230,
+          "planLeft": 0
+        }
+      ]
+    },
+    {
+      "task": "fin-amortisation",
+      "kind": "bug",
+      "model": "hivey",
+      "passed": true,
+      "seconds": 45.3,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "openai/gpt-6.1-sol-pro",
+          "steps": 10,
+          "promptTokens": 61425,
+          "completionTokens": 1391,
+          "usd": 0.0661479,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "update_plan": 4,
+            "list_files": 1,
+            "read_file": 3,
+            "edit_file": 1,
+            "run_command": 1
+          },
+          "ms": 45027,
+          "planLeft": 0
+        }
+      ]
+    },
+    {
+      "task": "fin-fix-message",
+      "kind": "bug",
+      "model": "hivey",
+      "passed": true,
+      "seconds": 81.6,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "openai/gpt-6.1-sol-pro",
+          "steps": 12,
+          "promptTokens": 91477,
+          "completionTokens": 3424,
+          "usd": 0.1046688,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "update_plan": 4,
+            "list_files": 1,
+            "read_file": 3,
+            "run_command": 2,
+            "edit_file": 2
+          },
+          "ms": 81303,
+          "planLeft": 0
+        }
+      ]
+    },
+    {
+      "task": "fin-iban",
+      "kind": "bug",
+      "model": "hivey",
+      "passed": true,
+      "seconds": 50.2,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "openai/gpt-6.1-sol-pro",
+          "steps": 9,
+          "promptTokens": 62353,
+          "completionTokens": 1846,
+          "usd": 0.0715793,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "update_plan": 4,
+            "read_file": 2,
+            "edit_file": 1,
+            "run_command": 2
+          },
+          "ms": 50084,
+          "planLeft": 0
+        }
+      ]
+    },
+    {
+      "task": "fin-identifiers",
+      "kind": "bug",
+      "model": "hivey",
+      "passed": true,
+      "seconds": 134.9,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "openai/gpt-6.1-sol-pro",
+          "steps": 14,
+          "promptTokens": 104911,
+          "completionTokens": 4779,
+          "usd": 0.1260963,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "update_plan": 4,
+            "read_file": 2,
+            "list_files": 1,
+            "edit_file": 4,
+            "run_command": 2,
+            "run_agent": 1
+          },
+          "ms": 134776,
+          "planLeft": 0
+        }
+      ]
+    },
+    {
+      "task": "fin-market-hours",
+      "kind": "bug",
+      "model": "hivey",
+      "passed": true,
+      "seconds": 61.2,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "openai/gpt-6.1-sol-pro",
+          "steps": 12,
+          "promptTokens": 82297,
+          "completionTokens": 2130,
+          "usd": 0.08676329999999999,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "update_plan": 4,
+            "list_files": 1,
+            "read_file": 3,
+            "edit_file": 2,
+            "run_command": 2
+          },
+          "ms": 61077,
+          "planLeft": 0
+        }
+      ]
+    },
+    {
+      "task": "fin-minor-units",
+      "kind": "bug",
+      "model": "hivey",
+      "passed": true,
+      "seconds": 57.3,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "openai/gpt-6.1-sol-pro",
+          "steps": 10,
+          "promptTokens": 64285,
+          "completionTokens": 1931,
+          "usd": 0.07308170000000001,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "update_plan": 4,
+            "list_files": 1,
+            "read_file": 3,
+            "edit_file": 1,
+            "run_command": 1
+          },
+          "ms": 57018,
+          "planLeft": 0
+        }
+      ]
+    },
+    {
+      "task": "fin-settlement",
+      "kind": "bug",
+      "model": "hivey",
+      "passed": true,
+      "seconds": 64,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "openai/gpt-6.1-sol-pro",
+          "steps": 10,
+          "promptTokens": 65500,
+          "completionTokens": 2438,
+          "usd": 0.07927079999999999,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "update_plan": 4,
+            "list_files": 1,
+            "read_file": 3,
+            "edit_file": 1,
+            "run_command": 1
+          },
+          "ms": 63770,
+          "planLeft": 0
+        }
+      ]
+    },
+    {
+      "task": "ibmi-cl-monmsg",
+      "kind": "ibmi",
+      "model": "hivey",
+      "passed": true,
+      "seconds": 49.7,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "openai/gpt-6.1-sol-pro",
+          "steps": 6,
+          "promptTokens": 40912,
+          "completionTokens": 1660,
+          "usd": 0.0546271,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "update_plan": 3,
+            "read_file": 1,
+            "edit_file": 1,
+            "run_command": 1
+          },
+          "ms": 49596,
+          "planLeft": 0
+        }
+      ]
+    },
+    {
+      "task": "ibmi-cl-qualify",
+      "kind": "ibmi",
+      "model": "hivey",
+      "passed": false,
+      "seconds": 100.9,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "openai/gpt-6.1-sol-pro",
+          "steps": 9,
+          "promptTokens": 60240,
+          "completionTokens": 4390,
+          "usd": 0.0985628,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "update_plan": 4,
+            "read_file": 1,
+            "list_files": 1,
+            "run_command": 2,
+            "edit_file": 1
+          },
+          "ms": 100815,
+          "planLeft": 0
+        }
+      ],
+      "why": "",
+      "agent": " run `python3 - <<'PY'\nfrom pathlib import Path\nimport re\nsource = Path('ARCHIVE.clle').read_text()\nassert re.search(r'PGM\\s+PARM\\(&LIB\\)', source)\nassert re.search(r'DCL\\s+VAR\\(&LIB\\) TYPE\\(\\*CHAR\\) LEN\\(10\\)', source)\nassert re.search(r'DCL\\s+VAR\\(&TARGETLIB\\).*VALUE\\(\\x27DEVCFC\\x27\\)', source)\nassert re.search(r'CHGVAR\\s+VAR\\(&TARGETLIB\\) VALUE\\(&LIB\\)\\s+MONMSG\\s+MSGID\\(MCH3601\\)', source)\nrefs = re.findall(r'\\b(?:FILE|FROMFILE|TOFILE)\\(([^)]+)\\)', source)\nassert refs == ['&TARGETLIB/ARCSTG', '&TARGETLIB/ORDHDR', '&TARGETLIB/ARCSTG', '&TARGETLIB/ARCOLD'], refs\nassert all(len(line) <= 80 for line in source.splitlines())\nprint('Static checks passed: parameter, default fallback, and all four qualified file references.')\nPY`\u001b[0m\n\u001b[2m  $ python3 - <<'PY'\nfrom pathlib import Path\nimport re\nsource = Path('ARCHIVE.clle').read_text()\nassert re.search(r'PGM\\s+PARM\\(&LIB\\)', source)\nassert re.search(r'DCL\\s+VAR\\(&LIB\\) TYPE\\(\\*CHAR\\) LEN\\(10\\)', source)\nassert re.search(r'DCL\\s+VAR\\(&TARGETLIB\\).*VALUE\\(\\x27DEVCFC\\x27\\)', source)\nassert re.search(r'CHGVAR\\s+VAR\\(&TARGETLIB\\) VALUE\\(&LIB\\)\\s+MONMSG\\s+MSGID\\(MCH3601\\)', source)\nrefs = re.findall(r'\\b(?:FILE|FROMFILE|TOFILE)\\(([^)]+)\\)', source)\nassert refs == ['&TARGETLIB/ARCSTG', '&TARGETLIB/ORDHDR', '&TARGETLIB/ARCSTG', '&TARGETLIB/ARCOLD'], refs\nassert all(len(line) <= 80 for line in source.splitlines())\nprint('Static checks passed: parameter, default fallback, and all four qualified file references.')\nPY\u001b[0m\n\u001b[2m  plan 3/3\u001b[0m\n\u001b[2m  plan: 3/3\u001b[0m\nUpdated `ARCHIVE.clle`:\n\n- Added the 10-character `&LIB` parameter.\n- Defaults to `DEVCFC` when the parameter is omitted, using an `MCH3601` handler.\n- Qualified every file reference in `CLRPFM`, `CPYF`, and `DLTF` with `&TARGETLIB`.\n\nStatic checks passed. IBM i compilation/runtime testing and editor diagnostics were unavailable here.\n\u001b[2m  60240+4390 tokens · $0.0986\u001b[0m\n\n\u001b[2mTo know\u001b[0m\n\u001b[2m  • The context is 100 % full — summarising it will keep answers sharp and cheaper.\u001b[0m\n"
+    },
+    {
+      "task": "ibmi-cl-sbmjob",
+      "kind": "ibmi",
+      "model": "hivey",
+      "passed": false,
+      "seconds": 41.3,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "openai/gpt-6.1-sol-pro",
+          "steps": 4,
+          "promptTokens": 27833,
+          "completionTokens": 1200,
+          "usd": 0.0387813,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "update_plan": 2,
+            "read_file": 1,
+            "list_files": 1
+          },
+          "ms": 41196,
+          "planLeft": 2
+        }
+      ],
+      "why": "",
+      "agent": "\u001b[2mhivey → openai/gpt-6.1-sol-pro\u001b[0m\n\u001b[1mHivey Code\u001b[0m\u001b[2m — sovereign coding assistant\u001b[0m\n\u001b[2mopenai/gpt-6.1-sol-pro · openrouter.ai · mode agent · \u001b[33mremote, redaction strict\u001b[0m\u001b[0m\n\u001b[2m/help for the commands, Ctrl+C to quit.\n\u001b[0m\n\u001b[2m  plan 0/3 · Inspect NIGHTLY.clle and repository conventions\u001b[0m\n\u001b[2m  plan: 0/3\u001b[0m\n\u001b[2m  read NIGHTLY.clle\u001b[0m\n\u001b[2m  1 file(s)\u001b[0m\n\u001b[2m  plan 1/3 · Make batch submission explicit and monitor failures\u001b[0m\n\u001b[2m  plan: 1/3\u001b[0m\nWhat qualified `JOBD` and ordered `INLLIBL` should the batch use? Neither is defined in the repository.\n\nI suggest `JOB(NIGHTCLS)`. With those values, I’ll add `MONMSG CPF0000` immediately after `SBMJOB`, propagate submission failures as an escape message, and send `'Nightly submitted'` only on success.\n\u001b[2m  27833+1200 tokens · $0.0388\u001b[0m\n\u001b[33m  unfinished: the turn ended with 2 step(s) of its own plan outstanding (\"Make batch submission explicit and monitor failures\", \"Check the change and report verification\")\u001b[0m\n\n\u001b[2mTo know\u001b[0m\n\u001b[2m  • Left undone from my own plan: Make batch submission explicit and monitor failures\u001b[0m\n\u001b[2m  • Left undone from my own plan: Check the change and report verification\u001b[0m\n\u001b[2m  • The context is 87 % full — summarising it will keep answers sharp and cheaper.\u001b[0m\n"
+    },
+    {
+      "task": "ibmi-db2-catalog",
+      "kind": "ibmi",
+      "model": "hivey",
+      "passed": true,
+      "seconds": 55.7,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "openai/gpt-6.1-sol-pro",
+          "steps": 8,
+          "promptTokens": 52567,
+          "completionTokens": 1785,
+          "usd": 0.0659449,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "update_plan": 4,
+            "list_files": 1,
+            "read_file": 1,
+            "write_file": 1,
+            "run_command": 1
+          },
+          "ms": 55555,
+          "planLeft": 0
+        }
+      ]
+    },
+    {
+      "task": "ibmi-db2-commit",
+      "kind": "ibmi",
+      "model": "hivey",
+      "passed": false,
+      "seconds": 87.5,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "openai/gpt-6.1-sol-pro",
+          "steps": 10,
+          "promptTokens": 81032,
+          "completionTokens": 3740,
+          "usd": 0.1039907,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "update_plan": 4,
+            "search_text": 1,
+            "list_files": 1,
+            "read_file": 1,
+            "edit_file": 1,
+            "run_command": 2
+          },
+          "ms": 87379,
+          "planLeft": 0
+        }
+      ],
+      "why": "",
+      "agent": "git diff --check; git diff -- TRANSFER.sqlrpgle\u001b[0m\n\u001b[2m  auto-approved: run `if command -v CRTSQLRPGI >/dev/null 2>&1; then echo 'CRTSQLRPGI available'; else echo 'CRTSQLRPGI unavailable: cannot compile SQLRPGLE here'; fi\npython3 - <<'PY'\nfrom pathlib import Path\ns = Path('TRANSFER.sqlrpgle').read_text()\nassert 'set option commit = *cs;' in s\nassert s.count('if SQLCODE <> 0;') == 3\nassert s.count('if not inError;') == 2\nassert 'if inError;\\n  exec sql rollback;\\nendif;' in s\nassert s.count('endif;') == s.count('if ')\nassert not any(line.rstrip() != line for line in s.splitlines())\nprint('Static transaction structure and whitespace checks passed (not an RPG compile or database test).')\nPY`\u001b[0m\n\u001b[2m  $ if command -v CRTSQLRPGI >/dev/null 2>&1; then echo 'CRTSQLRPGI available'; else echo 'CRTSQLRPGI unavailable: cannot compile SQLRPGLE here'; fi\npython3 - <<'PY'\nfrom pathlib import Path\ns = Path('TRANSFER.sqlrpgle').read_text()\nassert 'set option commit = *cs;' in s\nassert s.count('if SQLCODE <> 0;') == 3\nassert s.count('if not inError;') == 2\nassert 'if inError;\\n  exec sql rollback;\\nendif;' in s\nassert s.count('endif;') == s.count('if ')\nassert not any(line.rstrip() != line for line in s.splitlines())\nprint('Static transaction structure and whitespace checks passed (not an RPG compile or database test).')\nPY\u001b[0m\n\u001b[2m  plan 3/3\u001b[0m\n\u001b[2m  plan: 3/3\u001b[0m\nUpdated `TRANSFER.sqlrpgle:10–36`:\n- Enabled commitment control with `COMMIT = *CS`.\n- Checked `SQLCODE` immediately after each update.\n- Skipped the credit if the debit failed.\n- Committed only when both updates succeeded.\n- Set `inError` and attempted rollback if an update or commit failed.\n\nStatic checks passed. IBM i compilation and database tests could not run here; no compiler or editor diagnostics tool is available. `ACCOUNT` must be journaled for commitment control.\n\u001b[2m  81032+3740 tokens · $0.1040\u001b[0m\n\n\u001b[2mTo know\u001b[0m\n\u001b[2m  • The context is 100 % full — summarising it will keep answers sharp and cheaper.\u001b[0m\n"
+    },
+    {
+      "task": "ibmi-db2-ddl",
+      "kind": "ibmi",
+      "model": "hivey",
+      "passed": true,
+      "seconds": 32,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "openai/gpt-6.1-sol-pro",
+          "steps": 3,
+          "promptTokens": 25365,
+          "completionTokens": 1540,
+          "usd": 0.0404928,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "read_file": 1,
+            "write_file": 1,
+            "run_command": 1
+          },
+          "ms": 31888
+        }
+      ]
+    },
+    {
+      "task": "ibmi-dds-field",
+      "kind": "ibmi",
+      "model": "hivey",
+      "passed": true,
+      "seconds": 91.8,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "openai/gpt-6.1-sol-pro",
+          "steps": 9,
+          "promptTokens": 66094,
+          "completionTokens": 3730,
+          "usd": 0.09605380000000001,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "update_plan": 4,
+            "read_file": 1,
+            "list_files": 1,
+            "run_command": 2,
+            "edit_file": 1
+          },
+          "ms": 91670,
+          "planLeft": 0
+        }
+      ]
+    },
+    {
+      "task": "ibmi-dds-logical",
+      "kind": "ibmi",
+      "model": "hivey",
+      "passed": true,
+      "seconds": 59.4,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "openai/gpt-6.1-sol-pro",
+          "steps": 7,
+          "promptTokens": 48526,
+          "completionTokens": 2352,
+          "usd": 0.0685973,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "update_plan": 4,
+            "read_file": 1,
+            "edit_file": 1,
+            "run_command": 1
+          },
+          "ms": 59341,
+          "planLeft": 0
+        }
+      ]
+    },
+    {
+      "task": "ibmi-dds-printer",
+      "kind": "ibmi",
+      "model": "hivey",
+      "passed": false,
+      "seconds": 154.9,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "openai/gpt-6.1-sol-pro",
+          "steps": 10,
+          "promptTokens": 89224,
+          "completionTokens": 8085,
+          "usd": 0.15628839999999997,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "update_plan": 4,
+            "list_files": 1,
+            "read_file": 1,
+            "run_command": 3,
+            "edit_file": 1
+          },
+          "ms": 154832,
+          "planLeft": 0
+        }
+      ],
+      "why": "",
+      "agent": "ds[current] = []\n    else:\n        assert padded[16] == ' ', (number, 'Invalid record marker')\n    records[current].append(padded)\n    if padded[41:44].strip():\n        assert padded[41:44].strip().isdigit(), (number, 'Invalid print position')\nassert list(records) == ['HEADER', 'DETAIL', 'TOTAL']\nheader = '\\n'.join(records['HEADER'])\nfor keyword in ['SKIPB(1)', 'SPACEA(2)', 'SPACEB(2)', 'DATE EDTCDE(Y)', 'PAGNBR EDTCDE(Z)', \"'Customer No.'\", \"'Customer Name'\", \"'Balance'\"]:\n    assert keyword in header, keyword\nassert 'SPACEA(1)' in records['DETAIL'][0]\nfor record, expected in [('DETAIL', {'CUSNO': ('10', 'A', '', '2'), 'CUSNAM': ('30', 'A', '', '15'), 'CUSBAL': ('11', 'P', '2', '50')}), ('TOTAL', {'TOTBAL': ('11', 'P', '2', '50')})]:\n    actual = {line[18:28].strip(): (line[29:34].strip(), line[34], line[35:37].strip(), line[41:44].strip()) for line in records[record] if line[16] != 'R' and line[18:28].strip()}\n    assert actual == expected, (record, actual)\nassert 'SPACEB(1)' in records['TOTAL'][0]\nassert any('SPACEA(1)' in line for line in records['TOTAL'])\nprint('PASS: fixed-format columns, field definitions, heading keywords, and explicit record spacing')\nPY\ncommand -v CRTPRTF || command -v crtprtf || true\u001b[0m\n\u001b[2m  plan 3/3\u001b[0m\n\u001b[2m  plan: 3/3\u001b[0m\nUpdated `CUSPRT.prtf` in fixed-format DDS:\n\n- **`HEADER` (line 1):** title, system date, page number, and column headings. Explicit `SKIPB(1)`, `SPACEB(2)`, and `SPACEA(2)`.\n- **`DETAIL` (line 10):** explicit `SPACEA(1)` and corrected print-position columns.\n- **`TOTAL` (line 14):** “Total” label and `TOTBAL`, with explicit before/after spacing.\n\nFixed-column and structural checks passed. IBM i compilation and editor diagnostics were unavailable.\n\nThe calling program must write `HEADER` initially and on overflow, then write `TOTAL` with the accumulated balance at the end.\n\u001b[2m  89224+8085 tokens · $0.1563\u001b[0m\n\n\u001b[2mTo know\u001b[0m\n\u001b[2m  • The context is 100 % full — summarising it will keep answers sharp and cheaper.\u001b[0m\n"
+    },
+    {
+      "task": "ibmi-rpg-copy-proto",
+      "kind": "ibmi",
+      "model": "hivey",
+      "passed": true,
+      "seconds": 77.3,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "openai/gpt-6.1-sol-pro",
+          "steps": 10,
+          "promptTokens": 70987,
+          "completionTokens": 3025,
+          "usd": 0.0920882,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "update_plan": 4,
+            "list_files": 1,
+            "read_file": 1,
+            "write_file": 1,
+            "edit_file": 2,
+            "run_command": 1
+          },
+          "ms": 77246,
+          "planLeft": 0
+        }
+      ]
+    },
+    {
+      "task": "ibmi-rpg-doc",
+      "kind": "ibmi",
+      "model": "hivey",
+      "passed": true,
+      "seconds": 89.6,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "openai/gpt-6.1-sol-pro",
+          "steps": 12,
+          "promptTokens": 79189,
+          "completionTokens": 3561,
+          "usd": 0.10074389999999998,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "update_plan": 4,
+            "read_file": 1,
+            "search_text": 1,
+            "list_files": 1,
+            "run_command": 2,
+            "edit_file": 3
+          },
+          "ms": 89496,
+          "planLeft": 0
+        }
+      ]
+    },
+    {
+      "task": "ibmi-rpg-fixed-lr",
+      "kind": "ibmi",
+      "model": "hivey",
+      "passed": true,
+      "seconds": 58.4,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "openai/gpt-6.1-sol-pro",
+          "steps": 7,
+          "promptTokens": 48590,
+          "completionTokens": 2272,
+          "usd": 0.0676175,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "update_plan": 3,
+            "read_file": 1,
+            "list_files": 1,
+            "edit_file": 1,
+            "run_command": 1
+          },
+          "ms": 58322,
+          "planLeft": 0
+        }
+      ]
+    },
+    {
+      "task": "ibmi-rpg-freeform",
+      "kind": "ibmi",
+      "model": "hivey",
+      "passed": false,
+      "seconds": 50.6,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "openai/gpt-6.1-sol-pro",
+          "steps": 4,
+          "promptTokens": 29491,
+          "completionTokens": 1764,
+          "usd": 0.0461323,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "update_plan": 2,
+            "read_file": 1,
+            "list_files": 1
+          },
+          "ms": 50527,
+          "planLeft": 0
+        }
+      ],
+      "why": "",
+      "agent": "\u001b[2mhivey → openai/gpt-6.1-sol-pro\u001b[0m\n\u001b[1mHivey Code\u001b[0m\u001b[2m — sovereign coding assistant\u001b[0m\n\u001b[2mopenai/gpt-6.1-sol-pro · openrouter.ai · mode agent · \u001b[33mremote, redaction strict\u001b[0m\u001b[0m\n\u001b[2m/help for the commands, Ctrl+C to quit.\n\u001b[0m\n\u001b[2m  plan 0/3 · Read the source and identify fixed-format constructs\u001b[0m\n\u001b[2m  plan: 0/3\u001b[0m\n\u001b[2m  read CUSTRPT.rpgle\u001b[0m\n\u001b[2m  1 file(s)\u001b[0m\n\u001b[2m  plan 3/3\u001b[0m\n\u001b[2m  plan: 3/3\u001b[0m\n`CUSTRPT.rpgle:13` contains `EXCEPT detail`, which has no fully free-form equivalent. The file also contains no output specifications defining `detail`.\n\nTo preserve behavior, I need the missing `detail` output specifications—or an externally described printer format to use with `WRITE`. Replacing `EXCEPT` blindly would change the report behavior.\n\nI left `CUSTRPT.rpgle` unchanged. Can you provide the `detail` definition?\n\u001b[2m  29491+1764 tokens · $0.0461\u001b[0m\n\n\u001b[2mTo know\u001b[0m\n\u001b[2m  • The context is 92 % full — summarising it will keep answers sharp and cheaper.\u001b[0m\n"
+    },
+    {
+      "task": "ibmi-rpg-indicators",
+      "kind": "ibmi",
+      "model": "hivey",
+      "passed": true,
+      "seconds": 76.5,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "openai/gpt-6.1-sol-pro",
+          "steps": 9,
+          "promptTokens": 66043,
+          "completionTokens": 3219,
+          "usd": 0.09001169999999999,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "update_plan": 4,
+            "list_files": 1,
+            "read_file": 1,
+            "edit_file": 2,
+            "run_command": 1
+          },
+          "ms": 76367,
+          "planLeft": 0
+        }
+      ]
+    },
+    {
+      "task": "ibmi-rpg-monitor",
+      "kind": "ibmi",
+      "model": "hivey",
+      "passed": true,
+      "seconds": 59.3,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "openai/gpt-6.1-sol-pro",
+          "steps": 9,
+          "promptTokens": 66611,
+          "completionTokens": 1773,
+          "usd": 0.0749384,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "update_plan": 4,
+            "search_text": 1,
+            "list_files": 1,
+            "read_file": 1,
+            "edit_file": 1,
+            "run_command": 1
+          },
+          "ms": 59180,
+          "planLeft": 0
+        }
+      ]
+    },
+    {
+      "task": "ibmi-rpg-move",
+      "kind": "ibmi",
+      "model": "hivey",
+      "passed": true,
+      "seconds": 120.6,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "openai/gpt-6.1-sol-pro",
+          "steps": 10,
+          "promptTokens": 74438,
+          "completionTokens": 5197,
+          "usd": 0.1186066,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "update_plan": 4,
+            "search_text": 1,
+            "list_files": 1,
+            "read_file": 1,
+            "run_command": 2,
+            "edit_file": 1
+          },
+          "ms": 120455,
+          "planLeft": 0
+        }
+      ]
+    },
+    {
+      "task": "ibmi-rpg-packed",
+      "kind": "ibmi",
+      "model": "hivey",
+      "passed": true,
+      "seconds": 119.9,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "openai/gpt-6.1-sol-pro",
+          "steps": 9,
+          "promptTokens": 70390,
+          "completionTokens": 5674,
+          "usd": 0.1201559,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "update_plan": 4,
+            "list_files": 1,
+            "read_file": 1,
+            "run_command": 2,
+            "edit_file": 1
+          },
+          "ms": 119745,
+          "planLeft": 0
+        }
+      ]
+    },
+    {
+      "task": "ibmi-rpg-procedure",
+      "kind": "ibmi",
+      "model": "hivey",
+      "passed": true,
+      "seconds": 81.2,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "openai/gpt-6.1-sol-pro",
+          "steps": 12,
+          "promptTokens": 83135,
+          "completionTokens": 3665,
+          "usd": 0.1062944,
+          "stoppedBecause": "max-steps",
+          "truncated": false,
+          "tools": {
+            "update_plan": 3,
+            "list_files": 1,
+            "read_file": 1,
+            "edit_file": 5,
+            "run_command": 2
+          },
+          "ms": 81080,
+          "planLeft": 1
+        }
+      ]
+    },
+    {
+      "task": "ibmi-rpg-sql-cursor",
+      "kind": "ibmi",
+      "model": "hivey",
+      "passed": false,
+      "seconds": 30.2,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "openai/gpt-6.1-sol-pro",
+          "steps": 3,
+          "promptTokens": 22165,
+          "completionTokens": 915,
+          "usd": 0.0307769,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "update_plan": 1,
+            "list_files": 1,
+            "read_file": 1
+          },
+          "ms": 30125,
+          "planLeft": 3
+        }
+      ],
+      "why": "",
+      "agent": "\u001b[2mhivey → openai/gpt-6.1-sol-pro\u001b[0m\n\u001b[1mHivey Code\u001b[0m\u001b[2m — sovereign coding assistant\u001b[0m\n\u001b[2mopenai/gpt-6.1-sol-pro · openrouter.ai · mode agent · \u001b[33mremote, redaction strict\u001b[0m\u001b[0m\n\u001b[2m/help for the commands, Ctrl+C to quit.\n\u001b[0m\n\u001b[2m  plan 0/3 · Inspect the report and native I/O\u001b[0m\n\u001b[2m  plan: 0/3\u001b[0m\n\u001b[2m  1 file(s)\u001b[0m\n\u001b[2m  read BALRPT.sqlrpgle\u001b[0m\n`BALRPT.sqlrpgle` shows `CUSBAL`, but not the branch key’s column name—`SETLL`/`READE` get that from `CUSTMAST`’s external definition.\n\nPlease provide the DDS or SQL definition of `CUSTMAST` (at least its key columns and `CUSBAL`’s type). I need that to write the correct `WHERE` clause and preserve the balance precision without guessing. No files changed yet.\n\u001b[2m  22165+915 tokens · $0.0308\u001b[0m\n\u001b[33m  unfinished: the turn ended with 3 step(s) of its own plan outstanding (\"Inspect the report and native I/O\", \"Replace native reads with a checked SQL cursor\", \"Verify the changes\")\u001b[0m\n\n\u001b[2mTo know\u001b[0m\n\u001b[2m  • Left undone from my own plan: Inspect the report and native I/O\u001b[0m\n\u001b[2m  • Left undone from my own plan: Replace native reads with a checked SQL cursor\u001b[0m\n\u001b[2m  • Left undone from my own plan: Verify the changes\u001b[0m\n"
+    },
+    {
+      "task": "ibmi-rpg-srvpgm",
+      "kind": "ibmi",
+      "model": "hivey",
+      "passed": true,
+      "seconds": 110.3,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "openai/gpt-6.1-sol-pro",
+          "steps": 11,
+          "promptTokens": 77332,
+          "completionTokens": 5732,
+          "usd": 0.1252656,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "update_plan": 4,
+            "list_files": 1,
+            "read_file": 1,
+            "note_aside": 1,
+            "edit_file": 1,
+            "write_file": 2,
+            "run_command": 1
+          },
+          "ms": 110160,
+          "planLeft": 0
+        }
+      ]
+    },
+    {
+      "task": "ibmi-rpg-unittest",
+      "kind": "test",
+      "model": "hivey",
+      "passed": true,
+      "seconds": 92.7,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "openai/gpt-6.1-sol-pro",
+          "steps": 13,
+          "promptTokens": 105473,
+          "completionTokens": 3638,
+          "usd": 0.1146336,
+          "stoppedBecause": "max-steps",
+          "truncated": false,
+          "tools": {
+            "update_plan": 3,
+            "list_files": 1,
+            "read_file": 2,
+            "run_command": 6,
+            "write_file": 1
+          },
+          "ms": 92599,
+          "planLeft": 1
+        }
+      ]
+    },
+    {
+      "task": "ibmi-sql-db2",
+      "kind": "ibmi",
+      "model": "hivey",
+      "passed": true,
+      "seconds": 59.9,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "openai/gpt-6.1-sol-pro",
+          "steps": 8,
+          "promptTokens": 52506,
+          "completionTokens": 2402,
+          "usd": 0.07272490000000001,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "update_plan": 4,
+            "list_files": 1,
+            "read_file": 1,
+            "edit_file": 1,
+            "run_command": 1
+          },
+          "ms": 59765,
+          "planLeft": 0
+        }
+      ]
+    },
+    {
+      "task": "java-equals-hashcode",
+      "kind": "bug",
+      "model": "hivey",
+      "passed": true,
+      "seconds": 58.1,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "openai/gpt-6.1-sol-pro",
+          "steps": 9,
+          "promptTokens": 61801,
+          "completionTokens": 2378,
+          "usd": 0.07928679999999999,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "update_plan": 4,
+            "list_files": 1,
+            "read_file": 1,
+            "edit_file": 2,
+            "run_command": 1
+          },
+          "ms": 57965,
+          "planLeft": 0
+        }
+      ]
+    },
+    {
+      "task": "java-junit",
+      "kind": "test",
+      "model": "hivey",
+      "passed": true,
+      "seconds": 52.6,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "openai/gpt-6.1-sol-pro",
+          "steps": 8,
+          "promptTokens": 58088,
+          "completionTokens": 2394,
+          "usd": 0.0751214,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "update_plan": 4,
+            "list_files": 1,
+            "read_file": 1,
+            "write_file": 1,
+            "run_command": 1
+          },
+          "ms": 52529,
+          "planLeft": 0
+        }
+      ]
+    },
+    {
+      "task": "java-optional",
+      "kind": "refactor",
+      "model": "hivey",
+      "passed": true,
+      "seconds": 67.3,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "openai/gpt-6.1-sol-pro",
+          "steps": 15,
+          "promptTokens": 81972,
+          "completionTokens": 3101,
+          "usd": 0.1007574,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "update_plan": 4,
+            "list_files": 1,
+            "read_file": 5,
+            "edit_file": 3,
+            "run_command": 1,
+            "search_text": 1
+          },
+          "ms": 67181,
+          "planLeft": 0
+        }
+      ]
+    },
+    {
+      "task": "java-try-with-resources",
+      "kind": "bug",
+      "model": "hivey",
+      "passed": true,
+      "seconds": 55.7,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "openai/gpt-6.1-sol-pro",
+          "steps": 8,
+          "promptTokens": 53971,
+          "completionTokens": 1906,
+          "usd": 0.0675586,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "update_plan": 4,
+            "list_files": 1,
+            "read_file": 1,
+            "edit_file": 1,
+            "run_command": 1
+          },
+          "ms": 55617,
+          "planLeft": 0
+        }
+      ]
+    },
+    {
+      "task": "js-async-race",
+      "kind": "bug",
+      "model": "hivey",
+      "passed": true,
+      "seconds": 64.7,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "openai/gpt-6.1-sol-pro",
+          "steps": 11,
+          "promptTokens": 60652,
+          "completionTokens": 2089,
+          "usd": 0.0725177,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "update_plan": 3,
+            "list_files": 1,
+            "read_file": 3,
+            "run_command": 3,
+            "edit_file": 1
+          },
+          "ms": 64417,
+          "planLeft": 0
+        }
+      ]
+    },
+    {
+      "task": "js-money-rounding",
+      "kind": "bug",
+      "model": "hivey",
+      "passed": true,
+      "seconds": 43.8,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "openai/gpt-6.1-sol-pro",
+          "steps": 9,
+          "promptTokens": 51775,
+          "completionTokens": 1448,
+          "usd": 0.059667200000000004,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "update_plan": 3,
+            "read_file": 3,
+            "list_files": 1,
+            "edit_file": 1,
+            "run_command": 1
+          },
+          "ms": 43594,
+          "planLeft": 0
+        }
+      ]
+    },
+    {
+      "task": "js-null-crash",
+      "kind": "bug",
+      "model": "hivey",
+      "passed": true,
+      "seconds": 41.2,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "openai/gpt-6.1-sol-pro",
+          "steps": 9,
+          "promptTokens": 47444,
+          "completionTokens": 952,
+          "usd": 0.052079200000000006,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "update_plan": 3,
+            "list_files": 1,
+            "read_file": 3,
+            "edit_file": 1,
+            "run_command": 1
+          },
+          "ms": 40935,
+          "planLeft": 0
+        }
+      ]
+    },
+    {
+      "task": "js-off-by-one",
+      "kind": "bug",
+      "model": "hivey",
+      "passed": true,
+      "seconds": 52.4,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "openai/gpt-6.1-sol-pro",
+          "steps": 13,
+          "promptTokens": 84922,
+          "completionTokens": 1652,
+          "usd": 0.0806162,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "update_plan": 4,
+            "list_files": 1,
+            "read_file": 5,
+            "run_command": 2,
+            "edit_file": 1
+          },
+          "ms": 52164,
+          "planLeft": 0
+        }
+      ]
+    },
+    {
+      "task": "py-aware-datetime",
+      "kind": "bug",
+      "model": "hivey",
+      "passed": true,
+      "seconds": 56.1,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "openai/gpt-6.1-sol-pro",
+          "steps": 10,
+          "promptTokens": 68390,
+          "completionTokens": 1945,
+          "usd": 0.07657280000000001,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "update_plan": 4,
+            "read_file": 2,
+            "edit_file": 2,
+            "run_command": 2
+          },
+          "ms": 55989,
+          "planLeft": 0
+        }
+      ]
+    },
+    {
+      "task": "py-date-parse",
+      "kind": "bug",
+      "model": "hivey",
+      "passed": true,
+      "seconds": 47,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "openai/gpt-6.1-sol-pro",
+          "steps": 9,
+          "promptTokens": 54739,
+          "completionTokens": 1423,
+          "usd": 0.062149499999999996,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "update_plan": 4,
+            "read_file": 2,
+            "edit_file": 1,
+            "run_command": 2
+          },
+          "ms": 46858,
+          "planLeft": 0
+        }
+      ]
+    },
+    {
+      "task": "py-decimal-money",
+      "kind": "bug",
+      "model": "hivey",
+      "passed": true,
+      "seconds": 59,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "openai/gpt-6.1-sol-pro",
+          "steps": 10,
+          "promptTokens": 73419,
+          "completionTokens": 2403,
+          "usd": 0.0831452,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "update_plan": 4,
+            "read_file": 2,
+            "run_command": 3,
+            "edit_file": 1
+          },
+          "ms": 58911,
+          "planLeft": 0
+        }
+      ]
+    },
+    {
+      "task": "py-mutable-default",
+      "kind": "bug",
+      "model": "hivey",
+      "passed": true,
+      "seconds": 50.6,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "openai/gpt-6.1-sol-pro",
+          "steps": 10,
+          "promptTokens": 64946,
+          "completionTokens": 1617,
+          "usd": 0.0711537,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "update_plan": 4,
+            "read_file": 2,
+            "edit_file": 2,
+            "run_command": 2
+          },
+          "ms": 50471,
+          "planLeft": 0
+        }
+      ]
+    },
+    {
+      "task": "py-reiterable",
+      "kind": "bug",
+      "model": "hivey",
+      "passed": true,
+      "seconds": 50,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "openai/gpt-6.1-sol-pro",
+          "steps": 9,
+          "promptTokens": 64268,
+          "completionTokens": 1626,
+          "usd": 0.0705022,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "update_plan": 4,
+            "read_file": 2,
+            "edit_file": 1,
+            "run_command": 2
+          },
+          "ms": 49839,
+          "planLeft": 0
+        }
+      ]
+    },
+    {
+      "task": "refactor-extract",
+      "kind": "refactor",
+      "model": "hivey",
+      "passed": true,
+      "seconds": 57.3,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "openai/gpt-6.1-sol-pro",
+          "steps": 14,
+          "promptTokens": 81610,
+          "completionTokens": 1765,
+          "usd": 0.08435629999999998,
+          "stoppedBecause": "max-steps",
+          "truncated": false,
+          "tools": {
+            "update_plan": 4,
+            "list_files": 1,
+            "read_file": 4,
+            "edit_file": 4,
+            "run_command": 1
+          },
+          "ms": 57083,
+          "planLeft": 0
+        }
+      ]
+    },
+    {
+      "task": "sql-fanout-double-count",
+      "kind": "bug",
+      "model": "hivey",
+      "passed": true,
+      "seconds": 53,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "openai/gpt-6.1-sol-pro",
+          "steps": 10,
+          "promptTokens": 58829,
+          "completionTokens": 2035,
+          "usd": 0.07086150000000001,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "update_plan": 4,
+            "list_files": 1,
+            "read_file": 3,
+            "edit_file": 1,
+            "run_command": 1
+          },
+          "ms": 52900,
+          "planLeft": 0
+        }
+      ]
+    },
+    {
+      "task": "sql-index-advice",
+      "kind": "bug",
+      "model": "hivey",
+      "passed": true,
+      "seconds": 38.9,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "openai/gpt-6.1-sol-pro",
+          "steps": 9,
+          "promptTokens": 45870,
+          "completionTokens": 1401,
+          "usd": 0.0561304,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "update_plan": 3,
+            "list_files": 1,
+            "read_file": 3,
+            "edit_file": 1,
+            "run_command": 1
+          },
+          "ms": 38814,
+          "planLeft": 0
+        }
+      ]
+    },
+    {
+      "task": "sql-join-fix",
+      "kind": "bug",
+      "model": "hivey",
+      "passed": true,
+      "seconds": 50.7,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "openai/gpt-6.1-sol-pro",
+          "steps": 9,
+          "promptTokens": 50169,
+          "completionTokens": 2027,
+          "usd": 0.065695,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "update_plan": 3,
+            "list_files": 1,
+            "read_file": 3,
+            "edit_file": 1,
+            "run_command": 1
+          },
+          "ms": 50584,
+          "planLeft": 0
+        }
+      ]
+    },
+    {
+      "task": "sql-latest-per-group",
+      "kind": "bug",
+      "model": "hivey",
+      "passed": true,
+      "seconds": 48.1,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "openai/gpt-6.1-sol-pro",
+          "steps": 10,
+          "promptTokens": 56039,
+          "completionTokens": 1745,
+          "usd": 0.0663996,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "update_plan": 4,
+            "list_files": 1,
+            "read_file": 3,
+            "edit_file": 1,
+            "run_command": 1
+          },
+          "ms": 47967,
+          "planLeft": 0
+        }
+      ]
+    },
+    {
+      "task": "sql-not-in-null",
+      "kind": "bug",
+      "model": "hivey",
+      "passed": true,
+      "seconds": 46.7,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "openai/gpt-6.1-sol-pro",
+          "steps": 10,
+          "promptTokens": 54537,
+          "completionTokens": 1495,
+          "usd": 0.06332919999999999,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "update_plan": 4,
+            "list_files": 1,
+            "read_file": 3,
+            "edit_file": 1,
+            "run_command": 1
+          },
+          "ms": 46612,
+          "planLeft": 0
+        }
+      ]
+    },
+    {
+      "task": "test-regression",
+      "kind": "test",
+      "model": "hivey",
+      "passed": true,
+      "seconds": 57.8,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "openai/gpt-6.1-sol-pro",
+          "steps": 12,
+          "promptTokens": 73476,
+          "completionTokens": 2045,
+          "usd": 0.0819409,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "update_plan": 4,
+            "list_files": 1,
+            "read_file": 3,
+            "edit_file": 2,
+            "run_command": 2
+          },
+          "ms": 57483,
+          "planLeft": 0
+        }
+      ]
+    },
+    {
+      "task": "test-write-vat",
+      "kind": "test",
+      "model": "hivey",
+      "passed": true,
+      "seconds": 49.1,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "openai/gpt-6.1-sol-pro",
+          "steps": 9,
+          "promptTokens": 56279,
+          "completionTokens": 1906,
+          "usd": 0.0691209,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "update_plan": 4,
+            "list_files": 1,
+            "read_file": 2,
+            "write_file": 1,
+            "run_command": 1
+          },
+          "ms": 48835,
+          "planLeft": 0
+        }
+      ]
+    },
+    {
+      "task": "ts-exhaustive-switch",
+      "kind": "feature",
+      "model": "hivey",
+      "passed": true,
+      "seconds": 49.8,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "openai/gpt-6.1-sol-pro",
+          "steps": 8,
+          "promptTokens": 54396,
+          "completionTokens": 1889,
+          "usd": 0.0676515,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "update_plan": 4,
+            "read_file": 1,
+            "list_files": 1,
+            "edit_file": 1,
+            "run_command": 1
+          },
+          "ms": 49681,
+          "planLeft": 0
+        }
+      ]
+    },
+    {
+      "task": "ts-impossible-state",
+      "kind": "refactor",
+      "model": "hivey",
+      "passed": false,
+      "seconds": 51.3,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "openai/gpt-6.1-sol-pro",
+          "steps": 8,
+          "promptTokens": 55083,
+          "completionTokens": 2023,
+          "usd": 0.06974480000000001,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "update_plan": 4,
+            "list_files": 1,
+            "read_file": 1,
+            "edit_file": 1,
+            "run_command": 1
+          },
+          "ms": 51243,
+          "planLeft": 0
+        }
+      ],
+      "why": "",
+      "agent": "1m  - export interface Request {\u001b[0m\n\u001b[31m  -   loading?: boolean;\u001b[0m\n\u001b[31m  -   data?: string[];\u001b[0m\n\u001b[31m  -   error?: string;\u001b[0m\n\u001b[31m  -   done?: boolean;\u001b[0m\n\u001b[31m  - }\u001b[0m\n\u001b[31m  - \u001b[0m\n\u001b[31m  - export function render(request: Request): string {\u001b[0m\n\u001b[31m  -   if (request.loading) return \"loading…\";\u001b[0m\n\u001b[31m  -   if (request.error) return `failed: ${request.error}`;\u001b[0m\n\u001b[31m  -   if (request.done) return (request.data ?? []).join(\", \");\u001b[0m\n\u001b[31m  -   return \"\";\u001b[0m\n\u001b[32m  + export type Request =\u001b[0m\n\u001b[32m  +   | { state: \"idle\" }\u001b[0m\n\u001b[32m  +   | { state: \"loading\" }\u001b[0m\n\u001b[32m  +   | { state: \"failed\"; error: string }\u001b[0m\n\u001b[32m  +   | { state: \"done\"; data: string[] };\u001b[0m\n\u001b[32m  + \u001b[0m\n\u001b[32m  + export function render(request: Request): string {\u001b[0m\n\u001b[32m  +   switch (request.state) {\u001b[0m\n\u001b[32m  +     case \"idle\":\u001b[0m\n\u001b[32m  +       return \"\";\u001b[0m\n\u001b[32m  +     case \"loading\":\u001b[0m\n\u001b[32m  +       return \"loading…\";\u001b[0m\n\u001b[32m  +     case \"failed\":\u001b[0m\n\u001b[32m  +       return `failed: ${request.error}`;\u001b[0m\n\u001b[32m  +     case \"done\":\u001b[0m\n\u001b[32m  +       return request.data.join(\", \");\u001b[0m\n\u001b[32m  +   }\u001b[0m\n\n\u001b[2m  edited request.ts\u001b[0m\n\u001b[2m  plan 2/3 · Run available checks\u001b[0m\n\u001b[2m  plan: 2/3\u001b[0m\n\u001b[2m  auto-approved: run `tsc --noEmit --strict request.ts`\u001b[0m\n\u001b[2m  $ tsc --noEmit --strict request.ts\u001b[0m\n\u001b[2m  plan 3/3\u001b[0m\n\u001b[2m  plan: 3/3\u001b[0m\nUpdated `request.ts`:\n- Replaced `Request` with a union discriminated by `state`: `idle`, `loading`, `failed`, or `done`.\n- `failed` requires `error`; `done` requires `data`. No optional fields remain.\n- Updated `render()` to switch on `state`, without a missing-data fallback.\n\nVerification is blocked: `tsc` is not installed (`tsc: not found`), and no editor diagnostics tool is available.\n\u001b[2m  55083+2023 tokens · $0.0697\u001b[0m\n\n\u001b[2mTo know\u001b[0m\n\u001b[2m  • Nothing in this turn ran a test, a build or a compile, so the change is unverified.\u001b[0m\n\u001b[2m  • The context is 100 % full — summarising it will keep answers sharp and cheaper.\u001b[0m\n"
+    },
+    {
+      "task": "ts-narrow-any",
+      "kind": "refactor",
+      "model": "hivey",
+      "passed": false,
+      "seconds": 180,
+      "agentExit": 124,
+      "runs": [],
+      "why": "",
+      "agent": "/bin/sh: 1: any: not found\n/bin/sh: 1: any: not found\n"
+    },
+    {
+      "task": "ts-readonly-input",
+      "kind": "bug",
+      "model": "hivey",
+      "passed": true,
+      "seconds": 47.4,
+      "agentExit": 0,
+      "runs": [
+        {
+          "model": "openai/gpt-6.1-sol-pro",
+          "steps": 8,
+          "promptTokens": 53061,
+          "completionTokens": 1932,
+          "usd": 0.0679393,
+          "stoppedBecause": "answer",
+          "truncated": false,
+          "tools": {
+            "update_plan": 3,
+            "list_files": 1,
+            "read_file": 1,
+            "edit_file": 1,
+            "run_command": 2
+          },
+          "ms": 47307,
+          "planLeft": 0
+        }
+      ]
+    }
+  ],
+  "byModel": [
+    {
+      "model": "hivey",
+      "totals": {
+        "tasks": 56,
+        "passed": 48,
+        "seconds": 3725.8,
+        "unpriced": 0,
+        "outOfSteps": 3,
+        "truncated": 0,
+        "escalations": 0,
+        "neverActed": 1,
+        "claimedDone": 7,
+        "planLeft": 4,
+        "refused": 0,
+        "passRate": 0.8571428571428571,
+        "steps": 516,
+        "promptTokens": 3448638,
+        "completionTokens": 138198,
+        "usd": 4.3422
+      },
+      "byKind": [
+        {
+          "kind": "bug",
+          "totals": {
+            "tasks": 24,
+            "passed": 24,
+            "seconds": 1357.9,
+            "unpriced": 0,
+            "outOfSteps": 0,
+            "truncated": 0,
+            "escalations": 0,
+            "neverActed": 0,
+            "claimedDone": 0,
+            "planLeft": 0,
+            "refused": 0,
+            "passRate": 1,
+            "steps": 240,
+            "promptTokens": 1537080,
+            "completionTokens": 48013,
+            "usd": 1.7732
+          }
+        },
+        {
+          "kind": "feature",
+          "totals": {
+            "tasks": 3,
+            "passed": 3,
+            "seconds": 152.8,
+            "unpriced": 0,
+            "outOfSteps": 0,
+            "truncated": 0,
+            "escalations": 0,
+            "neverActed": 0,
+            "claimedDone": 0,
+            "planLeft": 0,
+            "refused": 0,
+            "passRate": 1,
+            "steps": 27,
+            "promptTokens": 166907,
+            "completionTokens": 5632,
+            "usd": 0.2047
+          }
+        },
+        {
+          "kind": "ibmi",
+          "totals": {
+            "tasks": 21,
+            "passed": 15,
+            "seconds": 1607,
+            "unpriced": 0,
+            "outOfSteps": 1,
+            "truncated": 0,
+            "escalations": 0,
+            "neverActed": 0,
+            "claimedDone": 6,
+            "planLeft": 3,
+            "refused": 0,
+            "passRate": 0.7142857142857143,
+            "steps": 170,
+            "promptTokens": 1232670,
+            "completionTokens": 67681,
+            "usd": 1.7687
+          }
+        },
+        {
+          "kind": "refactor",
+          "totals": {
+            "tasks": 4,
+            "passed": 2,
+            "seconds": 355.9,
+            "unpriced": 0,
+            "outOfSteps": 1,
+            "truncated": 0,
+            "escalations": 0,
+            "neverActed": 1,
+            "claimedDone": 1,
+            "planLeft": 0,
+            "refused": 0,
+            "passRate": 0.5,
+            "steps": 37,
+            "promptTokens": 218665,
+            "completionTokens": 6889,
+            "usd": 0.2549
+          }
+        },
+        {
+          "kind": "test",
+          "totals": {
+            "tasks": 4,
+            "passed": 4,
+            "seconds": 252.2,
+            "unpriced": 0,
+            "outOfSteps": 1,
+            "truncated": 0,
+            "escalations": 0,
+            "neverActed": 0,
+            "claimedDone": 0,
+            "planLeft": 1,
+            "refused": 0,
+            "passRate": 1,
+            "steps": 42,
+            "promptTokens": 293316,
+            "completionTokens": 9983,
+            "usd": 0.3408
+          }
+        }
+      ]
+    }
+  ],
+  "measured": true
+}

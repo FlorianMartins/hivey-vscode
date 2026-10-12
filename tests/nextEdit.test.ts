@@ -13,7 +13,7 @@ import {
   describeRecentWork,
   parseNextEdit,
   recentEdits,
-  summarise,
+  summarize,
   RECENT_MS,
 } from "../src/core/completion/nextEdit.js";
 
@@ -126,6 +126,6 @@ test("a proposal that changes nothing is refused", () => {
 });
 
 test("the hint says what would happen, in one line", () => {
-  assert.equal(summarise({ find: "const a = old();", replace: "const a = new();" }), "const a = old(); → const a = new();");
-  assert.match(summarise({ find: "import { unused } from './x.js';", replace: "" }), /^remove import/);
+  assert.equal(summarize({ find: "const a = old();", replace: "const a = new();" }), "const a = old(); → const a = new();");
+  assert.match(summarize({ find: "import { unused } from './x.js';", replace: "" }), /^remove import/);
 });

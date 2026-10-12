@@ -1,0 +1,7 @@
+{
+  "title": "A new status",
+  "kind": "noverify",
+  "prompt": "Orders can now be `paused`, between `open` and `closed`. Add it.",
+  "check": "node demo.js | grep -qx 'open|paused|closed'",
+  "timeoutMs": 180000
+}

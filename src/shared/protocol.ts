@@ -10,6 +10,44 @@ export interface UiContextItem {
   label: string;
   /** Tokens the item costs, so the user can see what their context is worth before sending. */
   tokens: number;
+  /** For an image: its dimensions and weight, since the label alone says nothing about either. */
+  detail?: string;
+}
+
+/**
+ * A question the turn is waiting on, carried in the STATE rather than only announced once.
+ *
+ * It used to be a single `approval` message that the panel drew into the turn in progress, and
+ * nothing anywhere else knew it existed. So any rebuild that dropped that turn's DOM destroyed the
+ * card — and the promise behind it was never resolved, so the turn waited for ever: the request had
+ * been sent and paid for, no answer ever arrived, and there was nothing on screen to say why.
+ *
+ * Anything that must survive a render has to be in the state. This is the same lesson as the
+ * transcript, learned twice.
+ */
+export interface UiApproval {
+  id: string;
+  /** `egress` is consent to send; anything else is a tool asking permission to act. */
+  tool: string;
+  description: string;
+  /** The command, when the tool is `run_command` — shown verbatim, never paraphrased. */
+  command?: string;
+  choices: Array<"once" | "session" | "always" | "no">;
+  detail?: string[];
+  /**
+   * What each button should say, when "Allow" is not what it does.
+   *
+   * ⚠️ The four slots are a channel, not a vocabulary. They were named for permissions — allow once,
+   * for this conversation, always, never — and a card asking "install the model, or the model and
+   * ffmpeg, or neither?" has three real choices and none of them is "allow". Writing "Allow" on a
+   * button that downloads 142 MB is the kind of small lie an interface should not tell.
+   *
+   * Where a card gives labels, the slot carries only the answer back; what it MEANS is here, where
+   * both ends can read it.
+   */
+  labels?: Partial<Record<"once" | "session" | "always" | "no", string>>;
+  /** What the card says once it has been answered, per choice. */
+  done?: Partial<Record<"once" | "session" | "always" | "no", string>>;
 }
 
 export interface UiStep {
@@ -28,12 +66,31 @@ export interface UiEntry {
   error?: string;
   model?: string;
   usdCost?: number;
+  /** What the answer consumed, so its price can be explained on hover rather than only asserted. */
+  usage?: { promptTokens: number; completionTokens: number; cachedTokens: number };
+  /**
+   * True for the one answer a turn is writing right now.
+   *
+   * The panel skips it, because the live turn on screen is already showing it — and drawing both
+   * would print the answer twice. Saying it here rather than inferring it from `busy` is what lets
+   * the transcript be rebuilt at any moment during a turn without either duplicating the answer or
+   * freezing everything else.
+   */
+  streaming?: boolean;
   /** Number of files this question's checkpoint can put back. Zero means there is nothing to restore. */
   checkpointFiles?: number;
   /** True when the checkpoint could not hold everything the turn changed. */
   checkpointPartial?: boolean;
+  /** How many commands ran, whose effects no checkpoint holds. The restore says so before it runs. */
+  checkpointCommands?: number;
   /** The to-do list the agent kept while answering this turn. */
   plan?: Plan;
+  /**
+   * Things worth saying that nobody asked about — see `core/session/notices.ts`.
+   *
+   * Absent when there are none, which is the point: a section that is always there is furniture.
+   */
+  notices?: Notice[];
   /** What the model thought before answering, when a reasoning effort was asked for. */
   reasoning?: string;
   context?: UiContextItem[];
@@ -90,6 +147,26 @@ export interface UiModel {
   baseUrl?: string;
   /** True when the model is currently selected for the chat role. */
   current?: boolean;
+  /**
+   * For a Hivey preset only: what it routes to, role by role.
+   *
+   * ⚠️ A preset is not a model, and pricing it as one is what made two of them look identical: the row
+   * showed the price of its `everyday` role and called that the preset's price. "how come the Hivey
+   * Pro and Hivey Smart models come out at the same price?". Four roles, four models, four
+   * prices — so the interface shows a span and names what differs, instead of picking one and hoping.
+   *
+   * `sameAsCheaper` names the cheaper preset that already reaches this model for this role. Not a
+   * defect: it means the strongest current model was inside the cheaper preset's budget, so the dearer
+   * one had nothing better to buy. Unsaid, it reads as the presets being decorative.
+   */
+  roles?: Array<{
+    role: string;
+    model: string;
+    inUsd: number;
+    outUsd: number;
+    context: number;
+    sameAsCheaper?: string;
+  }>;
 }
 
 export interface UiPermissionRule {
@@ -101,6 +178,7 @@ export interface UiPermissionRule {
 }
 
 /** A model server found running on this machine. */
+import type { Notice } from "../core/session/notices.js";
 import type { Plan } from "../core/agent/plan.js";
 
 /**
@@ -113,7 +191,7 @@ import type { Plan } from "../core/agent/plan.js";
  *
  * It is EPHEMERAL. Nothing here is a message: the steps are drawn from this state, and when the
  * first real question is asked they are gone, leaving a conversation that looks like any other. A
- * wizard that left three of its own messages at the top of every specialised conversation would be
+ * wizard that left three of its own messages at the top of every specialized conversation would be
  * a wizard people stop using on the second day.
  */
 export interface UiWizard {
@@ -213,20 +291,55 @@ export interface UiState {
   model: string;
   modelLabel: string;
   provider: string;
+  /**
+   * The answer comes from somewhere other than this machine.
+   *
+   * About WHERE, never about money. The two were briefly the same field and a gateway broke both:
+   * it bills nobody, so the cost row was right to be quiet — and the composer then labelled it
+   * "Local" whatever provider was selected, because the label reads this. Choosing "Your own
+   * gateway" appeared to do nothing at all.
+   */
   remote: boolean;
+  /** Remote, but the user's own infrastructure: sent as is, without pseudonymization. */
+  trusted?: boolean;
+  /** Whether this provider charges the user. Drives the cost row, and nothing else. */
+  billed: boolean;
   contextTokens: number;
+  /**
+   * What the context is made of, biggest first — the bar's data.
+   *
+   * The ring has shown a percentage for a long time, and "84 %" answers the wrong half: the half
+   * somebody can act on is "84 % of WHAT". An attribution already existed and lived only on the
+   * consent card, a screen that appears for a remote provider once per session.
+   *
+   * Approximate by construction: it measures the sources rather than the assembled messages. See
+   * `core/context/breakdown.ts`.
+   */
+  contextParts?: Array<{ label: string; tokens: number }>;
+  /**
+   * Of that, how much actually goes with the next question.
+   *
+   * Equal to `contextTokens` until the conversation outgrows its budget, and then smaller — because
+   * the oldest exchanges are dropped from the prompt. Shown when the two differ, because that gap
+   * is the answer to "why does a conversation this size cost that much", read the other way round.
+   */
+  sentTokens: number;
   /** The budget the next question is measured against — `context.maxTokens`. */
   contextBudget: number;
+  /** Whether that figure was derived from the model's window rather than chosen by the user. */
+  contextBudgetAuto: boolean;
   /** The selected model's own window, 0 when the catalogue does not know it. */
   modelContext: number;
   budget: { spentTodayUsd: number; dailyUsd: number };
   /** What THIS conversation has cost so far. Distinct from the day's spend, which spans all of them. */
   sessionCostUsd: number;
+  /** Questions the turn is blocked on. Drawn from here, so no rebuild can lose one. */
+  pendingApprovals: UiApproval[];
   /** Every skill the panel may offer, and whether the user has left it switched on. */
   skills: UiSkill[];
   /** The families, with whether each is currently in play and whether the workspace suggests it. */
   skillGroups: UiSkillGroup[];
-  /** The guided setup, when a specialised conversation is being started. */
+  /** The guided setup, when a specialized conversation is being started. */
   wizard?: UiWizard;
   /**
    * The most recent conversations, unfiltered.
@@ -261,7 +374,7 @@ export interface UiState {
   searchQuery: string;
   setup: UiSetup;
   /**
-   * True when the conversation is long enough that summarising it is worth offering.
+   * True when the conversation is long enough that summarizing it is worth offering.
    *
    * Computed by the extension, which is the only side that knows the model's context window. The
    * panel drawing this from its own token count would be guessing at a number it does not have.
@@ -278,8 +391,6 @@ export interface UiState {
    * Undefined until something has actually been sent to a provider that reports it.
    */
   cacheHitRate?: number;
-  /** True when summarising happens by itself at the threshold instead of being offered. */
-  autoCompact: boolean;
   /**
    * Whether a turn is running, according to the side that runs it.
    *
@@ -290,6 +401,47 @@ export interface UiState {
    * the panel self-correcting.
    */
   busy: boolean;
+  /**
+   * Which palette the panel paints itself with.
+   *
+   * ⚠️ Sent in the state AND written as an attribute on `<html>`, and the redundancy is not an
+   * oversight: the attribute is produced when the HTML is built, which is once, and a webview that
+   * was already open does not rebuild. Applying it from the page on every render is the half that
+   * cannot fail — and it is what makes changing the setting take effect without a reload.
+   */
+  appearance?: "editor" | "hivey";
+  /**
+   * Whether anything is configured to turn speech into text.
+   *
+   * Sent rather than inferred in the panel: the webview cannot read a setting, and a microphone
+   * button with nowhere to send the recording is a button that wastes a sentence.
+   */
+  dictation?: boolean;
+  /**
+   * Record a WAV rather than WebM, because the transcriber runs here.
+   *
+   * ⚠️ whisper.cpp decodes WAV, FLAC and MP3 — not the Opus-in-WebM every `MediaRecorder` produces.
+   * The services accept both, which is why nothing had ever had to carry this distinction. It is also
+   * true when NOTHING is installed yet but something can be: the recording is made before the
+   * question "shall I install one?" is answered, and recording the wrong format would mean losing the
+   * sentence somebody just spoke.
+   */
+  dictationWav?: boolean;
+  /**
+   * The width below which the panel stops rearranging itself and scrolls sideways instead.
+   *
+   * ⚠️⚠️ Sent in the state because it CANNOT be written as a style attribute, and for a whole release
+   * it was. `<body style="min-width:260px">` is exactly what `style-src` without `'unsafe-inline'`
+   * forbids — and this panel's CSP has no `'unsafe-inline'`, deliberately, because a model's output is
+   * rendered here. So the floor was declared in the one place the document's own security policy
+   * guarantees will be discarded, and dragging the side bar narrow went on doing nothing at all. It
+   * was reported as "you can shrink it all the way without it stopping, even though I asked for a
+   * minimum width limit", twice.
+   *
+   * Setting a style PROPERTY from script is not blocked by the same policy — only the attribute, and
+   * `cssText` and `setAttribute("style", …)` with it. So the value travels and the page applies it.
+   */
+  panelMinWidth?: number;
 }
 
 /** Panel → extension. */
@@ -310,7 +462,7 @@ export type ToExtension =
   | { type: "setSkillEnabled"; name: string; enabled: boolean }
   /** Choose the families in play — everything else is switched off in one write. */
   | { type: "setSkillGroups"; groups: string[] }
-  /** Start the guided setup for a specialised conversation. */
+  /** Start the guided setup for a specialized conversation. */
   | { type: "startWizard" }
   /** Answer the step on screen. `value` is a mode, a list of families, or a list of skills. */
   | { type: "wizardAnswer"; step: "mode" | "family" | "skills"; value: string[] }
@@ -327,15 +479,37 @@ export type ToExtension =
   | { type: "setProvider"; provider: string }
   /** Put the files back as they were before this question, and rewind the conversation to it. */
   | { type: "restoreCheckpoint"; id: string }
+  /**
+   * A recording to transcribe, as base64.
+   *
+   * Base64 rather than a transferable: `postMessage` from a webview goes through VS Code's own
+   * serialisation, which does not carry an `ArrayBuffer` intact. A few seconds of Opus is tens of
+   * kilobytes, so the third it costs to encode is not worth a second channel.
+   */
+  | { type: "dictate"; audio: string; ms: number }
+  /**
+   * Record using a program on the machine, because the panel is not allowed a microphone.
+   *
+   * ⚠️ VS Code grants `media` to the workbench and not to a `vscode-webview://` origin, with no
+   * setting and no prompt — so `getUserMedia` in this panel answers `NotAllowedError` for ever. The
+   * recording therefore happens in the extension host, and these two messages are the button.
+   */
+  | { type: "startDictation" }
+  | { type: "stopDictation"; cancel?: boolean }
   /** Carry one message into another conversation, as context there. */
   | { type: "shareEntry"; id: string }
   | { type: "setMode"; mode: Mode }
   | { type: "setReasoning"; reasoning: Reasoning }
   | { type: "setContextBudget"; tokens: number }
-  | { type: "setAutoCompact"; on: boolean }
   /** `baseUrl` accompanies a model served by a machine other than the configured one. */
   | { type: "setModel"; model: string; provider: string; baseUrl?: string }
   | { type: "refreshModels" }
+  /**
+   * The picker was opened. Not a refresh: it asks the extension to look at what the user's OWN
+   * sources are serving — loopback and the gateway — and rebuild the list only if that has changed.
+   * The vendors are not touched, which is what makes it cheap enough to send on every open.
+   */
+  | { type: "pollModels" }
   | { type: "setHistoryFilter"; filter: Partial<UiHistoryFilter> }
   | { type: "search"; query: string }
   | { type: "setIncluded"; id: string; included: boolean }
@@ -343,8 +517,43 @@ export type ToExtension =
   | { type: "dropEntry"; id: string }
   | { type: "editEntry"; id: string; text: string }
   | { type: "retry" }
+  /**
+   * Ask the same question again, from any point in the conversation.
+   *
+   * Added at the END rather than replacing the answer it had. Replacing would be the obvious
+   * reading and the destructive one: the answer you did not like is still the answer you might want
+   * to compare the new one against, and muting or deleting it is already one click away. Nothing is
+   * ever lost by asking twice.
+   */
+  | { type: "askAgain"; id: string }
+  /**
+   * The same question, answered by several models, one after another.
+   *
+   * In a panel 300 px wide there is no side-by-side to be had, so the answers land in the
+   * conversation in sequence, each labelled with the model that wrote it. Which is also the honest
+   * shape: they are answers, and they belong where answers go.
+   */
+  | { type: "compareEntry"; id: string }
   | { type: "attach"; what: "active" | "editor" | "selection" | "browse" | "openFiles" | "mention" }
   | { type: "attachPath"; path: string }
+  /**
+   * Something pasted or dropped onto the composer.
+   *
+   * Text and images take the same route because from the user's side they are the same gesture. The
+   * panel does the decoding — it is the only side that has a clipboard — and the downscaling, so
+   * what crosses this channel is already bounded.
+   */
+  | {
+      type: "pasteContext";
+      /** What to call it: a file name when there was one, a description otherwise. */
+      name: string;
+      text?: string;
+      /** For an image: `image/png` and the base64 payload, without the `data:` prefix. */
+      mediaType?: string;
+      data?: string;
+      width?: number;
+      height?: number;
+    }
   | { type: "removeAttachment"; label: string }
   /** Keep or drop the file the editor is showing, for as long as it is the one on screen. */
   | { type: "setImplicit"; on: boolean }
@@ -357,7 +566,13 @@ export type ToExtension =
   | { type: "removePolicyEntry"; list: PolicyList; value: string }
   | { type: "openEgress" }
   | { type: "openCosts" }
-  | { type: "openSettings" }
+  /**
+   * The settings page. With `key`, filtered to that one setting.
+   *
+   * The filter matters: somebody told "set a transcriber" and dropped into forty settings has been
+   * given a search task, not an answer.
+   */
+  | { type: "openSettings"; key?: string }
   | { type: "approve"; id: string; answer: "once" | "session" | "always" | "no" }
   /** `atCursor` inserts at the caret; without it the selection is replaced. */
   | { type: "insertCode"; code: string; atCursor?: boolean }
@@ -367,6 +582,15 @@ export type ToExtension =
   | { type: "probeLocal" }
   /** The key never travels back to the panel; it goes straight to the OS keychain. */
   | { type: "saveKey"; provider: string; key: string }
+  /**
+   * The address AND the key, together, checked once.
+   *
+   * ⚠️ The setup screen had two buttons — "Save the address", then "Save the key" — which is the
+   * thing Florian reported: "the gateway, which asks you to store the address and then store the
+   * API key instead of filling in both fields and confirming". Two saves is also two chances to
+   * leave half a configuration behind, and a stored key pointing at no address looks configured.
+   */
+  | { type: "saveProvider"; provider: string; url?: string; key: string }
   | { type: "clearKey"; provider: string }
   | { type: "setEndpoint"; provider: string; url: string }
   /** Declare a model server on this machine or this network, and probe it. */
@@ -391,7 +615,7 @@ export type ToPanel =
       command?: string;
       /** Which answers to offer. Defaults to all four; egress consent has no "this session". */
       choices?: Array<"once" | "session" | "always" | "no">;
-      /** Extra lines under the question — what was pseudonymised, what it will cost. */
+      /** Extra lines under the question — what was pseudonymized, what it will cost. */
       detail?: string[];
     }
   | { type: "error"; message: string }
@@ -401,5 +625,33 @@ export type ToPanel =
   | { type: "openSearch" }
   /** Put text back into the composer — a restored question, ready to be asked differently. */
   | { type: "restoreDraft"; text: string }
+  /** What the recogniser heard, to be put in the composer for the user to read before sending. */
+  | { type: "dictated"; text: string }
+  /** Dictation could not run or heard nothing. Shown in the composer's own row, not as a dialog. */
+  | { type: "dictationFailed"; why: string }
+  /**
+   * What a long, one-off install is doing.
+   *
+   * ⚠️ Because it is 85 MB over somebody's home connection, and a spinner that cannot move is
+   * indistinguishable from a hang. The message carries the megabytes so far, which is the only number
+   * that proves anything is still happening.
+   */
+  | { type: "dictationProgress"; what: string }
+  /**
+   * Recording has actually begun.
+   *
+   * ⚠️ The panel used to light the microphone the moment it was clicked, before the extension had
+   * started anything — so when there was no recorder, the button looked as though it were listening
+   * and the next click "stopped" a recording that never existed. Reported as having to click twice
+   * before anything was offered. The button follows what IS, not what was asked for.
+   */
+  | { type: "dictationStarted"; levels: boolean }
+  /**
+   * How loud it is right now, from 0 to 1.
+   *
+   * Measured in the extension from the file as it grows, because the panel has no microphone of its
+   * own to listen to — see the permission note in `core/dictation/capture.ts`.
+   */
+  | { type: "dictationLevel"; level: number }
   /** The agent's plan, as it is written. Redrawn in place rather than appended. */
   | { type: "plan"; plan: Plan };

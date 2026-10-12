@@ -22,7 +22,7 @@ import {
   checkNextEdit,
   describeRecentWork,
   parseNextEdit,
-  summarise,
+  summarize,
   type EditEvent,
   type NextEdit,
 } from "../core/completion/nextEdit.js";
@@ -180,6 +180,7 @@ export class NextEditWatcher {
         // Never: this is a prediction, not a question, and a thinking budget on every pause in
         // typing is the whole cost of the feature spent on nothing.
         reasoning: "none",
+        chore: true,
         signal: ctl.signal,
       });
       if (ctl.signal.aborted) return;
@@ -198,7 +199,7 @@ export class NextEditWatcher {
         document.positionAt(check.offset!),
         document.positionAt(check.offset! + parsed.find.length),
       );
-      const summary = summarise(parsed);
+      const summary = summarize(parsed);
       const diagnostic = new vscode.Diagnostic(range, t("Hivey Code: {0}", summary), vscode.DiagnosticSeverity.Hint);
       diagnostic.source = "Hivey Code";
       // `Unnecessary` would grey the code out, which is a claim about the code rather than a

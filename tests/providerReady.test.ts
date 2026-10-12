@@ -43,12 +43,18 @@ test("an empty setup is not evidence of an empty keychain", () => {
   assert.equal(providerReady("anthropic", stateWith({ hasKey: { anthropic: true } })), true);
 });
 
-test("a gateway that is only an API shape needs an address as well as a key", () => {
-  // Azure, LiteLLM, a company proxy: the key alone points at nothing.
+test("a gateway needs an address, and a key only if it has one", () => {
+  // This test asserted the opposite — that an address without a key is not ready — and that
+  // assertion is what made the gateway impossible to select for three releases. It contradicted
+  // `providerFor`, which allows a missing key there in as many words, because a proxy on somebody's
+  // own network usually has none. The composer's menu refuses to switch to something that is not
+  // ready, so choosing "Your own gateway" did nothing at all and went on saying "Local".
+  //
+  // Azure, LiteLLM, a company proxy: what none of them can do without is the ADDRESS.
   const keyOnly = stateWith({ hasKey: { "openai-compatible": true } });
-  assert.equal(providerReady("openai-compatible", keyOnly), false);
+  assert.equal(providerReady("openai-compatible", keyOnly), false, "a key alone points at nothing");
   const both = stateWith({ hasKey: { "openai-compatible": true }, endpoints: { "openai-compatible": "https://x/v1" } });
   assert.equal(providerReady("openai-compatible", both), true);
   const urlOnly = stateWith({ endpoints: { "openai-compatible": "https://x/v1" } });
-  assert.equal(providerReady("openai-compatible", urlOnly), false, "an address without a key is not ready either");
+  assert.equal(providerReady("openai-compatible", urlOnly), true, "an address with no key is a perfectly ordinary proxy");
 });

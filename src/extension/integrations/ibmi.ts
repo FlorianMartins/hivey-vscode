@@ -14,15 +14,76 @@
 // on the tool, because one tool serves both.
 
 import * as vscode from "vscode";
-import { t } from "../../shared/i18n.js";
+import { en, t } from "../../shared/i18n.js";
 import type { Tool, ToolResult } from "../../core/agent/loop.js";
 import { headToTokens } from "../../core/util/tokens.js";
 import { cell, formatRows, isReadOnlySql, matchesName, parseMemberRef } from "../../core/ibmi/sql.js";
+import { clOnlyReads, refuseChange, type Refusal } from "../../core/ibmi/guard.js";
+import {
+  compilableTypes,
+  compileAllowed,
+  compileApproval,
+  errorsOnly,
+  formatReport,
+  runCompile,
+} from "../../core/ibmi/compile.js";
+import {
+  NOT_INSTALLED,
+  formatTestRun,
+  parseTestOutput,
+  presenceSql,
+  readPresence,
+  testCommand,
+  type RpgUnitPresence,
+  type TestRun,
+} from "../../core/ibmi/rpgunit.js";
+import {
+  PROGRAM_REFERENCE_LIMITS,
+  fieldMethod,
+  formatImpact,
+  programRefsCommand,
+  programRefsQuery,
+  referencesTo,
+  type Reference,
+} from "../../core/ibmi/impact.js";
+import { arcadInstalled } from "./arcad.js";
+import {
+  formatAdvice,
+  indexAdviceSql,
+  readAdvice,
+  readStats,
+  tableStatsSql,
+  type IndexAdvice,
+  type TableStats,
+} from "../../core/ibmi/db2advice.js";
+import {
+  formatMessage,
+  messageFiles,
+  messageSql,
+  notesCiting,
+  readMessage,
+  validMessageId,
+  type CitingNote,
+  type IbmMessage,
+} from "../../core/ibmi/messages.js";
+import { knowledgeStore } from "../knowledge.js";
+import { readSettings } from "../config.js";
 import { extractCalledPrograms, extractCopyDirectives } from "../../core/ibmi/symbols.js";
 
 const EXTENSION_ID = "halcyontechltd.code-for-ibmi";
 const MAX_ROWS = 200;
 const MAX_TOKENS = 6000;
+/**
+ * How far a field search goes before it stops and says it stopped.
+ *
+ * A field search downloads source members one at a time, and a library can hold thousands. The
+ * bound is what keeps the answer honest rather than slow: an answer that was cut short says so,
+ * and "nothing else uses it" is never implied by a search that gave up.
+ */
+const MAX_MEMBERS_SEARCHED = 300;
+const MAX_REFERENCE_ROWS = 5000;
+/** The source files a field is plausibly written in. Not every member of the library. */
+const SOURCE_FILES = ["QRPGLESRC", "QRPGSRC", "QCLSRC", "QCLLESRC", "QDDSSRC", "QSQLSRC", "QCBLLESRC"];
 
 /** Only the handful of methods used here; the real interface is an order of magnitude larger. */
 interface IBMiContent {
@@ -156,7 +217,7 @@ export async function ibmiAllLibraries(): Promise<Array<{ name: string; text?: s
   // Two ways of asking, because one of them coming back empty is indistinguishable from a machine
   // with no libraries — and what the user sees then is their own library list and nothing else,
   // which looks exactly like "it only takes my library list". It was that.
-  const attempts = [
+  const sources = [
     // Objects of type *LIB live in QSYS. This carries the text description, which is why it is
     // first: a screen of library names with no descriptions is a screen nobody can choose from.
     `SELECT * FROM TABLE(QSYS2.OBJECT_STATISTICS('QSYS', '*LIB')) X ORDER BY 1`,
@@ -164,11 +225,21 @@ export async function ibmiAllLibraries(): Promise<Array<{ name: string; text?: s
     // catalogue does not — and a name alone is still a name you can pick.
     `SELECT * FROM QSYS2.SYSSCHEMAS ORDER BY 1`,
   ];
-  for (const statement of attempts) {
+
+  // BOTH, merged — they were alternatives and should always have been complementary.
+  //
+  // The loop stopped at the first query that returned anything, which is the right shape for
+  // "try this, else that" and the wrong one here: the two do not see the same thing. The object
+  // catalogue carries descriptions and is subject to object authority; the schema catalogue has no
+  // descriptions and lists what SQL can see. Whichever answered first therefore decided the whole
+  // list, and the libraries only the other one knew about were never offered — reported as "the
+  // list does not show all the libraries".
+  //
+  // Order matters only in that descriptions arrive first: a name already seen is not replaced, so
+  // the row that carries a text description wins over the bare one.
+  for (const statement of sources) {
     try {
-      const rows = await content.runSQL(statement);
-      let added = 0;
-      for (const row of rows) {
+      for (const row of await content.runSQL(statement)) {
         const name = cell(row, "OBJNAME", "OBJECT_NAME", "SCHEMA_NAME", "SYSTEM_SCHEMA_NAME");
         if (!name || inList.has(name.toUpperCase())) continue;
         inList.add(name.toUpperCase());
@@ -177,11 +248,10 @@ export async function ibmiAllLibraries(): Promise<Array<{ name: string; text?: s
           text: cell(row, "OBJTEXT", "TEXT_DESCRIPTION", "SCHEMA_TEXT") || undefined,
           inList: false,
         });
-        added += 1;
       }
-      if (added) break;
     } catch {
-      // Try the next one. The library list alone is still a list, and the caller offers a field.
+      // One catalogue that cannot be read is one fewer looked in. The library list alone is still a
+      // list, and the caller offers a field to type a name into.
     }
   }
   return out;
@@ -195,8 +265,18 @@ export async function ibmiAllLibraries(): Promise<Array<{ name: string; text?: s
  * every file in the schema, which is the whole answer in a single call, and the source files fall
  * out of it as the distinct file names. When it is not available the per-file walk is still there.
  */
+/**
+ * Every source member of a library.
+ *
+ * `onProgress` exists because the two paths below take very different amounts of time and only one
+ * of them can say anything while it runs. The SQL path is a single round trip: it returns
+ * everything or nothing, and the only honest thing to say during it is that it is reading. The
+ * fallback walks the source files one at a time, which on a library with a hundred of them is a
+ * long wait with something true to say at every step.
+ */
 export async function ibmiAllMembers(
   library: string,
+  onProgress?: (read: number, sourceFile?: string) => void,
 ): Promise<Array<MemberRow & { sourceFile: string }>> {
   const lib = library.toUpperCase();
   const content = connection().getContent();
@@ -213,7 +293,10 @@ export async function ibmiAllMembers(
         lines: Number(cell(row, "NUMBER_ROWS")) || undefined,
       }))
       .filter((m) => m.sourceFile && m.name);
-    if (out.length) return out;
+    if (out.length) {
+      onProgress?.(out.length);
+      return out;
+    }
   } catch {
     // Fall through to the per-file walk.
   }
@@ -224,6 +307,7 @@ export async function ibmiAllMembers(
       for (const member of await content.getMemberList({ library: lib, sourceFile: file.name })) {
         out.push({ ...member, sourceFile: file.name });
       }
+      onProgress?.(out.length, file.name);
     } catch {
       // One file that cannot be listed is one fewer, not a failure.
     }
@@ -355,7 +439,7 @@ export async function collectMemberContext(
 
   for (const want of wanted) {
     if (found.length >= limit) {
-      missing.push(`${want.name} (${t("not fetched: the limit of {0} was reached", limit)})`);
+      missing.push(`${want.name} (${en("not fetched: the limit of {0} was reached", limit)})`);
       continue;
     }
     const inLibraries = want.library ? [want.library.toUpperCase()] : [...new Set(libraries)];
@@ -486,7 +570,52 @@ export async function ibmiDiagnose(library: string): Promise<string> {
   return lines.join("\n");
 }
 
-export function buildIbmiTools(): Tool[] {
+/**
+ * What the gate says, as a tool result.
+ *
+ * A refusal rather than a dialog, and that distinction is the whole point: a dialog asks a person
+ * to approve something the policy already forbids, which is how a policy becomes a habit of
+ * clicking yes. The message says what to do about it, because the two ways out — qualify the
+ * command, or widen the list — are both the user's to take and neither is obvious from "refused".
+ */
+function refusal(where: Refusal, writable: string[]): ToolResult {
+  const list = writable.join(", ");
+  switch (where.reason) {
+    case "unqualified":
+      return {
+        isError: true,
+        content: `Refused: this changes something and does not say which library. It would resolve against the job's library list, which cannot be checked from here. Name the library — LIBRARY/OBJECT — and it will run if the library is one of: ${list}.`,
+      };
+    case "opaque":
+      return {
+        isError: true,
+        content: `Refused: this carries what it will do inside a string — a shell line, or a command handed to QCMDEXC — so what it touches cannot be checked. Run the CL command directly, naming its library, and it will go through if the library is one of: ${list}.`,
+      };
+    default:
+      return {
+        isError: true,
+        content: `Refused: ${where.libraries.join(", ")} ${where.libraries.length > 1 ? "are" : "is"} not in hiveyCode.ibmi.writableLibraries, which allows: ${list}. Reading is unrestricted; this would have changed something.`,
+      };
+  }
+}
+
+
+/**
+ * A member reference, or nothing.
+ *
+ * `approval()` is called with whatever the model sent, before anything has validated it, and it
+ * runs while the card is being built — so it must not throw. `parseMemberRef` does, correctly, for
+ * a reference it cannot read; here the fallback is a plainer sentence rather than a broken card.
+ */
+function safeRef(ref: string): { library: string; sourceFile: string; member: string } | undefined {
+  try {
+    return parseMemberRef(ref);
+  } catch {
+    return undefined;
+  }
+}
+
+export function buildIbmiTools(writable: string[] = []): Tool[] {
   const sql: Tool = {
     schema: {
       name: "ibmi_sql",
@@ -505,6 +634,8 @@ export function buildIbmiTools(): Tool[] {
     },
     async run(args, ctx): Promise<ToolResult> {
       const statement = String(args["statement"] ?? "").replace(/;\s*$/, "");
+      const refused = refuseChange(statement, !isReadOnlySql(statement), { writable });
+      if (refused) return refusal(refused, writable);
       const rows = await connection().getContent().runSQL(statement);
       ctx.report(t("{0} rows from Db2 for i", rows.length));
       return { content: headToTokens(formatRows(rows, MAX_ROWS), MAX_TOKENS) };
@@ -544,6 +675,8 @@ export function buildIbmiTools(): Tool[] {
     async run(args, ctx): Promise<ToolResult> {
       const cmd = String(args["command"] ?? "");
       const environment = (args["environment"] as "ile" | "qsh" | "pase" | undefined) ?? "ile";
+      const refused = refuseChange(cmd, !clOnlyReads(cmd), { writable });
+      if (refused) return refusal(refused, writable);
       const result = await connection().runCommand({ command: cmd, environment });
       ctx.report(t("ran {0}", cmd.split(/\s+/)[0] ?? cmd));
       const body = [result.stdout, result.stderr].filter((s) => s?.trim()).join("\n");
@@ -603,8 +736,8 @@ export function buildIbmiTools(): Tool[] {
       ];
       if (missing.length) {
         parts.push(
-          `--- ${t("Not found on this system")}\n${missing.join(", ")}\n` +
-            t("These may be procedures local to the module, objects without source here, or in a library outside the list."),
+          `--- ${en("Not found on this system")}\n${missing.join(", ")}\n` +
+            en("These may be procedures local to the module, objects without source here, or in a library outside the list."),
         );
       }
       return { content: parts.join("\n\n") };
@@ -738,5 +871,469 @@ export function buildIbmiTools(): Tool[] {
     },
   };
 
-  return [sql, command, readMember, programContext, whereIsMember, listMembers, listObjects, libraryList];
+
+  /**
+   * Compile a member on the partition, and come back with what the compiler said.
+   *
+   * The loop this exists for is the one IBM Bob does not claim: write it, compile it, READ THE
+   * ERRORS, fix them. On IBM i that is the only loop worth having, because a member that does not
+   * compile produced nothing at all — there is no object, and nothing partial to inspect. Which is
+   * why `core/router/outcome.ts` counts a compile as a verdict on the turn, exactly as it counts a
+   * test suite: a compile still failing when the turn ends buys the escalation, with the error list
+   * attached.
+   *
+   * It is absent from plan mode, and not by a flag it sets on itself: `READ_ONLY` in
+   * `core/session/modes.ts` is an allow-list, and this creates objects, so it is simply not in it.
+   */
+  const compile: Tool = {
+    schema: {
+      name: "ibmi_compile",
+      description:
+        "Compile a source member into an object on the partition and return the compiler's errors — " +
+        "identifier, severity, line and text. Use this to CHECK your own change: a member that does " +
+        "not compile has produced no object at all. The command follows the member's type " +
+        `(${compilableTypes().join(", ")}); the target library must be one the user allows.`,
+      parameters: {
+        type: "object",
+        properties: {
+          member: { type: "string", description: "LIB/SRCFILE(MEMBER) or /LIB/SRCFILE/MEMBER.RPGLE" },
+          target: { type: "string", description: "The library the object is created in. Defaults to the source library." },
+          type: { type: "string", description: "The member type (rpgle, sqlrpgle, clle, pf, lf, dspf, prtf). Looked up when omitted." },
+          module: { type: "boolean", description: "Create an ILE *MODULE instead of a bound program." },
+        },
+        required: ["member"],
+      },
+    },
+    // Always. It creates an object on a real partition, and when `writableLibraries` is empty the
+    // sentence says that nothing is bounding it — which is the one state the user needs told.
+    approval: (args) => {
+      const ref = safeRef(String(args["member"] ?? ""));
+      if (!ref) return t("compile {0}", String(args["member"] ?? ""));
+      return compileApproval(
+        {
+          source: { ...ref, extension: String(args["type"] ?? "") },
+          targetLibrary: String(args["target"] ?? ref.library),
+          ...(args["module"] ? { module: true } : {}),
+        },
+        writable,
+      );
+    },
+    async run(args, ctx): Promise<ToolResult> {
+      const ref = parseMemberRef(String(args["member"] ?? ""));
+      const targetLibrary = String(args["target"] ?? ref.library);
+      const verdict = compileAllowed(targetLibrary, writable);
+      if (!verdict.allow) return { content: verdict.reason, isError: true };
+
+      // The member's type, from the member itself when the model did not say. `getMemberList` is
+      // the same call the member browser uses, so the answer is whatever Code for IBM i believes.
+      let extension = String(args["type"] ?? "").replace(/^\./, "");
+      if (!extension) {
+        try {
+          const found = await connection()
+            .getContent()
+            .getMemberList({ library: ref.library, sourceFile: ref.sourceFile, members: ref.member });
+          extension = found.find((m) => m.name.toUpperCase() === ref.member)?.extension ?? "";
+        } catch {
+          /* asked for below instead of guessed */
+        }
+      }
+      if (!extension) {
+        return {
+          content:
+            `I could not establish the type of ${ref.library}/${ref.sourceFile}(${ref.member}), and I will not ` +
+            `guess it: compiling a member with the wrong compiler produces a listing full of real-looking ` +
+            `errors about code that is fine. Pass "type" — one of ${compilableTypes().join(", ")}.`,
+          isError: true,
+        };
+      }
+
+      const conn = connection();
+      const outcome = await runCompile(
+        {
+          source: { ...ref, extension },
+          targetLibrary,
+          ...(args["module"] ? { module: true } : {}),
+        },
+        {
+          command: (command) => conn.runCommand({ command, environment: "ile" }),
+          sql: (statement) => conn.getContent().runSQL(statement),
+          read: cell,
+          user: conn.currentUser,
+        },
+      );
+      if ("refused" in outcome) return { content: outcome.refused, isError: true };
+
+      const { report } = outcome;
+      const errors = errorsOnly(report.messages).length;
+      ctx.report(
+        report.ok
+          ? t("compiled {0}/{1}", report.target.library, report.target.object)
+          : t("{0} failed, {1} error(s)", report.command.split(/\s+/)[0] ?? "compile", errors),
+      );
+      return {
+        content: headToTokens(formatReport(report), MAX_TOKENS),
+        // The verdict is the command's, so the step is red when the object was not created — which
+        // is what `verifyTurn` reads to decide whether the turn finished.
+        isError: !report.ok,
+      };
+    },
+  };
+
+
+  /**
+   * Run the shop's own RPG unit tests, and report the verdict.
+   *
+   * The compiler answers "is this a program?". This answers the question a bank actually asks:
+   * "does it still do what it did?" — and it does so by running the tests the shop already has,
+   * rather than by inventing a framework.
+   *
+   * The one thing it will not do is be reassuring. If RPGUnit is not installed it says so and
+   * stops; "no tests failed" on a partition with no test framework is the most expensive sentence
+   * this tool could produce.
+   */
+  const runTests: Tool = {
+    schema: {
+      name: "ibmi_test",
+      description:
+        "Run RPGUnit tests on the partition (RUCALLTST) against a compiled test program, and return " +
+        "which cases passed and which failed. Use it after ibmi_compile to check a change against the " +
+        "shop's own tests. If RPGUnit is not installed it says so and runs nothing.",
+      parameters: {
+        type: "object",
+        properties: {
+          library: { type: "string", description: "The library holding the compiled test program." },
+          program: { type: "string", description: "The test *PGM." },
+          testCase: { type: "string", description: "One test procedure instead of all of them." },
+        },
+        required: ["library", "program"],
+      },
+    },
+    // Running a test runs somebody's code on the partition. It is asked for, like a command is.
+    approval: (args) => t("run the tests in {0}/{1}", String(args["library"] ?? ""), String(args["program"] ?? "")),
+    async run(args, ctx): Promise<ToolResult> {
+      const conn = connection();
+      const content = conn.getContent();
+
+      // Asked of the catalogue, not by running the command: a RUCALLTST that does not exist fails
+      // in a way nothing reading an exit status can tell apart from a failing test.
+      let presence: RpgUnitPresence = { installed: false };
+      try {
+        presence = readPresence(await content.runSQL(presenceSql()), cell);
+      } catch {
+        // A catalogue we cannot read is not a partition without RPGUnit, and must not be reported
+        // as one. Said as its own case below.
+        return {
+          content:
+            "I could not ask the object catalogue whether RPGUnit is installed " +
+            "(QSYS2.OBJECT_STATISTICS did not answer), so I do not know, and I am not going to run " +
+            "RUCALLTST to find out — a command that does not exist fails in a way I cannot tell " +
+            "apart from a failing test.",
+          isError: true,
+        };
+      }
+      if (!presence.installed) return { content: NOT_INSTALLED, isError: true };
+
+      const built = testCommand({
+        library: String(args["library"] ?? ""),
+        program: String(args["program"] ?? ""),
+        ...(args["testCase"] ? { testCase: String(args["testCase"]) } : {}),
+        detail: true,
+      });
+      if ("refused" in built) return { content: built.refused, isError: true };
+
+      const result = await conn.runCommand({ command: built.command, environment: "ile" });
+      const output = [result.stdout, result.stderr].filter((x) => x?.trim()).join("\n");
+      const parsed = parseTestOutput(output);
+      const run: TestRun = {
+        command: built.command,
+        ok: result.code === 0,
+        cases: parsed.cases,
+        ...(parsed.reported ? { reported: parsed.reported } : {}),
+        unread: parsed.unread,
+        output,
+      };
+      const failed = run.cases.filter((c) => c.status !== "passed").length;
+      ctx.report(
+        run.ok
+          ? t("tests passed in {0}", String(args["program"] ?? ""))
+          : t("{0} test(s) failed in {1}", failed || "?", String(args["program"] ?? "")),
+      );
+      return { content: headToTokens(formatTestRun(run), MAX_TOKENS), isError: !run.ok };
+    },
+  };
+
+
+  /**
+   * Who uses this?
+   *
+   * The question asked before every change to a file here, and the one the member in front of you
+   * cannot answer: a physical file is used by programs nobody remembers writing, through logicals
+   * whose names say nothing, from a library that is not on the current list.
+   *
+   * It READS, and it is in plan mode's allow-list — which is only defensible because the one thing
+   * it writes is an output file in QTEMP, a library that is created per job and destroyed with it.
+   * The gate knows that explicitly (`SCRATCH_LIBRARY` in `core/ibmi/guard.ts`), and this tool puts
+   * its own command through the gate before running it: if `programRefsCommand` is ever changed to
+   * write somewhere else, the gate stops it rather than this comment being wrong.
+   */
+  const impact: Tool = {
+    schema: {
+      name: "ibmi_impact",
+      description:
+        "Who uses this file, program or field. At object level it reads the objects' own reference " +
+        "lists (DSPPGMREF), which is a fact; at field level it searches the source members it can read, " +
+        "which is evidence. The answer states which method it used and what that method cannot see. " +
+        "Run it BEFORE changing a physical file.",
+      parameters: {
+        type: "object",
+        properties: {
+          object: { type: "string", description: "LIB/NAME, or NAME to search the library list." },
+          field: { type: "string", description: "A field name, for a field-level search of the sources." },
+          libraries: {
+            type: "string",
+            description: "Comma-separated libraries to look in. Defaults to the job's library list.",
+          },
+        },
+        required: ["object"],
+      },
+    },
+    approval: () => false,
+    async run(args, ctx): Promise<ToolResult> {
+      const conn = connection();
+      const content = conn.getContent();
+      const asked = String(args["object"] ?? "").trim().toUpperCase();
+      if (!asked) return { content: "No object name given.", isError: true };
+      const [maybeLibrary, maybeName] = asked.includes("/") ? asked.split("/") : ["", asked];
+      const name = (maybeName ?? "").trim();
+      const field = String(args["field"] ?? "").trim().toUpperCase();
+
+      const scope = String(args["libraries"] ?? "")
+        .split(/[,\s]+/)
+        .map((l) => l.trim().toUpperCase())
+        .filter(Boolean);
+      const searched = scope.length
+        ? scope
+        : [...new Set([maybeLibrary, conn.getConfig().currentLibrary ?? "", ...(conn.getConfig().libraryList ?? [])].map((l) => (l ?? "").toUpperCase()).filter(Boolean))];
+      if (!searched.length) {
+        return { content: "No library to look in: name one, or set a library list in Code for IBM i.", isError: true };
+      }
+
+      // ── Field level: a search of the sources, and it says so ─────────────────────────────────
+      if (field) {
+        const { method, limits, better } = fieldMethod(arcadInstalled());
+        const references: Reference[] = [];
+        let truncated = false;
+        let read = 0;
+        for (const library of searched) {
+          for (const sourceFile of SOURCE_FILES) {
+            if (read >= MAX_MEMBERS_SEARCHED) {
+              truncated = true;
+              break;
+            }
+            let members: Array<{ library: string; file: string; name: string; extension: string }> = [];
+            try {
+              members = await content.getMemberList({ library, sourceFile });
+            } catch {
+              continue; // a source file that is not there is not an error, it is a library without one
+            }
+            for (const member of members) {
+              if (read >= MAX_MEMBERS_SEARCHED) {
+                truncated = true;
+                break;
+              }
+              if (ctx.signal?.aborted) return { content: "Stopped.", isError: true };
+              read++;
+              try {
+                const text = await content.downloadMemberContent(member.library, member.file, member.name);
+                const line = text.split("\n").find((l) => l.toUpperCase().includes(field));
+                if (line) {
+                  references.push({
+                    library: member.library.toUpperCase(),
+                    name: member.name.toUpperCase(),
+                    type: member.extension.toUpperCase(),
+                    usage: line.trim().slice(0, 120),
+                  });
+                }
+              } catch {
+                /* a member we cannot read is a member we cannot search; counted in `read` */
+              }
+            }
+          }
+        }
+        ctx.report(t("searched {0} member(s) for {1}", read, field));
+        return {
+          content: headToTokens(
+            formatImpact({
+              subject: { library: maybeLibrary || searched[0]!, name, field },
+              method,
+              references,
+              truncated,
+              searched,
+              limits,
+              ...(better ? { better } : {}),
+            }),
+            MAX_TOKENS,
+          ),
+        };
+      }
+
+      // ── Object level: the reference lists, which are a fact ──────────────────────────────────
+      const references: Reference[] = [];
+      let truncated = false;
+      const covered: string[] = [];
+      for (const library of searched) {
+        const command = programRefsCommand(library);
+        // Its own command, through the gate. The point is not suspicion of this code but of the
+        // next edit to it: `OUTFILE` pointing anywhere but QTEMP must fail here, loudly.
+        const refused = refuseChange(command, true, { writable });
+        if (refused) return refusal(refused, writable);
+        const ran = await conn.runCommand({ command, environment: "ile" });
+        if (ran.code !== 0) continue; // a library with no programs produces CPF9801 and no outfile
+        const rows = await content.runSQL(programRefsQuery(MAX_REFERENCE_ROWS));
+        if (rows.length >= MAX_REFERENCE_ROWS) truncated = true;
+        references.push(...referencesTo(rows, { library: maybeLibrary || library, name }, cell));
+        covered.push(library);
+      }
+      ctx.report(t("{0} user(s) of {1}", references.length, name));
+      return {
+        content: headToTokens(
+          formatImpact({
+            subject: { library: maybeLibrary || covered[0] || searched[0]!, name },
+            method: "program-references",
+            references,
+            truncated,
+            searched: covered.length ? covered : searched,
+            limits: PROGRAM_REFERENCE_LIMITS,
+          }),
+          MAX_TOKENS,
+        ),
+      };
+    },
+  };
+
+
+  /**
+   * What Db2 for i already knows about a table.
+   *
+   * Db2 for i keeps something no other platform hands you this directly: a record of the indexes
+   * its own optimizer wished existed while real queries ran. That turns "add an index on CUSTNO,
+   * that usually helps" into "the optimizer asked for this exact key 4 812 times, over 2.1 million
+   * rows, and built a temporary index for it".
+   *
+   * It reads, so it is free and it is in plan mode. Acting on what it says is not: creating an
+   * index is a CHANGE, it goes through `ibmi_sql`, and the gate sees it like any other.
+   */
+  const db2Advice: Tool = {
+    parallel: () => true,
+    schema: {
+      name: "ibmi_index_advice",
+      description:
+        "What Db2 for i's own optimizer wished it had: the indexes it asked for on a table " +
+        "(QSYS2.SYSIXADV) with how often it asked, plus the table's size and index count " +
+        "(QSYS2.SYSTABLESTAT). Read this BEFORE proposing an index or explaining why a query is slow. " +
+        "It is a wish list, not a design, and the answer says what it does not mean.",
+      parameters: {
+        type: "object",
+        properties: {
+          schema: { type: "string", description: "The library (SQL schema)." },
+          table: { type: "string", description: "The table. Omit to see the whole schema's advice." },
+        },
+        required: ["schema"],
+      },
+    },
+    approval: () => false,
+    async run(args, ctx): Promise<ToolResult> {
+      const content = connection().getContent();
+      const schema = String(args["schema"] ?? "").trim();
+      const table = String(args["table"] ?? "").trim();
+      if (!schema) return { content: "No schema given.", isError: true };
+
+      const gaps: string[] = [];
+      let advice: IndexAdvice[] = [];
+      try {
+        advice = readAdvice(await content.runSQL(indexAdviceSql(schema, table || undefined)), cell);
+      } catch (err) {
+        gaps.push(`the index advisor (${(err as Error).message.split("\n")[0]?.slice(0, 120)})`);
+      }
+
+      let stats: TableStats | undefined;
+      if (table) {
+        try {
+          stats = readStats(await content.runSQL(tableStatsSql(schema, table)), cell);
+        } catch (err) {
+          gaps.push(`the table statistics (${(err as Error).message.split("\n")[0]?.slice(0, 120)})`);
+        }
+      }
+
+      ctx.report(t("{0} index suggestion(s) from the optimizer", advice.length));
+      return {
+        content: headToTokens(formatAdvice({ schema: schema.toUpperCase(), ...(table ? { table: table.toUpperCase() } : {}) }, advice, stats, gaps), MAX_TOKENS),
+      };
+    },
+  };
+
+
+  /**
+   * What an identifier means, and what this shop does about it.
+   *
+   * IBM's text says what happened. It does not say what to DO, because what to do is a decision
+   * this company made years ago and wrote down somewhere — the recovery procedure, the batch to
+   * re-run, the person to call. That part lives in the internal documentation this extension can
+   * already read, so an identifier resolves to both, labelled, because "IBM says this" and "your
+   * documentation says this" carry very different authority when the second one is from 2011.
+   */
+  const message: Tool = {
+    parallel: () => true,
+    schema: {
+      name: "ibmi_message",
+      description:
+        "What an IBM i message identifier means (CPF, CPD, MCH, RNF, SQL…): IBM's own first- and " +
+        "second-level text from the message file, AND the internal documentation notes that mention " +
+        "it. Use it whenever a message id appears in a joblog, a compile listing or an error.",
+      parameters: {
+        type: "object",
+        properties: { id: { type: "string", description: "A message identifier, for example CPF4131." } },
+        required: ["id"],
+      },
+    },
+    approval: () => false,
+    async run(args, ctx): Promise<ToolResult> {
+      const id = String(args["id"] ?? "").trim().toUpperCase();
+      if (!validMessageId(id)) {
+        return {
+          content: `“${args["id"]}” is not a message identifier. They are three letters and four digits, like CPF4131.`,
+          isError: true,
+        };
+      }
+
+      const gaps: string[] = [];
+      let found: IbmMessage | undefined;
+      const content = connection().getContent();
+      for (const file of messageFiles(id)) {
+        if (found) break;
+        try {
+          found = readMessage(await content.runSQL(messageSql(file, id)), file, cell);
+        } catch (err) {
+          gaps.push(`${file.library}/${file.name} (${(err as Error).message.split("\n")[0]?.slice(0, 100)})`);
+        }
+      }
+
+      // The house half. Read from the knowledge base the user configured, which may be none — and
+      // then the answer simply says the documentation does not mention it.
+      let house: CitingNote[] = [];
+      const store = knowledgeStore(readSettings());
+      if (store) {
+        try {
+          house = notesCiting(await store.list(), id);
+        } catch (err) {
+          gaps.push(`the knowledge base (${(err as Error).message.split("\n")[0]?.slice(0, 100)})`);
+        }
+      }
+
+      ctx.report(t("{0}: {1} house note(s)", id, house.length));
+      return { content: headToTokens(formatMessage(id, found, house, gaps), MAX_TOKENS) };
+    },
+  };
+
+  return [sql, command, compile, runTests, impact, db2Advice, message, readMember, programContext, whereIsMember, listMembers, listObjects, libraryList];
 }
