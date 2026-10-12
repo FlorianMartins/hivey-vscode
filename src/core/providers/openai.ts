@@ -425,6 +425,27 @@ export class OpenAICompatibleProvider implements Provider {
     }
   }
 
+  /**
+   * The context window this server gives a model, when it says: llama-swap and llama.cpp report
+   * `context_length` / `context_window` / `meta.n_ctx` in /models — the RUNTIME window, which is
+   * what refuses a request, not the model's training maximum. 0 when the server does not say.
+   *
+   * ⚠️ Without it the extension sized everything from a catalogue that has never heard of a
+   * self-hosted model, fell back to its 8000-token floor, and let a turn grow until the server
+   * refused it: "request (69882 tokens) exceeds the available context size (69632 tokens)".
+   */
+  async contextWindow(model: string): Promise<number> {
+    try {
+      const res = await request(`${this.baseUrl}/models`, { headers: this.headers(), timeoutMs: 15_000, label: "model list" });
+      if (!res.ok) return 0;
+      const json = (await res.json()) as any;
+      const entry = (json.data ?? []).find((m: any) => m?.id === model);
+      return contextWindowOf(entry);
+    } catch {
+      return 0;
+    }
+  }
+
   async listModels(): Promise<string[]> {
     try {
       const res = await request(`${this.baseUrl}/models`, { headers: this.headers(), timeoutMs: 15_000, label: "model list" });
@@ -642,4 +663,14 @@ export function isCompleteJson(args: string): boolean {
   } catch {
     return false;
   }
+}
+
+/** The runtime context window a /models entry reports, 0 when it reports none. */
+export function contextWindowOf(entry: unknown): number {
+  const e = (entry ?? {}) as Record<string, any>;
+  for (const value of [e["context_length"], e["context_window"], e["meta"]?.["n_ctx"], e["max_context_length"]]) {
+    const n = Number(value);
+    if (Number.isFinite(n) && n > 0) return Math.floor(n);
+  }
+  return 0;
 }

@@ -465,6 +465,36 @@ test("⚠️ a turn that outgrows the context mid-way shortens old tool outputs 
   assert.equal(last[1], big, "the latest output — the one the next step is about — is left whole");
 });
 
+test("⚠️ with the window known, the turn is fitted BEFORE it is sent — no error at all", async () => {
+  // "we can't leave a limit like that": the server's refusal is the last line of defence, not the
+  // mechanism. Knowing the window, the loop shortens old tool outputs before asking.
+  const big = "line of a long build log\n".repeat(4000); // ~96 000 characters ≈ 24 000 tokens each
+  const read = tool("read_file", { run: async () => ({ content: big }) });
+  let calls = 0;
+  let largest = 0;
+  const provider: Provider = {
+    id: "fake",
+    baseUrl: "http://127.0.0.1:11434/v1",
+    isLocal: true,
+    async chat(req): Promise<ChatResult> {
+      calls++;
+      const chars = req.messages.reduce((n, m) => n + m.content.length, 0);
+      largest = Math.max(largest, chars);
+      if (chars / 4 > 69632) throw new Error("request (80000 tokens) exceeds the available context size (69632 tokens)");
+      if (calls <= 3) {
+        return { text: "", reasoning: "", toolCalls: [{ id: `c${calls}`, name: "read_file", args: "{}" }], usage: { promptTokens: 1, completionTokens: 1, cachedTokens: 0 }, stopReason: "tool_calls" };
+      }
+      return { text: "All read.", reasoning: "", toolCalls: [], usage: { promptTokens: 1, completionTokens: 1, cachedTokens: 0 }, stopReason: "stop" };
+    },
+    async listModels() {
+      return [];
+    },
+  };
+  const r = await runTurn({ ...base, provider, tools: [read], contextWindow: 69632 });
+  assert.equal(r.text, "All read.");
+  assert.ok(largest / 4 <= 69632 * 0.9, `a request of ~${Math.round(largest / 4)} tokens was sent`);
+});
+
 test("when nothing is left to shorten, the context error stands", async () => {
   const provider: Provider = {
     id: "fake",

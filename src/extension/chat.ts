@@ -147,6 +147,7 @@ const PERMISSIONS_KEY = "hiveyCode.permissions";
 const SETUP_SEEN_KEY = "hiveyCode.setupSeen";
 const VISIONLESS_KEY = "hiveyCode.visionless";
 const VISIONLESS_TTL_MS = 24 * 60 * 60 * 1000;
+const WINDOWS_KEY = "hiveyCode.contextWindows";
 
 /**
  * The only addresses `openExternal` will open.
@@ -325,8 +326,54 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     return attachmentTokens(settings, this.attachments.length + adding, this.modelWindow(settings));
   }
 
+  /**
+   * Context windows learned from the servers themselves, per address and model.
+   *
+   * ⚠️ "the auto-compact clearly doesn't work in this case […] we can't leave a limit like that".
+   * A self-hosted model is in no catalogue, so its window was unknown, the budget fell to its
+   * 8000-token floor, and nothing stopped a turn growing until the server refused it. The server
+   * says what it gives (`context_length` / `n_ctx` in /models) and says it again in its refusal
+   * ("available context size (69632 tokens)"); both are kept here, across restarts.
+   */
+  private windowsSeen?: Map<string, number>;
+  private windows(): Map<string, number> {
+    return (this.windowsSeen ??= new Map(Object.entries(this.ctx.globalState.get<Record<string, number>>(WINDOWS_KEY) ?? {})));
+  }
+
+  private windowKey(s: Settings, model = s.chat.model): string {
+    const providerId = isHivey(model) ? "openrouter" : s.chat.provider;
+    return `${safeUrl(s, providerId)}::${model}`;
+  }
+
+  /** The window learned for this address and model, 0 when none has been. */
+  private learnedWindow(s: Settings, model = s.chat.model): number {
+    return this.windows().get(this.windowKey(s, model)) ?? 0;
+  }
+
+  private learnWindow(key: string, tokens: number): void {
+    if (!(tokens > 0) || this.windows().get(key) === tokens) return;
+    this.windows().set(key, tokens);
+    void this.ctx.globalState.update(WINDOWS_KEY, Object.fromEntries([...this.windows()].slice(-50)));
+    this.log.appendLine(`[context] ${key} → ${tokens} tokens`);
+  }
+
+  /** Ask the server for the window of the selected model, once per address and model. */
+  private async discoverWindow(s: Settings): Promise<void> {
+    if (isHivey(s.chat.model) || this.learnedWindow(s)) return;
+    try {
+      const provider = await providerFor(s, this.keys, s.chat.provider);
+      const tokens = (await provider.contextWindow?.(s.chat.model)) ?? 0;
+      if (tokens > 0) this.learnWindow(this.windowKey(s), tokens);
+    } catch {
+      /* the server did not say; the refusal, if one comes, will */
+    }
+  }
+
   /** The selected model's own window, 0 when nothing knows it. */
   private modelWindow(s: Settings): number {
+    // What the server itself said beats any catalogue: it is the window that refuses requests.
+    const learned = this.learnedWindow(s);
+    if (learned) return learned;
     const id = hiveyModel(s.chat.model, "everyday");
     // The live list first, because a provider serving its own build of a model knows its window
     // better than a catalogue does — then the catalogue, because the live list is fetched, fails
@@ -1667,6 +1714,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     try {
       const settings = readSettings();
       this.models = await listModels(settings, this.keys, settings.chat.model);
+      void this.discoverWindow(settings);
     } catch (err) {
       this.log.appendLine(`[models] ${(err as Error).message}`);
     } finally {
@@ -1795,6 +1843,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       // could generate until the whole context slot was full — minutes of a "stuck" turn with nothing
       // on screen, since a sub-agent streams nothing to the panel.
       maxTokens: env.settings.chat.maxOutputTokens,
+      ...(this.modelWindow(env.settings) ? { contextWindow: this.modelWindow(env.settings) } : {}),
       ...(run.signal ? { signal: run.signal } : {}),
       approve: (req) => this.askApproval(req),
       beforeRequest: async (msgs) => {
@@ -3975,6 +4024,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
   private async compact(): Promise<boolean> {
     const settings = readSettings();
+    // Sized from the real window, so the summary request itself fits — see `discoverWindow`.
+    await this.discoverWindow(settings);
     // Compaction rewrites the transcript, so the cache is lost regardless: the one moment where a
     // rebuilt map costs nothing.
     this.frozenMap = undefined;
@@ -4216,6 +4267,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
   private async runTurn(handover?: { provider: ProviderId; model: string; note: string }): Promise<void> {
     const settings = readSettings();
+    // The window first: everything below — the history kept, the compaction offered, the turn's own
+    // fitting — is sized from it. One /models request, the first time this model is used.
+    await this.discoverWindow(settings);
     const mode = this.session.mode;
     // Every file this turn is about to change gets snapshotted against the question that asked for
     // it. Set here rather than passed down: `confirmEdit` sits several layers of tool machinery
@@ -4680,6 +4734,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         tools,
         signal: ctl.signal,
         maxTokens: outputTokens,
+        // Fitted before each request — see `RunTurnOptions.contextWindow`. Only for the model whose
+        // window is known: a fallback model elsewhere has its own.
+        ...(useModel === model && this.modelWindow(settings) ? { contextWindow: this.modelWindow(settings) } : {}),
         // Never an effort a model cannot use. The control is hidden when `canReason` is false, but a
         // stored preference survives a model change — so switching to a plain model went on sending
         // `effort: "high"` to an endpoint with no idea what to do with it. Hidden is not unsent.
@@ -5012,6 +5069,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       const message = (err as Error).message;
       this.log.appendLine(`[turn] ${message}`);
       if (overflowed) {
+        // The server's figure is kept, so the history is sized right from the next request on.
+        const said = /\((\d+) tokens\)[^(]*\((\d+) tokens\)/.exec(message);
+        if (said) this.learnWindow(this.windowKey(settings), Number(said[2]));
         // Not an error the user has to act on: the recovery below takes over.
         this.post({ type: "status", text: t("The conversation no longer fits the model's context: summarizing it, then asking again…") });
       }
@@ -5027,16 +5087,36 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         // — was recorded nowhere. It was posted as a message, drawn into the turn in progress, and
         // destroyed by the next rebuild: a red line that appeared for a fraction of a second and
         // left nothing behind. The user could see something was wrong and could not read what.
+        // ⚠️ "we can't leave a limit like that". A refusal for size is not a failure to show raw:
+        // the server's own figure is kept (so the next turns are sized from it), and the person is
+        // told what it means and offered the two ways out, in one click each.
+        const tooLong = isContextOverflow(message);
+        if (tooLong) {
+          const said = /\((\d+) tokens\)[^(]*\((\d+) tokens\)/.exec(message);
+          if (said) this.learnWindow(this.windowKey(settings), Number(said[2]));
+        }
+        const shown = tooLong
+          ? t("This conversation no longer fits the model's context window. Summarize it to continue, or start a new conversation.")
+          : message;
         const last = this.session.entries[this.session.entries.length - 1];
-        if (last?.role === "assistant" && !last.text) last.error = message;
-        else this.session.add({ role: "assistant", text: "", model }).error = message;
-        this.post({ type: "error", message });
-        // And once, out of the transcript, because a transcript can be scrolled past — and because
-        // somebody who cannot get an answer needs the text of the failure to be able to report it.
-        const open = t("Open the log");
-        void vscode.window.showErrorMessage(t("Hivey Code: {0}", message), open).then((choice) => {
-          if (choice === open) this.log.show(true);
-        });
+        if (last?.role === "assistant" && !last.text) last.error = shown;
+        else this.session.add({ role: "assistant", text: "", model }).error = shown;
+        this.post({ type: "error", message: shown });
+        if (tooLong) {
+          const summarize = t("Summarize the conversation");
+          const fresh = t("New conversation");
+          void vscode.window.showWarningMessage(shown, summarize, fresh).then(async (choice) => {
+            if (choice === summarize) await this.compactConversation();
+            else if (choice === fresh) await vscode.commands.executeCommand("hiveyCode.newSession");
+          });
+        } else {
+          // And once, out of the transcript, because a transcript can be scrolled past — and because
+          // somebody who cannot get an answer needs the text of the failure to be able to report it.
+          const open = t("Open the log");
+          void vscode.window.showErrorMessage(t("Hivey Code: {0}", message), open).then((choice) => {
+            if (choice === open) this.log.show(true);
+          });
+        }
       }
     } finally {
       // Before anything else, and unconditionally: this is what the panel reads to decide whether

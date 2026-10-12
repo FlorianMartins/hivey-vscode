@@ -95,6 +95,11 @@ export interface TurnOptions {
   maxTokens?: number;
   /** A side task — see `ChatRequest.chore`. Thinking is switched off for it on a self-hosted server. */
   chore?: boolean;
+  /**
+   * The server's runtime context window, when known. Checked BEFORE each request: a turn that has
+   * grown past it gets its oldest tool outputs shortened first, rather than an error from the server.
+   */
+  contextWindow?: number;
   temperature?: number;
   reasoning?: ReasoningEffort;
   signal?: AbortSignal;
@@ -308,6 +313,15 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
   for (let step = 0; step < maxSteps; step++) {
     if (opts.signal?.aborted) return done("cancelled");
 
+    // Fitted BEFORE it is sent, when the window is known: the estimate counts ~4 characters a
+    // token and code packs tighter, so a tenth is kept in hand, plus room for the answer.
+    if (opts.contextWindow && opts.contextWindow > 0) {
+      const limit = Math.floor(opts.contextWindow * 0.9) - ANSWER_ROOM_TOKENS;
+      const estimate = estimateMessageTokens(working);
+      if (estimate > limit && shrinkToolOutputs(working, estimate - limit)) {
+        opts.report?.("the turn was approaching the model's context window — older tool outputs were shortened");
+      }
+    }
     const prepared = opts.beforeRequest ? await opts.beforeRequest(working) : working;
     const outgoing = opts.promptCache ? withRollingCacheMark(prepared) : prepared;
     let res: ChatResult;

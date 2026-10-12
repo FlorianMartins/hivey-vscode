@@ -7,7 +7,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { AddressInfo } from "node:net";
-import { OpenAICompatibleProvider } from "../src/core/providers/openai.js";
+import { contextWindowOf, OpenAICompatibleProvider } from "../src/core/providers/openai.js";
 import { AnthropicProvider } from "../src/core/providers/anthropic.js";
 import { HttpError } from "../src/core/util/http.js";
 
@@ -315,6 +315,30 @@ test("⚠️ a stream that stops without ever finishing is reported as interrupt
   });
   await byReason.close();
   assert.equal(b.interrupted, undefined);
+});
+
+test("⚠️ the server's runtime context window is read from /models", async () => {
+  // llama-swap answers with the RUNTIME window — the one that refuses requests — not the model's
+  // training maximum. Without it a self-hosted model sat on the 8000-token floor and grew until refused.
+  const s = await serve((req, res) => {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(
+      JSON.stringify({
+        data: [
+          { id: "qwen-27b", context_length: 69632, context_window: 69632, meta: { n_ctx: 69632 } },
+          { id: "other", meta: { n_ctx: 32768 } },
+          { id: "silent" },
+        ],
+      }),
+    );
+  });
+  const p = new OpenAICompatibleProvider({ id: "local", baseUrl: s.url, isLocal: true });
+  assert.equal(await p.contextWindow("qwen-27b"), 69632);
+  assert.equal(await p.contextWindow("other"), 32768, "meta.n_ctx alone is enough");
+  assert.equal(await p.contextWindow("silent"), 0, "a server that does not say gives 0, not a guess");
+  assert.equal(await p.contextWindow("absent"), 0);
+  await s.close();
+  assert.equal(contextWindowOf({ max_context_length: 8192 }), 8192);
 });
 
 test("reasoning effort is translated per provider, not passed through", async () => {

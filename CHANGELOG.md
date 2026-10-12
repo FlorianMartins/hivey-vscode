@@ -6,6 +6,19 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **⚠️⚠️ La limite de contexte du serveur est connue, et respectée avant d'être atteinte.** « le
+  auto-compact ne fonctionne clairement pas […] on ne peut pas laisser une limite comme ça ». Un
+  modèle auto-hébergé n'est dans aucun catalogue : sa fenêtre était inconnue, le budget retombait à
+  son plancher de 8000 tokens, et rien n'empêchait un tour de grossir jusqu'au refus du serveur.
+  Désormais :
+  - la fenêtre **réelle** est lue sur le serveur (`context_length` / `n_ctx` de `/models`), apprise
+    aussi de son message de refus, et mémorisée par adresse et modèle ;
+  - l'historique, la proposition de résumé et le résumé lui-même sont dimensionnés dessus ;
+  - avant **chaque** requête d'un tour d'agent, les anciennes sorties d'outils sont raccourcies si le
+    tour approche de la limite — plus d'erreur, l'agent continue ;
+  - en dernier recours, plus d'erreur brute : un message clair avec deux boutons, **Résumer la
+    conversation** et **Nouvelle conversation**.
+
 - **⚠️ Un tour d'agent qui dépasse le contexte en cours de route ne s'arrête plus sur une erreur.**
   « HTTP 400 Bad Request: request (69882 tokens) exceeds the available context size (69632
   tokens) ». Les résultats d'outils s'accumulent dans un tour et rien ne les réduisait : un long tour

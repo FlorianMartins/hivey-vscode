@@ -146,6 +146,8 @@ export interface Provider {
   /** Fill-in-the-middle. Absent on providers whose models cannot do it. */
   complete?(req: CompletionRequest): Promise<string>;
   listModels(): Promise<string[]>;
+  /** The runtime context window the server gives this model, 0 when it does not say. */
+  contextWindow?(model: string): Promise<number>;
 }
 
 export const EMPTY_USAGE: Usage = { promptTokens: 0, completionTokens: 0, cachedTokens: 0 };
