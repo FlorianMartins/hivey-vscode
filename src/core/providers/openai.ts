@@ -20,6 +20,7 @@ import type {
 } from "./types.js";
 import { EMPTY_USAGE } from "./types.js";
 import { keepCacheMarks } from "./cache.js";
+import { isSelfHostedProvider } from "../redaction/index.js";
 import { toolCallsFromText } from "./textToolCall.js";
 
 export interface OpenAIProviderOptions {
@@ -243,6 +244,13 @@ export class OpenAICompatibleProvider implements Provider {
       // Explicitly off, so a model that thinks by default does not bill for it.
       body["reasoning"] = { exclude: true };
     }
+    // ⚠️ A side task on a self-hosted server: thinking OFF. "none" above sends nothing to
+    // llama.cpp, and nothing means the chat template's default effort — so an edit prediction or a
+    // commit message thought for longer than it took to write. Only for chores and only on the
+    // user's own server (llama.cpp reads `reasoning_effort: "none"` as enable_thinking=false); a
+    // turn somebody is waiting to read keeps its thinking, and clouds are left exactly as they were.
+    // A server that rejects the field gets the request again without it — see `adaptRequest`.
+    if (req.chore && isSelfHostedProvider(this.id)) body["reasoning_effort"] = "none";
 
     // Ask for the accounting. OpenAI-compatible servers that do not know the field ignore it.
     body["stream_options"] = { include_usage: true };

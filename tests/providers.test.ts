@@ -258,6 +258,27 @@ test("Anthropic: the stable prefix is marked for the prompt cache", async () => 
   assert.equal(r.usage.completionTokens, 5);
 });
 
+test("⚠️ a side task on a self-hosted server is sent with thinking off — and only that", async () => {
+  // Qwen on llama.cpp thinks at the template's default effort unless told otherwise, so an edit
+  // prediction or a commit message spent its time thinking. A turn somebody reads keeps its thinking;
+  // a cloud is left exactly as it was.
+  const sent = async (id: string, chore: boolean): Promise<Record<string, unknown>> => {
+    const s = await serve((_req, res) => sse(res, [{ choices: [{ delta: { content: "x" } }] }]));
+    await new OpenAICompatibleProvider({ id, baseUrl: s.url, isLocal: id === "local", apiKey: "k" }).chat({
+      model: "m",
+      messages: [{ role: "user", content: "hi" }],
+      reasoning: "none",
+      ...(chore ? { chore: true } : {}),
+    });
+    await s.close();
+    return s.requests[0]!.body;
+  };
+  assert.equal((await sent("local", true)).reasoning_effort, "none", "local chore: thinking off");
+  assert.equal((await sent("openai-compatible", true)).reasoning_effort, "none", "own gateway chore: thinking off");
+  assert.equal((await sent("local", false)).reasoning_effort, undefined, "a real turn keeps the server's default");
+  assert.equal((await sent("openai", true)).reasoning_effort, undefined, "a cloud is not touched");
+});
+
 test("reasoning effort is translated per provider, not passed through", async () => {
   // OpenRouter normalizes it under `reasoning`; an OpenAI-shaped gateway takes `reasoning_effort`.
   const or = await serve((_req, res) => sse(res, [{ choices: [{ delta: { content: "x" } }] }]));

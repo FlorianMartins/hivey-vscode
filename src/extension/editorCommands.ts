@@ -258,6 +258,8 @@ async function oneShot(deps: EditorDeps, system: string, user: string, token?: v
       ],
       maxTokens: 2048,
       temperature: 0.2,
+      // A commit message is a chore: no thinking on a self-hosted server. See `ChatRequest.chore`.
+      chore: true,
       signal: ctl.signal,
       afterResponse: (t) => vault.restore(t),
     });

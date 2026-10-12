@@ -180,6 +180,7 @@ export class NextEditWatcher {
         // Never: this is a prediction, not a question, and a thinking budget on every pause in
         // typing is the whole cost of the feature spent on nothing.
         reasoning: "none",
+        chore: true,
         signal: ctl.signal,
       });
       if (ctl.signal.aborted) return;

@@ -4035,6 +4035,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         signal: ctl.signal,
         maxTokens: 2048,
         temperature: 0.2,
+        // Summarizing is a chore: no thinking on a self-hosted server. See `ChatRequest.chore`.
+        chore: true,
         onDelta: (d) => {
           if (!d.text || ctl.signal.aborted) return;
           streamed += d.text;

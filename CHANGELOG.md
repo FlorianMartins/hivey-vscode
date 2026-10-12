@@ -6,6 +6,13 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **⚠️ Les tâches annexes ne font plus réfléchir le modèle auto-hébergé.** La prédiction d'édition,
+  le message de commit et le résumé de conversation demandaient « pas de réflexion », mais rien
+  n'était envoyé à llama.cpp — qui appliquait alors l'effort par défaut de son modèle (le maximum,
+  pour Qwen3.8). Ces trois tâches partent maintenant avec `reasoning_effort: "none"` vers le modèle
+  local et votre propre gateway. Les réponses que vous lisez gardent leur réflexion, et les
+  fournisseurs cloud ne sont pas touchés.
+
 - **⚠️ La lueur fait vraiment le tour du cadre.** « il fait gauche, haut, droite, bas et pas le tour
   proprement ». C'était un dégradé conique tournant autour du **centre** : sur un cadre quatre fois
   plus large que haut, un angle n'est pas une distance, et l'arc filait sur les petits côtés et se

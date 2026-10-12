@@ -93,6 +93,8 @@ export interface TurnOptions {
    */
   selfCheck?: (trace: TurnResult["trace"]) => string | undefined;
   maxTokens?: number;
+  /** A side task — see `ChatRequest.chore`. Thinking is switched off for it on a self-hosted server. */
+  chore?: boolean;
   temperature?: number;
   reasoning?: ReasoningEffort;
   signal?: AbortSignal;
@@ -265,6 +267,7 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
           messages: outgoing,
           tools: schemas.length ? schemas : undefined,
           maxTokens: opts.maxTokens,
+          ...(opts.chore ? { chore: true } : {}),
           temperature: opts.temperature,
           reasoning: opts.reasoning,
           signal: opts.signal,
