@@ -16,6 +16,8 @@ export interface ProviderConfig {
   id: ProviderId;
   baseUrl: string;
   apiKey?: string;
+  /** Ask for Anthropic's prompt cache through OpenRouter. See `OpenAIProviderOptions.promptCache`. */
+  promptCache?: boolean;
 }
 
 export const ATTRIBUTION = {
@@ -39,5 +41,6 @@ export function makeProvider(cfg: ProviderConfig): Provider {
     isLocal: isLocalEndpoint(cfg.baseUrl),
     referer: ATTRIBUTION.referer,
     title: ATTRIBUTION.title,
+    ...(cfg.promptCache ? { promptCache: true } : {}),
   });
 }

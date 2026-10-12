@@ -20,7 +20,9 @@ const INTERESTING: Record<string, string[]> = {
   search_text: ["pattern"],
   get_diagnostics: ["path"],
   use_skill: ["name"],
-  run_agent: ["agent", "task"],
+  // ⚠️ `name`, not `agent`: the schema calls it `name`, so `agent` was never found, the fallback
+  // took `task`, and a step line showed the task without saying WHICH agent received it.
+  run_agent: ["name", "task"],
   ibmi_sql: ["sql"],
   ibmi_command: ["command"],
   ibmi_member: ["member", "library"],
@@ -74,4 +76,21 @@ export function callSignature(tool: string, args: Record<string, unknown>): stri
 function short(value: string): string {
   const line = value.replace(/\s+/g, " ").trim();
   return line.length > MAX ? `${line.slice(0, MAX - 1)}…` : line;
+}
+
+/**
+ * The arguments a call carried, or an empty object.
+ *
+ * The trace keeps the call as the model sent it — raw JSON — rather than the coerced arguments, so
+ * anything reading a finished trace has to parse. Malformed JSON is a call that already failed; it
+ * gets an empty object rather than throwing inside whatever was summarising a transcript.
+ */
+export function safeArgs(raw: string | undefined): Record<string, unknown> {
+  if (!raw) return {};
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
 }

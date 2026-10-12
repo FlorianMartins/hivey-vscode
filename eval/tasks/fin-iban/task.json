@@ -1,0 +1,7 @@
+{
+  "title": "An IBAN check that accepts a wrong account number",
+  "kind": "bug",
+  "prompt": "iban.py only checks the length and the country, so a typed digit that is wrong gets through and the payment fails days later at the bank. Implement the real check: move the first four characters to the end, replace each letter by its position in the alphabet plus nine, and require the whole number modulo 97 to be 1. The tests show what must be accepted and refused.",
+  "check": "python3 -m unittest discover -q",
+  "timeoutMs": 180000
+}

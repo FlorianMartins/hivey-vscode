@@ -37,6 +37,14 @@ export type HiveyVariant = "hivey/free" | "hivey" | "hivey/smart";
 /** What kind of work a request is, from this routing's point of view. */
 export type HiveyRole = "chore" | "everyday" | "deep" | "completion";
 
+/**
+ * The presets, cheapest first.
+ *
+ * ⚠️ The order is read, not just displayed — `hiveyRoles` uses it to say which preset is cheaper than
+ * which — and `hivey` moved to the end of it. The labels have been crossed since two renames, so
+ * "Hivey Smart" is `hivey` and "Hivey Pro" is `hivey/smart`; naming an id to mean "the dearest" is
+ * exactly how that mix-up would spread, which is why nothing does.
+ */
 export const HIVEY_VARIANTS: Array<{ id: HiveyVariant; label: string; hint: string }> = [
   {
     id: "hivey/free",
@@ -44,14 +52,14 @@ export const HIVEY_VARIANTS: Array<{ id: HiveyVariant; label: string; hint: stri
     hint: t("Free endpoints only. Costs nothing, and is rate-limited like everything free."),
   },
   {
-    id: "hivey",
-    label: "Hivey Smart",
-    hint: t("A strong model where you feel it, a cheap one for the plumbing."),
-  },
-  {
     id: "hivey/smart",
     label: "Hivey Pro",
-    hint: t("The best of the catalogue on the hard work, without paying it to write commit messages."),
+    hint: t("A strong model where you feel it, a cheap one for the plumbing. The middle of the three."),
+  },
+  {
+    id: "hivey",
+    label: "Hivey Smart",
+    hint: t("The premium one: Anthropic's own ladder, its flagship on hard work and its small model on chores."),
   },
 ];
 
@@ -115,4 +123,41 @@ export function hiveyModel(model: string, role: HiveyRole): string {
 export function hiveyModels(model: string): string[] {
   const table = HIVEY_ROUTING[hiveyVariant(model)] ?? {};
   return [...new Set(Object.values(table))];
+}
+
+export const HIVEY_ROLES: HiveyRole[] = ["chore", "everyday", "deep", "completion"];
+
+/**
+ * What a preset routes to, role by role — and which of those a cheaper preset already reached.
+ *
+ * ⚠️ This exists because the panel priced a preset by ONE of its four roles, the `everyday` one, and
+ * presented that figure as the preset's price. Reported as "how come the Hivey Pro and Hivey Smart
+ * models come out at the same price? Smart is supposed to use the best models". The
+ * figures were not wrong; the question they answered was not the one being asked.
+ *
+ * And the honest answer is that no single number separates those two presets, because on today's
+ * catalogue they genuinely cost the same at both ends: the same cheap model for chores, the same
+ * strong model for deep work, and the same $2/M input on everything in between. What differs is the
+ * OUTPUT price of one role, and which model answers an ordinary question. A row that reduces that to
+ * one figure cannot help but look like a defect — so the interface stops reducing it.
+ *
+ * `sameAsCheaper` is the fact that explains the rest: a dearer preset reaching for the model a cheaper
+ * one already uses is not a bug (the generated file says so too, in `HIVEY_OVERLAPS`), it means the
+ * strongest current model was already inside the cheaper preset's budget and the dearer one had
+ * nothing better to buy. Said out loud, it is useful. Left unsaid, it reads as the presets being fake.
+ *
+ * Derived from the routing table rather than parsed out of `HIVEY_OVERLAPS`, whose entries are prose
+ * meant for a human reading the generated file.
+ */
+export function hiveyRoles(
+  model: string,
+): Array<{ role: HiveyRole; model: string; sameAsCheaper?: HiveyVariant }> {
+  const variant = hiveyVariant(model);
+  // The declaration order of HIVEY_VARIANTS is cheapest first, which is what "cheaper" means here.
+  const cheaper = HIVEY_VARIANTS.map((v) => v.id).slice(0, HIVEY_VARIANTS.findIndex((v) => v.id === variant));
+  return HIVEY_ROLES.map((role) => {
+    const resolved = hiveyModel(variant, role);
+    const twin = cheaper.find((other) => hiveyModel(other, role) === resolved);
+    return twin ? { role, model: resolved, sameAsCheaper: twin } : { role, model: resolved };
+  });
 }
