@@ -22,24 +22,26 @@ test("with no figure, the budget is the model's window less what the turn still 
   assert.ok(contextBudget(undefined, 1_000_000) > 700_000, "a million-token model should give most of a million");
 });
 
-test("the reserve is never smaller than room for the answer and the steps after it", () => {
-  // Not a preference: a prompt filling the whole window leaves nothing for the reply, and in agent
-  // mode nothing for the tool results of the steps that follow. The turn would truncate on its first
-  // answer, which is the failure `loop.ts` calls "it only does the reasoning and gives no answer".
+test("the reserve is never smaller than room for the answer", () => {
+  // Not a preference: a prompt filling the whole window leaves nothing for the reply. Room for ONE
+  // answer, not three and not a fifth of the window — "adapt to the models' own limits, don't add
+  // manual limits": the steps after it are the loop's business, which shortens its oldest tool
+  // outputs (kept word for word in the memory with recall) when the window fills.
   const window = 1_000_000;
   const answer = 8000;
-  assert.ok(window - contextBudget(undefined, window, answer) >= answer * 3);
-  // And a big answer budget takes its room even when a fifth of the window would not have covered it.
-  assert.ok(300_000 - contextBudget(undefined, 300_000, 40_000) >= 40_000 * 3);
+  assert.ok(window - contextBudget(undefined, window, answer) >= answer);
+  assert.ok(contextBudget(undefined, window, answer) >= window * 0.95, "the model's own window, nearly all of it");
+  // And a big answer budget takes its room even when a twentieth of the window would not cover it.
+  assert.ok(300_000 - contextBudget(undefined, 300_000, 40_000) >= 40_000);
 });
 
 test("the floor wins when the reserve would leave nothing to work with", () => {
-  // ⚠️ The two bounds meet here, and the floor is the one that has to win. A 60k window with a 20k
-  // answer budget cannot give three answers' room AND a usable prompt — honouring the reserve would
+  // ⚠️ The two bounds meet here, and the floor is the one that has to win. A 12k window with an 8k
+  // answer budget cannot give an answer's room AND a usable prompt — honouring the reserve would
   // hand the model a budget of zero, which is not a smaller context, it is no conversation at all.
   // The floor is what keeps such a model usable, exactly as it did before any of this derivation
   // existed.
-  assert.equal(contextBudget(undefined, 60_000, 20_000), CONTEXT_FLOOR_TOKENS);
+  assert.equal(contextBudget(undefined, 12_000, 8_000), CONTEXT_FLOOR_TOKENS);
 });
 
 test("an unknown window behaves exactly as before", () => {

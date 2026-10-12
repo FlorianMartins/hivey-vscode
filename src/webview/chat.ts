@@ -1132,7 +1132,11 @@ export function restoreDraft(draft: Draft | undefined): void {
 function composerRing(): Element[] {
   const glow = el("div", "composer-glow");
   const ring = el("div", "composer-ring");
-  for (const node of [glow, ring]) node.setAttribute("aria-hidden", "true");
+  // The light that travels round the edge — one in the line, one in the glow, moving together.
+  for (const node of [glow, ring]) {
+    node.setAttribute("aria-hidden", "true");
+    node.append(el("div", "composer-comet"));
+  }
   return [glow, ring];
 }
 

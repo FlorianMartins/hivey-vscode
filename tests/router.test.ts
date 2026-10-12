@@ -169,7 +169,11 @@ test("the shipped per-request cap clears an ordinary agent turn on every model t
   }
 });
 
-test("the cap still catches the accident it exists for", () => {
+test("the size question is off by default, and still catches the accident when it is set", () => {
+  // ⚠️ "remove every context or token limit, even for cloud models". The shipped figure is 0: the
+  // model's own window is the only limit on what a request may carry, and the money caps still ask
+  // before a billed one. Somebody who wants the size asked about sets a figure, and then:
+  assert.equal(shippedDefault("hiveyCode.budget.perRequestTokens"), 0);
   // A pasted build log, a tool that read a minified bundle: the guard is worth having, and the fix
   // for the cap firing too early must not be "stop guarding".
   //
@@ -182,7 +186,7 @@ test("the cap still catches the accident it exists for", () => {
   const limits = {
     perRequestUsd: shippedDefault("hiveyCode.budget.perRequestUsd"),
     dailyUsd: shippedDefault("hiveyCode.budget.dailyUsd"),
-    perRequestTokens: shippedDefault("hiveyCode.budget.perRequestTokens"),
+    perRequestTokens: 200_000,
   };
   const budget = new Budget(new MemorySpendStore(), limits);
   const price = makeLookup(GENERATED_PRICES);

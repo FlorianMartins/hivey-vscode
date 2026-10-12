@@ -556,6 +556,7 @@ async function main(): Promise<void> {
         );
       }
       if (result.stoppedBecause === "max-steps") console.log(C.amber(t("  (stopped at the maximum number of steps)")));
+      if (result.stoppedBecause === "repeating") console.log(C.amber(t("  (stopped: the model kept repeating the same call)")));
       // The verdict the panel reaches, reached here too — and said out loud. A turn that ends with
       // its own steps outstanding has declared itself finished against its own list, and the person
       // reading the terminal is the one who should know that first.

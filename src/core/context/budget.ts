@@ -39,10 +39,12 @@ export const CONTEXT_FLOOR_TOKENS = 8000;
  *
  * The reserve is not a preference. A prompt filling the whole window leaves nothing for the reply,
  * and in agent mode nothing for the tool results of the steps that follow — the turn would truncate
- * on its first answer. A fifth of the window, and never less than room for three answers.
+ * on its first answer. A twentieth of the window, and never less than room for one answer: "adapt to
+ * the models' own limits, don't add manual limits" — and a turn that grows past it no longer fails,
+ * it shortens its oldest tool outputs (kept word for word in the memory with recall) and goes on.
  */
-export const RESERVE_SHARE = 0.2;
-export const RESERVE_ANSWERS = 3;
+export const RESERVE_SHARE = 0.05;
+export const RESERVE_ANSWERS = 1;
 
 /**
  * The budget for this turn.

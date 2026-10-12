@@ -2807,6 +2807,58 @@ pre.code {
   );
   animation: hc-flow 6s linear infinite;
 }
+/* Fifth version: « on ne voit pas bien la rotation même si j'aime bien les couleurs, il faudrait une
+ * rotation plus lisible et fluide de la zone violette ». A whole border lit evenly gives the eye
+ * nothing to follow, so the turning was invisible. The colours stay, dimmed and still, as the
+ * track; ONE bright violet light runs round it — along the card's own edge (`offset-path:
+ * border-box`, corners included) at a CONSTANT speed. The earlier travelling lights turned round the
+ * centre, which is what made them race on the long sides and break at the corners. */
+.composer-comet {
+  display: none;
+}
+@supports (offset-path: border-box) {
+  .composer-ring,
+  .composer-glow {
+    background: conic-gradient(
+      from 200deg,
+      color-mix(in srgb, var(--flow-a) 30%, transparent),
+      color-mix(in srgb, var(--flow-b) 30%, transparent),
+      color-mix(in srgb, var(--flow-c) 30%, transparent),
+      color-mix(in srgb, var(--flow-a) 30%, transparent)
+    );
+    animation: none;
+  }
+  .composer-comet {
+    display: block;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 220px;
+    height: 220px;
+    offset-path: border-box;
+    offset-rotate: 0deg;
+    /* A white-hot core in the violet, so the head reads on a 1.5 px line, fading into a long tail. */
+    background: radial-gradient(
+      closest-side,
+      color-mix(in srgb, var(--flow-b) 55%, white),
+      var(--flow-b) 30%,
+      color-mix(in srgb, var(--flow-b) 45%, transparent) 65%,
+      transparent
+    );
+    animation: hc-comet 3.5s linear infinite;
+  }
+  .composer-glow {
+    opacity: 0.8;
+  }
+}
+@keyframes hc-comet {
+  from {
+    offset-distance: 0%;
+  }
+  to {
+    offset-distance: 100%;
+  }
+}
 .composer.working .composer-ring,
 .composer.working .composer-glow {
   display: block;
@@ -2859,9 +2911,13 @@ pre.code {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  /* Still: the same gradient, not turning, and no glow. */
+  /* Still: the same gradient, not turning, no travelling light and no glow. */
   .composer-ring {
     animation: none;
+  }
+  .composer-comet {
+    animation: none;
+    display: none !important;
   }
   .composer-glow {
     display: none !important;

@@ -50,7 +50,7 @@ export interface RunRecord {
   completionTokens: number;
   /** Absent when this model's price is not in the catalogue — never 0 to mean "free". */
   usd?: number;
-  stoppedBecause: "answer" | "max-steps" | "cancelled";
+  stoppedBecause: "answer" | "max-steps" | "repeating" | "cancelled";
   /** The model ran out of output budget mid-sentence. */
   truncated: boolean;
   /** How many times each tool was called, by name. */
@@ -213,7 +213,7 @@ export function totalsFor(outcomes: TaskOutcome[]): Totals {
   out.unpriced = runs.length - priced.length;
   // Only when something was priced. A sum of nothing is not $0.00, it is nothing.
   if (priced.length) out.usd = round4(priced.reduce((n, r) => n + (r.usd ?? 0), 0));
-  out.outOfSteps = runs.filter((r) => r.stoppedBecause === "max-steps").length;
+  out.outOfSteps = runs.filter((r) => r.stoppedBecause === "max-steps" || r.stoppedBecause === "repeating").length;
   out.truncated = runs.filter((r) => r.truncated).length;
   out.escalations = runs.filter((r) => r.escalatedTo).length;
   return out;

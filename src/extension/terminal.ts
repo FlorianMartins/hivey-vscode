@@ -16,6 +16,7 @@
 import * as vscode from "vscode";
 import { t } from "../shared/i18n.js";
 import { cleanTerminalOutput, describeOutcome, isStatusAnswer } from "../core/terminal/output.js";
+import { scaledChars } from "../core/context/scale.js";
 
 /** The name is the contract: one terminal, reused, so only the first command waits for the shell. */
 export const TERMINAL_NAME = "Hivey Code";
@@ -178,7 +179,7 @@ export async function runCommandInTerminal(opts: RunOptions): Promise<RunResult>
     for await (const chunk of stream) {
       raw += chunk;
       // Keep twice the budget while collecting: the cut happens once, at the end, on clean text.
-      if (raw.length > MAX_OUTPUT_CHARS * 4) raw = raw.slice(-MAX_OUTPUT_CHARS * 4);
+      if (raw.length > scaledChars(MAX_OUTPUT_CHARS, 0.15) * 4) raw = raw.slice(-scaledChars(MAX_OUTPUT_CHARS, 0.15) * 4);
     }
   })();
 
@@ -238,7 +239,7 @@ export async function runCommandInTerminal(opts: RunOptions): Promise<RunResult>
   if (cancelled) {
     return { captured: true, isError: true, exitCode: undefined, content: `Cancelled by the user.\n${output}`.trim() };
   }
-  const content = describeOutcome({ output, exitCode, timedOut }, MAX_OUTPUT_CHARS);
+  const content = describeOutcome({ output, exitCode, timedOut }, scaledChars(MAX_OUTPUT_CHARS, 0.15));
   // `grep` exiting 1 found nothing, which is an answer. See `isStatusAnswer`: the step is not drawn
   // as a failure, the model is not told the tool errored, and `verifyTurn` does not count a check
   // that failed — three wrong conclusions that used to come from one correct command.

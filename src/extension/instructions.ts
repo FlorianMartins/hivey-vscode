@@ -19,6 +19,7 @@
 import * as vscode from "vscode";
 import { t } from "../shared/i18n.js";
 import { estimateTokens } from "../core/util/tokens.js";
+import { scaledTokens } from "../core/context/scale.js";
 
 const MAX_TOKENS = 1200;
 
@@ -73,14 +74,14 @@ export async function readInstructions(): Promise<Instructions | undefined> {
 }
 
 function clip(raw: string, path: string): Instructions {
-  if (estimateTokens(raw) <= MAX_TOKENS) return { path, text: raw, truncated: false };
+  if (estimateTokens(raw) <= scaledTokens(MAX_TOKENS, 0.05)) return { path, text: raw, truncated: false };
   // Cut on a line boundary rather than mid-sentence: half a rule reads as a whole one.
   const lines = raw.split("\n");
   const kept: string[] = [];
   let used = 0;
   for (const line of lines) {
     const cost = estimateTokens(line);
-    if (used + cost > MAX_TOKENS) break;
+    if (used + cost > scaledTokens(MAX_TOKENS, 0.05)) break;
     kept.push(line);
     used += cost;
   }

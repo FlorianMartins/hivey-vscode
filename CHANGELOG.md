@@ -21,6 +21,43 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **Bordure de saisie : une lumière violette qui fait le tour, lisible et fluide.** « on ne voit pas
+  bien la rotation même si j'aime bien les couleurs ». Les couleurs restent, atténuées et immobiles,
+  comme piste ; une seule lumière violette au cœur vif parcourt le contour de la zone de saisie à
+  vitesse constante, coins arrondis compris (`offset-path: border-box`, 3,5 s par tour), avec son halo.
+  Les versions précédentes tournaient autour du centre, d'où une vitesse qui s'emballait sur les côtés
+  longs et cassait aux coins. Désactivée si le système demande moins d'animations.
+- **⚠️ Plus aucune limite manuelle de contexte ou de tokens : tout suit la fenêtre du modèle choisi.**
+  « supprime toutes les limites en terme de contexte ou de token même pour les modèles cloud, il faut
+  s'adapter aux limites des modèles ». Les plafonds fixes des outils deviennent une part de la fenêtre
+  du modèle utilisé, sans jamais descendre sous l'ancien chiffre : lecture de fichier (24 000
+  caractères → un quart de la fenêtre), sortie de commande (8 000 → 15 %), règles du dépôt (1 200
+  tokens → 5 %), diffs git (5 000 → 15 %), outils MCP, IBM i, ARCAD et notes de connaissance (→ 10 %).
+  La réserve gardée pour la réponse passe d'un cinquième de la fenêtre à la place d'une réponse.
+  Les pièces jointes n'ont plus de plafond par défaut (`context.attachmentTokens` = 0) et la question
+  « cette requête est très grosse » est désactivée par défaut (`budget.perRequestTokens` = 0) — les
+  plafonds en argent demandent toujours avant une requête payante. Chez Anthropic, qui exige une
+  longueur maximale, l'extension demande 64 000 tokens et, si le modèle en accepte moins, lit sa vraie
+  limite dans le refus de l'API, la retient et renvoie aussitôt la requête.
+- **⚠️ Plus de longueur maximale de réponse par défaut, et une tâche n'est plus jamais recommencée
+  depuis le début.** « Le modèle a consommé tout son budget de réponse en raisonnement… comment ça
+  alors qu'il est en local ? ». Ce n'était pas un budget : la conversation avait rempli toute la fenêtre
+  du serveur (69 631 tokens sur 69 632) en pleine réflexion, l'extension l'a pris pour une limite de
+  réponse, et a relancé **toute la tâche** depuis le début — deux fois. Désormais :
+  `hiveyCode.chat.maxOutputTokens` vaut 0 par défaut (aucune limite, rien n'est envoyé au serveur) ;
+  une réponse coupée parce que la fenêtre est pleine est jetée, les plus anciens résultats d'outils
+  sont raccourcis (gardés mot pour mot dans la mémoire avec rappel) et **la même étape** est
+  redemandée ; l'estimation de la taille de la conversation est recalée sur les chiffres réels du
+  serveur, au lieu de compter 4 caractères par token, ce qui la sous-estimait d'un cinquième sur du code.
+- **⚠️ Le mode agent n'a plus de limite d'étapes : il va au bout de la tâche.** « il ne finit pas
+  les tâches […] retire cette bride, j'ai besoin que le modèle puisse faire ce qu'on lui demande de A
+  à Z ». Un tour d'agent s'arrêtait d'office après 30 requêtes au modèle — en pleine refonte, après
+  avoir lu, modifié et lancé les tests — avec pour seul signe une ligne d'état qui disparaissait aussitôt.
+  Par défaut il n'y a plus de limite : le tour s'arrête quand la tâche est finie, quand on appuie sur
+  Stop, ou quand le modèle répète le même appel (détecteur de boucles). Le nouveau réglage
+  `hiveyCode.agent.maxSteps` permet d'en remettre une ; si elle est atteinte, ou si le détecteur de
+  boucles arrête le tour, un avis reste affiché sous la réponse et un bouton **Continuer** relance la
+  tâche là où elle s'est arrêtée.
 - **⚠️ Un agent qui tourne en rond est arrêté.** « il tourne en rond depuis 12h sur une requête ».
   Seul le plafond de 30 étapes par tour arrêtait un modèle qui relisait le même fichier ou relançait
   la même recherche. Désormais, la même lecture (même outil, mêmes arguments) faite une troisième

@@ -19,7 +19,6 @@ import { makeProvider, type Provider, type ProviderId } from "../core/providers/
 import { defaultEndpoints, endpointSettingKey, REMOTE_VENDORS, vendor } from "../core/providers/vendors.js";
 import { isLocalEndpoint, isSelfHostedProvider } from "../core/redaction/index.js";
 import { checkEndpoint, describeMissingEndpoint, describeUnusableEndpoint, looksLikeApiKey } from "../core/providers/endpoint.js";
-import { ATTACHMENT_CEILING_TOKENS } from "../core/util/tokens.js";
 import type { RedactionLevel, RedactionPolicy } from "../core/redaction/types.js";
 import type { EscalationPolicy, RouterConfig } from "../core/router/route.js";
 
@@ -32,10 +31,17 @@ export interface Settings {
   chat: {
     provider: ProviderId;
     model: string;
-    /** How many tokens one answer may be. A thinking model spends this on its thinking too. */
+    /**
+     * How many tokens one answer may be; 0, the default, for no cap — the model writes until it is
+     * done, and only the server's own window bounds it. A thinking model spends this on its thinking.
+     */
     maxOutputTokens: number;
     /** Ask for Anthropic's prompt cache through OpenRouter. Off: it changes the request's shape. */
     promptCache: boolean;
+  };
+  agent: {
+    /** Model requests one agent turn may make. 0: no limit — it runs until done or stopped. */
+    maxSteps: number;
   };
   /** Speaking instead of typing. Off until configured — see `core/dictation/dictation.ts`. */
   dictation: DictationSettings;
@@ -252,8 +258,9 @@ function readSettingsRaw(scope?: vscode.Uri): Settings {
       provider: c.get<ProviderId>("chat.provider", "local"),
       model: c.get<string>("chat.model", "qwen2.5-coder:7b"),
       promptCache: c.get<boolean>("chat.promptCache", false),
-      maxOutputTokens: c.get<number>("chat.maxOutputTokens", 8192),
+      maxOutputTokens: Math.max(0, Math.floor(c.get<number>("chat.maxOutputTokens", 0) || 0)),
     },
+    agent: { maxSteps: Math.max(0, Math.floor(c.get<number>("agent.maxSteps", 0) || 0)) },
     appearance: c.get<"editor" | "hivey">("appearance", "editor"),
     dictation: {
       command: c.get<string>("dictation.command", ""),
@@ -309,7 +316,7 @@ function readSettingsRaw(scope?: vscode.Uri): Settings {
       // from the same value typed by the user, and the whole point is to derive the budget from the
       // model's window unless someone has actually chosen a figure. See `core/context/budget.ts`.
       maxTokens: explicit<number>(c, "context.maxTokens"),
-      attachmentTokens: c.get<number>("context.attachmentTokens", ATTACHMENT_CEILING_TOKENS),
+      attachmentTokens: c.get<number>("context.attachmentTokens", 0),
       repoMap: c.get<boolean>("context.repoMap", true),
     },
     knowledge: {

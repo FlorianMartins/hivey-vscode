@@ -69,6 +69,7 @@ import {
 import { knowledgeStore } from "../knowledge.js";
 import { readSettings } from "../config.js";
 import { extractCalledPrograms, extractCopyDirectives } from "../../core/ibmi/symbols.js";
+import { scaledTokens } from "../../core/context/scale.js";
 
 const EXTENSION_ID = "halcyontechltd.code-for-ibmi";
 const MAX_ROWS = 200;
@@ -638,7 +639,7 @@ export function buildIbmiTools(writable: string[] = []): Tool[] {
       if (refused) return refusal(refused, writable);
       const rows = await connection().getContent().runSQL(statement);
       ctx.report(t("{0} rows from Db2 for i", rows.length));
-      return { content: headToTokens(formatRows(rows, MAX_ROWS), MAX_TOKENS) };
+      return { content: headToTokens(formatRows(rows, MAX_ROWS), scaledTokens(MAX_TOKENS, 0.1)) };
     },
     restrict(): Tool {
       // Plan mode gets to query the catalogue — which is most of what planning against Db2 for i
@@ -681,7 +682,7 @@ export function buildIbmiTools(writable: string[] = []): Tool[] {
       ctx.report(t("ran {0}", cmd.split(/\s+/)[0] ?? cmd));
       const body = [result.stdout, result.stderr].filter((s) => s?.trim()).join("\n");
       // A non-zero code is an outcome, not a crash: the message ids in the output are the answer.
-      return { content: headToTokens(`Exit code ${result.code}\n${body || "(no output)"}`, MAX_TOKENS) };
+      return { content: headToTokens(`Exit code ${result.code}\n${body || "(no output)"}`, scaledTokens(MAX_TOKENS, 0.1)) };
     },
   };
 
@@ -700,7 +701,7 @@ export function buildIbmiTools(writable: string[] = []): Tool[] {
       const { library, sourceFile, member } = parseMemberRef(String(args["member"] ?? ""));
       const text = await connection().getContent().downloadMemberContent(library, sourceFile, member);
       ctx.report(t("read {0}/{1}({2})", library, sourceFile, member));
-      return { content: headToTokens(text, MAX_TOKENS) };
+      return { content: headToTokens(text, scaledTokens(MAX_TOKENS, 0.1)) };
     },
   };
 
@@ -971,7 +972,7 @@ export function buildIbmiTools(writable: string[] = []): Tool[] {
           : t("{0} failed, {1} error(s)", report.command.split(/\s+/)[0] ?? "compile", errors),
       );
       return {
-        content: headToTokens(formatReport(report), MAX_TOKENS),
+        content: headToTokens(formatReport(report), scaledTokens(MAX_TOKENS, 0.1)),
         // The verdict is the command's, so the step is red when the object was not created — which
         // is what `verifyTurn` reads to decide whether the turn finished.
         isError: !report.ok,
@@ -1058,7 +1059,7 @@ export function buildIbmiTools(writable: string[] = []): Tool[] {
           ? t("tests passed in {0}", String(args["program"] ?? ""))
           : t("{0} test(s) failed in {1}", failed || "?", String(args["program"] ?? "")),
       );
-      return { content: headToTokens(formatTestRun(run), MAX_TOKENS), isError: !run.ok };
+      return { content: headToTokens(formatTestRun(run), scaledTokens(MAX_TOKENS, 0.1)), isError: !run.ok };
     },
   };
 
@@ -1172,7 +1173,7 @@ export function buildIbmiTools(writable: string[] = []): Tool[] {
               limits,
               ...(better ? { better } : {}),
             }),
-            MAX_TOKENS,
+            scaledTokens(MAX_TOKENS, 0.1),
           ),
         };
       }
@@ -1205,7 +1206,7 @@ export function buildIbmiTools(writable: string[] = []): Tool[] {
             searched: covered.length ? covered : searched,
             limits: PROGRAM_REFERENCE_LIMITS,
           }),
-          MAX_TOKENS,
+          scaledTokens(MAX_TOKENS, 0.1),
         ),
       };
     },
@@ -1267,7 +1268,7 @@ export function buildIbmiTools(writable: string[] = []): Tool[] {
 
       ctx.report(t("{0} index suggestion(s) from the optimizer", advice.length));
       return {
-        content: headToTokens(formatAdvice({ schema: schema.toUpperCase(), ...(table ? { table: table.toUpperCase() } : {}) }, advice, stats, gaps), MAX_TOKENS),
+        content: headToTokens(formatAdvice({ schema: schema.toUpperCase(), ...(table ? { table: table.toUpperCase() } : {}) }, advice, stats, gaps), scaledTokens(MAX_TOKENS, 0.1)),
       };
     },
   };
@@ -1331,7 +1332,7 @@ export function buildIbmiTools(writable: string[] = []): Tool[] {
       }
 
       ctx.report(t("{0}: {1} house note(s)", id, house.length));
-      return { content: headToTokens(formatMessage(id, found, house, gaps), MAX_TOKENS) };
+      return { content: headToTokens(formatMessage(id, found, house, gaps), scaledTokens(MAX_TOKENS, 0.1)) };
     },
   };
 
