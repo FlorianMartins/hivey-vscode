@@ -8,8 +8,10 @@
 import { request } from "../util/http.js";
 import { sseData, sseLines } from "../util/sse.js";
 import type { ChatDelta, ChatRequest, ChatResult, Provider, ToolCall, Usage } from "./types.js";
+import { toolCallsFromText } from "./textToolCall.js";
 import { EMPTY_USAGE, THINKING_BUDGET } from "./types.js";
-import { describeHttpError } from "./openai.js";
+import { keepCacheMarks } from "./cache.js";
+import { describeHttpError, isCompleteJson } from "./openai.js";
 
 export interface AnthropicOptions {
   baseUrl: string;
@@ -32,11 +34,23 @@ export class AnthropicProvider implements Provider {
     const system = req.messages.filter((m) => m.role === "system");
     const rest = req.messages.filter((m) => m.role !== "system");
 
+    // One budget of four breakpoints, shared by the system blocks and the messages, in that order —
+    // which is the order the API reads them in. Beyond four Anthropic rejects the request outright,
+    // and a repository with two skills loaded reaches five without anyone doing anything unusual.
+    const wanted: number[] = [];
+    system.forEach((m, i) => {
+      if (m.cacheable !== false) wanted.push(i);
+    });
+    rest.forEach((m, i) => {
+      if (m.cacheable) wanted.push(system.length + i);
+    });
+    const marks = keepCacheMarks(wanted);
+
     const body: Record<string, unknown> = {
       model: req.model,
       max_tokens: req.maxTokens ?? 4096,
       stream: true,
-      messages: rest.map((m) => {
+      messages: rest.map((m, index) => {
         if (m.role === "tool") {
           return { role: "user", content: [{ type: "tool_result", tool_use_id: m.toolCallId, content: m.content }] };
         }
@@ -50,15 +64,21 @@ export class AnthropicProvider implements Provider {
         }
         const block: Record<string, unknown> = { type: "text", text: m.content };
         // A cache breakpoint costs nothing when it misses and saves ~90 % of the input price when
-        // it hits. Put it on the big, stable blocks only: the API allows four per request.
-        if (m.cacheable) block["cache_control"] = { type: "ephemeral" };
-        return { role: m.role === "assistant" ? "assistant" : "user", content: [block] };
+        // it hits. Which ones survive the ceiling of four is decided once, above.
+        if (marks.has(system.length + index)) block["cache_control"] = { type: "ephemeral" };
+        // Images after the text, for the same reason as everywhere else: a model handed a picture
+        // before the question it is about describes the picture instead of answering.
+        const images = (m.images ?? []).map((img) => ({
+          type: "image",
+          source: { type: "base64", media_type: img.mediaType, data: img.data },
+        }));
+        return { role: m.role === "assistant" ? "assistant" : "user", content: [block, ...images] };
       }),
     };
     if (system.length) {
-      body["system"] = system.map((s) => {
+      body["system"] = system.map((s, i) => {
         const b: Record<string, unknown> = { type: "text", text: s.content };
-        if (s.cacheable !== false) b["cache_control"] = { type: "ephemeral" };
+        if (marks.has(i)) b["cache_control"] = { type: "ephemeral" };
         return b;
       });
     }
@@ -142,9 +162,27 @@ export class AnthropicProvider implements Provider {
       .sort((a, b) => a[0] - b[0])
       .map(([i, b]) => ({ id: b.id ?? `call_${i}`, name: b.name ?? "", args: b.json || "{}" }))
       .filter((t) => t.name);
-    if (toolCalls.length) stopReason = "tool_calls";
 
-    return { text, reasoning, toolCalls, usage, stopReason };
+    // The same fallback the OpenAI-compatible client has, for the same reason, applied here for
+    // symmetry rather than because Anthropic needs it: `api.anthropic.com` always returns `tool_use`
+    // natively. What does not is a GATEWAY speaking Anthropic's shape in front of something else —
+    // which is an ordinary enterprise deployment, and would have failed exactly as Ollama did.
+    // Leaving one of the two clients without the fallback would mean the bug is fixed depending on
+    // which wire format the operator's proxy happens to speak.
+    if (!toolCalls.length && text.trim()) {
+      const written = toolCallsFromText(text, (req.tools ?? []).map((t) => t.name));
+      if (written.length) {
+        toolCalls.push(...written);
+        text = "";
+      }
+    }
+    // Cut off by `max_tokens`: an unfinished call is dropped and "length" kept, as in the
+    // OpenAI-compatible client — see the note there.
+    const cut = stopReason === "length";
+    const usable = cut ? toolCalls.filter((c) => isCompleteJson(c.args)) : toolCalls;
+    if (usable.length && !cut) stopReason = "tool_calls";
+
+    return { text, reasoning, toolCalls: usable, usage, stopReason };
   }
 
   async listModels(): Promise<string[]> {

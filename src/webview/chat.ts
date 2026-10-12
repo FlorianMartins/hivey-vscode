@@ -6,16 +6,23 @@
 // assistant is ALLOWED to do rather than how clever it is, the model button carries its price, and
 // every exchange can be muted out of the context without being deleted from the story.
 
-import { button, closeMenu, el, formatTokens, icon, ICON, menu, menuItem, menuTitle, separator } from "./dom.js";
+import { button, closeMenu, el, formatTokens, icon, ICON, menu, menuItem, menuTitle, separator, vendorIcon } from "./dom.js";
 import { markdown } from "./markdown.js";
 import { t } from "../shared/i18n.js";
+import { vendorSlug } from "../core/router/vendorIcon.js";
+import { transcriptPieces } from "../core/session/checkpoint.js";
 import { REMOTE_VENDORS, vendor } from "../core/providers/vendors.js";
 import { closeModelCombo, isModelComboOpen, openModelCombo } from "./modelCombo.js";
+import { wirePaste } from "./paste.js";
+import { microphonePossible, startRecording, type Recorder } from "./dictate.js";
 import { focusGateway } from "./setup.js";
-import type { Mode, Reasoning, ToExtension, UiEntry, UiSkill, UiState } from "../shared/protocol.js";
+import type { Mode, Reasoning, ToExtension, UiApproval, UiEntry, UiSkill, UiState } from "../shared/protocol.js";
 import { applySuggestion, suggestionsFor, type Suggestion } from "../core/session/mentions.js";
 import { BUILTIN_SKILLS, type BuiltinSkill } from "../core/session/skills.js";
 import { planComplete, planSummary, type Plan } from "../core/agent/plan.js";
+import { contextBreakdown, OTHER } from "../core/context/breakdown.js";
+import type { Notice } from "../core/session/notices.js";
+import { providerIsReady, whatIsMissing, type ProviderState } from "../core/providers/ready.js";
 
 const MODES: Array<{ id: Mode; label: string; hint: string }> = [
   { id: "chat", label: t("Chat"), hint: t("Answers from what you attach. No access to the repository.") },
@@ -36,16 +43,128 @@ export interface ChatDeps {
   rerender: () => void;
 }
 
-export function chatScreen(state: UiState, deps: ChatDeps): HTMLElement {
+/**
+ * `liveTurn` is the DOM of the answer currently being written, when there is one.
+ *
+ * The panel is rebuilt from scratch on every state message, and state messages arrive for reasons
+ * that have nothing to do with the conversation — the caret moved in an editor, a file was opened,
+ * the agent itself saved a file. Rebuilding the transcript under a streaming answer used to throw
+ * away the live turn, the typing animation and the scroll position, several times a second.
+ *
+ * The first attempt at that was to keep the WHOLE transcript untouched while a turn ran. It fixed
+ * the scrolling and introduced something far worse: for the length of a turn the transcript stopped
+ * being drawn from the state at all, so nothing new appeared — no answer, no step, and no error
+ * either. If anything left the panel believing a turn was still running, it went silent and stayed
+ * silent, with no message to say why and a token counter climbing behind it.
+ *
+ * So the transcript is rebuilt every time, as it always was, and the ONE node that cannot be
+ * rebuilt — the live turn, which holds the typing animation's state — is carried across. The answer
+ * it is writing is skipped by `transcript()`, so nothing is drawn twice.
+ */
+export function chatScreen(state: UiState, deps: ChatDeps, liveTurn?: HTMLElement): HTMLElement {
   const wrap = el("div", "screen chat-screen");
   // The transcript sits in its own positioned box so the "latest" button can float at the BOTTOM
   // OF THE TRANSCRIPT — which is the gap between the last answer and the composer, wherever the
   // composer happens to end up. Pinning it to the screen with a hand-measured offset put it inside
   // the composer the moment the composer grew a row.
   const area = el("div", "transcript-wrap");
-  area.append(transcript(state, deps));
+  const list = transcript(state, deps);
+  if (liveTurn) list.append(liveTurn);
+  // Last, below everything including the turn in progress: a question blocking the turn is the one
+  // thing on the screen the user has to act on, and it is drawn from the state so that no rebuild
+  // can lose it.
+  for (const request of state.pendingApprovals) list.append(approvalCard(request, deps));
+  area.append(list);
   wrap.append(area, composer(state, deps));
   return wrap;
+}
+
+
+/**
+ * The question a turn is waiting on, drawn from the state.
+ *
+ * It used to be appended into the turn in progress and to exist nowhere else, so a rebuild that
+ * dropped that turn's DOM destroyed it — and the promise behind it was never resolved. The turn
+ * then waited for ever on a request that had already been sent and paid for, with nothing on screen
+ * to say why. Drawn from the state, every rebuild puts it back.
+ *
+ * The card answers itself optimistically the moment it is clicked, and the extension removes it
+ * from the state a moment later: the alternative is a button that looks unpressed for a round trip,
+ * on the one control where hesitating costs the user a second click.
+ */
+export function approvalCard(request: UiApproval, deps: ChatDeps): HTMLElement {
+  const egress = request.tool === "egress" || request.tool === "send";
+  // Spending is neither a permission nor a destination, and generic labels made it unreadable:
+  // "Allow / Always / Refuse" says nothing about what is being allowed or what it costs.
+  const budget = request.tool === "budget";
+  const card = el("div", `approval${egress ? " egress" : ""}`);
+  const head = el("div", "approval-head");
+  head.append(icon("shield", "approval-ico"));
+  head.append(
+    el("span", undefined, budget ? t("Over your spending cap") : egress ? t("Leaving this machine") : t("Approval requested")),
+  );
+  card.append(head);
+  card.append(el("div", "approval-body", request.description));
+  if (request.command) card.append(el("pre", "approval-command", request.command));
+  for (const line of request.detail ?? []) card.append(el("div", "approval-detail", line));
+
+  const actions = el("div", "approval-actions");
+  const answer = (a: "once" | "session" | "always" | "no", label: string): void => {
+    deps.send({ type: "approve", id: request.id, answer: a });
+    // The class, not only the contents: the frame breathes while the question is open, and a
+    // question that has been answered is not open. Replacing the children alone left a decided
+    // card pulsing at the reader for the rest of the conversation.
+    card.classList.add("answered");
+    card.replaceChildren(el("div", "approval-done", label));
+  };
+  // Egress consent is per destination, so "this conversation" would be a promise about the wrong
+  // thing. The labels differ too: what is being agreed to is sending, not permitting an action.
+  // A card may name its own buttons. See `labels` in the protocol: the four slots are a channel, not
+  // a vocabulary, and "Allow" on a button that downloads 142 MB is a small lie.
+  const named = (slot: "once" | "session" | "always" | "no", fallback: string) => request.labels?.[slot] ?? fallback;
+  const saidAfter = (slot: "once" | "session" | "always" | "no", fallback: string) => request.done?.[slot] ?? fallback;
+  const available: Record<string, () => HTMLElement> = {
+    once: () =>
+      button({
+        label: named("once", budget ? t("Send anyway") : egress ? t("Send") : t("Allow")),
+        className: "btn primary",
+        onClick: () => answer("once", saidAfter("once", budget || egress ? t("Sent.") : t("Allowed once."))),
+      }),
+    session: () =>
+      button({
+        label: named("session", budget ? t("For this conversation") : t("Always (this conversation)")),
+        className: "btn",
+        title: budget
+          ? t("Send this and everything else in this conversation, without moving the cap")
+          : t("Stop asking for {0} until the next conversation", request.tool),
+        onClick: () =>
+          answer("session", saidAfter("session", budget ? t("Allowed for this conversation, sent.") : t("Allowed for this conversation."))),
+      }),
+    always: () =>
+      button({
+        label: budget ? t("Raise the cap") : egress ? t("Always to this model") : t("Always"),
+        className: "btn",
+        title: budget
+          ? t("Move the cap above this request, and send")
+          : egress
+            ? t("Stop asking before sending to this model")
+            : t("Write a permanent rule for this action"),
+        onClick: () =>
+          answer(
+            "always",
+            budget ? t("Cap raised, sent.") : egress ? t("This model will not be asked about again.") : t("Permanent rule saved."),
+          ),
+      }),
+    no: () =>
+      button({
+        label: named("no", budget || egress ? t("Do not send") : t("Refuse")),
+        className: "btn danger",
+        onClick: () => answer("no", saidAfter("no", budget || egress ? t("Not sent.") : t("Refused."))),
+      }),
+  };
+  for (const choice of request.choices) actions.append(available[choice]!());
+  card.append(actions);
+  return card;
 }
 
 // ── Transcript ───────────────────────────────────────────────────────────────────────────────
@@ -63,15 +182,21 @@ function transcript(state: UiState, deps: ChatDeps): HTMLElement {
     return list;
   }
   const matches = new Set(state.matches);
-  let first = true;
-  for (const entry of state.session.entries) {
-    if (state.searchQuery && !matches.has(entry.id)) continue;
-    // The rule belongs to the transcript, not to either message it separates — it is emitted
-    // between them rather than inside the question, so that a pinned answer's tint and a muted
-    // turn's fade stop at the message and do not swallow the way back out of it.
-    if (!first && entry.role === "user") list.append(turnRule(entry, deps));
-    list.append(renderEntry(entry, state, deps));
-    first = false;
+  // ⚠️ The order comes from `transcriptPieces`, which is tested without a DOM. "The first question
+  // has a restore" was reported as false three times while the code said it was true: the decision
+  // had a test and the LOOP APPLYING IT did not, so nothing could tell whether the renderer called
+  // it, skipped the entry first, or drew the result. This loop now only turns values into nodes.
+  const byId = new Map(state.session.entries.map((e) => [e.id, e]));
+  for (const piece of transcriptPieces(
+    state.session.entries,
+    state.searchQuery ? { visible: (id: string) => matches.has(id) } : {},
+  )) {
+    const entry = byId.get(piece.id)!;
+    if (piece.kind === "rule") {
+      list.append(turnRule(entry, deps, piece.opening));
+      continue;
+    }
+    list.append(renderEntry(entry, state, deps, piece.first));
   }
   if (state.searchQuery && !matches.size) {
     list.append(el("p", "empty", t("No message contains “{0}”.", state.searchQuery)));
@@ -97,9 +222,11 @@ function welcome(state: UiState, deps: ChatDeps): HTMLElement {
     el(
       "p",
       "welcome-lede",
-      state.remote
-        ? t("The selected model is remote: what leaves is pseudonymised, and you are asked before the first request.")
-        : t("The model runs on your machine. Nothing you write here leaves the network."),
+      state.remote && state.trusted
+        ? t("The selected model runs on your own infrastructure: what you write is sent as is, without pseudonymization.")
+        : state.remote
+          ? t("The selected model is remote: what leaves is pseudonymized, and you are asked before the first request.")
+          : t("The model runs on your machine. Nothing you write here leaves the network."),
     ),
   );
   return w;
@@ -199,7 +326,11 @@ function wizardCard(state: UiState, wizard: NonNullable<UiState["wizard"]>, deps
       const main = el("div", "skill-main");
       const name = el("div", "wizard-family-name");
       name.append(el("span", undefined, group.label));
-      if (group.suggested) name.append(el("span", "wizard-suggested", t("what you have open")));
+      // ⚠️ "already on", not "suggested". The flag used to mean "we would tick this for you" and now
+      // means "this IS in play for this conversation, because of the files you have open" — the row
+      // can be left unticked and the family still answers. A label that understates what has already
+      // happened is the half-truth that makes a feature look broken.
+      if (group.suggested) name.append(el("span", "wizard-suggested", t("already on, from your open files")));
       main.append(name);
       main.append(el("div", "skill-desc", group.hint));
       row.append(main);
@@ -311,7 +442,32 @@ function wizardFoot(deps: ChatDeps, onNext: (() => void) | undefined, label: str
   return foot;
 }
 
-function renderEntry(entry: UiEntry, state: UiState, deps: ChatDeps): HTMLElement {
+/**
+ * What pressing the way back will and will not do, in one sentence.
+ *
+ * ⚠️ Written once because it is now offered from two places — the bar between turns, and the opening
+ * question's own header — and the sentence is the part that decides whether to press it. Two copies
+ * of a promise drift, and the copy nobody is looking at is the one that drifts.
+ */
+function restoreTitle(entry: UiEntry): string {
+  if (entry.checkpointPartial) {
+    return t("Restore {0} file(s) — some changes were too large to record", entry.checkpointFiles ?? 0);
+  }
+  if (entry.checkpointCommands) {
+    return entry.checkpointFiles
+      ? t(
+          "Restore {0} file(s) — but {1} command(s) also ran, and what they changed stays",
+          entry.checkpointFiles,
+          entry.checkpointCommands,
+        )
+      : t("Rewind the conversation — {0} command(s) ran, and what they changed stays", entry.checkpointCommands);
+  }
+  return entry.checkpointFiles
+    ? t("Put the {0} file(s) this turn changed back, and rewind the conversation here", entry.checkpointFiles)
+    : t("Rewind the conversation to before this question — that turn changed no file");
+}
+
+function renderEntry(entry: UiEntry, state: UiState, deps: ChatDeps, first = false): HTMLElement {
   // The message, and next to it the things you can do to the message.
   //
   // They used to be one element, and the give-away was pinning: a pinned answer paints a tint
@@ -335,11 +491,36 @@ function renderEntry(entry: UiEntry, state: UiState, deps: ChatDeps): HTMLElemen
   // sat between the name and the tags, competing for a row that is already tight at a docked width,
   // and they were read on every turn by nobody. They now appear with the buttons, on hover, at the
   // far end of the row — the last thing on the line, which is where a total goes.
+  // ⚠️⚠️ THE WAY BACK FOR THE OPENING QUESTION, and only for it.
+  //
+  // Every other turn carries it on the bar above itself, labelled, the way the editor's own chat
+  // does — asked for in those words: "I preferred the 'Restore Checkpoint' text on the bar like
+  // with GitHub Copilot […] and keep the button only on the first message". The first
+  // question has no bar above it, because there is no boundary to draw before the first thing in a
+  // conversation, so it is the one turn that needs the control somewhere else.
+  //
+  // It stays in the HEADER rather than in `.entry-actions`, which lives at `opacity: 0` until the
+  // block is hovered, and which is where two earlier attempts at this control went to die. (The
+  // third attempt put `opacity: 1` on the button itself, which does nothing at all: opacity is not
+  // inherited, it MULTIPLIES, so a child of a transparent parent cannot be opaque.) The
+  // header has no opacity rule and no hover gate: a control placed here exists whenever the message
+  // does, which is what this particular control requires — something that overwrites the working
+  // tree should never be discovered by accident.
+  if (entry.role === "user" && first) {
+    head.append(
+      button({
+        icon: ICON.restore,
+        title: restoreTitle(entry),
+        className: `btn icon-only tiny restore-here${entry.checkpointPartial || entry.checkpointCommands ? " partial" : ""}`,
+        onClick: () => deps.send({ type: "restoreCheckpoint", id: entry.id }),
+      }),
+    );
+  }
   if (!entry.included) head.append(el("span", "entry-tag", t("out of context")));
   if (entry.pinned) {
     // A mark, not a word, and never faded.
     //
-    // Pinning worked and looked as though it did not: it printed "pinned" in the muted colour, in
+    // Pinning worked and looked as though it did not: it printed "pinned" in the muted color, in
     // the row that fades to nothing when the pointer leaves — so the one visible consequence of the
     // button disappeared a second after it was pressed. What a pinned message needs is what a
     // pinned message has everywhere else: a mark that stays, and an edge you can see down the
@@ -374,6 +555,20 @@ function renderEntry(entry: UiEntry, state: UiState, deps: ChatDeps): HTMLElemen
   if (entry.role === "user") {
     actions.append(
       button({ icon: ICON.edit, title: t("Edit and resend"), className: "btn icon-only", onClick: () => startEdit(entry, deps) }),
+      // Asking the same thing again, unchanged. Distinct from editing: the commonest reason to want
+      // another answer is that the first one was poor, not that the question was.
+      button({
+        icon: ICON.askAgain,
+        title: t("Ask this again — the answer is added below, nothing is replaced"),
+        className: "btn icon-only",
+        onClick: () => deps.send({ type: "askAgain", id: entry.id }),
+      }),
+      button({
+        icon: ICON.compare,
+        title: t("Answer this with several models, to compare them"),
+        className: "btn icon-only",
+        onClick: () => deps.send({ type: "compareEntry", id: entry.id }),
+      }),
     );
   }
   actions.append(
@@ -411,7 +606,8 @@ function renderEntry(entry: UiEntry, state: UiState, deps: ChatDeps): HTMLElemen
   // The plan first, above the answer: it is the summary of what was done, and someone re-reading a
   // turn wants the shape of it before the prose.
   if (entry.plan) wrap.append(planBlock(entry.plan, false));
-  if (entry.reasoning) wrap.append(collapsible(t("Reasoning"), entry.reasoning));
+  if (entry.notices?.length) wrap.append(noticesBlock(entry.notices));
+  if (entry.reasoning) wrap.append(reasoningBlock(entry.reasoning));
   if (entry.steps?.length) wrap.append(stepList(entry.steps));
 
   if (entry.error) {
@@ -437,7 +633,17 @@ function renderEntry(entry: UiEntry, state: UiState, deps: ChatDeps): HTMLElemen
   if (entry.model && entry.role === "assistant") receipt.append(el("span", "entry-meta", entry.model));
   if (entry.usdCost) {
     const cost = el("span", "entry-meta cost", formatCost(entry.usdCost));
-    cost.title = t("What this answer cost.");
+    // The breakdown, not just the total. A price on its own is unarguable and undiagnosable: a user
+    // who finds an answer expensive has no way to discover that the input was resent on every step
+    // of an agent turn, or that none of it came from the cache. These three numbers say which.
+    cost.title = entry.usage
+      ? t(
+          "What this answer cost. Sent {0} tokens ({1} served from the cache), received {2}. An agent turn sends the whole conversation again at every step — the cache is what stops that being paid for twice.",
+          formatTokens(entry.usage.promptTokens),
+          formatTokens(entry.usage.cachedTokens),
+          formatTokens(entry.usage.completionTokens),
+        )
+      : t("What this answer cost.");
     receipt.append(cost);
   }
   if (receipt.childElementCount) {
@@ -513,43 +719,247 @@ const MARKS: Record<string, string> = {
 /**
  * The line between two turns, and the way back to before the one it introduces.
  *
- * Drawn above every question but the transcript's first, because that is where one exchange ends
- * and the next starts. A transcript is a stack of question-and-answer pairs, and until now nothing
- * said so: every entry was separated from the next by the same amount of space, so a question sat
- * as far from its own answer as from a different turn entirely. The space now goes at the
- * boundary, and the reply is pulled up close to what it answers, so a pair reads as one block.
+ * Drawn above every question. A transcript is a stack of question-and-answer pairs, and until now
+ * nothing said so: every entry was separated from the next by the same amount of space, so a
+ * question sat as far from its own answer as from a different turn entirely. The space now goes at
+ * the boundary, and the reply is pulled up close to what it answers, so a pair reads as one block.
+ *
+ * ⚠️ `opening` is the transcript's first question, and only the LINE is dropped there — there is no
+ * previous turn to separate it from. The restore stays, because it was the one thing this function
+ * carried that had nothing to do with being a separator, and hiding it left every conversation
+ * unable to undo its own opening turn.
  *
  * When the turn changed files the line carries the restore, sitting on it the way the editor's
  * chat marks a restore point — visible without hovering, unlike everything else attached to a
  * message, because it is the only one that puts files back and something that overwrites the
  * working tree should never be discovered by accident.
  */
-function turnRule(entry: Pick<UiEntry, "id" | "checkpointFiles" | "checkpointPartial">, deps: ChatDeps): HTMLElement {
-  const files = entry.checkpointFiles ?? 0;
-  const wrap = el("div", `turn-rule${files ? "" : " bare"}`);
-  const action = button({
+function turnRule(entry: UiEntry, deps: ChatDeps, opening = false): HTMLElement {
+  const rule = el("div", `turn-rule${opening ? " opening" : ""}`);
+  // The opening question has no boundary to draw before it, and carries its own way back in its
+  // header instead. Everywhere else the line holds the label.
+  if (opening) return rule;
+
+  // ⚠️⚠️ The LABEL is back, and the reason it ever left is worth correcting rather than quietly
+  // dropping. The note here used to read "this button was reported as invisible above every
+  // question", and that was a misreading of three reports that all said the same narrower thing:
+  // there was no way back on the FIRST message. Which was true, and had an obvious cause — the first
+  // question has no bar above it. The button on every other bar was working the whole time, and it
+  // was removed to fix a defect it did not have.
+  //
+  // A report names a symptom. Widening it into a theory and then acting on the theory is how a
+  // working control gets deleted, and this is what that costs: "I preferred the 'Restore
+  // Checkpoint' text on the bar like with GitHub Copilot, can you put it back the way it was". For
+  // every other turn the bar reads better, and it was asked for by name: "I preferred the 'Restore
+  // Checkpoint' text on the bar like with GitHub Copilot". The editor's own chat puts the same
+  // words in the same place, and a word is reachable
+  // by someone reading the conversation — an icon in a header is only reachable by someone who
+  // already knows what it does.
+  //
+  // Not hover-gated, unlike the editor's. What this presses overwrites the working tree, and this
+  // project's rule for that is older than the button: it "should never be discovered by accident".
+  // A control you must hover to find is one you can also press by accident while reaching past it.
+  const back = button({
     icon: ICON.restore,
-    label: t("Restore checkpoint"),
-    className: "btn tiny checkpoint-btn",
-    // Three different promises, and each says which one it is making before it is pressed. A turn
-    // that wrote nothing to disk is still a point to come back to — that is the common case in
-    // chat and plan mode, and refusing it there made the restore point look like an agent feature.
-    title: entry.checkpointPartial
-      ? t("Restore {0} file(s) — some changes were too large to record", files)
-      : files
-        ? t("Put the {0} file(s) this turn changed back, and rewind the conversation here", files)
-        : t("Rewind the conversation to before this question — that turn changed no file"),
+    label: t("Restore Checkpoint"),
+    title: restoreTitle(entry),
+    className: `btn ghost tiny turn-restore${entry.checkpointPartial || entry.checkpointCommands ? " partial" : ""}`,
     onClick: () => deps.send({ type: "restoreCheckpoint", id: entry.id }),
   });
-  if (entry.checkpointPartial) action.classList.add("partial");
-  wrap.append(action);
-  return wrap;
+  rule.append(back);
+  return rule;
 }
 
+/**
+ * Press to speak, press again to stop.
+ *
+ * A toggle rather than press-and-hold: holding a key down for the length of a sentence is a gesture
+ * that fails on a trackpad, on a touch screen and for anybody who cannot hold two things at once.
+ * Escape cancels, and cancelling throws the recording away without sending it anywhere — somebody
+ * who changes their mind mid-sentence has not asked for their voice to be transcribed.
+ */
+function micButton(deps: ChatDeps, configured: boolean): HTMLElement {
+  const recording = listening;
+  const control = button({
+    icon: ICON.mic,
+    title: recording
+      ? t("Stop and transcribe (Esc cancels)")
+      : configured
+        ? t("Dictate")
+        : t("Dictate — needs a transcriber. Click to set one up."),
+    className: `btn ghost icon-only mic${recording ? " recording" : ""}${configured ? "" : " unconfigured"}`,
+    onClick: () => {
+      // ⚠️ The recording happens in the EXTENSION, not here. VS Code grants `media` to the workbench
+      // and withholds it from a `vscode-webview://` origin, with no prompt and no setting — so
+      // `getUserMedia` in this panel answers `NotAllowedError` for ever, which is what "no way to
+      // enable it" was. The button is now two messages; a program on the machine does the
+      // listening.
+      if (listening) {
+        listening = false;
+        deps.send({ type: "stopDictation" });
+        setComposerNote(t("Transcribing…"));
+        refreshMic();
+        return;
+      }
+      // ⚠️ NOT `listening = true` here. The button used to light up the instant it was clicked, before
+      // the extension had started anything — so with no recorder on the machine it looked as though it
+      // were listening, and the next click "stopped" a recording that had never begun. Reported as
+      // having to click twice before anything was offered. The extension says when it has started.
+      deps.send({ type: "startDictation" });
+      setComposerNote(t("Starting…"));
+
+    },
+  });
+  return control;
+}
+
+/**
+ * Whether a recording is running, which the extension is doing.
+ *
+ * Module scope because the composer is rebuilt under it: a flag held in the button would be lost the
+ * first time anything else arrived, and the microphone would go back to looking idle while the
+ * machine was still listening.
+ */
+let listening = false;
+
+/** Redraw just the microphone, without rebuilding the composer under a live recording. */
+function refreshMic(): void {
+  // The box as well as the button: the edge of the thing you are speaking INTO is where somebody
+  // dictating is looking, not at a 24-pixel icon in the corner of it.
+  document.querySelector<HTMLElement>(".composer")?.classList.toggle("listening", listening);
+  const node = document.querySelector<HTMLElement>(".composer .btn.mic");
+  if (!node) return;
+  node.classList.toggle("recording", listening);
+}
+
+/** Cancel a recording in flight. Called by Escape, and when the panel goes away. */
+export function cancelDictation(deps?: ChatDeps): boolean {
+  if (!listening) return false;
+  listening = false;
+  deps?.send({ type: "stopDictation", cancel: true });
+  setComposerNote("");
+  refreshMic();
+  return true;
+}
+
+/** The extension says a recording ended for a reason of its own — a failure, or a cancel. */
+export function dictationStopped(): void {
+  listening = false;
+  setLevel(0);
+  refreshMic();
+}
+
+/** The extension says a recording has actually begun. Only now does the button say it is listening. */
+export function dictationStarted(levels: boolean): void {
+  listening = true;
+  // ⚠️ When nothing will report the voice, the edge BREATHES instead of sitting still. A ring that
+  // never moves is indistinguishable from a broken one, and inventing a level would be worse than
+  // either — it would claim to hear something.
+  document.querySelector<HTMLElement>(".composer")?.classList.toggle("quiet", !levels);
+  refreshMic();
+}
+
+/**
+ * How loud it is, 0 to 1, as a CSS variable the ring reads.
+ *
+ * ⚠️ Measured in the extension and sent here, because this panel has no microphone to listen to — the
+ * editor withholds that from every extension. Where the recorder writes its file only when it stops,
+ * which is the Windows one, nothing arrives and the ring keeps its calm resting size: a bar that
+ * never moves is better than one that invents a voice.
+ */
+export function setLevel(level: number): void {
+  const node = document.querySelector<HTMLElement>(".composer-card");
+  node?.style.setProperty("--voice", String(Math.max(0, Math.min(1, level))));
+}
+
+/**
+ * One line under the composer, for what dictation is doing.
+ *
+ * Not a notification and not a transcript entry: it is a state of the control the user just pressed,
+ * so it belongs next to the control. A dialog for "listening" would be a dialog to dismiss while
+ * talking.
+ */
+let noteTimer: ReturnType<typeof setTimeout> | undefined;
+
+/**
+ * A line under the composer, for something that has just happened.
+ *
+ * ⚠️ `fadeMs` exists because nothing ever cleared this. A failure printed here stayed until the next
+ * render — and a render only happens when the extension sends something, so after a dictation that
+ * failed there was nothing left to send and the message sat there for the rest of the session:
+ * "and the message doesn't go away...".
+ *
+ * A STATE — "Listening…", "Transcribing…" — must not fade: it is true until it stops being true, and
+ * a label that vanished while the microphone was still open would be worse than none. An EVENT —
+ * something failed, something finished — fades, because it describes a moment that has passed.
+ */
+export function setComposerNote(text: string, fadeMs?: number): void {
+  if (noteTimer) clearTimeout(noteTimer);
+  noteTimer = undefined;
+  const host = document.querySelector<HTMLElement>(".composer-footer");
+  if (!host) return;
+  let note = host.querySelector<HTMLElement>(".composer-note");
+  if (!text) {
+    note?.remove();
+    return;
+  }
+  if (!note) {
+    note = el("span", "composer-note");
+    host.prepend(note);
+  }
+  note.textContent = text;
+  if (fadeMs) noteTimer = setTimeout(() => setComposerNote(""), fadeMs);
+}
+
+/** How long a message about something that has already happened stays on screen. */
+export const NOTE_FADE_MS = 8000;
+
+/**
+ * What the agent did, folded once the turn is over.
+ *
+ * ⚠️ A long turn is twelve rows of tool steps sitting above its answer, permanently. While the turn
+ * is running they are the only thing happening and they belong on screen; once it has finished, the
+ * answer is what the reader came for and the steps are evidence to go back to. Captured frames of
+ * the real panel made this plain: a finished agent turn is mostly a list of things that already
+ * worked.
+ *
+ * Folded rather than removed, and the summary says what is inside — a header reading "7 steps" tells
+ * you nothing about whether to open it. "7 steps · 2 commands · 1 edit" does, and ANY FAILED STEP
+ * keeps the list open: a turn with a failure in it is one where the detail is the point, and folding
+ * that away would hide the one thing worth noticing.
+ *
+ * Six is the threshold. Below it the list is shorter than its own summary would be.
+ */
+const FOLD_STEPS_ABOVE = 6;
+
 export function stepList(steps: Array<{ tool: string; summary: string; ok: boolean; call?: string }>): HTMLElement {
-  const list = el("div", "steps");
-  for (const s of steps) list.append(stepRow(s));
-  return list;
+  const failed = steps.some((s) => !s.ok);
+  if (steps.length <= FOLD_STEPS_ABOVE || failed) {
+    const list = el("div", "steps");
+    for (const s of steps) list.append(stepRow(s));
+    return list;
+  }
+  const inner = el("div", "steps");
+  for (const s of steps) inner.append(stepRow(s));
+  const block = collapsible(stepSummary(steps), inner, { open: false });
+  block.classList.add("steps-folded");
+  return block;
+}
+
+/** "9 steps · 3 commands · 1 edit" — what is inside, so the fold can be left shut. */
+export function stepSummary(steps: Array<{ tool: string; ok: boolean }>): string {
+  const count = (names: string[]): number => steps.filter((s) => names.includes(s.tool)).length;
+  const parts = [t("{0} steps", steps.length)];
+  const commands = count(["run_command"]);
+  // Counted by what they DID, not by tool name: `write_file` and `edit_file` are one thing to
+  // somebody deciding whether to open this, and "1 write, 2 edits" is a distinction the reader did
+  // not ask for.
+  const edits = count(["edit_file", "write_file"]);
+  const reads = count(["read_file", "list_files", "search_text"]);
+  if (edits) parts.push(t("{0} edits", edits));
+  if (commands) parts.push(t("{0} commands", commands));
+  if (!edits && !commands && reads) parts.push(t("{0} reads", reads));
+  return parts.join(" · ");
 }
 
 /**
@@ -572,18 +982,46 @@ export function stepRow(s: { tool: string; summary: string; ok: boolean; call?: 
   return row;
 }
 
-export function collapsible(title: string, body: string): HTMLElement {
+export function collapsible(
+  title: string,
+  // An element as well as text: a folded list of steps is a list, not a paragraph, and building it
+  // as a string would mean losing the per-step markup the rows already have.
+  body: string | HTMLElement,
+  opts: { open?: boolean; onToggle?: (open: boolean) => void } = {},
+): HTMLElement {
   const wrap = el("div", "collapsible");
   const head = el("button", "collapsible-head");
   head.append(icon("chevron", "collapsible-chevron"));
   head.append(el("span", undefined, title));
-  const content = el("div", "collapsible-body", body);
-  content.hidden = true;
+  const content = el("div", "collapsible-body", typeof body === "string" ? body : undefined);
+  if (typeof body !== "string") content.append(body);
+  content.hidden = !opts.open;
+  wrap.classList.toggle("open", Boolean(opts.open));
   head.addEventListener("click", () => {
     content.hidden = !content.hidden;
     wrap.classList.toggle("open", !content.hidden);
+    opts.onToggle?.(!content.hidden);
   });
   wrap.append(head, content);
+  return wrap;
+}
+
+/**
+ * A model's reasoning.
+ *
+ * Open while it is being written, shut once it is a record. Thinking is worth watching as it
+ * happens — it is most of the reason for turning reasoning on, and a shut block does not grow, so
+ * the panel had nothing to follow and sat on the previous answer for the whole of it. A finished
+ * one is reference material: it belongs behind a heading, not between the question and the answer.
+ *
+ * Which makes the state a property of the TURN rather than a preference of the reader, and that is
+ * why there is no setting for it: the right answer changes halfway through, by itself.
+ */
+export function reasoningBlock(body: string, opts: { open?: boolean } = {}): HTMLElement {
+  const wrap = collapsible(t("Reasoning"), body, opts);
+  // Its own class, so the frame can carry a colour of its own: a plain grey box among grey boxes
+  // read as one more folded step list, and the thinking is not that.
+  wrap.classList.add("reasoning");
   return wrap;
 }
 
@@ -599,6 +1037,24 @@ function startEdit(entry: UiEntry, deps: ChatDeps): void {
 // ── Composer ─────────────────────────────────────────────────────────────────────────────────
 
 /**
+ * Whether there is anything to send, said on the composer so the send button can mean something.
+ *
+ * ⚠️ The send control was a ghost icon at the end of a row of six identical ghost icons, and the
+ * reasoning written beside it — "the send is special is a thing a toolbar says by position, not by
+ * paint" — is right about an empty composer and wrong about a full one. On an empty box there is
+ * nothing to emphasise and position is enough; the moment there is a question in the box, the one
+ * control that will send it should not take the same number of looks to find as the attach button.
+ *
+ * So the emphasis is INFORMATION, not decoration: it says "this will do something now". A button
+ * that is always filled teaches nothing and is just louder.
+ */
+function markReady(area: HTMLTextAreaElement): void {
+  area.closest(".composer")?.classList.toggle("ready", area.value.trim().length > 0);
+}
+
+
+
+/**
  * What the user had typed, so a re-render does not throw it away.
  *
  * `render()` empties the whole panel and rebuilds it, which is the right thing for a transcript and
@@ -611,6 +1067,17 @@ export interface Draft {
   start: number;
   end: number;
   editing?: string;
+  /**
+   * Whether the user was typing in it.
+   *
+   * The half of the draft that was missing, and the one that made the panel feel broken. A rebuild
+   * replaces the textarea with a new one, so the old one's focus goes with it — and the panel
+   * rebuilds on any of sixty-odd state messages, none of which the user causes: a file saved, the
+   * caret moved in an editor, a model list arriving. The text and the caret were carried across and
+   * the focus was not, so typing a question was interrupted by the box going dead under the
+   * keyboard, "as if you had clicked somewhere else". Which is exactly what had happened.
+   */
+  focused: boolean;
 }
 
 let lastDeps: ChatDeps | undefined;
@@ -623,21 +1090,52 @@ export function captureDraft(): Draft | undefined {
     start: area.selectionStart ?? area.value.length,
     end: area.selectionEnd ?? area.value.length,
     ...(area.dataset["editing"] ? { editing: area.dataset["editing"] } : {}),
+    // `document.activeElement` is the only place this is written down, and it does not survive the
+    // node being replaced.
+    focused: document.activeElement === area,
   };
 }
 
 export function restoreDraft(draft: Draft | undefined): void {
-  if (!draft?.text) return;
+  if (!draft) return;
   const area = document.querySelector<HTMLTextAreaElement>(".composer-input");
-  const hints = document.querySelector<HTMLElement>(".slash-hints");
   if (!area) return;
-  area.value = draft.text;
-  if (draft.editing) area.dataset["editing"] = draft.editing;
-  area.setSelectionRange(draft.start, draft.end);
-  autoGrow(area);
-  // And the completion list with it: it is derived from the caret, so restoring one without the
-  // other leaves the box looking right and the suggestions gone.
-  if (hints && lastDeps) slashHints(hints, area, lastDeps);
+  const hints = document.querySelector<HTMLElement>(".slash-hints");
+
+  if (draft.text) {
+    area.value = draft.text;
+    if (draft.editing) area.dataset["editing"] = draft.editing;
+    area.setSelectionRange(draft.start, draft.end);
+    autoGrow(area);
+    // And the completion list with it: it is derived from the caret, so restoring one without the
+    // other leaves the box looking right and the suggestions gone.
+    if (hints && lastDeps) slashHints(hints, area, lastDeps);
+  }
+
+  // Focus last, and ONLY when it was there: taking it otherwise would pull the cursor out of the
+  // file the user is editing every time the panel redraws — the same defect pointing the other way.
+  //
+  // An empty box that had focus is restored too. It is the ordinary case: the panel rebuilds while
+  // somebody sits in an empty composer deciding what to ask, and a box that goes dead before the
+  // first keystroke is the one that looks most broken.
+  if (draft.focused && document.activeElement !== area) {
+    area.focus({ preventScroll: true });
+    area.setSelectionRange(draft.start, draft.end);
+  }
+}
+
+/**
+ * The light that runs around the composer while a turn is working — see `.composer-ring` in the
+ * stylesheet. Always present and hidden at rest, so a turn starting only has to toggle a class on
+ * the composer (`setStreaming`) rather than rebuild it.
+ */
+function composerRing(): HTMLElement[] {
+  const ring = el("div", "composer-ring");
+  ring.append(el("span", "composer-ring-light"));
+  const halo = el("div", "composer-halo");
+  halo.append(el("span", "composer-halo-light"));
+  for (const node of [ring, halo]) node.setAttribute("aria-hidden", "true");
+  return [halo, ring];
 }
 
 function composer(state: UiState, deps: ChatDeps): HTMLElement {
@@ -645,8 +1143,17 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
   // The working state lives on the composer rather than on the transcript because that is where the
   // user is looking while they wait — and because it is the control that is unavailable, which is
   // the thing the animation is actually telling them.
-  const wrap = el("div", `composer${isStreaming() ? " working" : ""}`);
+  // "Waiting for you" is not the same state as "working", and telling them apart is the difference
+  // between a panel that looks busy and a panel that is asking a question. A turn blocked on an
+  // approval used to look exactly like one that was thinking.
+  const waiting = state.pendingApprovals.length > 0;
+  const wrap = el("div", `composer${isStreaming() && !waiting ? " working" : ""}${waiting ? " waiting" : ""}`);
   const card = el("div", "composer-card");
+  card.append(...composerRing());
+  // Paste and drop, on the card rather than the text area: dropping a file on the chips or on the
+  // toolbar is the same intent, and a target that only accepts the middle of itself is a target
+  // people miss. An ordinary paste is untouched — see `wirePaste`.
+  wirePaste(card, deps.send);
 
   if (state.attachments.length || state.implicit) {
     const chips = el("div", "chips attached");
@@ -682,14 +1189,16 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
     for (const a of state.attachments) {
       const chip = el("span", "chip removable");
       chip.append(icon(chipIcon(a.kind, a.label), "chip-ico"));
-      // The file NAME, with its folder after it in the muted colour — the editor's own shape for
+      // The file NAME, with its folder after it in the muted color — the editor's own shape for
       // this, and the right one: `src/webview/chat.ts` truncated from the left is unreadable, and
       // truncated from the right is every file in the folder. The name identifies, the folder
       // disambiguates, and only the second is allowed to be cut.
       const cut = a.label.lastIndexOf("/");
       chip.append(el("span", "chip-label", cut >= 0 ? a.label.slice(cut + 1) : a.label));
       if (cut > 0) chip.append(el("span", "chip-dir", a.label.slice(0, cut)));
-      chip.title = t("{0} · ~{1} tokens", a.kind, formatTokens(a.tokens));
+      chip.title = a.detail
+        ? t("{0} · {1} · ~{2} tokens", a.kind, a.detail, formatTokens(a.tokens))
+        : t("{0} · ~{1} tokens", a.kind, formatTokens(a.tokens));
       chip.append(
         button({
           icon: ICON.close,
@@ -741,6 +1250,7 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
         : t("Ask a question…");
   area.addEventListener("input", () => {
     autoGrow(area);
+    markReady(area);
     // `#` used to be swallowed and replaced by a file dialog. It now stays in the text and opens
     // the completion list, which is both what Copilot does and what lets `#changes` exist at all:
     // a dialog can only ever offer files.
@@ -778,25 +1288,61 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
   // separate buttons for about an hour, and the cost was immediate and measurable — the model name
   // collapsed to "qwe…" because every icon in this row is width the one label carrying real
   // information does not have. Copilot has one configure affordance for the same reason.
-  // Order: what to attach, what it may do, which model, how hard it thinks — then the skills.
-  // Skills sit last because they are the one control that changes what `/` offers rather than what
-  // this message does, and because that is where the user asked for it.
+  // ⚠️ The MODEL is not here any more. Asked for directly: "you can move the model choice out of
+  // the user input area, next to the response mode choice (local, openrouter, providers or gateway)
+  // and the approval button […] for a cleaner, more consistent look". And it is the right
+  // cut, not just a tidier one: which service answers, which model answers and what it may do without
+  // asking are three settings of the CONVERSATION, so they belong together outside the box — while
+  // what to attach, which mode and how hard to think are about THIS message. The box held one control
+  // from the other group, and that is why the row never looked settled.
+  //
+  // It also buys back the width the row was short of: three controls plus the send survive a narrow
+  // panel where four did not.
+  // ⚠️ The editor's own chat row, in its own order: what to attach, how to answer, which model, how
+  // hard to think, what it may reach for — then, at the far end, speak and send. Asked for by name
+  // after a first pass had moved the model out: "also copy the button positions from the GitHub
+  // Copilot chat tab, which is clean". The model belongs with the mode because they
+  // are one decision asked twice — "who answers, and how" — and splitting them across two rows is
+  // what made the row never look settled.
+  //
+  // `reasoning` has no equivalent in the editor's chat, where effort hides inside the model picker.
+  // It stays visible here because it was asked for in the opposite direction — it has to be reachable
+  // on a Gateway model and on a local one — and a control that exists only inside another menu is a
+  // control nobody finds. It sits after the model because it is a property OF the model.
   left.append(contextButton(state, deps), modeButton(state, deps), modelButton(state, deps));
   if (state.reasoningAvailable) left.append(reasoningButton(state, deps));
+  // ⚠️ Skills is NOT here, and the reason is a report rather than a preference: "the skills and
+  // sub-agent button disappears when you make the sidebar narrower". It was last in this group, and
+  // this group is the one with `overflow: hidden` — so it was the first thing cut when the row ran
+  // out of room. The editor puts its tool picker here; the editor's row also never has to survive a
+  // 300-pixel panel. It sits with the send instead, in the group that is never clipped.
   bar.append(left);
 
-  // Skills sit with the send rather than at the end of the left group. On a wide panel the two
-  // groups are pushed apart by `margin-left: auto`, so "last on the left" and "next to send" are
-  // not the same place at all — and this is the control you reach for while writing the message,
-  // not while configuring the conversation.
+  // Speak and send, and nothing else. The far end of the row is for the two things that ACT on the
+  // message you have written; everything that decides how it will be answered is on the left, in one
+  // run, where it reads as one group of settings rather than as six unrelated icons.
   const right = el("div", "toolbar-group end");
+  // ⚠️ Shown wherever a microphone CAN work, configured or not — and the earlier rule was wrong.
+  //
+  // It was hidden until a transcriber was configured, on the reasoning that "a button that looks
+  // like it is listening and is not is worse than no button". That reasoning is sound and it was
+  // applied to the wrong thing: it argues against a button that pretends to RECORD, not against one
+  // that offers to set dictation up. Hiding it made the feature undiscoverable — reported as "I
+  // don't see the button for voice recording" by the person who asked for it.
+  //
+  // So the button is always there when the host can record, and when nothing is configured it says
+  // so and offers to configure it, instead of silently doing nothing.
   right.append(toolsButton(state, deps));
+  // ⚠️ No longer gated on `microphonePossible()`: that asked whether the PANEL could record, and the
+  // answer in VS Code is permanently no. The recording is the extension's job now, so what decides
+  // whether the button appears is whether there is anywhere to send the result.
+  right.append(micButton(deps, Boolean(state.dictation)));
   right.append(
     // The same button as its neighbours, carrying a different glyph. `primary` made it a size and a
     // weight of its own at the end of a row of six identical controls, and "the send is special"
     // is a thing a toolbar says by position, not by paint.
     isStreaming()
-      ? button({ icon: ICON.stop, title: t("Stop the answer"), className: "btn ghost icon-only send", onClick: () => deps.send({ type: "stop" }) })
+      ? button({ icon: ICON.stop, title: t("Stop the answer"), className: "btn ghost icon-only send stop", onClick: () => deps.send({ type: "stop" }) })
       : button({ icon: ICON.send, title: t("Send (⏎)"), className: "btn ghost icon-only send", onClick: () => submit(area, deps) }),
   );
   bar.append(right);
@@ -806,13 +1352,38 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
   // it still read as part of the field you type into, which is exactly what it should not be: it is
   // a reading about the conversation, not a control of the message.
   const meter = el("div", "composer-footer");
-  // What the session runs on, and how much of it runs without asking. Both belong OUTSIDE the box:
-  // they are settings for the conversation, not parts of the message being written, and inside the
-  // border they read as controls of the text. The editor's own chat makes the same split.
+  // What the session runs on, which model answers, and how much of it runs without asking. All three
+  // belong OUTSIDE the box: they are settings for the conversation, not parts of the message being
+  // written, and inside the border they read as controls of the text.
+  //
+  // The order is the one that was asked for and it is also the order of the question: WHERE the answer
+  // comes from, WHICH model gives it, WHAT it may do without asking. "in terms of order for the
+  // composer-footer buttons, I want the mode first as it is now, then the models, and then
+  // approvals".
   meter.append(providerButton(state, deps), approvalButton(state, deps));
   meter.append(el("div", "spacer"));
+  if (waiting) {
+    meter.append(el("span", "composer-waiting", t("Waiting for your answer above")));
+    meter.append(el("span", "composer-sep", "\u2022"));
+  }
   const tokens = el("span", "composer-tokens", t("{0} tokens", formatTokens(state.contextTokens)));
-  tokens.title = t("What the next question will send, once muted exchanges are removed.");
+  // Said precisely, because this number sits next to a price and the two do not measure the same
+  // thing at all: this is what the conversation weighs NOW, and the price is everything every turn
+  // has spent. Reading them as a ratio — which is the natural thing to do with two numbers on one
+  // line — makes any long conversation look like a billing error.
+  //
+  // And when the conversation has outgrown its budget, what travels is smaller than what it weighs.
+  // Reporting the weight under the words "what the next question sends" was simply false.
+  tokens.title =
+    state.sentTokens < state.contextTokens
+      ? t(
+          "This conversation weighs {0} tokens; the next question sends {1} of them — the oldest exchanges no longer fit the context budget. The price beside this is what the whole conversation has spent, not what one question costs.",
+          formatTokens(state.contextTokens),
+          formatTokens(state.sentTokens),
+        )
+      : t(
+          "What the next question sends, once muted exchanges are removed. The price beside it is what the whole conversation has spent so far, not what one question costs.",
+        );
   // A ring rather than a bar, and always drawn.
   //
   // The bar was ninety pixels of a row that has to hold the provider, the approval setting, a token
@@ -829,17 +1400,54 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
   //
   // Hidden entirely on a local model with nothing spent — a figure that is structurally zero is not
   // a reading, it is a decoration that teaches people to ignore the row it sits in.
-  if (state.sessionCostUsd > 0 || state.remote) {
+  if (state.sessionCostUsd > 0 || state.billed) {
     meter.append(el("span", "composer-sep", "\u2022"));
+    // ⚠️ The words are gone and the problem is not, so it is solved another way — read this before
+    // putting a suffix back. The ambiguity was never in the word, it was in the ADJACENCY: two
+    // unrelated figures side by side read as a ratio. They are separated by the row's layout now.
+    // (Earlier note kept because the reasoning still holds:)
+    // Florian read this row as a rate: "for 40k tokens it costs $3.60, which seems a bit excessive
+    // to me with sonnet 5.5". The arithmetic was right — $3.60 is what the CONVERSATION had
+    // cost, and the 40 k beside it is the context the NEXT question will send. Two unrelated
+    // quantities, adjacent, one of them unlabelled, read as a ratio: 40 k tokens for $3.60 is
+    // $90/M, which is forty-five times Sonnet's input price and rightly alarming.
+    //
+    // A tooltip did say so and a tooltip needs hovering, which nobody does before being alarmed.
+    // This project already learned this once and fixed it the same way — the bench column called
+    // `time` became `model time` rather than gaining a footnote, because a figure whose name invites
+    // the wrong reading is a figure that will be misread.
     const cost = el("span", "composer-cost", formatCost(state.sessionCostUsd));
-    cost.title = t("What this conversation has cost. Today's total is in the cost report.");
+    cost.title = t(
+      "What this whole conversation has cost, not this question: every turn re-sends the conversation, so the total grows faster than the number of questions. Today's total is in the cost report.",
+    );
     meter.append(cost);
+  }
+  // The day's spend against its cap, shown once it is close enough to matter.
+  //
+  // It was in the state from the beginning and drawn nowhere, and that is how a $2-a-day default
+  // could stop every question without a word: the cap was checked before sending, the refusal was
+  // posted as a message the next rebuild destroyed, and the one number that explained it was never
+  // on screen. Anything that can end a turn has to be readable before it does.
+  const { spentTodayUsd, dailyUsd } = state.budget;
+  if (dailyUsd > 0 && spentTodayUsd >= dailyUsd * 0.6) {
+    meter.append(el("span", "composer-sep", "\u2022"));
+    const day = el("span", `composer-cost${spentTodayUsd >= dailyUsd ? " over" : " near"}`);
+    day.textContent = t("{0} of {1} today", formatCost(spentTodayUsd), formatCost(dailyUsd));
+    day.title =
+      spentTodayUsd >= dailyUsd
+        ? t("Today's cap is reached: each question will ask before it is sent. Raise hiveyCode.budget.dailyUsd.")
+        : t("Spent today against hiveyCode.budget.dailyUsd. At the cap, each question asks before it is sent.");
+    meter.append(day);
   }
   const offer = state.suggestCompact ? compactOffer(state, deps) : undefined;
   if (offer) wrap.append(offer);
   wrap.append(card, meter);
-  // Size the box to its content on first paint, not only after the first keystroke.
-  requestAnimationFrame(() => autoGrow(area));
+  // Size the box to its content on first paint, not only after the first keystroke — and say
+  // whether there is anything to send, for the same reason: a restored draft is a full composer.
+  requestAnimationFrame(() => {
+    autoGrow(area);
+    markReady(area);
+  });
   return wrap;
 }
 
@@ -865,28 +1473,15 @@ function compactOffer(state: UiState, deps: ChatDeps): HTMLElement | undefined {
   body.append(el("div", "compact-title", t("This conversation fills {0}% of the context.", Math.round(state.contextFill * 100))));
   // Says what it does to the transcript, because "compact" alone reads as "delete". Nothing is
   // deleted, and that is the first thing anyone wants to know before pressing it.
-  body.append(el("div", "compact-hint", t("Summarising replaces it in the prompt. Nothing leaves the screen.")));
+  body.append(el("div", "compact-hint", t("Summarizing replaces it in the prompt. Nothing leaves the screen.")));
   wrap.append(body);
 
   wrap.append(
     button({
-      label: t("Summarise"),
+      label: t("Summarize"),
       className: "btn tiny primary",
       onClick: () => {
         compactDismissedAt = undefined;
-        deps.send({ type: "compact" });
-      },
-    }),
-    // Answering the question the offer raises the second time it appears: "must I keep saying yes?"
-    // Putting the setting here rather than only in the settings file is the difference between a
-    // preference and a preference anyone finds.
-    button({
-      label: t("Always"),
-      className: "btn tiny",
-      title: t("Summarise by itself from now on, at this same point."),
-      onClick: () => {
-        compactDismissedAt = undefined;
-        deps.send({ type: "setAutoCompact", on: true });
         deps.send({ type: "compact" });
       },
     }),
@@ -987,8 +1582,12 @@ function contextRing(state: UiState, deps: ChatDeps): HTMLElement {
   wrap.addEventListener("click", () =>
     menu(wrap, (close) => {
       const panel = el("div", "menu-list");
+      // The bar first, because it answers the question the ring raises. "84 %" is not actionable;
+      // "84 %, of which 61 % is the repository map" is — you detach it, or you raise the budget.
+      panel.append(...contextBarSection(state));
+      panel.append(separator());
       panel.append(...contextBudgetSection(state, deps, close));
-      // Summarising lives here, under the number it moves.
+      // Summarizing lives here, under the number it moves.
       //
       // It was briefly a row in the view's ⋯ menu, which was wrong for a reason worth writing down:
       // that menu holds the things that are true of the extension — where the panel sits, what left
@@ -997,19 +1596,10 @@ function contextRing(state: UiState, deps: ChatDeps): HTMLElement {
       panel.append(separator(), menuTitle(t("This conversation")));
       panel.append(
         menuItem({
-          label: t("Summarise it now"),
+          label: t("Summarize it now"),
           hint: t("{0} in the prompt. The summary replaces them and nothing leaves the screen.", formatTokens(state.contextTokens)),
           onClick: () => {
             deps.send({ type: "compact" });
-            close();
-          },
-        }),
-        menuItem({
-          label: t("Summarise automatically"),
-          hint: t("At two thirds of the budget, without asking. Costs one request each time."),
-          selected: state.autoCompact,
-          onClick: () => {
-            deps.send({ type: "setAutoCompact", on: !state.autoCompact });
             close();
           },
         }),
@@ -1062,6 +1652,22 @@ function autoGrow(area: HTMLTextAreaElement): void {
 let streaming = false;
 export function setStreaming(value: boolean): void {
   streaming = value;
+  // ⚠️ Applied to the live node as well as kept in the flag, and that redundancy is the fix.
+  //
+  // The turning ring around the composer is `.composer.working`, and the class was only ever set
+  // while BUILDING the composer — so it existed exactly as long as the next rebuild agreed with it.
+  // Any `state` message arriving mid-turn re-renders from `state.busy`, and `turnEnd` did not
+  // re-render at all, so the ring could vanish while the model was still thinking and linger after
+  // it had stopped. Reported as "the animation around the user input area no longer seems to be
+  // there when the AI is thinking".
+  //
+  // Toggling the class here makes the state true of the DOM at the moment it becomes true, whatever
+  // the next render decides. The build-time class stays, for the composer that does not exist yet.
+  const node = document.querySelector<HTMLElement>(".composer");
+  if (!node) return;
+  // `waiting` wins: a turn stopped on an approval is asking a question, not working, and the two
+  // must not animate the same way.
+  node.classList.toggle("working", value && !node.classList.contains("waiting"));
 }
 export function isStreaming(): boolean {
   return streaming;
@@ -1126,18 +1732,31 @@ const PROVIDERS: Array<{ id: string; short: string; label: string; hint: string 
  * drawn from the same `state.setup` — it simply was not being consulted at the moment the choice is
  * actually made.
  */
-export function providerReady(id: string, state: UiState): boolean {
-  if (id === "local") return state.setup.probing || state.setup.runtimes.length > 0;
-  if (!state.setup.hasKey[id]) return false;
-  // A gateway that is only an API shape needs to be told where it lives.
-  if (vendor(id)?.needsUrl) return Boolean(state.setup.endpoints?.[id]);
-  return true;
+/** The pieces `providerIsReady` needs, read off the state the panel already has. */
+function readiness(id: string, state: UiState): ProviderState {
+  return {
+    hasKey: Boolean(state.setup.hasKey[id]),
+    hasEndpoint: Boolean(state.setup.endpoints?.[id]),
+    needsUrl: Boolean(vendor(id)?.needsUrl),
+    localFound: state.setup.probing || state.setup.runtimes.length > 0,
+  };
 }
 
-function missingFor(id: string): string {
-  if (id === "local") return t("No model server found on this machine — set one up");
-  if (vendor(id)?.needsUrl) return t("Needs an address and a key — set them up");
-  return t("No key yet — set one up");
+export function providerReady(id: string, state: UiState): boolean {
+  return providerIsReady(id, readiness(id, state));
+}
+
+function missingFor(id: string, state: UiState): string {
+  switch (whatIsMissing(id, readiness(id, state))) {
+    case "runtime":
+      return t("No model server found on this machine — set one up");
+    case "endpoint":
+      // Not "an address and a key". A proxy on your own network usually has no key, and asking for
+      // one that is not needed is how this provider became impossible to select.
+      return t("Needs an address — set it up");
+    default:
+      return t("No key yet — set one up");
+  }
 }
 
 /**
@@ -1147,18 +1766,23 @@ function missingFor(id: string): string {
  * a local model for the ordinary work, something larger for the one hard question — and a decision
  * made that often has to be one click from the box you type in.
  *
- * The label says which, and the colour says whether anything leaves the machine. That second fact
+ * The label says which, and the color says whether anything leaves the machine. That second fact
  * is the whole argument of this extension and it should never take reading to establish.
  */
 function providerButton(state: UiState, deps: ChatDeps): HTMLElement {
   const current = PROVIDERS.find((p) => p.id === state.provider) ?? PROVIDERS[0]!;
   const b = button({
-    icon: ICON.chip,
+    // A cloud, not a chip. The chip belongs to the model, which is now this button's neighbour, and
+    // two identical glyphs side by side say "these are the same kind of thing" about the two choices
+    // people most need to keep apart: which service, and which model.
+    icon: ICON.cloud,
     label: state.remote ? current.short : t("Local"),
     trailingIcon: ICON.chevron,
-    title: state.remote
-      ? t("{0} — what leaves is pseudonymised first", current.label)
-      : t("Runs on this machine: nothing leaves, nothing is billed"),
+    title: state.remote && state.trusted
+      ? t("{0} — your own infrastructure: sent as is, without pseudonymization", current.label)
+      : state.remote
+        ? t("{0} — what leaves is pseudonymized first", current.label)
+        : t("Runs on this machine: nothing leaves, nothing is billed"),
     className: `btn ghost tiny provider${state.remote ? " remote" : " local"}`,
     onClick: () =>
       menu(b, (close) => {
@@ -1172,7 +1796,7 @@ function providerButton(state: UiState, deps: ChatDeps): HTMLElement {
               // What is missing, in the place where the choice is made. Picking a gateway with no key
               // used to switch in silence and fail one question later with an HTTP 401 — the worst
               // moment and the worst place to learn that a key was needed.
-              hint: ready ? p.hint : missingFor(p.id),
+              hint: ready ? p.hint : missingFor(p.id, state),
               detail: ready ? undefined : t("not set up"),
               selected: p.id === state.provider,
               onClick: () => {
@@ -1249,6 +1873,10 @@ function approvalButton(state: UiState, deps: ChatDeps): HTMLElement {
 function modeButton(state: UiState, deps: ChatDeps): HTMLElement {
   const current = MODES.find((m) => m.id === state.mode) ?? MODES[2]!;
   const b = button({
+    // The shield is what this panel already uses for "what is allowed" — on the approval card and in
+    // the permissions screen. Reusing it here is what makes the mode button recognisable as the same
+    // subject rather than as a third dropdown.
+    icon: ICON.shield,
     label: current.label,
     trailingIcon: ICON.chevron,
     title: t("Mode: {0}", current.hint),
@@ -1289,13 +1917,22 @@ function modeButton(state: UiState, deps: ChatDeps): HTMLElement {
 
 function modelButton(state: UiState, deps: ChatDeps): HTMLElement {
   const b: HTMLElement = button({
+    // ⚠️ The MAKER's mark, not a generic chip. "add a provider icon in front of the model name like
+    // on GitHub Copilot (e.g. OpenAI icon, Anthropic icon, etc.)" — and the
+    // editor's own picker does the same, because a row of twenty model names all wearing one glyph
+    // tells you nothing you could not already read. A preset is not one vendor's model, so it keeps
+    // the chip; so does anything the lookup does not recognise, which makes an unknown vendor look
+    // like a model rather than like a missing image.
+    iconNode: vendorIcon(vendorSlug(state.model) ?? ""),
+    icon: ICON.chip,
     label: state.modelLabel,
     trailingIcon: ICON.chevron,
     title:
       `${state.model}\n` +
       (state.remote
-        ? t("Remote model — it is billed, and what you send is pseudonymised first.")
+        ? t("Remote model — it is billed, and what you send is pseudonymized first.")
         : t("Local model — nothing leaves this machine.")),
+    // The class follows the neighbours, not the control: these chips are all one size.
     className: `btn ghost model${state.remote ? " remote" : " local"}`,
     onClick: () => {
       closeMenu();
@@ -1314,6 +1951,99 @@ function modelButton(state: UiState, deps: ChatDeps): HTMLElement {
  * room left for the answer" after the other had stopped capping it. Two renderings of one setting
  * drift, and the one nobody is looking at is the one that drifts.
  */
+/**
+ * The context bar: what the window is actually holding.
+ *
+ * A stacked bar and a legend, in the menu rather than in the toolbar. The toolbar was the obvious
+ * place and it is the wrong one: a capture showed what 22 px of it cost last time something was
+ * added there — the model name, the one label in that row carrying something nobody can guess, went
+ * from "qwen2.5-co…" to "qwen2…". The ring is already in the toolbar, already about exactly this,
+ * and one click from here.
+ *
+ * Approximate, and it says so: it measures the sources rather than the assembled messages, so the
+ * parts do not sum exactly to what a provider counts. Naming the big one correctly is the point.
+ */
+/**
+ * "À savoir" — what it noticed, what it did not verify, and the state of the tool.
+ *
+ * Under the answer and visually quieter than it, because it is adjacent to the work rather than part
+ * of it. Nothing here was changed, and the block says so when it carries something the model
+ * noticed: the whole value of an aside is that the finding reaches the person without the diff
+ * growing something nobody asked for.
+ *
+ * Drawn only when there is something. A section that is always there is furniture, and furniture is
+ * what people stop reading.
+ */
+function noticesBlock(notices: Notice[]): HTMLElement {
+  const box = el("div", "notices");
+  box.append(el("div", "notices-title", t("To know")));
+  const list = el("ul", "notices-list");
+  for (const notice of notices) {
+    const item = el("li", `notice ${notice.kind}`);
+    item.append(el("span", "notice-text", notice.text));
+    if (notice.where) item.append(el("code", "notice-where", notice.where));
+    list.append(item);
+  }
+  box.append(list);
+  if (notices.some((n) => n.kind === "noticed")) {
+    box.append(el("div", "notices-foot", t("None of this was changed.")));
+  }
+  return box;
+}
+
+function contextBarSection(state: UiState): HTMLElement[] {
+  const parts = state.contextParts ?? [];
+  if (!parts.length) {
+    // Before the first turn there is nothing measured, and an empty bar would be a drawing of a
+    // number nobody took.
+    return [menuTitle(t("Context")), el("div", "menu-note", t("Nothing has been assembled yet."))];
+  }
+  const breakdown = contextBreakdown(parts, state.contextBudget);
+  const out: HTMLElement[] = [
+    menuTitle(
+      breakdown.budget > 0
+        ? t("Context — {0} of {1}", formatTokens(breakdown.used), formatTokens(breakdown.budget))
+        : t("Context — {0}, window unknown", formatTokens(breakdown.used)),
+    ),
+  ];
+
+  const bar = el("div", `context-bar${breakdown.over ? " over" : ""}`);
+  const shown = breakdown.budget > 0 ? breakdown.segments : [];
+  for (const [index, segment] of shown.entries()) {
+    const slice = el("span", `context-slice s${index % 5}`);
+    // Clamped for drawing only: the figure in the legend stays true even when it exceeds the window.
+    slice.style.width = `${Math.min(100, segment.share * 100).toFixed(2)}%`;
+    slice.title = `${segment.label} — ${formatTokens(segment.tokens)}`;
+    bar.append(slice);
+  }
+  if (breakdown.freeShare > 0) {
+    const free = el("span", "context-slice free");
+    free.style.width = `${(breakdown.freeShare * 100).toFixed(2)}%`;
+    free.title = t("free — {0}", formatTokens(breakdown.free));
+    bar.append(free);
+  }
+  if (shown.length) out.push(bar);
+
+  for (const [index, segment] of breakdown.segments.entries()) {
+    const row = el("div", "context-legend");
+    const dot = el("span", `context-dot s${index % 5}`);
+    const label = el("span", "context-legend-label");
+    label.textContent = segment.label === OTHER ? t("everything else") : segment.label;
+    const size = el("span", "context-legend-size");
+    size.textContent =
+      breakdown.budget > 0
+        ? `${formatTokens(segment.tokens)} · ${Math.round(segment.share * 100)}%`
+        : formatTokens(segment.tokens);
+    row.append(dot, label, size);
+    out.push(row);
+  }
+  if (breakdown.over) out.push(el("div", "menu-note", t("Over the budget — the oldest exchanges are being left out.")));
+  // Said once, here, rather than in every tooltip: the figures measure the sources, not the
+  // assembled request, so they will not add up to the last count a provider reported.
+  out.push(el("div", "menu-note", t("Measured from the sources, so these are close rather than exact.")));
+  return out;
+}
+
 function contextBudgetSection(state: UiState, deps: ChatDeps, close: () => void): HTMLElement[] {
   const out: HTMLElement[] = [
     menuTitle(
@@ -1322,6 +2052,23 @@ function contextBudgetSection(state: UiState, deps: ChatDeps, close: () => void)
         : t("Context budget"),
     ),
   ];
+  // First, and the default: let it follow the model. A fixed figure chosen once, on whatever model
+  // was selected that day, is how a conversation on a 200k model ended up being summarized away
+  // after three exchanges.
+  out.push(
+    menuItem({
+      label: t("Automatic"),
+      hint:
+        state.modelContext > 0
+          ? t("{0} tokens — follows the model", formatTokens(state.contextBudget))
+          : t("Follows the model's own window"),
+      selected: state.contextBudgetAuto,
+      onClick: () => {
+        deps.send({ type: "setContextBudget", tokens: 0 });
+        close();
+      },
+    }),
+  );
   for (const tokens of contextBudgets(state.modelContext)) {
     out.push(
       menuItem({
@@ -1330,7 +2077,7 @@ function contextBudgetSection(state: UiState, deps: ChatDeps, close: () => void)
           tokens === state.modelContext && state.modelContext > 0
             ? t("The whole window. The answer needs room in it too.")
             : undefined,
-        selected: tokens === state.contextBudget,
+        selected: !state.contextBudgetAuto && tokens === state.contextBudget,
         onClick: () => {
           deps.send({ type: "setContextBudget", tokens });
           close();
@@ -1368,7 +2115,7 @@ export function contextBudgets(modelContext: number): number[] {
   const out: number[] = [];
   for (const fraction of [1 / 8, 1 / 4, 1 / 2, 3 / 4, 1]) {
     // The whole window is used exactly, not rounded: rounding 1 000 000 up would offer more than
-    // the model holds, and rounding it down would print a number nobody recognises.
+    // the model holds, and rounding it down would print a number nobody recognizes.
     const value = fraction === 1 ? modelContext : roundTokens(modelContext * fraction);
     if (value > 0 && !out.includes(value)) out.push(value);
   }
@@ -1390,6 +2137,11 @@ function roundTokens(n: number): number {
 function reasoningButton(state: UiState, deps: ChatDeps): HTMLElement {
   const current = REASONING.find((r) => r.id === state.reasoning) ?? REASONING[0]!;
   const b = button({
+    // ⚠️ A leading glyph, because the closed button shows only its VALUE. "Agent · qwen2.5-coder ·
+    // Direct" gives no clue that the third one is about thinking — reported as "the menus are still
+    // just as hard to understand". The row wraps now, so the 14px this costs is no longer
+    // taken from the model name.
+    icon: ICON.sparkle,
     label: current.label,
     trailingIcon: ICON.chevron,
     title: t("Reasoning: {0}", current.hint),
@@ -1491,7 +2243,7 @@ function slashHints(container: HTMLElement, area: HTMLTextAreaElement, deps: Cha
     .filter((sk) => !sk.builtin && sk.enabled)
     .map((sk) => ({ name: sk.name, hint: sk.description }));
   const rows = suggestionsFor(query, {
-    slash: [...available.map((c) => ({ name: c.name, hint: c.hint })), ...repoSkills],
+    slash: [...available.map((c) => ({ name: c.name, hint: t(c.hint) })), ...repoSkills],
     mentions: MENTIONS,
     participants: PARTICIPANTS,
   });

@@ -1,0 +1,8 @@
+{
+  "title": "The latest rate per currency, with the wrong rate",
+  "kind": "bug",
+  "prompt": "latest.sql should give one row per currency, the most recent rate. It returns every rate instead: somebody silenced a GROUP BY error by adding the column to it. Fix latest.sql so the output matches expected.txt.",
+  "setup": "sqlite3 rates.db < schema.sql",
+  "check": "sqlite3 rates.db < latest.sql | diff -u expected.txt -",
+  "timeoutMs": 180000
+}

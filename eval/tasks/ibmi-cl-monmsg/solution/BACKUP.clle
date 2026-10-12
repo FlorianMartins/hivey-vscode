@@ -1,0 +1,15 @@
+             PGM        PARM(&LIB)
+             DCL        VAR(&LIB) TYPE(*CHAR) LEN(10)
+
+/* "File not found" is the expected case the first time this runs, and only that message is      */
+/* tolerated: a program-level MONMSG MSGID(CPF0000) would also swallow an authority failure and  */
+/* a damaged object, and the program would report success having copied nothing.                 */
+             DLTF       FILE(&LIB/WRKCOPY)
+             MONMSG     MSGID(CPF2105) EXEC(DO) /* object not found */
+             ENDDO
+
+             CRTDUPOBJ  OBJ(CUSTMAST) FROMLIB(&LIB) OBJTYPE(*FILE) +
+                          TOLIB(&LIB) NEWOBJ(WRKCOPY) DATA(*YES)
+
+             SNDPGMMSG  MSG('Copie terminee') MSGTYPE(*COMP)
+             ENDPGM

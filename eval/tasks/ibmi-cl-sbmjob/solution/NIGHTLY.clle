@@ -1,0 +1,20 @@
+             PGM        PARM(&LIB)
+
+             DCL        VAR(&LIB) TYPE(*CHAR) LEN(10) VALUE('DEVCFC')
+
+/* Everything stated: the job name so it can be found in the output queue afterwards, the job   */
+/* description qualified by its library so it does not resolve against the caller's list, and   */
+/* the initial library list so the batch does not inherit whatever the submitter happened to    */
+/* have. A bare SBMJOB runs under all three of those by accident.                               */
+             SBMJOB     CMD(CALL PGM(&LIB/NIGHTCLS)) +
+                          JOB(NIGHTCLS) +
+                          JOBD(&LIB/NIGHTJOBD) +
+                          INLLIBL(&LIB QGPL QTEMP)
+/* And the submission itself can fail — a missing JOBD, no authority, a full job queue.         */
+             MONMSG     MSGID(CPF0000) EXEC(DO)
+             SNDPGMMSG  MSG('Nightly could NOT be submitted') MSGTYPE(*ESCAPE)
+             ENDDO
+
+             SNDPGMMSG  MSG('Nightly submitted')
+
+             ENDPGM

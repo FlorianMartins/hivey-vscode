@@ -137,7 +137,7 @@ test("an empty list blocks nothing, and no list blocks by accident", () => {
 });
 
 test("the same glob is compiled once and keeps working", () => {
-  // The cache is an optimisation, and an optimisation that returns a stale answer on the second
+  // The cache is an optimization, and an optimization that returns a stale answer on the second
   // call would be worse than no cache at all.
   for (let i = 0; i < 3; i++) {
     assert.equal(matchGlob(".env", "**/.env*"), true);

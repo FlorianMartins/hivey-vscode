@@ -5,6 +5,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { calibrate, describeCalibration, factorFor, observe, prune, MAX_FACTOR, MIN_FACTOR } from "../src/core/util/calibrate.js";
+import { estimateMessageTokens } from "../src/core/util/tokens.js";
 
 test("an unmeasured model is left exactly as estimated", () => {
   assert.equal(factorFor({}, "qwen"), 1);
@@ -86,4 +87,32 @@ test("the table cannot grow for ever", () => {
   let table = {};
   for (let i = 0; i < 60; i++) table = observe(table, `model-${i}`, { estimated: 1000, actual: 1100 });
   assert.equal(Object.keys(prune(table, 40)).length, 40);
+});
+
+// ── The two halves of the measurement have to be the same request ───────────────────────────────
+
+test("the estimate the calibration learns from counts the images that were sent", () => {
+  // The calibration is learned from a pair: what we estimated for a request against what the
+  // provider counted for it. Images were missing from our half, so every request carrying a
+  // screenshot produced a ratio above 1 for a reason that has nothing to do with tokenization. The
+  // factor drifted upwards and inflated every later estimate, the figure on the consent card, and
+  // the number the spending cap is checked against.
+  const text = [{ content: "what is wrong with this screenshot?" }];
+  const withImage = [{ content: "what is wrong with this screenshot?", images: [{}] }];
+  assert.ok(
+    estimateMessageTokens(withImage) > estimateMessageTokens(text) + 1_000,
+    "an image costs nothing in the estimate the calibration is trained on",
+  );
+});
+
+test("a factor learned from that pair stays where it belongs", () => {
+  // End to end: a provider that counts exactly what we estimate must teach a factor of 1, image or
+  // no image. It used to teach 2.5 — the clamp — after enough screenshots.
+  let table = {};
+  const messages = [{ content: "a question about this screenshot", images: [{}] }];
+  for (let i = 0; i < 20; i++) {
+    const estimated = estimateMessageTokens(messages);
+    table = observe(table, "m", { estimated, actual: estimated });
+  }
+  assert.ok(Math.abs(factorFor(table, "m") - 1) < 0.01, `factor drifted to ${factorFor(table, "m")}`);
 });

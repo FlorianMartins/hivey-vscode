@@ -22,6 +22,14 @@ export interface ButtonOptions {
   label?: string;
   title?: string;
   icon?: IconName;
+  /**
+   * An icon the caller has already drawn, used INSTEAD of `icon` when it is there.
+   *
+   * It exists for the maker's marks: those are filled, on a different grid, and fetched from a
+   * generated table rather than named in `ICON`. A button should not have to know any of that, and
+   * the caller already does — it is the one that knows which model this is.
+   */
+  iconNode?: SVGSVGElement | undefined;
   /** Drawn after the label — the chevron of a control that opens a menu. */
   trailingIcon?: IconName;
   className?: string;
@@ -32,7 +40,8 @@ export interface ButtonOptions {
 
 export function button(opts: ButtonOptions): HTMLButtonElement {
   const b = el("button", opts.className ?? "btn");
-  if (opts.icon) b.append(icon(opts.icon));
+  if (opts.iconNode) b.append(opts.iconNode);
+  else if (opts.icon) b.append(icon(opts.icon));
   if (opts.label) b.append(el("span", "lbl", opts.label));
   if (opts.trailingIcon) b.append(icon(opts.trailingIcon, "ico trailing"));
   if (opts.title) {
@@ -60,6 +69,9 @@ const PATHS = {
   // goes UP, into the conversation above the box you are typing in.
   send: "M8 12.75V4.25M4.25 8 8 4.25 11.75 8",
   stop: "M4 4h8v8H4z",
+  // A capsule on a stand. Drawn in the same 16-unit box and the same open-stroke language as the
+  // rest: a filled mic glyph would read as a different family beside `send` and `attach`.
+  mic: "M8 2.5a1.75 1.75 0 0 1 1.75 1.75v3a1.75 1.75 0 0 1-3.5 0v-3A1.75 1.75 0 0 1 8 2.5ZM4.5 7.25a3.5 3.5 0 0 0 7 0M8 10.75v2.75M6 13.5h4",
   add: "M8 3v10M3 8h10",
   history: "M8 3a5 5 0 1 1-4.9 4M3 3v3h3M8 5.5V8l2 1.5",
   search: "M7 3.2a3.8 3.8 0 1 0 0 7.6 3.8 3.8 0 0 0 0-7.6ZM10 10l3 3",
@@ -103,6 +115,13 @@ const PATHS = {
   // An arrow turning back on itself: the workbench's own shape for "undo this", used here for
   // going back to before a question.
   restore: "M3.5 7.5a5 5 0 1 1 1.6 4.4M3.5 4v3.5H7",
+  // Ask again: a full circle with the arrow at the top right, going forward. Deliberately not the
+  // rewind arrow above, which belongs to the checkpoint — two different actions that looked alike
+  // would be two actions people press by mistake.
+  askAgain: "M12.5 8.5a4.5 4.5 0 1 1-1.4-4M12.5 1.5V5H9",
+  // Compare: two panes side by side, which is what the answers are even when a narrow panel has to
+  // stack them.
+  compare: "M6.5 2v12M2.5 2h11v12h-11z",
   // A spanner: the workbench's own mark for "configure the tools this thing may use", which is
   // exactly what the skills picker is.
   // A wand with a spark: what a skill IS — a named thing you invoke that changes what the assistant
@@ -112,6 +131,13 @@ const PATHS = {
   // tried here read as "settings page" (a gear) or as "magic" (a wand), and this one reads as
   // "adjust what is on".
   tools: "M2 5.5h2.5M7.5 5.5H14M2 10.5h6.5M11.5 10.5H14M7.5 5.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 1 1 3 0M11.5 10.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 1 1 3 0",
+  // A cloud: where the answer comes FROM.
+  //
+  // ⚠️ Added the day the provider and the model became neighbours in the same row. Both had carried
+  // `chip`, which cost nothing while they sat in different rows and became unreadable the moment they
+  // did not: two identical glyphs side by side say "these are the same kind of thing", and "which
+  // service" and "which model" are the two choices people most need to keep apart here.
+  cloud: "M4.8 12.5h6.4a2.7 2.7 0 0 0 .3-5.4 3.8 3.8 0 0 0-7.2-.8 2.8 2.8 0 0 0 .5 6.2Z",
   // A small chip: the model, and where it runs.
   chip: "M5.5 5.5h5v5h-5zM3 6.5h2.5M3 9.5h2.5M10.5 6.5H13M10.5 9.5H13M6.5 3v2.5M9.5 3v2.5M6.5 10.5V13M9.5 10.5V13",
   more: "M4 8a1 1 0 1 0 0-.01M8 8a1 1 0 1 0 0-.01M12 8a1 1 0 1 0 0-.01",
@@ -122,7 +148,7 @@ const PATHS = {
  *
  * The ellipsis was three zero-length segments with round caps, which at stroke-width 1.3 produces
  * three dots 1.3 px across — a quarter of the ink of any other icon in the row, and it read as
- * disabled next to them. The colour was never wrong: it is `currentColor`, the same as its
+ * disabled next to them. The color was never wrong: it is `currentColor`, the same as its
  * neighbours. A dot has to be filled to have the weight of a line.
  */
 const FILLED = new Set<IconName>(["more", "sparkle"]);
@@ -133,6 +159,43 @@ const FILLED = new Set<IconName>(["more", "sparkle"]);
 const BOLD = new Set<IconName>(["send"]);
 
 export type IconName = keyof typeof PATHS;
+
+/**
+ * A maker's mark, drawn from the real thing.
+ *
+ * ⚠️ These were hand-drawn approximations for about an hour, and the request that replaced them was
+ * exact: "can you use the real icons please". They come from
+ * lobehub/lobe-icons (MIT), fetched once by `scripts/update-vendor-icons.mjs` and committed —
+ * nothing is loaded at runtime, because this panel's CSP forbids it and the extension ships no
+ * runtime dependency.
+ *
+ * Two things differ from every other icon here and both are the brands' doing rather than a choice:
+ * they are FILLED rather than stroked, and they live on a 24×24 grid rather than 16×16. A mark drawn
+ * with a stroke is a different logo, and one rescaled by hand is a wrong one.
+ *
+ * Several paths are normal — Google's four-colour G is four shapes — so this draws all of them.
+ */
+export function vendorIcon(slug: string, className = "ico"): SVGSVGElement | undefined {
+  const paths = VENDOR_PATHS[slug];
+  if (!paths?.length) return undefined;
+  const NS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(NS, "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("width", "14");
+  svg.setAttribute("height", "14");
+  svg.setAttribute("aria-hidden", "true");
+  svg.setAttribute("class", className);
+  for (const d of paths) {
+    const path = document.createElementNS(NS, "path");
+    path.setAttribute("d", d);
+    path.setAttribute("fill", "currentColor");
+    // The marks are authored with `evenodd`, and the holes in them — the middle of a knot, the
+    // counter of a letter — close up without it.
+    path.setAttribute("fill-rule", "evenodd");
+    svg.append(path);
+  }
+  return svg;
+}
 
 export function icon(name: IconName, className = "ico"): SVGSVGElement {
   const NS = "http://www.w3.org/2000/svg";
@@ -160,14 +223,18 @@ export function icon(name: IconName, className = "ico"): SVGSVGElement {
 }
 
 /** Names, so screens read `ICON.trash` rather than a string literal that can go stale. */
+import { VENDOR_PATHS } from "./vendorPaths.generated.js";
+
 export const ICON: Record<
   | "send" | "stop" | "add" | "history" | "search" | "close" | "chevron" | "chevronLeft" | "file"
   | "check" | "cross" | "mute" | "unmute" | "pin" | "edit" | "copy" | "trash" | "settings"
-  | "shield" | "attach" | "sparkle" | "bringIn" | "forward" | "restore" | "tools" | "chip" | "more" | "back",
+  | "shield" | "attach" | "sparkle" | "bringIn" | "forward" | "restore" | "askAgain" | "compare"
+  | "tools" | "chip" | "cloud" | "more" | "back" | "mic",
   IconName
 > = {
   send: "send",
   stop: "stop",
+  mic: "mic",
   add: "add",
   history: "history",
   search: "search",
@@ -191,8 +258,11 @@ export const ICON: Record<
   bringIn: "bringIn",
   forward: "forward",
   restore: "restore",
+  askAgain: "askAgain",
+  compare: "compare",
   tools: "tools",
   chip: "chip",
+  cloud: "cloud",
   more: "more",
 };
 

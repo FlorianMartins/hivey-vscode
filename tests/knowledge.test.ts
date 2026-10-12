@@ -2,7 +2,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { noteId, parseNote, serialiseNote, validId, type KnowledgeNote } from "../src/core/knowledge/note.js";
+import { noteId, parseNote, serialiseNote, validId, type KnowledgeNote, parseSharedNote, sharedNoteId, sharedDocKind } from "../src/core/knowledge/note.js";
 import { nearDuplicates, scoreNote, searchNotes, terms } from "../src/core/knowledge/search.js";
 import { knowledgeIndex } from "../src/core/knowledge/index.js";
 
@@ -108,4 +108,57 @@ test("the newest notes are the ones that fit", () => {
   const newer = { ...note("a/new", "New"), updated: "2026-09-03" };
   const index = knowledgeIndex([older, newer], 60);
   assert.match(index.text, /a\/new/);
+});
+
+// ── A folder somebody pointed this at ───────────────────────────────────────────────────────────
+//
+// Internal documentation is ordinary Markdown. It has no `---` header with a `title:` in it, and
+// nobody is going back to add one to four hundred wiki pages — so running a share through the
+// strict parser returns "no header" for every file, and a folder of documentation reads as an empty
+// knowledge base with four hundred problems in it.
+
+test("a plain Markdown page is readable, and titled by its first heading", () => {
+  const parsed = parseSharedNote("creation-client", "# Création d'un client\n\nÉtape 1 : …\n");
+  assert.equal(parsed.problems.length, 0, parsed.problems.join("; "));
+  assert.equal(parsed.note?.title, "Création d'un client");
+  assert.match(parsed.note?.body ?? "", /Étape 1/);
+});
+
+test("with no heading, the file name is the title", () => {
+  // A guess that lets a page be found is worth more than a rule that hides it: the index the model
+  // reads is a list of titles, and a page with no title can never be chosen.
+  const parsed = parseSharedNote("procedures/creation_client", "Étape 1 : ouvrir l'écran.\n");
+  assert.equal(parsed.note?.title, "creation client");
+});
+
+test("a note written in the strict format is still read as one, wherever it lives", () => {
+  // Somebody may well keep their team's notes on a share. The header is honored when it is there.
+  const strict = "---\ntitle: Settlement job\ntags: batch\n---\n\nIt runs at 22:00.\n";
+  const parsed = parseSharedNote("settlement", strict);
+  assert.equal(parsed.note?.title, "Settlement job");
+  assert.deepEqual(parsed.note?.tags, ["batch"]);
+});
+
+test("an empty file is not a note", () => {
+  assert.ok(parseSharedNote("blank", "   \n").problems.length);
+});
+
+test("a document is identified by what it is, not by whether it was named for us", () => {
+  // `noteId` requires `.md` and an id that is already lowercase and unaccented, because the bases
+  // this extension writes are written by it. A folder of internal documentation is not: its files
+  // are called `Création d'un client.docx`, and refusing them for their name would refuse the
+  // feature. The id is folded; the title keeps the original.
+  assert.equal(sharedNoteId("Création d'un client.docx"), "creation-d-un-client");
+  assert.equal(sharedNoteId("Procédures/Clôture mensuelle.pdf"), "procedures/cloture-mensuelle");
+  assert.equal(sharedNoteId("notes.md"), "notes");
+  assert.equal(sharedNoteId("budget.xlsx"), undefined, "a spreadsheet is not documentation we can read");
+  assert.equal(sharedNoteId("photo.png"), undefined);
+});
+
+test("the kind decides how it is read", () => {
+  assert.equal(sharedDocKind("a.md"), "text");
+  assert.equal(sharedDocKind("A.TXT"), "text");
+  assert.equal(sharedDocKind("Création.docx"), "docx");
+  assert.equal(sharedDocKind("manuel.PDF"), "pdf");
+  assert.equal(sharedDocKind("archive.zip"), undefined);
 });

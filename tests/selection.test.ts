@@ -40,9 +40,11 @@ test("the lightbulb gets a couple of rows, not the whole catalogue", () => {
   assert.ok(lit.length >= 1 && lit.length <= 3, `${lit.length} rows on the lightbulb`);
 });
 
-test("the offers are translated, instructions included", () => {
-  // The label being French while the instruction stays English is the shape this went wrong in
-  // elsewhere: the visible half gets translated and the half sent to the model does not.
+test("the label follows the interface language; the instruction the model reads stays English", () => {
+  // "all the skills, tools, etc. are in French […] switch everything to English". What a person
+  // reads
+  // is translated; what the model reads is the product's own instructions, in English — the reply
+  // language is said separately, by `languageDirective`.
   try {
     setLanguage("fr");
     const fr = selectionActions();
@@ -50,7 +52,7 @@ test("the offers are translated, instructions included", () => {
     const en = selectionActions();
     for (let i = 0; i < en.length; i++) {
       assert.notEqual(fr[i]!.label, en[i]!.label, `${en[i]!.id} label not translated`);
-      assert.notEqual(fr[i]!.instruction, en[i]!.instruction, `${en[i]!.id} instruction not translated`);
+      assert.equal(fr[i]!.instruction, en[i]!.instruction, `${en[i]!.id} instruction must not be translated`);
     }
   } finally {
     setLanguage("en");

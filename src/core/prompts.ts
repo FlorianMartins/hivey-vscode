@@ -11,7 +11,7 @@ How to be useful here:
 - Be concrete. Show the code, name the file and the line. Skip the preamble.
 - When you are unsure whether something exists in this codebase, look it up rather than guessing.
   An invented function name costs more than a question.
-- Prefer the smallest change that solves the problem. Do not reorganise code that was not asked
+- Prefer the smallest change that solves the problem. Do not reorganize code that was not asked
   about, and do not add dependencies without saying why.
 - Match the surrounding style: naming, comment density, error handling, test conventions.
 - Say plainly when something cannot work, or when you did not verify a claim.
@@ -112,10 +112,27 @@ export interface StablePromptParts {
   knowledge?: string;
   /** Which skills exist. Not which one is being used. */
   skills?: string;
+  /**
+   * How to deliberate, for a model that has no thinking of its own.
+   *
+   * Stable for the life of a conversation because it is derived from the model and the chosen effort,
+   * neither of which follows the user around. Empty on a model that reasons natively — see
+   * `core/router/thinking.ts`, which is where that decision lives rather than here.
+   */
+  thinking?: string;
 }
 
 export function stablePrompt(parts: StablePromptParts): string {
-  return [parts.mode, parts.workspace, parts.houseRules, parts.knowledge ? `\n${parts.knowledge}\n` : "", parts.skills]
+  return [
+    parts.mode,
+    // Right after the mode: how to think belongs with what you are, and before the repository's own
+    // rules, which may contradict it and should win when they do.
+    parts.thinking ? `\n\n${parts.thinking}\n` : "",
+    parts.workspace,
+    parts.houseRules,
+    parts.knowledge ? `\n${parts.knowledge}\n` : "",
+    parts.skills,
+  ]
     .filter(Boolean)
     .join("");
 }
@@ -131,8 +148,53 @@ export interface TurnDirectiveParts {
   dialect?: string;
   /** The named participant this turn is addressed to, when the user picked one. */
   participant?: string;
+  /** Which language to reply in. See `languageDirective`. */
+  language?: string;
 }
 
 export function turnDirectives(parts: TurnDirectiveParts): string {
-  return [parts.dialect, parts.participant].filter(Boolean).join("\n\n").trim();
+  return [parts.dialect, parts.participant, parts.language].filter(Boolean).join("\n\n").trim();
+}
+
+/**
+ * The language the user is writing in, read from what they wrote.
+ *
+ * ⚠️ "the model switches to English". The rule "answer in the language the user writes in" sits at
+ * the top of the system prompt, and after a few screens of English code, logs and tool output a
+ * local model follows the most recent text instead. So the language is decided HERE, from the
+ * question, and restated after the transcript every turn. Deliberately simple — a handful of very
+ * common words and the accents only French uses — and it falls back to the interface language when
+ * the question is too short or too technical to tell.
+ */
+export function detectLanguage(text: string, fallback: "en" | "fr"): "en" | "fr" {
+  const words = text.toLowerCase().replace(/`[^`]*`/g, " ").match(/[a-zàâçéèêëîïôûùüÿœ']+/g) ?? [];
+  let fr = 0;
+  let en = 0;
+  for (const w of words) {
+    if (FRENCH_WORDS.has(w)) fr++;
+    if (ENGLISH_WORDS.has(w)) en++;
+    if (/[àâçèêëîïôûùœ]/.test(w)) fr += 0.5;
+  }
+  if (fr + en < 2) return fallback;
+  return fr >= en ? "fr" : "en";
+}
+
+const FRENCH_WORDS = new Set([
+  "le", "la", "les", "des", "une", "est", "et", "pour", "que", "qui", "dans", "pas", "sur", "avec", "tu", "vous",
+  "je", "il", "ce", "cette", "mais", "fais", "peux", "plait", "plaît", "merci", "quoi", "comment", "pourquoi", "du",
+  "au", "aux", "ne", "on", "nous",
+]);
+const ENGLISH_WORDS = new Set([
+  "the", "and", "is", "are", "for", "that", "with", "this", "please", "can", "you", "what", "why", "how", "does",
+  "do", "not", "it", "of", "to", "in", "my", "should", "would", "could",
+]);
+
+/** Restated after the transcript every turn, where a model reads it last. */
+export function languageDirective(lang: "en" | "fr"): string {
+  const name = lang === "fr" ? "French" : "English";
+  return (
+    `Reply language: ${name}. Write every sentence of your reply in ${name} — explanations, plans, summaries, ` +
+    `questions and notices — including after reading code, logs or tool output in another language. ` +
+    `Keep code, identifiers, file names, commands and error messages exactly as they are.`
+  );
 }

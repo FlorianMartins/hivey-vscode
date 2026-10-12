@@ -106,15 +106,22 @@ export function sessionAsContext(
  * expensive and still entirely intact.
  *
  * Under a floor of a few thousand tokens it never fires whatever the ratio: on a tiny budget, four
- * exchanges cross two thirds, and nobody wants to be asked to summarise four exchanges.
+ * exchanges cross two thirds, and nobody wants to be asked to summarize four exchanges.
  */
-export const COMPACT_RATIO = 0.66;
+/**
+ * How full the context has to be before summarizing is worth offering.
+ *
+ * Seventy per cent, raised from two thirds along with the removal of the automatic version: an
+ * offer is only worth making once it is nearly needed, and a banner that appears early teaches
+ * people to dismiss banners.
+ */
+export const COMPACT_RATIO = 0.7;
 export const COMPACT_FLOOR_TOKENS = 6000;
 
 export function shouldSuggestCompact(contextTokens: number, budgetTokens: number, exchanges: number): boolean {
   if (budgetTokens <= 0) return false;
   if (contextTokens < COMPACT_FLOOR_TOKENS) return false;
-  // Two exchanges cannot be summarised into fewer than two exchanges worth reading.
+  // Two exchanges cannot be summarized into fewer than two exchanges worth reading.
   if (exchanges < 4) return false;
   return contextTokens / budgetTokens >= COMPACT_RATIO;
 }
@@ -122,7 +129,7 @@ export function shouldSuggestCompact(contextTokens: number, budgetTokens: number
 /**
  * What the model is asked to produce when compacting.
  *
- * Written as a brief rather than as "summarise this": a summary optimised for prose is the wrong
+ * Written as a brief rather than as "summarize this": a summary optimized for prose is the wrong
  * artefact here. What the next turn needs is the state of the work — decisions taken, paths tried
  * and rejected, files touched, what is still open — because the summary REPLACES the transcript as
  * the thing the model reasons from. A digest that reads beautifully and omits the file being
@@ -130,7 +137,7 @@ export function shouldSuggestCompact(contextTokens: number, budgetTokens: number
  */
 export function compactBrief(): string {
   return [
-    "Summarise this conversation so it can replace the transcript in your own context.",
+    "Summarize this conversation so it can replace the transcript in your own context.",
     "Write it for yourself, not for the user: it is the only record you will have of what came before.",
     "Cover, as sections and in this order:",
     "1. What the user is trying to achieve, in their terms.",
@@ -139,9 +146,9 @@ export function compactBrief(): string {
     "4. Files, symbols and commands touched, by exact name.",
     "5. What is still open, and the immediate next step.",
     "Keep every identifier verbatim. Prefer omitting a pleasantry to omitting a fact.",
-    "Do not address the user, do not apologise, and do not describe the conversation as a conversation.",
+    "Do not address the user, do not apologize, and do not describe the conversation as a conversation.",
     // The whole point of compacting is the space it frees, so the budget is stated rather than
-    // hoped for. Without it a model asked to "summarise" will happily return something two thirds
+    // hoped for. Without it a model asked to "summarize" will happily return something two thirds
     // the length of what it was given, which buys nothing and costs a request.
     "Be dense. Use short lines and fragments, not paragraphs. Aim for under 400 words, and never",
     "exceed a fifth of the length of what you were given. Drop anything the next step does not need.",
