@@ -1,0 +1,9 @@
+             PGM        PARM(&LIB)
+             DCL        VAR(&LIB) TYPE(*CHAR) LEN(10)
+
+             DLTF       FILE(&LIB/WRKCOPY)
+             CRTDUPOBJ  OBJ(CUSTMAST) FROMLIB(&LIB) OBJTYPE(*FILE) +
+                          TOLIB(&LIB) NEWOBJ(WRKCOPY) DATA(*YES)
+
+             SNDPGMMSG  MSG('Copie terminee') MSGTYPE(*COMP)
+             ENDPGM

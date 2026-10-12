@@ -1,0 +1,7 @@
+{
+  "title": "Extract a duplicated rule",
+  "kind": "refactor",
+  "prompt": "The same discount rule is written three times in orders.js. Extract it into one function and use it everywhere. The behaviour must not change: the tests must still pass.",
+  "check": "node --test && [ $(codeonly orders.js | grep -c '0\\.9') -le 1 ]",
+  "timeoutMs": 180000
+}

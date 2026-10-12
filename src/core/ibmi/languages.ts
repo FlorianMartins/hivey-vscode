@@ -271,22 +271,64 @@ const LANGUAGES: Record<IbmiLanguageId, IbmiLanguage> = {
   },
 };
 
-/** Extension → dialect, for the cases where the file name settles it. */
-const BY_EXTENSION: Array<[RegExp, IbmiLanguageId]> = [
+/**
+ * Extension → dialect, for the cases where the file name settles it.
+ *
+ * The third element marks an extension that ALSO means something off this platform, and it exists
+ * because the table read as if it did not. `.sql` is every database anyone has ever used; `.cl` is
+ * Common Lisp and OpenCL; `.cmd` is a Windows batch file; `.pf` and `.table` belong to half a dozen
+ * tools. Claiming those unconditionally is how a `.sql` file holding ordinary Postgres came to be
+ * answered with "This is Db2 for i, not Db2 LUW, not Oracle and not SQL Server" — the platform's
+ * rules switched on by a file name, on a machine with no partition anywhere near it.
+ *
+ * An ambiguous extension therefore has to be corroborated: by the IBM i side being in play at all,
+ * by a path that is a member or a QSYS object, or by the source itself. The unambiguous ones —
+ * `.rpgle`, `.dspf`, `.sqlrpgle`, `.clle` — are claimed as before, because nothing else uses them.
+ */
+const BY_EXTENSION: Array<[RegExp, IbmiLanguageId, true?]> = [
   [/\.sqlrpgle$/i, "sqlrpgle"],
   [/\.sqlclle$/i, "cl"],
   [/\.rpgle$/i, "rpgle-free"],
   [/\.(?:rpg36|rpt36|rpg38|rpt38|rpt)$/i, "rpg3"],
   [/\.rpg$/i, "rpg3"],
-  [/\.(?:clle|clp|cl)$/i, "cl"],
+  [/\.(?:clle|clp)$/i, "cl"],
+  [/\.cl$/i, "cl", true],
   [/\.(?:sqlcblle|cblle|cbl|cobol)$/i, "cobol"],
   [/\.dspf$/i, "dds-dspf"],
   [/\.prtf$/i, "dds-prtf"],
   [/\.lf$/i, "dds-lf"],
-  [/\.(?:pf|dds|table)$/i, "dds-pf"],
-  [/\.cmd$/i, "cmd"],
-  [/\.(?:sql|view|sqlprc|sqludf|sqltrg)$/i, "db2"],
+  [/\.dds$/i, "dds-pf"],
+  [/\.(?:pf|table)$/i, "dds-pf", true],
+  [/\.cmd$/i, "cmd", true],
+  [/\.(?:view|sqlprc|sqludf|sqltrg)$/i, "db2"],
+  [/\.sql$/i, "db2", true],
 ];
+
+/**
+ * What the SOURCE has to show before an ambiguous extension is read as IBM i.
+ *
+ * One pattern per dialect, and each is something that exists nowhere else: `QSYS2` and `*LIBL` are
+ * not in a Postgres schema, a `PARM KWD(` line is not in a batch file, and a specification letter in
+ * column 6 is not in Common Lisp. Deliberately narrow — the cost of missing evidence is a prompt
+ * that says nothing about the dialect, and the cost of inventing it is a model taught the wrong
+ * platform's rules.
+ */
+const EVIDENCE: Partial<Record<IbmiLanguageId, RegExp>> = {
+  db2: /\b(?:QSYS2|SYSIBM|SYSTOOLS|QTEMP|SYSDUMMY1|\*LIBL|LABEL\s+ON|RUNSQLSTM|CHGPF|RRN\s*\()/i,
+  cmd: /^\s*(?:CMD\s+PROMPT|PARM\s+KWD|ELEM\s+TYPE|QUAL\s+TYPE)\(/im,
+  cl: /^\s*(?:PGM\b|DCL\s+VAR\(|DCLF\b|MONMSG\b|CHGVAR\b|SNDPGMMSG\b|ENDPGM\b|CALL\s+PGM\()/im,
+  "dds-pf": /^\s{5}A[\s*A-Z]/m,
+};
+
+/**
+ * Does the PATH itself say IBM i, whatever the extension is?
+ *
+ * A source member and a QSYS object are addressed in shapes nothing else uses, and Code for IBM i
+ * registers its own schemes for them. Any of those settles the question before the content is read.
+ */
+function ibmiPath(path: string): boolean {
+  return /^(?:member|streamfile):/i.test(path) || /\/QSYS\.LIB\//i.test(path) || memberTypeOf(path) !== undefined;
+}
 
 /** Member type → dialect, which is what a QSYS member actually carries. */
 const BY_MEMBER_TYPE: Record<string, IbmiLanguageId> = {
@@ -316,6 +358,11 @@ const BY_MEMBER_TYPE: Record<string, IbmiLanguageId> = {
   VIEW: "db2",
 };
 
+export interface DetectOptions {
+  /** True when the editor is working with an IBM i at all — see `ibmiEnabled`. */
+  onIbmi?: boolean;
+}
+
 /**
  * Which IBM i dialect this source is, or undefined when it is not IBM i source at all.
  *
@@ -324,16 +371,25 @@ const BY_MEMBER_TYPE: Record<string, IbmiLanguageId> = {
  * converted yet, and telling a model the wrong one produces code that cannot compile. Two lines of
  * the member settle it — `**FREE` in column 1, or a specification letter in column 6 — so we read
  * them rather than trusting the extension.
+ *
+ * `onIbmi` is the caller saying "this machine works with IBM i" — the Code for IBM i extension is
+ * there, the same signal that decides whether the IBM i tools exist at all. It is what allows the
+ * ambiguous extensions through: on a partition, `.sql` is Db2 for i; anywhere else it is a `.sql`
+ * file and the platform's rules have to be earned from the path or the source.
  */
-export function detectIbmiLanguage(path: string, text?: string): IbmiLanguage | undefined {
+export function detectIbmiLanguage(path: string, text?: string, opts?: DetectOptions): IbmiLanguage | undefined {
   const member = memberTypeOf(path);
   let id: IbmiLanguageId | undefined = member ? BY_MEMBER_TYPE[member.toUpperCase()] : undefined;
   if (!id) {
-    for (const [re, candidate] of BY_EXTENSION) {
-      if (re.test(path)) {
-        id = candidate;
-        break;
+    for (const [re, candidate, ambiguous] of BY_EXTENSION) {
+      if (!re.test(path)) continue;
+      // An extension that means something else elsewhere needs a reason to be read as IBM i here.
+      if (ambiguous && !opts?.onIbmi && !ibmiPath(path)) {
+        const evidence = EVIDENCE[candidate];
+        if (!evidence || text === undefined || !evidence.test(text)) return undefined;
       }
+      id = candidate;
+      break;
     }
   }
   if (!id) return undefined;
@@ -387,9 +443,15 @@ function refineRpg(id: IbmiLanguageId, text: string): IbmiLanguageId {
  * rule to an IFS path would call `README.md` a member of type MD.
  */
 export function memberTypeOf(path: string): string | undefined {
-  const m = /^\/?(?:[^/]+)\/([^/]+)\/([^/.]+)\.([A-Za-z0-9]+)$/.exec(path.replace(/^member:/, ""));
+  const m = /^\/?([^/]+)\/([^/]+)\/([^/.]+)\.([A-Za-z0-9]+)$/.exec(path.replace(/^member:/, ""));
   if (!m) return undefined;
-  const type = m[3]!.toUpperCase();
+  // Ten characters, three times over. An object name on this platform cannot be longer, so the
+  // limit is the platform's own and not a guess — and it is what tells a member apart from a path
+  // that merely has three segments. Without it `db/migrations/0007_add_index.sql` was a member of
+  // type SQL in library `db`, which is how an ordinary migration in a web project came to be
+  // answered with Db2 for i's rules.
+  if (m.slice(1, 4).some((part) => part!.length > 10)) return undefined;
+  const type = m[4]!.toUpperCase();
   return type in BY_MEMBER_TYPE ? type : undefined;
 }
 

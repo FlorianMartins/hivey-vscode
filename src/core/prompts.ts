@@ -11,7 +11,7 @@ How to be useful here:
 - Be concrete. Show the code, name the file and the line. Skip the preamble.
 - When you are unsure whether something exists in this codebase, look it up rather than guessing.
   An invented function name costs more than a question.
-- Prefer the smallest change that solves the problem. Do not reorganise code that was not asked
+- Prefer the smallest change that solves the problem. Do not reorganize code that was not asked
   about, and do not add dependencies without saying why.
 - Match the surrounding style: naming, comment density, error handling, test conventions.
 - Say plainly when something cannot work, or when you did not verify a claim.
@@ -41,8 +41,10 @@ Working method:
   cannot silently rewrite the rest of a file.
 - After editing, call get_diagnostics to see whether the editor's language server agrees with you.
   Fix what you broke before saying you are done.
-- run_command starts the command in the user's terminal and does NOT return its output. Use it for
-  tests and builds, then ask the user what it printed.
+- run_command runs the command in the user's terminal and returns its output and exit code. Run the
+  tests or the build after you change something, read what came back, and fix what it says before
+  you claim to be done. On a shell without integration the result says the output could not be
+  read — in that case ask the user, and never assume it passed.
 - The user approves every change. If they decline, do not try the same thing another way — ask
   what they would prefer.
 - Stop when the task is done and say what you changed. Do not announce work you did not do.
@@ -79,3 +81,120 @@ export const INLINE_EDIT_PROMPT = `You rewrite a fragment of code according to a
 Answer with the replacement code ONLY: no explanation, no markdown fence, no commentary. Keep the
 surrounding indentation style. If the instruction cannot be satisfied, answer with the original
 fragment unchanged.`;
+
+/**
+ * The part of the prompt that must be byte-identical from one turn to the next.
+ *
+ * Every remote provider with a prompt cache keys it on a PREFIX. Anthropic marks it explicitly,
+ * OpenAI and OpenRouter match it implicitly, and all of them share one rule: the cache hits up to
+ * the first byte that differs, and misses on everything after it. So a single character that
+ * changes per turn at the top of the system prompt does not cost one character — it costs the
+ * whole prefix, on every turn, which on a long conversation with a repository map is most of the
+ * bill.
+ *
+ * This function exists to make that rule impossible to break by accident. It takes only things that
+ * are stable for the life of a conversation, and it takes them as named fields rather than as a
+ * concatenated string, so adding "just one more line about the open file" here is a change somebody
+ * has to make deliberately and a reviewer can see.
+ *
+ * Anything that follows the user around — which file is open, what they attached, who they are
+ * talking to — belongs in `turnDirectives`, which is sent AFTER the transcript and cached by
+ * nobody.
+ */
+export interface StablePromptParts {
+  /** The mode's own instructions: chat, plan or agent. */
+  mode: string;
+  /** What this workspace is. Its name and root, which do not change while it is open. */
+  workspace?: string;
+  /** The repository's own rules, from its instruction files. */
+  houseRules?: string;
+  /** The knowledge base's table of contents. Not its contents. */
+  knowledge?: string;
+  /** Which skills exist. Not which one is being used. */
+  skills?: string;
+  /**
+   * How to deliberate, for a model that has no thinking of its own.
+   *
+   * Stable for the life of a conversation because it is derived from the model and the chosen effort,
+   * neither of which follows the user around. Empty on a model that reasons natively — see
+   * `core/router/thinking.ts`, which is where that decision lives rather than here.
+   */
+  thinking?: string;
+}
+
+export function stablePrompt(parts: StablePromptParts): string {
+  return [
+    parts.mode,
+    // Right after the mode: how to think belongs with what you are, and before the repository's own
+    // rules, which may contradict it and should win when they do.
+    parts.thinking ? `\n\n${parts.thinking}\n` : "",
+    parts.workspace,
+    parts.houseRules,
+    parts.knowledge ? `\n${parts.knowledge}\n` : "",
+    parts.skills,
+  ]
+    .filter(Boolean)
+    .join("");
+}
+
+/**
+ * The part that changes every turn, and therefore must never sit in the cacheable prefix.
+ *
+ * Sent as its own message after the transcript, which also puts it where a model reads it last —
+ * the position that carries the most weight in practice.
+ */
+export interface TurnDirectiveParts {
+  /** Dialect rules implied by the files in play, e.g. Db2 for i rather than PostgreSQL. */
+  dialect?: string;
+  /** The named participant this turn is addressed to, when the user picked one. */
+  participant?: string;
+  /** Which language to reply in. See `languageDirective`. */
+  language?: string;
+}
+
+export function turnDirectives(parts: TurnDirectiveParts): string {
+  return [parts.dialect, parts.participant, parts.language].filter(Boolean).join("\n\n").trim();
+}
+
+/**
+ * The language the user is writing in, read from what they wrote.
+ *
+ * ⚠️ "the model switches to English". The rule "answer in the language the user writes in" sits at
+ * the top of the system prompt, and after a few screens of English code, logs and tool output a
+ * local model follows the most recent text instead. So the language is decided HERE, from the
+ * question, and restated after the transcript every turn. Deliberately simple — a handful of very
+ * common words and the accents only French uses — and it falls back to the interface language when
+ * the question is too short or too technical to tell.
+ */
+export function detectLanguage(text: string, fallback: "en" | "fr"): "en" | "fr" {
+  const words = text.toLowerCase().replace(/`[^`]*`/g, " ").match(/[a-zàâçéèêëîïôûùüÿœ']+/g) ?? [];
+  let fr = 0;
+  let en = 0;
+  for (const w of words) {
+    if (FRENCH_WORDS.has(w)) fr++;
+    if (ENGLISH_WORDS.has(w)) en++;
+    if (/[àâçèêëîïôûùœ]/.test(w)) fr += 0.5;
+  }
+  if (fr + en < 2) return fallback;
+  return fr >= en ? "fr" : "en";
+}
+
+const FRENCH_WORDS = new Set([
+  "le", "la", "les", "des", "une", "est", "et", "pour", "que", "qui", "dans", "pas", "sur", "avec", "tu", "vous",
+  "je", "il", "ce", "cette", "mais", "fais", "peux", "plait", "plaît", "merci", "quoi", "comment", "pourquoi", "du",
+  "au", "aux", "ne", "on", "nous",
+]);
+const ENGLISH_WORDS = new Set([
+  "the", "and", "is", "are", "for", "that", "with", "this", "please", "can", "you", "what", "why", "how", "does",
+  "do", "not", "it", "of", "to", "in", "my", "should", "would", "could",
+]);
+
+/** Restated after the transcript every turn, where a model reads it last. */
+export function languageDirective(lang: "en" | "fr"): string {
+  const name = lang === "fr" ? "French" : "English";
+  return (
+    `Reply language: ${name}. Write every sentence of your reply in ${name} — explanations, plans, summaries, ` +
+    `questions and notices — including after reading code, logs or tool output in another language. ` +
+    `Keep code, identifiers, file names, commands and error messages exactly as they are.`
+  );
+}

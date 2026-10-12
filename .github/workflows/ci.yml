@@ -18,12 +18,50 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # The unit tests on every Node this project claims to support.
+  #
+  # `engines` says 18 or later and the build job pins 20, so 18 and 22 were claimed and never run.
+  # The call itself was the reason: `node --test dist-tests/` means different things to different
+  # releases of the runner. It is enumerated explicitly now (scripts/run-tests.mjs), and this matrix
+  # is what proves the claim rather than repeating it.
+  unit:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ["18", "20", "22"]
+        os: [ubuntu-latest]
+        # One Windows run, because the reason the old call was fragile is a Windows one: npm runs
+        # scripts through cmd.exe, which does not expand a glob.
+        include:
+          - node: "22"
+            os: windows-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm test
+
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # What signing needs. `id-token` is the OIDC token GitHub mints for this run, which is what
+      # ties the signature to THIS workflow, THIS commit and nothing else — the whole point of
+      # provenance is that it cannot be produced by anybody who is not this job.
+      id-token: write
+      attestations: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "20"
           cache: npm
@@ -40,6 +78,30 @@ jobs:
       - name: Secrets — scanned with the extension's own detectors
         run: node scripts/scan-secrets.mjs
 
+      # A number written in prose has no reason to follow the thing it describes. The README
+      # announced 562 unit tests and version 0.39.0 while the repository was at 0.61.0 with 699,
+      # and the French one still said 284 and 0.11.1. Nobody lied; nobody could have noticed.
+      - name: Documentation — the numbers it claims
+        run: npm run check:numbers
+
+      # Not the evaluation itself, which needs a model. This is the gate that makes the evaluation
+      # worth running at all: every task's check must FAIL on its untouched fixture, or the task
+      # scores every model 100 % and measures nothing. It needs no GPU, so it runs on every commit.
+      # The course describes the whole product to somebody who does not code, and its failure mode is
+      # silent: it goes on describing a version that no longer exists. Not auto-fixable on purpose.
+      - name: The course still describes this version
+        run: npm run check:course
+
+      - name: Evaluation tasks are honest
+        run: npm run eval:verify
+
+      # The opposite gate. `eval:verify` catches a task that passes before the model touches it;
+      # this one catches a task that can NEVER pass — a typo in a grep, a compiler the runner does
+      # not have, a condition the prompt never asks for. Such a task scores every model zero and
+      # becomes evidence against the models rather than against itself.
+      - name: Evaluation checks are satisfiable
+        run: npm run eval:solutions
+
       - name: Dependencies — known vulnerabilities
         # The extension ships zero runtime dependency; this covers the dev toolchain, which is
         # still code that runs on a maintainer's machine.
@@ -50,19 +112,62 @@ jobs:
         continue-on-error: true # a provider outage must not turn the build red
 
       - name: Package the extension
-        run: npx --yes @vscode/vsce@3 package --no-dependencies -o hivey-code.vsix
+        run: npx --yes @vscode/vsce@3.9.2 package --no-dependencies -o hivey-code.vsix
+
+      # Would a submission be refused? Asked of the file that would be uploaded, not of the
+      # repository: `.vscodeignore` says what should ship and the `.vsix` is what does, and the gap
+      # between them is where the defects were. The French readme shipped with five broken image
+      # links and a link to `README.md` that 404s on Linux, both for a whole release.
+      - name: The package would survive a submission
+        run: node scripts/check-publish.mjs hivey-code.vsix
+
+      # What somebody who downloads the file can check it against.
+      #
+      # `.vsix` is a zip, and a zip carries the modification time of every file in it, so two builds
+      # of the same commit do NOT produce the same bytes. Byte-for-byte reproducibility is therefore
+      # not claimed here — what is offered instead is stronger in the way that matters: the digest
+      # of the artifact that was actually published, tied by signature to the commit and the
+      # workflow run that produced it.
+      - name: Digest
+        id: digest
+        run: |
+          sha256sum hivey-code.vsix | tee SHA256SUMS
+          echo "sha256=$(sha256sum hivey-code.vsix | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          {
+            echo "### The build you can check"
+            echo
+            echo "\`hivey-code.vsix\`"
+            echo
+            echo "| | |"
+            echo "| --- | --- |"
+            echo "| sha256 | \`$(sha256sum hivey-code.vsix | cut -d' ' -f1)\` |"
+            echo "| commit | \`${GITHUB_SHA}\` |"
+            echo "| run | ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID} |"
+            echo
+            echo "Verify with \`gh attestation verify hivey-code.vsix --repo ${GITHUB_REPOSITORY}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Sigstore, through GitHub's own action: a signed statement that this exact file was built by
+      # this workflow from this commit. It is verified with `gh attestation verify`, needs no key
+      # anybody has to keep, and it is the difference between "zero dependencies, trust us" and
+      # "zero dependencies, and here is how you check that what you installed is what is on GitHub".
+      - name: Sign the build
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.4.0
+        with:
+          subject-path: hivey-code.vsix
 
       - name: Software bill of materials
         run: |
-          npx --yes @cyclonedx/cyclonedx-npm@latest --output-file sbom.json --omit dev || \
+          npx --yes @cyclonedx/cyclonedx-npm@6.0.1 --output-file sbom.json --omit dev || \
             echo '{"note":"SBOM generation skipped"}' > sbom.json
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: hivey-code-vsix
           path: |
             hivey-code.vsix
             sbom.json
+            SHA256SUMS
           retention-days: 30
 
   integration:
@@ -70,11 +175,35 @@ jobs:
     # into it headless, and checks that every command the manifest declares actually exists.
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "20"
           cache: npm
       - run: npm ci
       - name: Extension host tests
         run: xvfb-run -a npm run test:integration
+
+  # ---------------------------------------------------------------------------
+  # One check for branch protection to require, the same name as in the other
+  # repositories: the matrix can grow or shrink without touching the settings.
+  ci:
+    name: CI complete
+    runs-on: ubuntu-latest
+    needs: [unit, build, integration]
+    if: always()
+    steps:
+      - name: Fail when any job failed
+        run: |
+          # GitHub expressions only accept single-quoted string literals.
+          results='${{ join(needs.*.result, ' ') }}'
+          echo "job results: $results"
+          for result in $results; do
+            if [ "$result" != "success" ] && [ "$result" != "skipped" ]; then
+              echo "::error::a required job did not succeed"
+              exit 1
+            fi
+          done
+          echo "✅ every job succeeded"

@@ -1,0 +1,7 @@
+{
+  "title": "Add a flag to a small CLI",
+  "kind": "feature",
+  "prompt": "Add a --json flag to count.js. With it, print one JSON object {\"lines\":N,\"words\":N,\"chars\":N} and nothing else. Without it, keep the current output exactly as it is.",
+  "check": "printf 'a b\\nc\\n' | node count.js --json | node -e \"let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const o=JSON.parse(s);if(o.lines!==2||o.words!==3||o.chars!==6){console.error('got '+s);process.exit(1)}})\" && printf 'a b\\nc\\n' | node count.js | grep -q '2 lines'",
+  "timeoutMs": 180000
+}

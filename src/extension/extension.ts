@@ -3,13 +3,35 @@
 
 import * as vscode from "vscode";
 import { showKnowledge } from "./knowledge.js";
+import { announcePolicy, policySource, reloadPolicy } from "./policy.js";
+import { SiemShipper } from "./siem.js";
+import { Background } from "./background.js";
+import { findRecorder, inputDevices } from "./whisper.js";
+import { pickMicrophone } from "./microphone.js";
+import { Corpus } from "./corpus.js";
+import { LearnedRouting } from "./learned.js";
+import { ReviewDiagnostics, parseFindings, prepareReview, summarise } from "./review.js";
+import { sovereigntyReport } from "./sovereignty.js";
+import type { ReportRow } from "../core/audit/sovereignty.js";
 import { setLanguage, t } from "../shared/i18n.js";
 import { Budget } from "../core/router/budget.js";
+import { contextBudget } from "../core/context/budget.js";
+import { MODES, type Mode } from "../core/session/modes.js";
 import { isLocalEndpoint } from "../core/redaction/index.js";
 import { ChatViewProvider, PreviewProvider } from "./chat.js";
 import { HiveyCodeActions } from "./codeActions.js";
 import { InlineCompletionProvider } from "./completion.js";
-import { Keys, endpointFor, providerFor, readSettings, SECTION, writeTarget } from "./config.js";
+import {
+  Keys,
+  endpointFor,
+  providerFor,
+  managedSettings,
+  readSettings,
+  recoverMisplacedKeys,
+  restoreMisplacedGatewayAddress,
+  SECTION,
+  writeTarget,
+} from "./config.js";
 import { EgressGate, WorkspaceSpendStore, safeHost } from "./egress.js";
 import { registerEditorCommands } from "./editorCommands.js";
 import { showEgressReport, showCostReport } from "./reports.js";
@@ -18,6 +40,47 @@ import { McpManager } from "./integrations/mcp.js";
 import { watchInstructions } from "./instructions.js";
 import { createDefinition, definitionUri, DefinitionStore } from "./definitions.js";
 import { ibmiDiagnose, ibmiLibraryList } from "./integrations/ibmi.js";
+import { REMOTE_VENDORS, vendor, type ProviderId } from "../core/providers/vendors.js";
+import { checkCredentials, keyProblem, normalizeBaseUrl, urlProblem } from "../core/providers/credentials.js";
+import { NextEditWatcher } from "./nextEdit.js";
+import { toJsonl, toSyslog, type Chained } from "../core/audit/chain.js";
+
+/** The three modes, as a quick pick, for the palette entry that names none. */
+async function pickMode(): Promise<Mode | undefined> {
+  const picked = await vscode.window.showQuickPick(
+    MODES.map((m) => ({ label: m.label, description: m.hint, id: m.id })),
+    { placeHolder: t("Which mode?") },
+  );
+  return picked?.id;
+}
+
+/**
+ * Say, once, why some of Hivey Code stays in the editor's language.
+ *
+ * "the translation of the options' hover texts can also follow the chosen language". The
+ * settings page — descriptions and hovers — the menus and the command names come from
+ * `package.nls.*.json`, which VS Code picks from ITS display language; no API lets an extension
+ * choose otherwise. This used to be said only to somebody changing the language through the
+ * command, so a language chosen in the settings looked half-applied with no explanation. Now it is
+ * said once at startup for each mismatch, with the one button that does change it.
+ */
+async function explainEditorLanguage(context: vscode.ExtensionContext): Promise<void> {
+  const chosen = readSettings().language;
+  const editor = vscode.env.language.toLowerCase();
+  if (chosen === "auto" || editor.startsWith(chosen)) return;
+  const seenKey = "hiveyCode.editorLanguageExplained";
+  const combo = `${chosen}->${editor}`;
+  if (context.globalState.get<string>(seenKey) === combo) return;
+  await context.globalState.update(seenKey, combo);
+  const change = t("Change VS Code's language");
+  const answer = await vscode.window.showInformationMessage(
+    t("The settings descriptions, menus and command names of Hivey Code follow VS Code's own display language ({0}), not the language chosen for Hivey Code.", vscode.env.language),
+    { modal: false, detail: t("The command palette entries and the settings page follow VS Code's own display language, which an extension cannot change.") },
+    change,
+  );
+  // The editor's own picker: it lists the languages, installs the language pack and restarts.
+  if (answer === change) await vscode.commands.executeCommand("workbench.action.configureLocale");
+}
 
 export function activate(context: vscode.ExtensionContext): void {
   // The editor knows which language the user reads, unless they said otherwise.
@@ -26,16 +89,49 @@ export function activate(context: vscode.ExtensionContext): void {
     setLanguage(choice === "auto" ? vscode.env.language : choice);
   };
   applyLanguage();
+  void explainEditorLanguage(context);
   const log = vscode.window.createOutputChannel("Hivey Code");
   const keys = new Keys(context.secrets);
   const disposables: vscode.Disposable[] = [];
   const workspace = new WorkspaceContext(disposables);
   watchInstructions(disposables);
+  // Before anything else reads a setting. A refused policy means the extension is in its safest
+  // mode — local only, strongest redaction, nothing auto-approved — and a user who does not know
+  // that reads it as the product being broken. See `policy.ts`.
+  announcePolicy();
+  // Before anything is sent. Someone whose key is in the wrong box has an extension that cannot
+  // work, and the sooner they are told the fewer questions they ask into the void.
+  void recoverMisplacedKeys(keys, log);
+  // And undo the ones it got wrong before the detector was narrowed. See the note on the function.
+  void restoreMisplacedGatewayAddress(keys, log);
   const budget = new Budget(new WorkspaceSpendStore(context.globalState), readSettings().budget);
   const gate = new EgressGate(context.globalState, budget);
+  // Off unless an operator configured a collector. The shipper is handed every ledger row and
+  // decides for itself whether there is anywhere to send it — one place that knows, rather than the
+  // egress path asking.
+  const siem = new SiemShipper(context, log);
+  // Each task gets its own worktree and its own branch, so several can run at once without
+  // seeing each other's work — or the work of the person who started them.
+  const background = new Background(keys, log, () => status.show());
+  // One collection, replaced by each review: leaving the previous one behind would mean somebody
+  // fixing a finding and still seeing it.
+  // Off unless asked for. What this machine learned, kept on this machine — see `corpus.ts`.
+  const corpus = new Corpus(context, log);
+  // Per workspace, which is per repository: two checkouts of the same project are two sets of
+  // measurements, and that is correct — the small model may do well in one and not the other.
+  const learnedRouting = new LearnedRouting(context.workspaceState);
+  const reviewDiagnostics = new ReviewDiagnostics();
+  disposables.push(reviewDiagnostics);
+  gate.onRecord = (row) => siem.offer(row);
+  disposables.push(siem);
 
   const status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
   const completion = new InlineCompletionProvider(keys, status, log);
+  // The edit that follows the one just made, elsewhere in the file. Runs on the completion model,
+  // so on a local endpoint it is free; see `nextEdit.ts` for why it is not offered on a paid one.
+  const nextEdit = new NextEditWatcher(keys, log);
+  const previousText = new Map<string, string>();
+  for (const doc of vscode.workspace.textDocuments) previousText.set(doc.uri.toString(), doc.getText());
   completion.updateStatus(readSettings());
 
   // MCP servers are started after activation, never during it: a slow or hanging server must not
@@ -50,6 +146,11 @@ export function activate(context: vscode.ExtensionContext): void {
   const definitions = new DefinitionStore(disposables);
 
   const chat = new ChatViewProvider(context, keys, workspace, gate, log, mcp, definitions);
+  // The corpus records an escalation that WORKED, so the turn has to be able to reach it. A
+  // property rather than a constructor argument because it is optional by design: absent means
+  // nothing is recorded, which is the default.
+  chat.corpus = corpus;
+  chat.learnedRouting = learnedRouting;
 
   context.subscriptions.push(
     log,
@@ -73,8 +174,25 @@ export function activate(context: vscode.ExtensionContext): void {
       // The width floor lives in a style attribute on <body>, which is written once when the HTML
       // is built. Without this the setting appears to do nothing until the window is reloaded.
       if (e.affectsConfiguration(`${SECTION}.panel.minWidth`)) chat.reload();
+      // The appearance is an attribute on <html>, written once when the HTML is built — like the
+      // width floor above it, and for the same reason: without this the setting appears to do
+      // nothing until the window is reloaded.
+      if (e.affectsConfiguration(`${SECTION}.appearance`)) chat.reload();
+      // What the picker may offer depends on the provider in use and on the addresses configured —
+      // see `core/models/offer.ts`. The list was built once and then never rebuilt on either, so
+      // choosing the gateway left the picker showing the four hundred rows it had computed while
+      // the local provider was selected.
+      if (
+        e.affectsConfiguration(`${SECTION}.chat.provider`) ||
+        e.affectsConfiguration(`${SECTION}.endpoints`)
+      ) {
+        chat.reloadModels();
+      }
       const s = readSettings();
       budget.setLimits(s.budget);
+      // Checked on every change, because the mistake is made IN the settings editor and the moment
+      // it is made is the moment the person who can undo it is looking at it.
+      void recoverMisplacedKeys(keys, log);
       completion.invalidateProvider();
       completion.updateStatus(s);
     }),
@@ -83,6 +201,13 @@ export function activate(context: vscode.ExtensionContext): void {
     // It briefly asked which kind of conversation to start, and the cost was immediate — anything
     // that invoked it non-interactively waited for ever for an answer nobody was there to give.
     vscode.commands.registerCommand("hiveyCode.newSession", () => chat.newSession()),
+
+    // Chat, plan or agent, from the palette or a keybinding. Asked for when no mode is named, so
+    // the palette entry is usable on its own; the argument is what a keybinding and the tests pass.
+    vscode.commands.registerCommand("hiveyCode.setMode", async (mode?: Mode) => {
+      const wanted = mode ?? (await pickMode());
+      if (wanted) chat.setMode(wanted);
+    }),
 
     /**
      * The guided start, as its own command.
@@ -104,6 +229,85 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("hiveyCode.stopAnswer", () => chat.stopTurn()),
 
     vscode.commands.registerCommand("hiveyCode.showKnowledge", () => showKnowledge()),
+    vscode.commands.registerCommand("hiveyCode.siemStatus", () => siem.report()),
+    vscode.commands.registerCommand("hiveyCode.routingShow", () => learnedRouting.show()),
+    vscode.commands.registerCommand("hiveyCode.routingForget", () => learnedRouting.forget()),
+    vscode.commands.registerCommand("hiveyCode.corpusStatus", () => corpus.status()),
+    vscode.commands.registerCommand("hiveyCode.corpusExport", () => corpus.export()),
+    vscode.commands.registerCommand("hiveyCode.corpusPurge", () => corpus.purge()),
+    vscode.commands.registerCommand("hiveyCode.reviewBranch", async () => {
+      const root = vscode.workspace.workspaceFolders?.[0];
+      if (!root) {
+        void vscode.window.showWarningMessage(t("Reviewing a branch needs a folder open."));
+        return;
+      }
+      const prepared = await prepareReview(root.uri.fsPath);
+      if ("refused" in prepared) {
+        void vscode.window.showInformationMessage(prepared.refused);
+        return;
+      }
+      // Through the chat view, because that is where the model, the budget and the egress gate are.
+      // A review with its own request path would be a second place a request can leave the machine.
+      const answer = await chat.askAndWait(prepared.prompt);
+      const { findings, problems } = parseFindings(answer);
+      reviewDiagnostics.publish(root.uri.fsPath, findings);
+      for (const problem of problems) log.appendLine(`[review] ${problem}`);
+      void vscode.window.showInformationMessage(
+        problems.length
+          ? t("{0}. {1} part(s) of the answer could not be read — see the output channel.", summarise(findings), problems.length)
+          : t("{0}. They are in the Problems panel.", summarise(findings)),
+      );
+    }),
+    vscode.commands.registerCommand("hiveyCode.runInBackground", async () => {
+      const task = await vscode.window.showInputBox({
+        title: t("Run a task in the background"),
+        prompt: t("It gets its own branch and its own directory, and it never pushes."),
+      });
+      if (task?.trim()) await background.start(task.trim());
+    }),
+    vscode.commands.registerCommand("hiveyCode.backgroundTasks", async () => {
+      const tasks = background.list();
+      if (!tasks.length) {
+        void vscode.window.showInformationMessage(t("No background task is running."));
+        return;
+      }
+      const picked = await vscode.window.showQuickPick(
+        tasks.map((task) => ({
+          label: task.branch,
+          description: `${task.state} · ${task.steps} step(s)`,
+          detail: task.summary ?? task.task,
+          id: task.id,
+          state: task.state,
+        })),
+        { title: t("Background tasks") },
+      );
+      if (picked?.state === "running") background.cancel(picked.id);
+    }),
+    vscode.commands.registerCommand("hiveyCode.sovereigntyReport", () =>
+      sovereigntyReport(gate.ledger() as unknown as ReportRow[], context.secrets),
+    ),
+    // Reloading is a deliberate act rather than a file watcher: a policy being written half a file
+    // at a time would otherwise be read mid-write and refused, putting the machine into safe mode
+    // because an administrator was in the middle of a deployment.
+    vscode.commands.registerCommand("hiveyCode.reloadPolicy", () => {
+      const state = reloadPolicy();
+      if (state.kind === "none") {
+        void vscode.window.showInformationMessage(
+          t("No organisation policy on this machine. It would be read from {0}.", policySource()),
+        );
+        return;
+      }
+      if (state.kind === "refused") {
+        announcePolicy(state);
+        return;
+      }
+      const managed = managedSettings();
+      void vscode.window.showInformationMessage(
+        managed.keys.length
+          ? t("Policy from {0} in force: {1} setting(s) are managed.", state.policy.organisation ?? policySource(), managed.keys.length)
+          : t("Policy from {0} in force. Nothing you have set conflicts with it.", state.policy.organisation ?? policySource()),
+      );
+    }),
 
     // An instrument rather than another guess. Listings came back empty on a real partition, and
     // there is none here to try anything against, so each fix was a hypothesis handed to somebody
@@ -123,6 +327,24 @@ export function activate(context: vscode.ExtensionContext): void {
       await vscode.window.showTextDocument(doc);
     }),
 
+    // What, literally, was just sent.
+    //
+    // The egress log answers "what has left over time" and holds no content, by design. This answers
+    // the other question — the one somebody asks once before trusting the thing, and again the first
+    // time an answer is strange. It is the pseudonymized form, because that is the form that left,
+    // and it is held in memory for the session only: nothing is written anywhere by this command.
+    vscode.commands.registerCommand("hiveyCode.auditLastPrompt", async () => {
+      const report = chat.auditLastPrompt();
+      if (!report) {
+        void vscode.window.showInformationMessage(
+          t("Nothing has been sent yet in this session, so there is nothing to audit."),
+        );
+        return;
+      }
+      const doc = await vscode.workspace.openTextDocument({ language: "markdown", content: report });
+      await vscode.window.showTextDocument(doc);
+    }),
+
     vscode.commands.registerCommand("hiveyCode.pinLastAnswer", async () => {
       await chat.reveal();
       return chat.togglePinLastAnswer();
@@ -135,6 +357,24 @@ export function activate(context: vscode.ExtensionContext): void {
 
     vscode.commands.registerCommand("hiveyCode.completionAccepted", () => completion.noteAccepted()),
 
+    vscode.commands.registerCommand("hiveyCode.applyNextEdit", () => nextEdit.apply()),
+
+    // The journal needs the text as it was BEFORE the change, and the change event does not carry
+    // it — so the last version of every open document is kept here, one string per file, replaced
+    // on every change. Cheaper than reconstructing it from the content changes, and correct in the
+    // cases reconstruction is not: a multi-cursor edit, a formatter, an applied refactor.
+    vscode.workspace.onDidChangeTextDocument((event) => {
+      const key = event.document.uri.toString();
+      const before = previousText.get(key) ?? event.document.getText();
+      previousText.set(key, event.document.getText());
+      nextEdit.onChange(event, before);
+    }),
+    vscode.workspace.onDidCloseTextDocument((doc) => previousText.delete(doc.uri.toString())),
+    vscode.workspace.onDidOpenTextDocument((doc) => previousText.set(doc.uri.toString(), doc.getText())),
+    // A suggestion is about where the user was. Moving somewhere else retires it.
+    vscode.window.onDidChangeActiveTextEditor(() => nextEdit.clear()),
+    nextEdit,
+
     vscode.commands.registerCommand("hiveyCode.toggleCompletions", async () => {
       const config = vscode.workspace.getConfiguration(SECTION);
       const next = !config.get<boolean>("completion.enabled", true);
@@ -142,26 +382,103 @@ export function activate(context: vscode.ExtensionContext): void {
       completion.updateStatus(readSettings());
     }),
 
+    /**
+     * Add a provider: the address and the key, in one pass, checked.
+     *
+     * ⚠️ This flow had two faults and Florian named both: "adding a new API key is buggy and not
+     * user friendly, for example for the gateway, which asks you to store the address and then
+     * store the API key instead of filling in both fields and confirming".
+     *
+     *   • IT NEVER ASKED FOR THE ADDRESS. For the one provider whose address is the user's to supply
+     *     — a gateway, Azure, LiteLLM, a corporate proxy — the key was stored and the address had to
+     *     be found afterwards in the settings page, in a different part of the product, with nothing
+     *     saying so. A flow that collects half of what it needs and reports success is worse than
+     *     one that collects none.
+     *
+     *   • NOTHING WAS CHECKED. The vendor table carries a `placeholder` whose own comment says it is
+     *     there "so a wrong paste is visible before it is stored", and no code read it. A key with a
+     *     newline in it was accepted in silence and surfaced later as `401` on an unrelated question.
+     *
+     * Now: address (prefilled with the default, so one Enter accepts it), key, both validated as they
+     * are typed, one GET to prove they work, and the pair stored together or not at all.
+     */
     vscode.commands.registerCommand("hiveyCode.setApiKey", async () => {
       const provider = await vscode.window.showQuickPick(
         [
-          { label: "openrouter", detail: t("Multi-model gateway") },
-          { label: "anthropic", detail: t("Claude API") },
-          { label: "openai-compatible", detail: t("Internal gateway, Azure, LiteLLM…") },
-          { label: "local", detail: t("A local server that requires a key (rare)") },
+          ...REMOTE_VENDORS.map((v) => ({ label: v.id, description: v.label, detail: v.hint })),
+          { label: "local", description: t("On this machine"), detail: t("A local server that requires a key (rare)") },
         ],
-        { placeHolder: t("Which provider?") },
+        { placeHolder: t("Which provider?"), ignoreFocusOut: true },
       );
       if (!provider) return;
+      const id = provider.label as ProviderId;
+      const vendorInfo = vendor(id);
+      const config = vscode.workspace.getConfiguration(SECTION);
+      const settingKey = vendorInfo?.settingKey ?? "local";
+      const currentUrl = config.get<string>(`endpoints.${settingKey}`) || vendorInfo?.baseUrl || "";
+
+      // Step 1 of 2, prefilled. A standard vendor's default is already right, so this is one Enter;
+      // a gateway's is empty, which is the whole point of asking.
+      const address = await vscode.window.showInputBox({
+        title: t("Add {0} — 1 of 2", vendorInfo?.label ?? id),
+        prompt: t("Address. The default is right unless you use a proxy, a region or a gateway."),
+        value: currentUrl,
+        placeHolder: vendorInfo?.baseUrl || "https://…/v1",
+        ignoreFocusOut: true,
+        validateInput: (value) => {
+          const problem = urlProblem(value, { required: Boolean(vendorInfo?.needsUrl) || !vendorInfo?.baseUrl });
+          if (!problem) return undefined;
+          return problem.fatal
+            ? problem.message
+            : { message: problem.message, severity: vscode.InputBoxValidationSeverity.Warning };
+        },
+      });
+      if (address === undefined) return;
+
+      const baseUrl = normalizeBaseUrl(address) || vendorInfo?.baseUrl || "";
       const key = await vscode.window.showInputBox({
-        prompt: t("Key for {0}. It is stored in the system keychain, never in the settings.", provider.label),
+        title: t("Add {0} — 2 of 2", vendorInfo?.label ?? id),
+        prompt: t("Key for {0}. It is stored in the system keychain, never in the settings.", vendorInfo?.label ?? id),
+        placeHolder: vendorInfo?.placeholder,
         password: true,
         ignoreFocusOut: true,
+        validateInput: (value) => {
+          if (!value) return undefined; // Nothing typed yet is not a mistake.
+          const problem = keyProblem({ label: vendorInfo?.label ?? id, placeholder: vendorInfo?.placeholder ?? "…" }, value);
+          if (!problem) return undefined;
+          return problem.fatal
+            ? problem.message
+            : { message: problem.message, severity: vscode.InputBoxValidationSeverity.Warning };
+        },
       });
       if (!key) return;
-      await keys.store(provider.label as never, key);
+
+      // Checked before being stored, with one GET that costs no tokens. A credential that is known
+      // to work is a different thing from one that has been written down.
+      const check = await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: t("Checking the key against {0}…", baseUrl) },
+        () => checkCredentials({ wire: vendorInfo?.wire ?? "openai", label: vendorInfo?.label ?? id }, baseUrl, key, fetch),
+      );
+      if (!check.ok) {
+        const anyway = t("Store it anyway");
+        const answer = await vscode.window.showWarningMessage(check.why, { modal: true, detail: t("Nothing has been saved yet.") }, anyway);
+        // A key the server rejected outright is not worth storing; an endpoint that could not be
+        // reached might be a VPN that is not up yet, so that one is the user's call.
+        if (answer !== anyway) return;
+      }
+
+      // Both, together. The address first: a stored key pointing at the wrong address is the state
+      // this whole flow exists to prevent.
+      if (baseUrl && baseUrl !== vendorInfo?.baseUrl) {
+        await config.update(`endpoints.${settingKey}`, baseUrl, vscode.ConfigurationTarget.Global);
+      }
+      await keys.store(id as never, key);
       completion.invalidateProvider();
-      void vscode.window.showInformationMessage(t("Hivey Code: {0} key stored in the keychain.", provider.label));
+      void vscode.window.showInformationMessage(
+        check.ok
+          ? t("{0} is ready. {1}", vendorInfo?.label ?? id, check.models ? t("{0} models available.", check.models) : t("The key works."))
+          : t("{0} key stored, unverified.", vendorInfo?.label ?? id),
+      );
     }),
 
     vscode.commands.registerCommand("hiveyCode.exportSession", () => chat.exportSession()),
@@ -198,7 +515,29 @@ export function activate(context: vscode.ExtensionContext): void {
         .update("language", picked.id, vscode.ConfigurationTarget.Global);
       applyLanguage();
       chat.reload();
-      void vscode.window.showInformationMessage(t("Language changed. Reopen a panel if a title still shows the old one."));
+      // ⚠️ One honest limit, stated rather than papered over. The command palette entries and the
+      // settings page come from `package.nls.*.json`, which VS CODE resolves from its OWN display
+      // language — an extension cannot override that, for any setting it invents. Everything the
+      // extension draws itself does follow this choice; those two surfaces follow the editor.
+      //
+      // Saying so is the whole point: somebody who picks French, sees the panel turn French and the
+      // command palette stay English concludes the setting is broken. It is not, and the one thing
+      // that would change it is a command the editor owns.
+      const mismatch = picked.id !== "auto" && !vscode.env.language.toLowerCase().startsWith(picked.id);
+      if (!mismatch) {
+        void vscode.window.showInformationMessage(t("Language changed."));
+        return;
+      }
+      const change = t("Change VS Code's language");
+      const answer = await vscode.window.showInformationMessage(
+        t("Hivey Code is now in {0}.", picked.label),
+        {
+          modal: false,
+          detail: t("The command palette entries and the settings page follow VS Code's own display language, which an extension cannot change."),
+        },
+        change,
+      );
+      if (answer === change) await vscode.commands.executeCommand("workbench.action.configureLocale");
     }),
 
     vscode.commands.registerCommand("hiveyCode.openSettings", () =>
@@ -259,6 +598,49 @@ export function activate(context: vscode.ExtensionContext): void {
       if (uri) await vscode.window.showTextDocument(uri);
     }),
 
+    /**
+     * Pick which microphone dictation listens to.
+     *
+     * ⚠️ It exists because of a machine with several inputs, where the default was not the one being
+     * spoken into: "his mic didn't hear anything". Nothing was broken — the recorder took what the
+     * system calls the default, recorded a perfectly valid file of silence, and the failure surfaced
+     * three steps later as a transcriber's complaint about a temporary path.
+     */
+    vscode.commands.registerCommand("hiveyCode.chooseMicrophone", async () => {
+      const found = findRecorder(process.platform);
+      if (!found) {
+        void vscode.window.showWarningMessage(
+          t("Nothing on this machine can record yet — press the microphone in the panel and it will offer to install one."),
+        );
+        return;
+      }
+      if (!found.devices) {
+        // ⚠️ Said plainly rather than offering a list that cannot be acted on. Windows' built-in
+        // recorder opens the WAVE_MAPPER, and the WAVE_MAPPER IS the Windows default input.
+        //
+        // ⚠️⚠️ And the likeliest reason to be reading this with ffmpeg already installed is named,
+        // because it was reported exactly that way: a program installed after the editor started is
+        // not on the editor's PATH, and the window has to be reloaded before it is. A message that
+        // tells somebody to install what they have just installed is a message that wastes their
+        // afternoon.
+        const answer = await vscode.window.showInformationMessage(
+          t("{0} always records from the system's default input, which Windows sets — it cannot be told which microphone to use.", found.program),
+          { modal: false, detail: t("If you have just installed ffmpeg, this window has not seen it yet: reload and it will be used instead.") },
+          t("Reload the window"),
+        );
+        if (answer) await vscode.commands.executeCommand("workbench.action.reloadWindow");
+        return;
+      }
+      const devices = inputDevices(found.devices);
+      if (!devices.length) {
+        void vscode.window.showWarningMessage(t("{0} listed no inputs on this machine.", found.program));
+        return;
+      }
+      // No "system default" on DirectShow: it has no device by that name, and offering it was
+      // offering "Error opening input file audio=default".
+      await pickMicrophone(devices, found.devices !== "dshow");
+    }),
+
     vscode.commands.registerCommand("hiveyCode.setup", async () => {
       await chat.reveal();
       chat.openSetup();
@@ -311,7 +693,7 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
 
     vscode.commands.registerCommand("hiveyCode.clearApiKey", async () => {
-      const provider = await vscode.window.showQuickPick(["openrouter", "anthropic", "openai-compatible", "local"], {
+      const provider = await vscode.window.showQuickPick([...REMOTE_VENDORS.map((v) => v.id), "local"], {
         placeHolder: t("Which key to clear?"),
       });
       if (!provider) return;
@@ -360,12 +742,60 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("hiveyCode.showEgress", () => showEgressReport(gate, readSettings())),
     vscode.commands.registerCommand("hiveyCode.showCosts", () => showCostReport(gate, readSettings())),
 
+    /**
+     * The log, out of the editor and into whatever collects logs here.
+     *
+     * A tamper-evident log that only exists on the machine being audited is half a control: the
+     * copy that matters is the one somewhere the person being audited cannot reach. The hash and
+     * the link go out with each line, so the copy in the SIEM can be checked against the copy here.
+     */
+    vscode.commands.registerCommand("hiveyCode.exportAudit", async () => {
+      const rows = gate.ledger();
+      if (!rows.length) {
+        void vscode.window.showInformationMessage(t("Nothing has left this machine yet, so there is nothing to export."));
+        return;
+      }
+      const format = await vscode.window.showQuickPick(
+        [
+          { label: "JSONL", detail: t("One JSON object per line — Splunk, Elastic, Loki, jq") },
+          { label: "syslog", detail: t("RFC 5424 with structured data") },
+        ],
+        { placeHolder: t("Which format?") },
+      );
+      if (!format) return;
+      const chained = rows as unknown as Array<Record<string, unknown> & Chained>;
+      const body =
+        format.label === "JSONL"
+          ? toJsonl(chained)
+          : toSyslog(chained, { host: vscode.env.machineId.slice(0, 12) || "workstation" });
+      const doc = await vscode.workspace.openTextDocument({
+        content: body,
+        language: format.label === "JSONL" ? "json" : "log",
+      });
+      await vscode.window.showTextDocument(doc);
+    }),
+
+    vscode.commands.registerCommand("hiveyCode.verifyAudit", () => {
+      const verdict = gate.verifyLedger();
+      if (verdict.ok) {
+        void vscode.window.showInformationMessage(
+          t("The egress log holds: {0} entries, each linked to the one before it.", verdict.checked),
+        );
+        return;
+      }
+      // Named rather than vague. "The log is invalid" sends somebody looking through five hundred
+      // rows; a sequence number and a reason sends them to one.
+      void vscode.window.showWarningMessage(
+        t("The egress log does not hold at entry {0} ({1}). It has been altered since it was written.", verdict.brokenAt ?? 0, verdict.reason ?? ""),
+      );
+    }),
+
     vscode.commands.registerCommand("hiveyCode.indexWorkspace", async () => {
       await vscode.window.withProgress(
         { location: vscode.ProgressLocation.Notification, title: t("Hivey Code: mapping the repository…") },
         async () => {
           workspace.invalidate();
-          const map = await workspace.repoMap(readSettings().context.maxTokens, true);
+          const map = await workspace.repoMap(contextBudget(readSettings().context.maxTokens, 0), true);
           void vscode.window.showInformationMessage(
             map
               ? t("Repository map: {0} files, {1} omitted (token budget).", map.files, map.omitted)
@@ -381,7 +811,7 @@ export function activate(context: vscode.ExtensionContext): void {
   // Quick fixes are registered for every file: the diagnostics come from whichever language server
   // the user already has, so there is no list of supported languages to keep up to date.
   context.subscriptions.push(
-    vscode.languages.registerCodeActionsProvider({ pattern: "**" }, new HiveyCodeActions(), {
+    vscode.languages.registerCodeActionsProvider({ pattern: "**" }, new HiveyCodeActions(nextEdit), {
       providedCodeActionKinds: HiveyCodeActions.kinds,
     }),
   );
@@ -411,7 +841,7 @@ async function announce(context: vscode.ExtensionContext, log: vscode.OutputChan
     local
       ? t("Hivey Code is active. Everything stays on your machine: completion and chat talk to your local server.")
       : t(
-          "Hivey Code is active. Chat uses {0}; what leaves is pseudonymised and will be shown to you before the first request.",
+          "Hivey Code is active. Chat uses {0}; what leaves is pseudonymized and will be shown to you before the first request.",
           safeHost(chatUrl),
         ),
     t("Open the settings"),

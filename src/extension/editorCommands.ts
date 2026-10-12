@@ -6,15 +6,17 @@
 // the user is having in the sidebar.
 
 import * as vscode from "vscode";
-import { t } from "../shared/i18n.js";
+import { en, t } from "../shared/i18n.js";
 import { runTurn } from "../core/agent/loop.js";
 import { isLocalEndpoint, redact, Vault } from "../core/redaction/index.js";
 import { headToTokens } from "../core/util/tokens.js";
 import type { ChatViewProvider } from "./chat.js";
 import { endpointFor, providerFor, readSettings, redactionPolicy, type Keys } from "./config.js";
+import { attachmentTokens } from "./budgets.js";
 import { COMMIT_PROMPT, INLINE_EDIT_PROMPT } from "../core/prompts.js";
 import { relative, type WorkspaceContext } from "./workspace.js";
 import { selectionActions, type SelectionAction } from "../core/agent/selection.js";
+import { hiveyModel, isHivey } from "../core/router/hivey.js";
 
 export interface EditorDeps {
   chat: ChatViewProvider;
@@ -27,7 +29,7 @@ export interface EditorDeps {
 export function registerEditorCommands(context: vscode.ExtensionContext, deps: EditorDeps): void {
   context.subscriptions.push(
     vscode.commands.registerCommand("hiveyCode.askAboutSelection", async () => {
-      const item = deps.workspace.activeContext();
+      const item = deps.workspace.activeContext(attachmentTokens(readSettings()));
       const question = await vscode.window.showInputBox({
         prompt: t("What do you want to know about this selection?"),
         placeHolder: t("Explain what this code does / find the bug / write a test"),
@@ -63,7 +65,7 @@ export function registerEditorCommands(context: vscode.ExtensionContext, deps: E
       }
       const message = await vscode.window.withProgress(
         { location: vscode.ProgressLocation.SourceControl, title: t("Hivey Code: commit message…") },
-        () => oneShot(deps, COMMIT_PROMPT, headToTokens(diff, 6000)),
+        () => oneShot(deps, COMMIT_PROMPT, headToTokens(diff, attachmentTokens(readSettings()))),
       );
       if (message) repo.inputBox.value = stripFence(message).trim();
     }),
@@ -105,7 +107,7 @@ export function registerEditorCommands(context: vscode.ExtensionContext, deps: E
       const doc = await vscode.workspace.openTextDocument(uri);
       const start = Math.max(0, diagnostic.range.start.line - 5);
       const end = Math.min(doc.lineCount - 1, diagnostic.range.end.line + 5);
-      await deps.chat.focusWithPrompt(t("Explain this problem and propose the fix: “{0}”", diagnostic.message), {
+      await deps.chat.focusWithPrompt(en("Explain this problem and propose the fix: “{0}”", diagnostic.message), {
         kind: "diagnostic",
         label: `${relative(uri)}:${diagnostic.range.start.line + 1}`,
         body: doc.getText(new vscode.Range(start, 0, end, doc.lineAt(end).text.length)),
@@ -114,7 +116,7 @@ export function registerEditorCommands(context: vscode.ExtensionContext, deps: E
     }),
 
     vscode.commands.registerCommand("hiveyCode.askWith", async (instruction: string) => {
-      await deps.chat.focusWithPrompt(instruction, deps.workspace.activeContext());
+      await deps.chat.focusWithPrompt(instruction, deps.workspace.activeContext(attachmentTokens(readSettings())));
     }),
 
     vscode.commands.registerCommand("hiveyCode.explainTerminalSelection", async () => {
@@ -123,10 +125,10 @@ export function registerEditorCommands(context: vscode.ExtensionContext, deps: E
         void vscode.window.showWarningMessage(t("Select some text in the terminal first."));
         return;
       }
-      await deps.chat.focusWithPrompt(t("Explain this terminal output and propose the fix."), {
+      await deps.chat.focusWithPrompt(en("Explain this terminal output and propose the fix."), {
         kind: "terminal",
         label: t("terminal output"),
-        body: headToTokens(selection, 3000),
+        body: headToTokens(selection, attachmentTokens(readSettings())),
         untrusted: true,
       });
     }),
@@ -182,7 +184,7 @@ async function selectionMenu(deps: EditorDeps): Promise<void> {
   const action = picked.action;
   if (!action) return;
   if (action.where === "file") await rewriteSelection(deps, action.instruction);
-  else await deps.chat.focusWithPrompt(action.instruction, deps.workspace.activeContext());
+  else await deps.chat.focusWithPrompt(action.instruction, deps.workspace.activeContext(attachmentTokens(readSettings())));
 }
 
 /**
@@ -233,7 +235,10 @@ async function rewriteSelection(deps: EditorDeps, fixed?: string): Promise<void>
  */
 async function oneShot(deps: EditorDeps, system: string, user: string, token?: vscode.CancellationToken): Promise<string | undefined> {
   const settings = readSettings();
-  const id = settings.chat.provider;
+  // A preset resolves to the model that answers an ordinary turn, and to the catalogue that serves
+  // it. Rewriting a selection is an ordinary turn that happens to have no transcript around it.
+  const model = hiveyModel(settings.chat.model, "everyday");
+  const id = isHivey(settings.chat.model) ? "openrouter" : settings.chat.provider;
   try {
     const baseUrl = endpointFor(settings, id);
     const isLocal = isLocalEndpoint(baseUrl);
@@ -246,13 +251,15 @@ async function oneShot(deps: EditorDeps, system: string, user: string, token?: v
 
     const result = await runTurn({
       provider,
-      model: settings.chat.model,
+      model,
       messages: [
         { role: "system", content: system, cacheable: true },
         { role: "user", content: payload },
       ],
       maxTokens: 2048,
       temperature: 0.2,
+      // A commit message is a chore: no thinking on a self-hosted server. See `ChatRequest.chore`.
+      chore: true,
       signal: ctl.signal,
       afterResponse: (t) => vault.restore(t),
     });

@@ -1,0 +1,7 @@
+{
+  "title": "A record-at-a-time loop that should be one query",
+  "kind": "ibmi",
+  "prompt": "BALRPT.sqlrpgle walks CUSTMAST with SETLL and READE and adds up the balances of one branch, one record at a time. Replace the native I/O with embedded SQL: a cursor over the rows that matter, fetched in a loop, with SQLCODE checked after every statement and the cursor closed on every path. Keep the same total.",
+  "check": "! codeonly BALRPT.sqlrpgle | grep -qiE '\\b(setll|reade|chain|read) +' && codeonly BALRPT.sqlrpgle | grep -qiE 'declare +[a-z0-9_]+ +cursor' && codeonly BALRPT.sqlrpgle | grep -qiE 'exec +sql +(open|fetch)' && codeonly BALRPT.sqlrpgle | grep -qiE 'exec +sql +close' && [ $(codeonly BALRPT.sqlrpgle | grep -ciE 'sqlcode|sqlstt') -ge 2 ] && codeonly BALRPT.sqlrpgle | grep -qi 'branch'",
+  "timeoutMs": 180000
+}

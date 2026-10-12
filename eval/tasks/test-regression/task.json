@@ -1,0 +1,7 @@
+{
+  "title": "Write the test that reproduces a bug, then fix it",
+  "kind": "test",
+  "prompt": "slugify turns 'Crème brûlée' into 'crme-brle'. Add a test to slug.test.js that reproduces this, then fix slugify so accented letters become their unaccented equivalent. Both existing and new tests must pass.",
+  "check": "node --test && node -e \"import('./slug.js').then(m=>{if(m.slugify('Crème brûlée')!=='creme-brulee'){console.error('got '+m.slugify('Crème brûlée'));process.exit(1)}})\"",
+  "timeoutMs": 180000
+}

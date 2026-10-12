@@ -1,0 +1,7 @@
+{
+  "title": "Write the missing tests",
+  "kind": "test",
+  "prompt": "vat.js has no tests. Write test file vat.test.js using node:test covering: the standard rate, the reduced rate, a zero amount, and a negative amount (which must throw). Then run the tests and make sure they pass.",
+  "check": "node --test && [ $(codeonly vat.test.js | grep -c 'test(') -ge 4 ]",
+  "timeoutMs": 180000
+}

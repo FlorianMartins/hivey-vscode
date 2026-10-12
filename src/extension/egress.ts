@@ -6,7 +6,7 @@
 //
 // The gate does four things, in this order, because each one can stop the next:
 //   1. BLOCK  — a path matching a blocked glob is not sent, at all, whatever else is configured.
-//   2. REDACT — reversible pseudonymisation of everything else.
+//   2. REDACT — reversible pseudonymization of everything else.
 //   3. REFUSE — a credential that survives redaction stops the request. Redaction removes it, so
 //               reaching this point means something was shaped like a secret and could not be
 //               replaced safely; sending it anyway is not a choice worth offering.
@@ -23,7 +23,11 @@ import type { ChatMessage } from "../core/providers/types.js";
 import { Budget, type SpendStore, type Spend } from "../core/router/budget.js";
 import { isBlockedPath, matchGlob } from "../core/util/glob.js";
 import { estimateMessageTokens } from "../core/util/tokens.js";
-import { redactionPolicy, type Settings } from "./config.js";
+import { redactionPolicy, trustsSelfHosted, type Settings } from "./config.js";
+import { link, verifyChain, type Chained, type ChainVerdict } from "../core/audit/chain.js";
+
+/** A ledger row: what was sent, plus its place in the chain. */
+export type LedgerEntry = EgressRecord & Chained;
 
 export interface EgressRecord {
   at: number;
@@ -37,6 +41,15 @@ export interface EgressRecord {
   redactions: number;
   /** Kinds only — `EMAIL x3, HOST x1` — never the values. */
   redactionSummary: string;
+  /**
+   * How many images went with it, when any did.
+   *
+   * The one thing in a request that the redaction count says nothing about: an image cannot be
+   * pseudonymized, so a row reading "0 redactions" on a turn that sent a screenshot would be true
+   * and misleading. Absent rather than zero on the ordinary turn, so the log does not grow a column
+   * of noughts.
+   */
+  images?: number;
 }
 
 const LEDGER_KEY = "hiveyCode.egress.ledger";
@@ -85,8 +98,10 @@ export class EgressGate {
     vault = new Vault(),
   ): Promise<PreparedRequest | undefined> {
     // Local endpoints skip the whole gate: redacting text that never leaves the machine costs
-    // answer quality and buys nothing.
-    if (target.isLocal) {
+    // answer quality and buys nothing. So do the self-hosted ones — the local endpoint and the
+    // user's own gateway, whatever their address — unless that trust is switched off or a policy
+    // forbids it: see `trustsSelfHosted`.
+    if (target.isLocal || trustsSelfHosted(settings, target.provider)) {
       return { messages, vault, findings: [], estimatedTokens: estimateMessageTokens(messages) };
     }
 
@@ -125,7 +140,7 @@ export class EgressGate {
       return true;
     }
 
-    const summary = summarise(findings);
+    const summary = summarize(findings);
     // Asked in the conversation rather than in a modal over the editor. The consent itself is not
     // negotiable — it is the whole privacy argument — but a modal at the moment of sending stops
     // the world for a question about a routine action, and a question that stops the world gets
@@ -133,7 +148,7 @@ export class EgressGate {
     const answer = this.ask
       ? await this.ask({
           description: t("Send ~{0} tokens to {1} ({2})?", tokens, host, target.model),
-          detail: [summary ? t("Pseudonymised: {0}.", summary) : t("No sensitive data detected.")],
+          detail: [summary ? t("Pseudonymized: {0}.", summary) : t("No sensitive data detected.")],
         })
       : "no";
     if (answer === "no") return false;
@@ -163,16 +178,53 @@ export class EgressGate {
   ask?: (request: { description: string; detail: string[] }) => Promise<"once" | "always" | "no">;
 
   /** Called after a remote call completed. */
+  /**
+   * Append one request to the ledger, linked to the one before it.
+   *
+   * The link is what turns "here is what we logged" into "here is what we logged, and you can tell
+   * whether anybody changed it" — see `core/audit/chain.ts`. It costs one hash per remote request,
+   * which is nothing next to the request itself.
+   */
+  /**
+   * Where a ledger row goes next, when the organisation ships its audit stream.
+   *
+   * A property rather than a constructor argument because the gate is built before the shipper —
+   * and because this must stay optional: on an unmanaged machine nothing is listening, and that is
+   * the default rather than a configuration.
+   */
+  onRecord?: (row: Record<string, unknown>) => void;
+
   record(entry: EgressRecord, settings: Settings): void {
     this.budget.record(entry.usd);
     if (!settings.privacy.auditLog) return;
-    const ledger = this.state.get<EgressRecord[]>(LEDGER_KEY, []);
-    ledger.unshift(entry);
+    const ledger = this.state.get<LedgerEntry[]>(LEDGER_KEY, []);
+    // Stored newest first, so the previous entry — the one this one links to — is at the front.
+    const linked = link(entry as unknown as Record<string, unknown>, ledger[0]) as unknown as LedgerEntry;
+    ledger.unshift(linked);
     void this.state.update(LEDGER_KEY, ledger.slice(0, LEDGER_MAX));
+    // And out to the organisation's collector, when there is one. Offered rather than sent: the
+    // shipper owns the decision, the queue and the transport, and a collector that is down must
+    // never be able to fail a request that has already happened.
+    try {
+      this.onRecord?.(linked as unknown as Record<string, unknown>);
+    } catch {
+      /* a log shipper may not break the thing it is logging */
+    }
   }
 
-  ledger(): EgressRecord[] {
-    return this.state.get<EgressRecord[]>(LEDGER_KEY, []);
+  ledger(): LedgerEntry[] {
+    return this.state.get<LedgerEntry[]>(LEDGER_KEY, []);
+  }
+
+  /**
+   * Does the ledger still hold together?
+   *
+   * Answered on demand rather than continuously: it is the question somebody asks when they are
+   * about to rely on the log, and hashing five hundred records to draw a report nobody is reading
+   * would be work for nothing.
+   */
+  verifyLedger(): ChainVerdict {
+    return verifyChain(this.ledger() as unknown as Array<Record<string, unknown> & Chained>);
   }
 
   clearLedger(): void {
@@ -185,7 +237,7 @@ export class EgressGate {
   }
 }
 
-export function summarise(findings: Finding[]): string {
+export function summarize(findings: Finding[]): string {
   if (!findings.length) return "";
   const counts = new Map<string, number>();
   for (const f of findings) {

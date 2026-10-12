@@ -1,0 +1,7 @@
+{
+  "title": "A logical file that reads the whole physical",
+  "kind": "ibmi",
+  "prompt": "CUSTL1.lf is meant to give the active customers of one branch, keyed by name, and it currently keys on nothing and selects nothing. Key it on BRANCH then CUSNAM, select only the records whose STATUS is 'A', and expose only CUSNO, CUSNAM, BRANCH and STATUS. Keep the DDS in fixed format.",
+  "check": "grep -qE '^     A' CUSTL1.lf && codeonly CUSTL1.lf | grep -qE '^     A +K +BRANCH' && codeonly CUSTL1.lf | grep -qE '^     A +K +CUSNAM' && codeonly CUSTL1.lf | grep -qiE 'S +STATUS' && codeonly CUSTL1.lf | grep -qiE \"COMP\\\\(EQ +'A'\\\\)\" && codeonly CUSTL1.lf | grep -qE '^     A +CUSNO' && ! codeonly CUSTL1.lf | grep -qiE 'CUSBAL'",
+  "timeoutMs": 180000
+}

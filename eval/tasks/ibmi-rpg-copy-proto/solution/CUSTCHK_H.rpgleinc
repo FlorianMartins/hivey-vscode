@@ -1,0 +1,10 @@
+// Prototype for CUSTCHK — the customer credit check.
+//
+// In a copybook rather than in each caller, so that one change to the program's parameters is one
+// change here and a compile error in every caller that has not caught up. That compile error is the
+// whole point of a prototype.
+dcl-pr CustomerCheck extpgm('CUSTCHK');
+  custno char(10) const;
+  status char(1);
+  credit packed(11:2);
+end-pr;

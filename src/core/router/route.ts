@@ -17,6 +17,7 @@
 // either applies (policy `auto`), asks about (`ask`), or ignores (`never`).
 
 import type { ProviderId } from "../providers/index.js";
+import { hiveyLabel, hiveyModel, hiveyRole, isHivey } from "./hivey.js";
 
 export type TaskKind = "completion" | "chat" | "agent" | "aux" | "embed";
 export type EscalationPolicy = "never" | "ask" | "auto";
@@ -51,11 +52,43 @@ export interface Route {
 
 // Signals that a request is beyond a small local model. Deliberately conservative: the failure
 // mode of escalating too eagerly is a bill, and the whole point of this project is not to have one.
+/**
+ * What makes a question worth the strong model.
+ *
+ * In BOTH languages the product speaks, and that is not a nicety. These patterns decide which model
+ * a Hivey preset answers with: match, and the question goes to `deep`; miss, and it goes to
+ * `everyday`. They were written in English only, so every hard question asked in French — "pourquoi
+ * est-ce que ça plante", "revue de sécurité", "fuite mémoire", "condition de course" — was graded as
+ * an ordinary turn and answered by the cheap model. The user got vaguer answers than the preset
+ * promised, for a reason that was invisible: the routing was right about a question it had not
+ * understood.
+ *
+ * Anything added here must be added in both languages, or it reintroduces exactly that.
+ */
 const HARD_SIGNALS: Array<[RegExp, string]> = [
-  [/\b(architecture|refactor(?:ing)?\s+(?:the|all|across)|migrat(?:e|ion)\s+(?:the|all)|redesign)\b/i, "cross-cutting change"],
+  [
+    /\b(architecture|refactor(?:ing)?\s+(?:the|all|across)|migrat(?:e|ion)\s+(?:the|all)|redesign)\b/i,
+    "cross-cutting change",
+  ],
+  [
+    /(?<!\p{L})(architecture|refonte|refactor(?:er|isation)?\s+(?:tout|toute|l'ensemble|le projet)|migr(?:er|ation)\s+(?:tout|toute|l'ensemble|le projet)|conception)(?!\p{L})/iu,
+    "cross-cutting change",
+  ],
   [/\b(why does|why is|root cause|race condition|deadlock|memory leak|heisenbug)\b/i, "diagnosis rather than transformation"],
+  [
+    /(?<!\p{L})(pourquoi|cause\s+racine|d['’]où\s+vient|condition\s+de\s+course|interblocage|fuite\s+(?:de\s+)?mémoire|concurrence)(?!\p{L})/iu,
+    "diagnosis rather than transformation",
+  ],
   [/\b(threat model|security review|audit|vulnerab)/i, "security reasoning"],
+  [
+    /(?<!\p{L})(modèle\s+de\s+menace|revue\s+de\s+sécurité|audit|vulnérab|faille|sécuriser)/iu,
+    "security reasoning",
+  ],
   [/\b(prove|invariant|complexity analysis|algorithm design)\b/i, "formal reasoning"],
+  [
+    /(?<!\p{L})(démontrer|démontre|preuve|invariant|complexité|conception\s+d['’]algorithme|algorithmique)(?!\p{L})/iu,
+    "formal reasoning",
+  ],
 ];
 
 export function classifyComplexity(prompt: string, promptTokens: number, localContextTokens: number): {
@@ -75,7 +108,17 @@ export function route(cfg: RouterConfig, input: RouteInput): Route {
   if (input.kind === "completion" || input.kind === "aux" || input.kind === "embed") {
     const p = input.kind === "completion" ? cfg.completion : { provider: cfg.completion.provider, model: cfg.completion.model };
     const provider = (p.provider === "off" ? "local" : p.provider) as ProviderId;
+    if (isHivey(p.model)) return preset(p.model, input.kind);
     return { provider, model: p.model, why: `${input.kind} never escalates: it is the high-frequency traffic` };
+  }
+
+  // A preset settles provider and model together, so none of the escalation logic below applies:
+  // there is no local model to be beyond, and nothing to ask permission to escalate to. What
+  // decides is the kind of work, and — for a chat turn — the same complexity grade the escalation
+  // path uses, so "hard" means one thing in this file rather than two.
+  if (isHivey(cfg.chat.model)) {
+    const { level } = classifyComplexity(input.prompt ?? "", input.promptTokens, cfg.localContextTokens);
+    return preset(cfg.chat.model, input.kind, input.forceRemote ? "hard" : level);
   }
 
   const base: Route = { provider: cfg.chat.provider, model: cfg.chat.model, why: "configured chat model" };
@@ -92,4 +135,43 @@ export function route(cfg: RouterConfig, input: RouteInput): Route {
     return { provider: cfg.escalateTo.provider, model: cfg.escalateTo.model, why: `escalated: ${why}` };
   }
   return { ...base, suggestEscalation: { ...cfg.escalateTo, why } };
+}
+
+/**
+ * A Hivey preset, resolved to the model that actually answers.
+ *
+ * The `why` names both the preset and the role, because those are the two facts a user needs to
+ * check the bill against: not "Hivey Pro" alone, which explains no single request, and not the
+ * model alone, which does not say why THAT model. Presets are reached through OpenRouter — that is
+ * where the catalogue they are curated from lives.
+ */
+function preset(model: string, kind: TaskKind, level?: Complexity): Route {
+  const role = hiveyRole(kind, level);
+  return {
+    provider: "openrouter",
+    model: hiveyModel(model, role),
+    why: `${hiveyLabel(model)}: ${role}`,
+  };
+}
+
+/**
+ * Where a proven failure goes next, or nowhere.
+ *
+ * Two sources, in order. An explicitly configured escalation model is the user's own answer to
+ * "what should take over", and it wins. Failing that, a Hivey preset already contains one: the
+ * `deep` role is the model the preset keeps for hard work, so a failed everyday turn has somewhere
+ * to go without anyone configuring anything.
+ *
+ * Returns nothing when the model that just failed IS the target — retrying the same model on the
+ * same evidence buys a second identical answer at full price.
+ */
+export function escalationTarget(cfg: RouterConfig, used: { provider: ProviderId; model: string }): { provider: ProviderId; model: string } | undefined {
+  if (cfg.escalateTo?.model && cfg.escalateTo.model !== used.model) {
+    return { provider: cfg.escalateTo.provider, model: cfg.escalateTo.model };
+  }
+  if (isHivey(cfg.chat.model)) {
+    const deep = hiveyModel(cfg.chat.model, "deep");
+    if (deep !== used.model) return { provider: "openrouter", model: deep };
+  }
+  return undefined;
 }

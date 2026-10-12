@@ -1,0 +1,7 @@
+{
+  "title": "A crash on missing data",
+  "kind": "bug",
+  "prompt": "formatAddress throws when a customer has no address. It should return an empty string instead. Make the tests pass.",
+  "check": "node --test",
+  "timeoutMs": 180000
+}

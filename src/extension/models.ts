@@ -1,22 +1,62 @@
 // The model list the picker shows.
 //
-// Two sources, merged: the generated catalogue (411 models with prices and context windows, no
-// network) and whatever the configured endpoint actually serves. The second matters more than it
-// sounds — a team running vLLM has three models with names nobody outside knows, and a catalogue
-// that cannot show them is a catalogue nobody uses.
+// Two sources, merged: the generated catalogue (four hundred-odd models with prices and context
+// windows, no network) and whatever the configured endpoint actually serves. The second matters
+// more than it sounds — a team running vLLM has three models with names nobody outside knows, and a
+// catalogue that cannot show them is a catalogue nobody uses.
 
 import * as vscode from "vscode";
 import { t } from "../shared/i18n.js";
 import { GENERATED_MODELS } from "../core/router/catalog.generated.js";
+import { catalogueWindow } from "../core/router/window.js";
+import { canReason } from "../core/router/reasoning.js";
+import { offerable } from "../core/models/offer.js";
 import { isLocalEndpoint, isLoopbackEndpoint } from "../core/redaction/index.js";
 import { discoverLocal, rankModels } from "../core/providers/discover.js";
 import { request } from "../core/util/http.js";
 import type { UiModel } from "../shared/protocol.js";
 import { endpointFor, providerFor, type Keys, type Settings } from "./config.js";
+import { DIRECT_VENDORS, type ProviderId } from "../core/providers/vendors.js";
 import { shortModelName } from "../core/models/names.js";
+import { hiveyLabel, hiveyModel, hiveyRoles, HIVEY_VARIANTS, isHivey } from "../core/router/hivey.js";
+
+/**
+ * The generated catalogue, indexed by id — for the rows that describe a model without listing it.
+ *
+ * Bare ids are aliased the way `GENERATED_PRICES` aliases them: the catalogue is OpenRouter's, so
+ * it calls a model `openai/gpt-5` where OpenAI's own API calls it `gpt-5`, and a row listed from a
+ * vendor's own endpoint would otherwise show a blank context and a price of zero — which reads as
+ * "free" on a model that is not.
+ */
+function catalogue(): Map<string, { context: number; inUsd: number; outUsd: number; cachedInUsd: number }> {
+  const map = new Map<string, { context: number; inUsd: number; outUsd: number; cachedInUsd: number }>();
+  for (const [id, , , context, inUsd, outUsd, cachedInUsd] of GENERATED_MODELS) {
+    map.set(id, { context, inUsd, outUsd, cachedInUsd });
+  }
+  for (const [id, , , context, inUsd, outUsd, cachedInUsd] of GENERATED_MODELS) {
+    const bare = id.includes("/") ? id.slice(id.indexOf("/") + 1) : undefined;
+    if (bare && !map.has(bare)) map.set(bare, { context, inUsd, outUsd, cachedInUsd });
+  }
+  return map;
+}
+
+/**
+ * The window a model is known to have, from the generated catalogue alone.
+ *
+ * Needed because the live list is not always there. It is fetched per provider, it fails silently
+ * when the endpoint is unreachable, and a vendor's own endpoint often answers with ids that carry
+ * no window at all — so anything derived from "the selected model's window" fell back to nothing
+ * and, through `contextBudget`, to the old flat floor. The symptom is not an error: it is an
+ * attachment quietly cut to a fraction of what the model could have read.
+ */
+export function contextWindow(id: string): number {
+  // The lookup is in `core/router/window.ts` so the terminal client can ask the same question and
+  // get the same answer. It had a constant instead, and the constant was wrong.
+  return catalogueWindow(id);
+}
 
 /** Models a provider is currently serving, or an empty list when it cannot be reached. */
-async function served(settings: Settings, keys: Keys, provider: Settings["chat"]["provider"]): Promise<string[]> {
+async function served(settings: Settings, keys: Keys, provider: ProviderId): Promise<string[]> {
   try {
     const p = await providerFor(settings, keys, provider);
     return await p.listModels();
@@ -66,9 +106,86 @@ async function localServers(settings: Settings): Promise<Array<{ name: string; b
   }
 }
 
+/**
+ * What the user's OWN sources are serving right now — every local runtime, plus the gateway.
+ *
+ * Ids only, and nothing else, because this is a signal rather than a list: it is asked on a timer
+ * to notice that somebody has pulled a model or added one to their proxy, and the moment it differs
+ * from what the picker holds the picker is rebuilt properly. Building the rows here as well would
+ * be a second assembly of the same thing, drifting from the first.
+ *
+ * Deliberately NOT the vendors. Those are network calls against somebody's account with a rate
+ * limit on it, and their catalogues do not change while you work — a model is added to OpenAI a few
+ * times a year, and to your Ollama several times an afternoon.
+ */
+export async function ownModelIds(settings: Settings, keys: Keys): Promise<string[]> {
+  const ids: string[] = [];
+  for (const server of await localServers(settings)) ids.push(...server.models);
+  if (safe(() => endpointFor(settings, "openai-compatible"))) {
+    ids.push(...(await served(settings, keys, "openai-compatible")));
+  }
+  return [...new Set(ids)].sort();
+}
+
 export async function listModels(settings: Settings, keys: Keys, current: string): Promise<UiModel[]> {
   const out: UiModel[] = [];
   const seen = new Set<string>();
+
+  // 0. The presets. Not models: each is a routing over the catalogue below, so that a chore is not
+  //    answered by the model kept for the hard question. They are listed first because choosing a
+  //    budget is an easier question than choosing among four hundred models, and it is the question
+  //    most people actually want to answer.
+  //
+  //    ⚠️⚠️ The figures used to be those of the model answering an ORDINARY turn, on the reasoning that
+  //    "the row cannot carry four prices, and that is the one a user meets most often". The reasoning
+  //    was sound and the result was indefensible: Hivey Smart and Hivey Pro came out at the SAME
+  //    price, because their two everyday models happen to charge the same $2/M to read. Reported as
+  // "how come the Hivey Pro and Hivey Smart models come out at the same price? Smart is supposed to
+  // use the best models".
+  //
+  //    The row now carries what is TRUE of the whole preset rather than one quarter of it:
+  //      • `inUsd`/`outUsd` — the DEAREST role, because that is what the preset can cost you and a
+  //        price must never quote the cheap tier and bill the expensive one;
+  //      • `context` — the SMALLEST role, because that is the window you can rely on everywhere, and
+  //        it is also the figure that separates the two presets honestly (Smart drops to 500 k on an
+  //        everyday turn; Pro does not);
+  //      • `roles` — all four, so the panel can show a span and name what actually differs.
+  const priced = catalogue();
+  for (const variant of HIVEY_VARIANTS) {
+    const roles = hiveyRoles(variant.id).map((r) => {
+      const p = priced.get(r.model);
+      return {
+        role: r.role,
+        model: r.model,
+        inUsd: p?.inUsd ?? 0,
+        outUsd: p?.outUsd ?? 0,
+        context: p?.context ?? 0,
+        ...(r.sameAsCheaper ? { sameAsCheaper: r.sameAsCheaper } : {}),
+      };
+    });
+    // A role the catalogue has never heard of reports a window of 0, and a minimum taken over a 0 is
+    // 0 — which reads as "unknown" on a preset where three roles are perfectly well known. Unknown
+    // windows are left out of the minimum rather than allowed to swallow it.
+    const windows = roles.map((r) => r.context).filter((c) => c > 0);
+    const everyday = priced.get(hiveyModel(variant.id, "everyday"));
+    out.push({
+      id: variant.id,
+      name: variant.label,
+      vendor: "hivey",
+      context: windows.length ? Math.min(...windows) : 0,
+      inUsd: Math.max(...roles.map((r) => r.inUsd)),
+      outUsd: Math.max(...roles.map((r) => r.outUsd)),
+      // The cache price is the one figure that only makes sense per model, and the prefix of a
+      // conversation is written by the role that answers it. The everyday one is the honest default.
+      cachedInUsd: everyday?.cachedInUsd ?? 0,
+      provider: "openrouter",
+      local: false,
+      loopback: false,
+      current: variant.id === current,
+      roles,
+    });
+    seen.add(variant.id);
+  }
 
   // 1. Everything running on this machine or this network. Always first: it is the free tier, and
   //    the argument this extension exists to make.
@@ -104,8 +221,16 @@ export async function listModels(settings: Settings, keys: Keys, current: string
   const gatewayUrl = safe(() => endpointFor(settings, "openai-compatible"));
   if (gatewayUrl) {
     for (const id of await served(settings, keys, "openai-compatible")) {
-      if (seen.has(id)) continue;
-      seen.add(id);
+      // Keyed by destination, like the direct vendors just below, and NOT by name alone.
+      //
+      // A gateway serving `qwen3-coder` and an Ollama on this machine serving `qwen3-coder` are two
+      // different places to send a question: a different machine, a different bill, a different
+      // window. Deduplicating by id alone let whichever came first — the local one, always — hide
+      // the other, so a proxy serving the same names as the laptop contributed nothing at all and
+      // looked broken.
+      const key = `${id}@gateway`;
+      if (seen.has(key)) continue;
+      seen.add(key);
       const local = isLocalEndpoint(gatewayUrl);
       out.push({
         id,
@@ -125,7 +250,47 @@ export async function listModels(settings: Settings, keys: Keys, current: string
     }
   }
 
-  // 3. The priced catalogue. No request: it ships with the extension and refreshes by workflow.
+  // 3. The vendors the user pays directly, each one asked what it serves.
+  //
+  //    Asked rather than assumed, and asked of nobody who has not stored a key: hard-coding a
+  //    vendor's model names is the mistake this project made once already — an id written by hand
+  //    answers 404 within weeks of the vendor renaming it, and a picker full of dead names is worse
+  //    than an empty one. What a key buys is precisely the right to ask.
+  //
+  //    A vendor that serves no listing (Perplexity has no /models) contributes nothing here and its
+  //    models are still reachable: the catalogue below names them, and choosing one keeps the
+  //    provider it is chosen under.
+  const direct = await Promise.all(
+    DIRECT_VENDORS.map(async (v) => {
+      if (!(await keys.get(v.id))) return { vendor: v, models: [] as string[] };
+      return { vendor: v, models: await served(settings, keys, v.id) };
+    }),
+  );
+  for (const { vendor, models } of direct) {
+    for (const id of models) {
+      const key = `${id}@${vendor.id}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const known = priced.get(id);
+      out.push({
+        id,
+        name: id,
+        vendor: vendor.label,
+        context: known?.context ?? 0,
+        inUsd: known?.inUsd ?? 0,
+        outUsd: known?.outUsd ?? 0,
+        cachedInUsd: known?.cachedInUsd ?? 0,
+        provider: vendor.id,
+        local: false,
+        loopback: false,
+        server: vendor.label,
+        baseUrl: settings.endpoints[vendor.id],
+        current: id === current && settings.chat.provider === vendor.id,
+      });
+    }
+  }
+
+  // 4. The priced catalogue. No request: it ships with the extension and refreshes by workflow.
   for (const [id, name, vendor, context, inUsd, outUsd, cachedInUsd] of GENERATED_MODELS) {
     if (seen.has(id)) continue;
     out.push({
@@ -143,11 +308,15 @@ export async function listModels(settings: Settings, keys: Keys, current: string
     });
   }
 
-  return out;
+  // Only what this installation can actually reach. See `core/models/offer.ts` — the catalogue and
+  // the presets both go through OpenRouter, and a user whose access is a private gateway was being
+  // shown four hundred models they had no way to send a question to.
+  return offerable(out, { openrouter: Boolean(await keys.get("openrouter")), provider: settings.chat.provider });
 }
 
 /** A short label for the composer button: the name without the vendor, plus a price hint. */
 export function labelFor(models: UiModel[], id: string): string {
+  if (isHivey(id)) return hiveyLabel(id);
   const found = models.find((m) => m.id === id);
   return shortModelName(found?.name ?? id);
 }
@@ -155,7 +324,10 @@ export function labelFor(models: UiModel[], id: string): string {
 
 /** Reasoning is only worth offering on models that actually do it. */
 export function supportsReasoning(id: string): boolean {
-  return /o[134]|gpt-5|claude|sonnet|opus|haiku|fable|deepseek|qwen3|reason|think|magistral|grok-[34]|gemini-[23]/i.test(id);
+  // The rule is in `core/router/reasoning.ts`, from the generated catalogue. It was a regular
+  // expression here naming versions, it matched `gpt-5`, the market moved to `gpt-6`, and the
+  // thinking control was hidden on the strongest model the product routes to.
+  return canReason(id);
 }
 
 function safe<T>(fn: () => T): T | undefined {

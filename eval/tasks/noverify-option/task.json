@@ -1,0 +1,7 @@
+{
+  "title": "A new configuration option",
+  "kind": "noverify",
+  "prompt": "Add a `retries` option to the configuration, a number, 3 by default.",
+  "check": "node demo.js | grep -qx '3 5'",
+  "timeoutMs": 180000
+}

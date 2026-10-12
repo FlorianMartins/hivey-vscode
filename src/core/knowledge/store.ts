@@ -59,12 +59,12 @@ export class HttpKnowledgeStore implements KnowledgeStore {
     const body = await this.json<unknown>("GET", "/notes");
     const rows = Array.isArray(body) ? body : (body as { notes?: unknown[] })?.notes;
     if (!Array.isArray(rows)) return [];
-    return rows.map((row) => normalise(row)).filter((note): note is KnowledgeNote => !!note);
+    return rows.map((row) => normalize(row)).filter((note): note is KnowledgeNote => !!note);
   }
 
   async read(id: string): Promise<KnowledgeNote | undefined> {
     const body = await this.json<unknown>("GET", `/notes/${encodeURIComponent(id)}`);
-    return normalise(body) ?? undefined;
+    return normalize(body) ?? undefined;
   }
 
   async write(note: KnowledgeNote): Promise<void> {
@@ -100,7 +100,7 @@ export class HttpKnowledgeStore implements KnowledgeStore {
  * the fields are coerced rather than trusted, and a row missing an id or a title is dropped instead
  * of being carried around half-formed.
  */
-function normalise(row: unknown): KnowledgeNote | undefined {
+function normalize(row: unknown): KnowledgeNote | undefined {
   if (!row || typeof row !== "object") return undefined;
   const r = row as Record<string, unknown>;
   const id = typeof r["id"] === "string" ? r["id"] : undefined;

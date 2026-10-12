@@ -29,7 +29,7 @@ choses possibles :
                       └───────────────────────┘
 ```
 
-## Les cinq idées
+## Les idées qui structurent le code
 
 ### 1. Le transcript n'est pas le prompt
 
@@ -69,13 +69,44 @@ Les permissions (`core/agent/permissions.ts`) sont la deuxième moitié : elles 
 **forme** de l'action, jamais sur une occurrence. Autoriser `npm test` n'autorise pas `npm publish`,
 et un refus l'emporte toujours sur une autorisation.
 
-### 4. Local d'abord, escalade consentie
+### 4. Local d'abord, escalade sur un échec **constaté**
 
-`core/router/route.ts`. La complétion, les embeddings et les corvées (titres, messages de commit)
-**ne s'escaladent jamais** : c'est le trafic fréquent, et c'est exactement ce qu'un modèle 7 B fait
-bien. Une question de discussion s'escalade sur un signal explicite (contexte plus grand que la
-fenêtre locale, ou classe de question que les petits modèles ratent) et selon une politique :
-`never`, `ask` (défaut), `auto`. **Le routeur ne dépense jamais de lui-même.**
+`core/router/route.ts` décide *avant*, `core/router/outcome.ts` décide *après*, et la seconde moitié
+est celle qui manquait.
+
+L'escalade a priori reste : la complétion, les embeddings et les corvées **ne s'escaladent jamais**
+— c'est le trafic fréquent, et c'est exactement ce qu'un modèle 7 B fait bien. Une question de
+discussion peut s'escalader sur un signal explicite (contexte plus grand que la fenêtre locale) et
+selon une politique `never` / `ask` / `auto`.
+
+Mais un pari pris sur la formulation d'une question se trompe dans les deux sens : il paie pour une
+question facile qui contient le mot « architecture », et il laisse en local une question difficile
+formulée simplement. Surtout, il n'apprend rien — rien ne pouvait constater que la tentative locale
+avait échoué, parce que jusqu'à la 0.39.0 l'éditeur ne savait pas lire la sortie d'une commande.
+
+`verifyTurn()` lit ce que le tour a **fait** : quelles commandes ont tourné, ce qu'ont dit les
+diagnostics, si le même appel a échoué trois fois de suite. Une seule subtilité, et elle est le
+cœur : la règle est « le **dernier** mot de chaque type de vérification ». Un agent qui lance les
+tests, les voit échouer, corrige et les relance a un échec dans sa trace et un dépôt qui marche —
+escalader là-dessus paierait un modèle distant pour refaire du travail fini, sur la majorité des
+tours réussis. Ce qui compte est l'état dans lequel le tour se termine.
+
+Quand l'échec est prouvé, le modèle distant reçoit le **diff de ce que la tentative a laissé sur le
+disque** et l'erreur produite. Sans cela il lit la version d'origine dans le transcript, réécrit le
+changement qui est déjà là, et annonce que c'est fait.
+
+### 4bis. Ce qui se passe quand personne ne répond
+
+`core/router/fallback.ts`. Un 429 terminait le tour — et le préréglage gratuit route justement vers
+des points d'accès gratuits *parce qu'ils* sont limités en débit. La requête descend maintenant une
+chaîne : le rôle moins cher du même préréglage, puis la machine. Deux règles l'empêchent d'être une
+façon de dépenser par accident : un repli est toujours **moins cher ou égal**, jamais vers un modèle
+que l'utilisateur n'a pas choisi, et il ne se déclenche que sur un échec qui veut dire « pas
+maintenant » (429, 5xx, socket morte). Un 400 veut dire que la requête est mauvaise, et l'envoyer
+ailleurs l'envoie deux fois.
+
+Il ne se déclenche pas non plus une fois qu'un mot est arrivé à l'écran : un tour qui a déjà diffusé
+une phrase ou lancé un outil ne peut pas être rejoué ailleurs sans répéter les deux.
 
 ### 5. Une carte, pas le territoire
 
@@ -85,8 +116,41 @@ tree-sitter coûte un binaire natif par plateforme ou un WASM, pour une carte do
 dire « il existe une fonction `parseInvoice` dans `billing/parse.ts` ». Dans VS Code, quand un
 serveur de langage a déjà ouvert le fichier, ses symboles sont préférés.
 
-Le classement met en tête le fichier édité, ses voisins de dossier, ce qu'il importe et ce qui
-l'importe, puis les fichiers ouverts et récemment modifiés.
+Le classement met en tête le fichier édité, ses voisins de dossier, ce qu'il importe, ce qui
+l'importe, ce que ses imports importent à leur tour, puis les fichiers ouverts et récemment
+modifiés — et surtout **ce que la question nomme**, chemins et symboles déclarés, derrière une liste
+de mots vides sans laquelle « corrige l'erreur dans ce fichier » promeut tous les fichiers à la fois.
+
+Le signal le plus fort était le seul à ne pas être utilisé : « le total de la facture est faux »
+était traité comme n'importe quelle question, et la réponse était classée autour de l'onglet ouvert.
+
+Le graphe d'imports, lui, ne s'était **jamais** déclenché sur ce dépôt : il comparait un
+spécificateur `./helper.js` à une racine de chemin `src/helper`, or dans un projet TypeScript ESM
+tout import finit en `.js` et tout fichier finit en `.ts`. Découvert en écrivant le test du
+classement au second degré, pas en relisant le code.
+
+### 5bis. Le préfixe est gelé, parce que le cache se paie à l'octet près
+
+`core/prompts.ts` (`stablePrompt` / `turnDirectives`) et le gel de la carte dans
+`extension/chat.ts`.
+
+Tous les caches de prompt fonctionnent sur un **préfixe** : le cache est touché jusqu'au premier
+octet qui diffère, et manqué sur tout ce qui suit. Une seule ligne du prompt système qui suit
+l'onglet ouvert ne coûte donc pas cette ligne — elle coûte **tout le préfixe**, à chaque tour, carte
+du dépôt comprise, chez les fournisseurs qui facturent le manque. Deux choses s'y trouvaient et
+changeaient : la note de dialecte, dérivée des fichiers joints, et la carte elle-même, reclassée
+autour de l'onglet de devant.
+
+Le prompt se construit maintenant en deux moitiés par une fonction qui prend les parties stables
+comme **champs nommés** : ajouter « juste une ligne sur le fichier ouvert » redevient un changement
+qu'un relecteur voit. La carte est gelée pour la durée d'une conversation et reconstruite seulement
+aux moments où le préfixe est de toute façon réécrit — nouvelle conversation, compactage, demande
+explicite. Une carte en retard d'un changement d'onglet ne coûte rien : ce sont des chemins et des
+symboles, le modèle peut lire n'importe quel fichier, et le classement ne décide que de ce qu'il
+voit **en premier**.
+
+Rien de tout cela ne se lit dans le code, ce qui est la raison pour laquelle l'invariant est tenu par
+un test d'intégration qui compare le premier message de deux requêtes **octet par octet**.
 
 ### 6. Zéro dépendance à l'exécution
 
@@ -106,8 +170,34 @@ question  ─►  session.build()      transcript → messages (muets exclus, co
           ─►  runTurn()            appel, outils, ré-anonymisation à chaque étape
           ─►  vault.restore()      les marqueurs redeviennent les vraies valeurs, chez vous
           ─►  budget.record()      coût réel (fourni par OpenRouter, estimé sinon)
-          ─►  gate.record()        journal : métadonnées, jamais de contenu
+          ─►  gate.record()        journal : métadonnées, chaînées, jamais de contenu
+          ─►  verifyTurn()         le tour a-t-il échoué ? si oui, et seulement si oui, on escalade
 ```
+
+Et deux embranchements qui n'existent que quand quelque chose ne va pas :
+
+```
+  provider refuse (429, 5xx, socket)  ─►  fallbackChain()  ─►  même préréglage moins cher ─► machine
+  le tour finit sur une vérification qui échoue  ─►  handoverNote()  ─►  diff + erreur ─► modèle plus grand
+```
+
+## Comment on sait que ça marche
+
+Trois niveaux, et ils ne mesurent pas la même chose.
+
+- **`node:test` sur `src/core/`** — 562 tests, en millisecondes, sans éditeur. Ils tiennent les
+  règles : ce qu'un budget refuse, ce qu'une anonymisation attrape, ce qu'un verdict d'échec dit.
+- **Les tests d'intégration** — 27, dans un vrai VS Code lancé sans affichage. Ils tiennent le
+  câblage, c'est-à-dire l'endroit où vivent les vrais défauts : la sortie d'une commande revient-elle
+  vraiment, le préfixe est-il vraiment identique d'un tour à l'autre, l'escalade part-elle vraiment
+  vers l'autre modèle. Chacun de ces trois-là a été vérifié en **retirant le correctif** et en
+  constatant que le test tombe — un test qui passe dans les deux cas ne prouve rien.
+- **`eval/`** — ce que les deux précédents ne peuvent pas dire : est-ce que la **réponse** est bonne.
+  Quinze petits dépôts cassés, une commande par tâche qui décide si le résultat marche, et le harnais
+  pilote le vrai client terminal — une évaluation qui aurait sa propre boucle mesurerait
+  l'évaluation. La règle qui donne un sens aux chiffres tourne à chaque commit : **le contrôle de
+  chaque tâche doit échouer sur la version non modifiée**, sans quoi la tâche note tout le monde à
+  100 % et personne ne le voit.
 
 ## Ce qui est délibérément absent
 

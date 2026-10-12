@@ -18,6 +18,10 @@
 // mysterious failure.
 
 import type { ChatMessage, ChatResult, Provider, ReasoningEffort, ToolCall, ToolSchema, Usage } from "../providers/types.js";
+import { coerceArgs, parseToolArgs, unknownToolMessage, validateArgs } from "./toolcall.js";
+import { estimateMessageTokens } from "../util/tokens.js";
+import { restoreDeep } from "../redaction/index.js";
+import { t } from "../../shared/i18n.js";
 
 export interface ToolContext {
   /** Cancels when the user stops the turn. */
@@ -76,18 +80,54 @@ export interface TurnOptions {
   messages: ChatMessage[];
   tools?: Tool[];
   maxSteps?: number;
+  /**
+   * Asked once, when the model stops calling tools: is this really finished?
+   *
+   * Returns a corrective message to continue with, or nothing to accept the answer. The POLICY lives
+   * with the caller (`selfCheckMessage` in the router) so this file stays free of opinions about
+   * what counts as verified; the MECHANISM is here, and it is deliberately small.
+   *
+   * ⚠️ At most one per turn. A second would be an argument, and a model that insists would turn the
+   * step cap into the only brake. One catches forgetfulness — which is what this is for — and does
+   * not negotiate.
+   */
+  selfCheck?: (trace: TurnResult["trace"]) => string | undefined;
   maxTokens?: number;
+  /** A side task — see `ChatRequest.chore`. Thinking is switched off for it on a self-hosted server. */
+  chore?: boolean;
   temperature?: number;
   reasoning?: ReasoningEffort;
   signal?: AbortSignal;
   onDelta?: (d: { text?: string; reasoning?: string }) => void;
   onStep?: (info: { step: number; toolCalls: ToolCall[] }) => void;
   onToolResult?: (info: { call: ToolCall; result: ToolResult }) => void;
+  /**
+   * One measurement per request: what we estimated the prompt at, and what the provider counted.
+   *
+   * Reported here rather than by the caller because only this loop knows the exact messages of each
+   * step — an agent turn is many requests, and pairing the first estimate with the SUM of every
+   * step's usage would teach the calibrator that its estimate is four times too low.
+   */
+  onUsage?: (info: { model: string; estimated: number; actual: number }) => void;
+  /**
+   * Move the cache breakpoint to the end of each request. Off unless asked for — see
+   * `OpenAIProviderOptions.promptCache` for what turning it on changes and what it cost.
+   */
+  promptCache?: boolean;
   approve?: Approver;
   /** Applied to the messages of EVERY step, immediately before the request leaves. */
   beforeRequest?: (messages: ChatMessage[]) => Promise<ChatMessage[]> | ChatMessage[];
   /** Applied to text coming back, to put real values behind the placeholders. */
   afterResponse?: (text: string) => string;
+  /**
+   * Put the real values back into a tool call's arguments, before anything looks at them.
+   *
+   * The same vault as `afterResponse`, applied to what the tools DO rather than to what the user
+   * reads. It runs before validation, before the approval card and before execution, so the schema
+   * check, the sentence the user approves and the diff all show what will actually happen — a card
+   * saying `write_file ⟨HOST_1⟩` asks somebody to approve a thing they cannot see.
+   */
+  restoreArgs?: (text: string) => string;
   report?: (message: string) => void;
 }
 
@@ -98,27 +138,127 @@ export interface TurnResult {
   usage: Usage;
   /** The tool calls made during this turn, for the transcript and the audit log. */
   trace: Array<{ call: ToolCall; result: ToolResult; approved: boolean }>;
+  /**
+   * Whether the turn's one self-check actually fired.
+   *
+   * Instrumented because the chantier that added the self-check could not be judged without it. The
+   * bench showed no improvement — 48/56 before, 47/56 after, and the figure it was meant to move
+   * unchanged — and the honest question was then "did it ever fire?", which nothing could answer.
+   * Arguing about that instead of measuring it is the failure mode this whole phase exists against.
+   */
+  selfChecked: boolean;
+  /** The cap a provider's refusal forced the last request down to, when one did. */
+  shortenedTo?: number;
   stoppedBecause: "answer" | "max-steps" | "cancelled";
+  /**
+   * The model ran out of output budget rather than finishing.
+   *
+   * It was thrown away — the provider reports `finish_reason: "length"` and nothing read it — so a
+   * sentence cut in half and a finished answer looked identical to everything above. On a model
+   * that thinks before answering the consequence is worse than a missing paragraph: the reasoning
+   * is charged against the same budget, so a long think leaves nothing for the answer and the turn
+   * ends with a full block of thinking and no reply at all. Which is precisely how it was reported
+   * — "it only does the reasoning and gives no answer" — and why plan mode felt it first: it is the
+   * mode that asks the model to investigate before it writes.
+   */
+  truncated: boolean;
 }
 
-const DEFAULT_MAX_STEPS = 12;
+/**
+ * How many tool calls one turn may make.
+ *
+ * ⚠️ Raised from 12, and the number was not the only problem. Reported as "it stops a task right in
+ * the middle, so agents and subagents don't work" — a turn ending with its work half
+ * done, which is the worst outcome an agent has: a repository in a state nobody chose.
+ *
+ * Twelve was calibrated against turns that worked. A turn that hits a defect does not spend its steps
+ * on the task: the session that produced that report spent them re-reading a file, re-checking a diff
+ * and disbelieving its own tools, because an edit was landing in the editor's buffer and not on disk.
+ * Those defects are fixed; the cap still has to leave room for the ordinary case of a long file —
+ * read, search, edit, verify, and again for the next place.
+ *
+ * Not unbounded, for the reason the cap exists: a model going round in circles must stop by itself
+ * rather than be stopped by the person watching it. Thirty is roughly three passes of
+ * read-edit-verify over three places, which is the shape of a real change.
+ */
+const DEFAULT_MAX_STEPS = 30;
+
+/**
+ * How many times one turn asks for the rest of a reply the output cap cut off. Two: enough to get
+ * past one long plan or one large file, few enough that a model which keeps writing past any cap
+ * cannot spend the whole step budget doing it.
+ */
+const MAX_CONTINUATIONS = 2;
+const CONTINUE_AFTER_CUT =
+  "Your previous reply was cut off by the output token limit before you finished, and any tool call you were writing was lost. " +
+  "Continue from where you stopped without repeating what you already wrote. " +
+  "If you were writing a large file, a long plan or a big edit, split it into several smaller tool calls, each well under the limit.";
+
+/**
+ * Below this there is nothing worth caching, and marking it costs money.
+ *
+ * A cache entry is written at a premium — Anthropic charges 1.25× for the tokens it stores — and
+ * read back at a tenth. So marking pays off the moment a prefix is reused once, and is a 25 %
+ * penalty when it never is. A title, a commit message, a classification: one short request, never
+ * repeated. Anthropic will not cache under about a thousand tokens in any case.
+ */
+const CACHE_WORTH_IT_TOKENS = 2000;
+
+/**
+ * Move the cache breakpoint to the end of what is being sent.
+ *
+ * This is the difference between caching the system prompt and caching the CONVERSATION, and on a
+ * long agent turn it is most of the bill.
+ *
+ * The prefix marked as cacheable by the caller is the part that never changes: the system prompt and
+ * the repository map. Everything a turn then produces — the model's tool calls, the file it read,
+ * the output of the command it ran — is appended, and on the next step every byte of it is sent
+ * again. Marked nowhere, all of it is charged at full price on step 2, and again on step 3, and so
+ * on: the cost of a twelve-step turn grows with the SQUARE of its length.
+ *
+ * One more breakpoint, at the end of each request, turns that into a straight line. Step N writes a
+ * cache entry covering everything it sent; step N+1 finds it, pays a tenth for all of it, and full
+ * price only for the tool result that has arrived since. The same mechanism makes the second
+ * question in a conversation cheap, and the twentieth cheap as well.
+ *
+ * Returns a new array: the flag must not stick to the messages the loop keeps, or a twelve-step turn
+ * would accumulate twelve breakpoints and Anthropic accepts four.
+ */
+export function withRollingCacheMark(messages: ChatMessage[]): ChatMessage[] {
+  if (messages.length < 2) return messages;
+  const total = estimateMessageTokens(messages);
+  if (total < CACHE_WORTH_IT_TOKENS) return messages;
+  const last = messages[messages.length - 1]!;
+  if (last.cacheable) return messages;
+  return [...messages.slice(0, -1), { ...last, cacheable: true }];
+}
+
 
 export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
   const tools = opts.tools ?? [];
   const byName = new Map(tools.map((t) => [t.schema.name, t]));
   const schemas: ToolSchema[] = tools.map((t) => t.schema);
   const maxSteps = opts.maxSteps ?? DEFAULT_MAX_STEPS;
+  /** Whether the one self-check of this turn has been spent. See `selfCheck`. */
+  let selfChecked = false;
+  /** Carried out of the provider: a refusal capped an answer, and the user has to be told. */
+  let shortenedTo: number | undefined;
 
   const working: ChatMessage[] = [...opts.messages];
   const trace: TurnResult["trace"] = [];
   const usage: Usage = { promptTokens: 0, completionTokens: 0, cachedTokens: 0, costUsd: 0 };
   let text = "";
   let reasoning = "";
+  /** Set by the last response that ran out of output budget. See `TurnResult.truncated`. */
+  let truncated = false;
+  /** How many times this turn has asked for the rest of a reply the cap cut off. */
+  let continuations = 0;
 
   for (let step = 0; step < maxSteps; step++) {
     if (opts.signal?.aborted) return done("cancelled");
 
-    const outgoing = opts.beforeRequest ? await opts.beforeRequest(working) : working;
+    const prepared = opts.beforeRequest ? await opts.beforeRequest(working) : working;
+    const outgoing = opts.promptCache ? withRollingCacheMark(prepared) : prepared;
     let res: ChatResult;
     try {
       res = await opts.provider.chat(
@@ -127,6 +267,7 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
           messages: outgoing,
           tools: schemas.length ? schemas : undefined,
           maxTokens: opts.maxTokens,
+          ...(opts.chore ? { chore: true } : {}),
           temperature: opts.temperature,
           reasoning: opts.reasoning,
           signal: opts.signal,
@@ -138,16 +279,60 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
       throw err;
     }
 
+    // Measured against `outgoing`, which is what actually left — after redaction, after whatever
+    // `beforeRequest` did to it. Estimating the pre-redaction messages would calibrate against text
+    // no provider ever saw.
+    if (res.usage.promptTokens > 0) {
+      opts.onUsage?.({ model: opts.model, estimated: estimateMessageTokens(outgoing), actual: res.usage.promptTokens });
+    }
+
     usage.promptTokens += res.usage.promptTokens;
     usage.completionTokens += res.usage.completionTokens;
     usage.cachedTokens += res.usage.cachedTokens;
     if (typeof res.usage.costUsd === "number") usage.costUsd = (usage.costUsd ?? 0) + res.usage.costUsd;
 
+    truncated = res.stopReason === "length";
+    if (res.shortenedTo) shortenedTo = res.shortenedTo;
     const answer = opts.afterResponse ? opts.afterResponse(res.text) : res.text;
     if (answer) text = text ? `${text}\n${answer}` : answer;
     if (res.reasoning) reasoning += res.reasoning;
 
-    if (!res.toolCalls.length) return done("answer");
+    // ⚠️ Cut off by the output cap with nothing to run: NOT an answer. It was returned as one, so a
+    // turn that ended "Here is the plan, then I'll get started:" — the plan or the call it
+    // announced lost to
+    // the cap — looked finished, and the agent simply stopped. Asked to carry on instead, a bounded
+    // number of times, with the one instruction that keeps it from being cut again: smaller pieces.
+    //
+    // ⚠️ Not when the THINKING ate the budget and there is no text at all: asking again at the same
+    // cap would be eaten the same way. That case belongs to the caller, which retries with more room
+    // (see "It spent the whole answer on thinking" in the extension) — and this used to pre-empt it.
+    const thoughtOnly = !res.text.trim() && Boolean(res.reasoning?.trim());
+    if (truncated && !thoughtOnly && !res.toolCalls.length && tools.length && continuations < MAX_CONTINUATIONS) {
+      continuations++;
+      opts.report?.("the reply hit the output limit — asking the model to continue");
+      working.push({ role: "assistant", content: res.text || "(cut off)" });
+      working.push({ role: "user", content: CONTINUE_AFTER_CUT });
+      continue;
+    }
+
+    if (!res.toolCalls.length) {
+      // The cheap middle between telling the user and escalating to a billed model: ask the same
+      // model to finish what it started. It usually can — it forgot, it did not fail.
+      const correction = selfChecked ? undefined : opts.selfCheck?.(trace);
+      if (correction) {
+        selfChecked = true;
+        // The premature answer is dropped rather than kept. It said the work was done; the model is
+        // about to supersede it, and showing both would read as the assistant contradicting itself
+        // two lines apart. What it did is still in the trace, which is where a reviewer looks.
+        text = "";
+        working.push({ role: "assistant", content: res.text || "(no answer)" });
+        working.push({ role: "user", content: correction });
+        // Falls through to the next iteration, so it costs a step: this is a real round trip and
+        // real money, and a budget that did not count it would be lying about the turn.
+        continue;
+      }
+      return done("answer");
+    }
 
     opts.onStep?.({ step, toolCalls: res.toolCalls });
     working.push({ role: "assistant", content: res.text, toolCalls: res.toolCalls });
@@ -179,22 +364,43 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
       }
       const tool = byName.get(call.name);
       if (!tool) {
-        planned.push({ call, settled: `Unknown tool: ${call.name}`, parallel: false });
+        // Naming the nearest real tool rather than only refusing: models invent plurals and
+        // synonyms constantly, and a refusal with no suggestion costs a whole step to recover from.
+        planned.push({ call, settled: unknownToolMessage(call.name, [...byName.keys()]), parallel: false });
         continue;
       }
-      let args: Record<string, unknown>;
-      try {
-        args = JSON.parse(call.args || "{}") as Record<string, unknown>;
-      } catch {
-        // A malformed call is the model's mistake to fix, not a crash.
-        planned.push({ call, settled: "Arguments were not valid JSON. Send the call again.", parallel: false });
+      // Repaired rather than refused where the text has exactly one plausible reading — a fence
+      // around the object, a trailing comma, a real newline inside a string. A small model given
+      // "not valid JSON" sends the same thing again; see `parseToolArgs` for why each repair is
+      // safe and why nothing is guessed.
+      const parsed = parseToolArgs(call.args || "{}");
+      if (!parsed.ok || !parsed.args) {
+        planned.push({ call, settled: parsed.error ?? "Those arguments could not be read.", parallel: false });
         continue;
       }
+      if (parsed.repaired) opts.report?.(`repaired the arguments of ${call.name}`);
+      // Before the schema check, the approval and the tool — see `restoreArgs`. Only placeholders
+      // this vault issued are put back; anything else is left exactly as the model sent it.
+      const real = opts.restoreArgs ? restoreDeep(parsed.args, opts.restoreArgs) : parsed.args;
+      // Checked against the schema before the tool sees them, so a missing field is one corrective
+      // sentence rather than an exception from inside a tool that says nothing useful.
+      const invalid = validateArgs(tool.schema, real);
+      if (invalid) {
+        planned.push({ call, settled: invalid, parallel: false });
+        continue;
+      }
+      const args: Record<string, unknown> = coerceArgs(tool.schema, real);
 
       const needs = tool.approval(args);
       let approved = true;
       if (needs !== false) {
-        approved = opts.approve ? await opts.approve({ tool: call.name, description: needs, args }) : false;
+        // A call the runtime did not deliver through the protocol says so, here, where the person
+        // deciding can read it. Recognising a call written in a message collapses a separation the
+        // protocol maintains — talking about an action cannot be performing one — and the honest
+        // compensation is not cleverness, it is telling the user which channel this arrived on.
+        // See `providers/textToolCall.ts`.
+        const description = call.source === "text" ? `${needs} ${t("(read from the model's message, not from a tool call)")}` : needs;
+        approved = opts.approve ? await opts.approve({ tool: call.name, description, args }) : false;
       }
       if (!approved) {
         const result: ToolResult = { content: "The user declined this action.", isError: true };
@@ -247,6 +453,16 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
   return done("max-steps");
 
   function done(stoppedBecause: TurnResult["stoppedBecause"]): TurnResult {
-    return { text, reasoning, steps: trace.length, usage, trace, stoppedBecause };
+    return {
+      text,
+      reasoning,
+      steps: trace.length,
+      usage,
+      trace,
+      stoppedBecause,
+      truncated,
+      selfChecked,
+      ...(shortenedTo ? { shortenedTo } : {}),
+    };
   }
 }

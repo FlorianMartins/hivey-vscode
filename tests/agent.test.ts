@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { runTurn, type Tool } from "../src/core/agent/loop.js";
 import type { ChatRequest, ChatResult, Provider } from "../src/core/providers/types.js";
 
-type Scripted = { text?: string; toolCalls?: Array<{ id: string; name: string; args: string }> };
+type Scripted = { text?: string; toolCalls?: Array<{ id: string; name: string; args: string }>; truncated?: boolean; reasoning?: string };
 
 function scriptedProvider(script: Scripted[]): Provider & { seen: ChatRequest[] } {
   let i = 0;
@@ -23,10 +23,10 @@ function scriptedProvider(script: Scripted[]): Provider & { seen: ChatRequest[] 
       if (s.text) onDelta?.({ text: s.text });
       return {
         text: s.text ?? "",
-        reasoning: "",
+        reasoning: s.reasoning ?? "",
         toolCalls: s.toolCalls ?? [],
         usage: { promptTokens: 10, completionTokens: 5, cachedTokens: 0 },
-        stopReason: s.toolCalls?.length ? "tool_calls" : "stop",
+        stopReason: s.truncated ? "length" : s.toolCalls?.length ? "tool_calls" : "stop",
       };
     },
     async listModels() {
@@ -132,7 +132,19 @@ test("an unknown tool is answered, never ignored", async () => {
   await runTurn({ ...base, provider, tools: [] });
   const last = provider.seen[1]!.messages.at(-1)!;
   assert.equal(last.role, "tool");
-  assert.match(last.content, /Unknown tool/);
+  assert.match(last.content, /no tool called "nope"/);
+  // With no tools at all, the answer says so rather than trailing off into an empty list — which
+  // reads to a model like a broken harness rather than like an answer.
+  assert.match(last.content, /no tools are available/);
+});
+
+test("an unknown tool that is nearly a real one is corrected rather than only refused", async () => {
+  // Models invent plurals and synonyms constantly. A bare refusal costs a whole step to recover
+  // from; naming the nearest real tool usually costs none.
+  const real = tool("read_file");
+  const provider = scriptedProvider([{ toolCalls: [{ id: "c1", name: "read_files", args: "{}" }] }, { text: "ok" }]);
+  await runTurn({ ...base, provider, tools: [real] });
+  assert.match(provider.seen[1]!.messages.at(-1)!.content, /Did you mean "read_file"/);
 });
 
 test("every call gets exactly one result, even when several arrive at once", async () => {
@@ -212,4 +224,189 @@ test("usage adds up across the steps of one turn", async () => {
   const r = await runTurn({ ...base, provider, tools: [t] });
   assert.equal(r.usage.promptTokens, 20);
   assert.equal(r.usage.completionTokens, 10);
+});
+
+// ── The breakpoint that moves ────────────────────────────────────────────────────────────────────
+//
+// Caching the system prompt caches the part that never grows. Everything a turn PRODUCES — the
+// model's tool calls, the file it read, the output of the command it ran — is appended and sent
+// again on the next step, and unmarked it is charged at full price every time: the cost of a
+// twelve-step turn grows with the square of its length.
+
+test("asked for it, each step marks the end of what it sent so the next starts from a cache hit", async () => {
+  const t1 = tool("a");
+  const provider = scriptedProvider([
+    { toolCalls: [{ id: "c1", name: "a", args: "{}" }] },
+    { toolCalls: [{ id: "c2", name: "a", args: "{}" }] },
+    { text: "done" },
+  ]);
+  // Long enough to be worth caching: below a couple of thousand tokens a breakpoint is a 25 % write
+  // premium on something that will never be read back.
+  const big = "x ".repeat(4000);
+  await runTurn({
+    ...base,
+    provider,
+    tools: [t1],
+    promptCache: true,
+    messages: [{ role: "system", content: big, cacheable: true }],
+  });
+
+  for (const [step, sent] of provider.seen.entries()) {
+    const last = sent.messages[sent.messages.length - 1]!;
+    assert.equal(last.cacheable, true, `step ${step} did not mark the end of what it sent`);
+  }
+  // And the flag must not stick to the loop's own copy, or a twelve-step turn accumulates twelve
+  // breakpoints — four is the most Anthropic accepts before refusing the request.
+  const lastRequest = provider.seen[provider.seen.length - 1]!.messages;
+  assert.ok(
+    lastRequest.filter((m) => m.cacheable).length <= 2,
+    `the marks accumulated: ${lastRequest.filter((m) => m.cacheable).length}`,
+  );
+});
+
+test("nothing is marked unless it was asked for", async () => {
+  // The default is the request shape that is known to work everywhere. See the providers tests for
+  // what turning it on changes and what that cost.
+  const provider = scriptedProvider([{ text: "ok" }]);
+  const big = "x ".repeat(4000);
+  await runTurn({ ...base, provider, messages: [{ role: "user", content: big }] });
+  assert.ok(!provider.seen[0]!.messages.some((m) => m.cacheable));
+});
+
+test("a short request is not marked even when it is asked for, because the write costs more", async () => {
+  // A title, a commit message, a classification: one short request, never repeated. Anthropic
+  // charges 1.25× to store a prefix and a tenth to read it back, so marking one that is never read
+  // is a straight 25 % penalty.
+  const provider = scriptedProvider([{ text: "ok" }]);
+  await runTurn({ ...base, provider, promptCache: true, messages: [{ role: "user", content: "write a commit message" }] });
+  assert.ok(!provider.seen[0]!.messages.some((m) => m.cacheable));
+});
+
+// ── Running out of room is not the same as finishing ────────────────────────────────────────────
+//
+// The provider says which of the two happened, in `finish_reason`, and nothing read it — so an
+// answer cut off mid-sentence and a complete one were indistinguishable to everything above. On a
+// model that thinks before it answers the consequence is worse than a missing paragraph: the
+// reasoning is charged against the same output budget, so a long think can consume all of it and
+// the turn ends with a full block of thinking and no reply. Reported as "it only does the reasoning
+// and gives no answer", and felt first in plan mode — the mode that asks the model to investigate
+// before it writes.
+
+test("a turn cut off by the output budget says so", () => {
+  const provider = scriptedProvider([{ text: "As I was say", truncated: true }]);
+  return runTurn({ ...base, provider, messages: [{ role: "user", content: "hello" }] }).then((result) => {
+    assert.equal(result.truncated, true, "the turn claims to have finished when it was cut off");
+  });
+});
+
+test("a turn that finished does not claim to have been cut off", () => {
+  const provider = scriptedProvider([{ text: "All of it." }]);
+  return runTurn({ ...base, provider, messages: [{ role: "user", content: "hello" }] }).then((result) => {
+    assert.equal(result.truncated, false);
+  });
+});
+
+test("⚠️ an agent reply cut off by the cap is continued, not taken for the answer", async () => {
+  // "Here is the plan, then I'll get started:" — and the turn ended there: the plan, or the call it
+  // announced, was lost to max_tokens and the loop returned the half-sentence as the answer.
+  const write = tool("write_file");
+  const provider = scriptedProvider([
+    { text: "Voici le plan, puis j'attaque :", truncated: true },
+    { toolCalls: [{ id: "1", name: "write_file", args: "{}" }] },
+    { text: "Fait." },
+  ]);
+  const r = await runTurn({ ...base, provider, tools: [write] });
+  assert.equal(write.calls.length, 1, "the call that was cut off is written again and run");
+  assert.equal(r.stoppedBecause, "answer");
+  assert.equal(r.truncated, false);
+  const asked = provider.seen[1]!.messages.at(-1)!;
+  assert.equal(asked.role, "user");
+  assert.match(String(asked.content), /cut off by the output token limit/);
+});
+
+test("a cut where only the thinking was written is left to the caller's roomier retry", async () => {
+  // Asking again at the same cap would be eaten the same way; the extension retries with four times
+  // the room, and continuing here used to pre-empt it (caught by the integration suite).
+  const provider = scriptedProvider([{ reasoning: "Thinking at length…", truncated: true }, { text: "never asked" }]);
+  const r = await runTurn({ ...base, provider, tools: [tool("read_file")] });
+  assert.equal(provider.seen.length, 1, "no continuation at the same budget");
+  assert.equal(r.truncated, true);
+  assert.equal(r.text, "");
+});
+
+test("continuing after a cut is bounded", async () => {
+  // A model that writes past any cap must not spend the whole step budget doing it.
+  const provider = scriptedProvider([{ text: "and on and on", truncated: true }]);
+  const r = await runTurn({ ...base, provider, tools: [tool("read_file")] });
+  assert.equal(provider.seen.length, 3, "one reply and two continuations, then it stops");
+  assert.equal(r.truncated, true, "and says it was cut off");
+});
+
+test("the budget the caller asked for is the budget that is sent", () => {
+  // The turn used a constant of 4 096 written at the call site, which is comfortable for a chat
+  // reply and not enough for a reasoning model writing a plan. It is a setting now, and this is the
+  // assertion that it reaches the provider rather than being decoration.
+  const provider = scriptedProvider([{ text: "ok" }]);
+  return runTurn({ ...base, provider, maxTokens: 12_345, messages: [{ role: "user", content: "hi" }] }).then(() => {
+    assert.equal(provider.seen[0]!.maxTokens, 12_345);
+  });
+});
+
+// ── The vault has to reach the tool arguments ───────────────────────────────────────────────────
+//
+// `vault.restore()` was applied to what the user READS — the answer, the reasoning — and not to what
+// the tools DO. In agent mode against a remote endpoint that is the difference between an edit that
+// lands and one that cannot: `write_file` writes the placeholder to disk, and `edit_file` looks for
+// an excerpt containing `⟨HOST_1⟩` in a file that has the real host in it, and finds nothing.
+
+test("a placeholder inside a tool call is the real value by the time the tool runs", async () => {
+  const seen: Array<Record<string, unknown>> = [];
+  const tool: Tool = {
+    schema: { name: "write_file", description: "", parameters: { type: "object", properties: { path: { type: "string" }, body: { type: "string" } }, required: ["path"] } },
+    approval: () => false,
+    async run(args) {
+      seen.push(args);
+      return { content: "written" };
+    },
+  };
+  const provider = scriptedProvider([
+    { toolCalls: [{ id: "1", name: "write_file", args: JSON.stringify({ path: "a.ts", body: "connect(⟨HOST_1⟩)" }) }] },
+    { text: "done" },
+  ]);
+
+  await runTurn({
+    ...base,
+    provider,
+    tools: [tool],
+    restoreArgs: (text) => text.replace("⟨HOST_1⟩", "db.internal.example"),
+    messages: [{ role: "user", content: "write it" }],
+  });
+
+  assert.equal(seen[0]?.["body"], "connect(db.internal.example)", "the tool was handed a placeholder");
+});
+
+test("arguments the vault does not know are left exactly as they are", async () => {
+  // A marker the model invented, or one the user typed themselves, is not a secret this vault hid:
+  // substituting it would be inventing a value, and leaving it is the only honest answer.
+  const seen: Array<Record<string, unknown>> = [];
+  const tool: Tool = {
+    schema: { name: "write_file", description: "", parameters: { type: "object", properties: { body: { type: "string" } } } },
+    approval: () => false,
+    async run(args) {
+      seen.push(args);
+      return { content: "ok" };
+    },
+  };
+  const provider = scriptedProvider([
+    { toolCalls: [{ id: "1", name: "write_file", args: JSON.stringify({ body: "⟨UNKNOWN_9⟩" }) }] },
+    { text: "done" },
+  ]);
+  await runTurn({
+    ...base,
+    provider,
+    tools: [tool],
+    restoreArgs: (text) => text.replace("⟨HOST_1⟩", "db.internal.example"),
+    messages: [{ role: "user", content: "write it" }],
+  });
+  assert.equal(seen[0]?.["body"], "⟨UNKNOWN_9⟩");
 });

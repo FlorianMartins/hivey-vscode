@@ -29,6 +29,124 @@
   --surface: var(--vscode-editorWidget-background, rgba(128, 128, 128, 0.06));
   --hover: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.14));
   --muted: var(--vscode-descriptionForeground);
+
+  /* Only the Hivey appearance draws with these; under the editor's theme they are inert. A token
+     that resolves to nothing is cheaper than a second rule for every element that might glow. */
+  --glow: transparent;
+  --grid: transparent;
+}
+
+/* ── The Hivey appearance ──────────────────────────────────────────────────────────────────── */
+
+/*
+ * A palette of its own, for the person who wants one.
+ *
+ * ⚠️ HOW THIS WORKS, because it is not obvious and it is the whole reason the file above did not
+ * have to change. VS Code hands every webview its theme as custom properties on the document —
+ * `--vscode-foreground`, `--vscode-focusBorder`, and 274 more references across this stylesheet.
+ * Custom properties are variables, so a more specific selector can REDEFINE them: everything below
+ * resolves every one of those 276 call sites to this palette instead, with nothing else edited.
+ *
+ * ⚠️ AND WHY EVERY LINE CARRIES `!important`, which is otherwise a smell. VS Code does not hand the
+ * theme to a webview in a stylesheet: it writes the variables as an INLINE STYLE on the document
+ * element, and an inline style beats every selector there is. The first version of this block used a
+ * more specific selector, which is the textbook answer and loses to inline by construction — the
+ * capture came back pixel-identical to the editor theme and that is how it was found. `!important`
+ * on a declaration does beat inline, and it is the only thing that does.
+ *
+ * The alternative was introducing `--fg`, `--bg`, `--accent` and rewriting 276 sites to use them.
+ * That is the textbook answer and it would have been a 4,000-line diff to reach the same place, with
+ * every one of those lines a chance to get a colour wrong.
+ *
+ * WHY IT IS NOT THE DEFAULT. "The card now belongs to the editor it lives in rather than to us" is a
+ * decision this project already took, deliberately, and wrote down: a panel docked next to the file
+ * tree and the terminal reads as a foreign object if it ignores the user's theme. Florian asked for
+ * something « moderne/futuriste et pro », which is a real want and not a reason to reverse that
+ * silently — so it is a setting, and the editor's theme stays the default.
+ *
+ * WHAT THE PALETTE IS. A deep blue-black base, amber as the one accent — the product's own colour,
+ * and a hive's — and a cool cyan for links so the two accents never compete for the same meaning.
+ * Every pair below clears 7:1 against its background except the dimmest, which clears 4.5:1, so this
+ * appearance is not a trade of legibility for atmosphere.
+ */
+:root[data-appearance="hivey"] {
+  --vscode-foreground: #e7eaf3 !important;
+  --vscode-descriptionForeground: #949cb2 !important;
+  --vscode-editor-background: #0a0c11 !important;
+  --vscode-sideBar-background: #0a0c11 !important;
+  --vscode-editorWidget-background: #121622 !important;
+  --vscode-input-background: #151a28 !important;
+  --vscode-input-foreground: #e7eaf3 !important;
+  --vscode-input-border: #222a3d !important;
+  --vscode-widget-border: #1d2435 !important;
+  --vscode-panel-border: #273048 !important;
+  --vscode-focusBorder: #ffab2e !important;
+  --vscode-textLink-foreground: #5fd0f5 !important;
+  --vscode-textLink-activeForeground: #8fe0fa !important;
+  --vscode-toolbar-hoverBackground: rgba(255, 171, 46, 0.12) !important;
+  --vscode-list-hoverBackground: rgba(255, 171, 46, 0.09) !important;
+  --vscode-list-activeSelectionBackground: rgba(255, 171, 46, 0.16) !important;
+  --vscode-textCodeBlock-background: #0e121b !important;
+  --vscode-textPreformat-foreground: #ffc46b !important;
+  --vscode-widget-shadow: rgba(0, 0, 0, 0.6) !important;
+  --vscode-scrollbarSlider-background: rgba(148, 156, 178, 0.18) !important;
+  --vscode-scrollbarSlider-hoverBackground: rgba(148, 156, 178, 0.3) !important;
+  --vscode-badge-background: rgba(255, 171, 46, 0.18) !important;
+  --vscode-badge-foreground: #ffc46b !important;
+  --vscode-button-background: #ffab2e !important;
+  --vscode-button-foreground: #15110a !important;
+  --vscode-button-hoverBackground: #ffbb55 !important;
+  /* States. Cooler and less saturated than a default theme's, so a row of them reads as one family
+     rather than as four unrelated warnings. */
+  --vscode-charts-green: #5fd49a !important;
+  --vscode-charts-blue: #5fd0f5 !important;
+  --vscode-charts-yellow: #ffc46b !important;
+  --vscode-charts-red: #ff7a7a !important;
+  --vscode-errorForeground: #ff8a8a !important;
+  --vscode-editorWarning-foreground: #ffc46b !important;
+  --vscode-inputValidation-errorBorder: #ff7a7a !important;
+  --vscode-gitDecoration-addedResourceForeground: #5fd49a !important;
+  --vscode-gitDecoration-deletedResourceForeground: #ff8a8a !important;
+  --vscode-diffEditor-insertedTextBackground: rgba(95, 212, 154, 0.14) !important;
+  --vscode-diffEditor-removedTextBackground: rgba(255, 122, 122, 0.14) !important;
+
+  --glow: rgba(255, 171, 46, 0.22);
+  /* A hairline grid, barely there. The one piece of pure atmosphere in here, and it is kept to a
+     single token so it can be removed in one line if it ever reads as noise. */
+  --grid: rgba(148, 156, 178, 0.045);
+}
+
+/*
+ * The one atmospheric effect, and the reasoning for keeping it to one.
+ *
+ * A futuristic interface fails by accumulation: a glow, a grid, a scanline, a gradient and a border
+ * animation each defensible alone and illegible together. So the transcript gets a 32px grid at 4.5%
+ * and nothing else, behind the content rather than over it, and every other surface stays flat.
+ */
+:root[data-appearance="hivey"],
+:root[data-appearance="hivey"] body {
+  /* ⚠️ Set DIRECTLY, not left to resolve through `--vscode-sideBar-background`. Redefining the
+     variable changes every rule in THIS stylesheet that reads it, and the panel's base colour is not
+     one of them: it comes from the stylesheet VS Code injects ahead of ours. The first capture showed
+     exactly that — the accents turned (they are ours) and the background did not (it is theirs). A
+     colour you cannot see in your own file is a colour you cannot fix by editing your own file. */
+  background-color: #0a0c11 !important;
+  color: #e7eaf3;
+}
+
+:root[data-appearance="hivey"] body {
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 32px 32px;
+  background-attachment: fixed;
+}
+
+/* Amber at 22% behind the focused composer, which is the only place in the panel where the user's
+   attention is supposed to be. Under the editor's theme `--glow` is transparent, so this costs
+   nothing there. */
+:root[data-appearance="hivey"] .composer-card:focus-within,
+:root[data-appearance="hivey"] .composer.working .composer-card {
+  box-shadow: 0 0 0 1px var(--glow), 0 4px 24px -8px var(--glow);
 }
 
 * {
@@ -84,11 +202,14 @@ body {
   font-size: var(--fs-meta);
 }
 
+/* ⚠️ Left, not centred. A centred sentence inside a screen where every other line starts at the same
+ * left margin does not read as "this list is empty" — it reads as something that failed to lay out,
+ * which is precisely how the permissions screen's two empty lists looked. Centring is for a page with
+ * nothing on it; this is a paragraph in a page that has plenty. */
 .empty {
   color: var(--muted);
   font-size: var(--fs-control);
-  padding: var(--sp-4);
-  text-align: center;
+  padding: var(--sp-2) 0;
 }
 
 /* ── Buttons ─────────────────────────────────────────────────────────────────────────────── */
@@ -108,6 +229,18 @@ body {
   cursor: pointer;
   white-space: nowrap;
   max-width: 100%;
+  /* ⚠️ Every control in this panel changed state in a single frame: a chip went from invisible edge
+   * to outlined the instant the pointer crossed it, which is what makes an interface feel like a
+   * form rather than like the editor's own chat. 120 ms is the editor's own figure for this, and it
+   * is short enough that nobody waits for it and long enough that the eye follows the change instead
+   * of being surprised by it.
+   *
+   * Only colour and the edge — never size or position. A control that MOVES under the pointer is a
+   * control you miss, and that is a regression dressed as polish. */
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
 }
 .btn:hover:not(:disabled) {
   background: var(--hover);
@@ -173,6 +306,33 @@ body {
   color: var(--muted);
   border-color: var(--border);
 }
+/* ⚠️ `ghost` means "no outline until you reach for it", and `tiny` was quietly putting one back: the
+ * two rules have the same specificity, so the later one won and every `ghost tiny` control carried a
+ * border it had asked not to have. That is what the row under the composer looked like — three boxed
+ * chips in a panel whose every other surface is borderless. Asked for directly: « concernant le choix
+ * du modele tu peux supprimer les borders pour que ce soit homogene avec le theme du reste de la
+ * sidebar ».
+ *
+ * The outline is not removed, it is MOVED to hover and focus, which is where it answers a question
+ * somebody is actually asking ("is this a control?"). Resting, the panel reads as one surface. This
+ * is how the editor's own chat draws the same row.
+ *
+ * Scoped to `ghost` on purpose: `btn tiny`, `btn tiny primary` and `btn tiny danger` are not ghosts
+ * and keep their edges. */
+.btn.ghost.tiny,
+.composer-toolbar .btn.ghost {
+  border-color: transparent;
+}
+/* ⚠️ And it stays transparent on hover. The first attempt brought the outline back under the pointer,
+ * which only moved the noise rather than removing it — a row of chips that grows edges as you sweep
+ * across it is busier than one that always had them. What answers "is this a control?" is the
+ * background tint `.btn:hover` already paints, which is what the editor's own chat uses and nothing
+ * else. The outline is kept for `:focus-visible` alone, where it is the only thing a keyboard user
+ * has. */
+.btn.ghost.tiny:focus-visible,
+.composer-toolbar .btn.ghost:focus-visible {
+  border-color: var(--vscode-focusBorder);
+}
 .btn.tiny:hover {
   color: var(--vscode-foreground);
 }
@@ -184,21 +344,46 @@ body {
   background: var(--vscode-inputValidation-errorBackground, rgba(255, 0, 0, 0.08));
 }
 
-/* The mode button is the one control that changes meaning, so it is the one that changes colour. */
+/* ⚠️ THE ICON CARRIES THE COLOUR, THE WORDS DO NOT — the same rule the provider control below already
+ * follows, and the reason it was reported as the one that looks right: « l'icone du type de providers
+ * […] a la bonne couleur du theme vscode mais pas les boutons dans la zone de saisie utilisateur ».
+ *
+ * Two things were wrong and only one of them was the colour. These rules painted the WHOLE button,
+ * so a row of chips had one shouting and the rest muted; and they reached for `--vscode-charts-*`
+ * with a HARD-CODED HEX fallback, which is a colour this project forbids itself everywhere else. A
+ * charts palette is for a bar chart: plenty of themes never tune it, and the hex then decides.
+ *
+ * `--vscode-textLink-foreground` is the workbench's own accent — the colour it uses to say "this is
+ * where the attention is" — and it is what the provider icon already wears. One accent across the
+ * row is also what makes it read as one row.
+ *
+ * The mode keeps its weight, because it is still the control that changes what the next message DOES.
+ * It just says so with its word rather than by being the brightest thing in the box. */
 .btn.mode .lbl {
   font-weight: 600;
 }
-.btn.mode-agent {
-  color: var(--vscode-charts-blue, #3794ff);
-}
-.btn.mode-plan {
-  color: var(--vscode-charts-purple, #b180d7);
-}
-.btn.mode-chat {
+.btn.mode,
+.btn.reasoning {
   color: var(--muted);
 }
-.btn.reasoning.active {
-  color: var(--vscode-charts-blue, #3794ff);
+.btn.mode:hover,
+.btn.reasoning:hover {
+  color: var(--vscode-foreground);
+}
+/* ⚠️ All three modes, in the workbench's own accent. This was Agent alone for an hour — on the
+ * reasoning that Agent is the only mode that CHANGES YOUR FILES, so it is the only one that needs a
+ * colour meaning "pay attention". Sound about a WARNING, and wrong about this mark, which is not
+ * one: « rajoutes les couleurs du thème vscode sur le mode chat et le mode plan aussi pour une
+ * cohérence graphique comme pour le mode agent ». A row where one chip is lit and two are grey reads
+ * as two of them being disabled.
+ *
+ * One accent for all three, never a palette of three: what tells the modes apart is the word inside
+ * them, which is right there and unambiguous. The colour says "this is the control that decides how
+ * the next message is answered", and that is true of all three. */
+.btn.mode .ico,
+.btn.reasoning.active .ico {
+  color: var(--vscode-textLink-foreground, var(--vscode-foreground));
+  opacity: 1;
 }
 
 /* ── Top bar ─────────────────────────────────────────────────────────────────────────────── */
@@ -331,11 +516,14 @@ mark.hit {
   scrollbar-gutter: stable;
 }
 
+/* ⚠️ The rule that used to sit here, `.entry + .entry { border-top: 1px solid }`, is gone: every
+ * `.entry` is wrapped in its own `.entry-block`, so the two are never siblings and that selector
+ * matched NOTHING. It also contradicted a comment further down claiming turns are "separated by
+ * space, which is what the editor does" — true, and true only because the rule asserting otherwise
+ * could not fire. Removing it changes no pixel; leaving it would go on describing a drawing nobody
+ * draws, which is what you read when you go looking for how this works. */
 .entry {
   padding: var(--sp-3) 0;
-}
-.entry + .entry {
-  border-top: 1px solid var(--border);
 }
 .entry.muted {
   opacity: 0.5;
@@ -664,6 +852,60 @@ pre.code {
   overflow-y: auto;
 }
 
+/* The model's reasoning, in a colour of its own.
+ *
+ * It wore the same grey frame as a folded list of steps, so the one block that is the model talking
+ * to itself looked like bookkeeping. A tinted frame and a leading edge — the language the approval
+ * cards already speak — says "this is thought, not answer" without a legend. The editor's chart
+ * purple: not the focus colour (that is the composer's), not a warning, not a success, so it claims
+ * no meaning it does not have. */
+:root {
+  --reasoning: var(--vscode-charts-purple, #b180d7);
+}
+:root[data-appearance="hivey"] {
+  /* Cyan against Hivey's amber: the second accent the palette already has. */
+  --reasoning: #5fd0f5;
+}
+.collapsible.reasoning {
+  border-color: color-mix(in srgb, var(--reasoning) 40%, transparent);
+  border-left: 2px solid var(--reasoning);
+  background: color-mix(in srgb, var(--reasoning) 5%, transparent);
+}
+.collapsible.reasoning > .collapsible-head {
+  color: color-mix(in srgb, var(--reasoning) 75%, var(--vscode-foreground));
+}
+.collapsible.reasoning > .collapsible-body {
+  border-top-color: color-mix(in srgb, var(--reasoning) 25%, transparent);
+}
+/* While it is being written the frame breathes, at the composer ring's unhurried pace: alive, not
+   urgent. It stops the moment the answer takes over. */
+.collapsible.reasoning.thinking {
+  animation: hc-reasoning 2.8s ease-in-out infinite;
+}
+@keyframes hc-reasoning {
+  0%,
+  100% {
+    border-top-color: color-mix(in srgb, var(--reasoning) 35%, transparent);
+    border-right-color: color-mix(in srgb, var(--reasoning) 35%, transparent);
+    border-bottom-color: color-mix(in srgb, var(--reasoning) 35%, transparent);
+    box-shadow: 0 0 0 0 transparent;
+  }
+  50% {
+    border-top-color: color-mix(in srgb, var(--reasoning) 85%, transparent);
+    border-right-color: color-mix(in srgb, var(--reasoning) 85%, transparent);
+    border-bottom-color: color-mix(in srgb, var(--reasoning) 85%, transparent);
+    box-shadow: 0 0 10px -2px color-mix(in srgb, var(--reasoning) 45%, transparent);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .collapsible.reasoning.thinking {
+    animation: none;
+    border-top-color: color-mix(in srgb, var(--reasoning) 70%, transparent);
+    border-right-color: color-mix(in srgb, var(--reasoning) 70%, transparent);
+    border-bottom-color: color-mix(in srgb, var(--reasoning) 70%, transparent);
+  }
+}
+
 /* ── Approval ────────────────────────────────────────────────────────────────────────────── */
 
 /* One colour per box, on the edge that says which kind.
@@ -676,20 +918,89 @@ pre.code {
  *
  * So: the panel's own quiet frame, and a leading edge carrying the one colour that matters. That is
  * the same language the rest of the panel already speaks — a pinned answer, a refusal in the
- * permission lists — so the edge is read as "which kind of thing is this" without a legend. */
+ * permission lists — so the edge is read as "which kind of thing is this" without a legend.
+ *
+ * The edge itself is no longer a warning colour, and that is the point of this pass. Yellow said
+ * "something has gone wrong" about a card that asks a routine question and expects a routine yes —
+ * and it said it in a hue that belongs to this extension's own brand rather than to the theme, so
+ * it stood out against every workbench it was docked in. `focusBorder` is what the user's theme
+ * nominates for "this is what you are being asked about": present in every theme, whatever hue
+ * that theme's accent is, and already the colour the panel's own focus rings take. The card now
+ * belongs to the editor it lives in rather than to us. */
 .approval {
   /* The stronger of the two panel borders: this card is a question that stops the turn, so it has
      to read as a card and not as a paragraph with a coloured edge. */
   border: 1px solid var(--border-strong);
-  border-left: 2px solid var(--vscode-editorWarning-foreground, var(--vscode-charts-yellow));
+  border-left: 2px solid var(--vscode-focusBorder, var(--vscode-textLink-foreground));
   background: var(--surface);
   border-radius: var(--radius-lg);
   padding: var(--sp-3);
   margin: var(--sp-3) 0;
 }
 .approval-ico {
-  color: var(--vscode-charts-yellow, #cca700);
+  color: var(--vscode-focusBorder, var(--vscode-textLink-foreground));
   flex: 0 0 auto;
+}
+
+/* A frame that breathes while the question is open.
+ *
+ * An approval card stops the turn: nothing else happens until it is answered. When it arrives at
+ * the bottom of a long transcript — or while the reader is up in the conversation re-reading
+ * something — a still card is indistinguishable from the text around it, and the panel looks as
+ * though it has quietly stopped. So the one edge that carries meaning is the one that moves.
+ *
+ * It fades rather than travels, and slowly. A card that slid, flashed or bounced would be a card
+ * that has to be dismissed before you can read anything else, and this is a question, not an alarm.
+ * Two and a half seconds is at the edge of "did that move?" — enough to catch the eye passing over
+ * it, never enough to be read as urgency.
+ *
+ * It stops on the answer, and that is what `.answered` is for: a decided card that went on pulsing
+ * would be asking for something nobody can give it. */
+@keyframes approval-open {
+  0%,
+  100% {
+    border-left-color: var(--vscode-focusBorder, var(--vscode-textLink-foreground));
+  }
+  50% {
+    border-left-color: color-mix(
+      in srgb,
+      var(--vscode-focusBorder, var(--vscode-textLink-foreground)) 30%,
+      var(--border-strong)
+    );
+  }
+}
+@keyframes approval-open-egress {
+  0%,
+  100% {
+    border-left-color: var(--vscode-textLink-foreground, var(--vscode-charts-blue));
+  }
+  50% {
+    border-left-color: color-mix(
+      in srgb,
+      var(--vscode-textLink-foreground, var(--vscode-charts-blue)) 30%,
+      var(--border-strong)
+    );
+  }
+}
+.approval:not(.answered) {
+  animation: approval-open 2.5s ease-in-out infinite;
+}
+.approval.egress:not(.answered) {
+  animation-name: approval-open-egress;
+}
+/* And the mark on the head moves with the edge — one card, one signal. Opacity rather than colour,
+   because the icon has no border to fade and a colour animation on a glyph reads as a flicker. */
+.approval:not(.answered) .approval-ico {
+  animation: approval-mark 2.5s ease-in-out infinite;
+}
+@keyframes approval-mark {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
 }
 .approval-head {
   display: flex;
@@ -911,9 +1222,17 @@ pre.code {
  * button painted over the send button. A floor that cannot be met is not a floor, it is an
    overlap. `overflow: hidden` on the group makes that failure impossible rather than merely
    unlikely. */
+/* The model is the one label here that can grow without limit — a vendor can ship
+ * `qwen3.7-flash-thinking-preview` tomorrow — so it is the one that gives up characters when the row
+ * runs out. Its neighbours are one short word each and would say nothing truncated. */
 .composer-toolbar .btn.model {
   flex: 0 1 auto;
   min-width: 7ch;
+}
+.composer-toolbar .btn.model .lbl {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .composer-toolbar .toolbar-group {
   overflow: hidden;
@@ -927,11 +1246,7 @@ pre.code {
 .composer-toolbar .btn.mode {
   flex: 0 0 auto;
 }
-.composer-toolbar .btn.model .lbl {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+
 .composer-tokens {
   font-size: var(--fs-meta);
   color: var(--muted);
@@ -1588,10 +1903,13 @@ pre.code {
 .combo-foot {
   display: flex;
   align-items: center;
+  /* Wraps, because three buttons do not fit on one row in a narrow panel and the widget clips what
+   * overflows: the third one was cut in half — "Refres" — in every screenshot and on every screen
+   * narrower than about six hundred pixels. A row that cannot wrap is a row that loses its last
+   * item silently. */
+  flex-wrap: wrap;
   gap: var(--sp-2);
   padding: var(--sp-2);
-}
-.combo-foot {
   border-top: 1px solid var(--border);
 }
 
@@ -2146,11 +2464,15 @@ pre.code {
 
 /* An egress card is about what leaves the machine rather than about what the agent may do, so its
    edge takes the colour the workbench uses for a link out: the same shape saying a different thing,
-   rather than a second border fighting the first. */
+   rather than a second border fighting the first. Now that the ordinary card carries the theme's
+   accent, the two are close relatives on most themes — which is right. They are the same question
+   asked about two different things, and the words on the card say which; a second hue would be a
+   legend to learn. What sets them apart is weight, not colour. */
 .approval.egress {
   border-left-color: var(--vscode-textLink-foreground, var(--vscode-charts-blue));
+  border-left-width: 3px;
 }
-/* And its icon follows, so the card is one colour rather than a blue edge above a yellow mark. */
+/* And its icon follows, so the card is one colour rather than a blue edge above a mark of another. */
 .approval.egress .approval-ico {
   color: var(--vscode-textLink-foreground, var(--vscode-charts-blue));
 }
@@ -2437,57 +2759,123 @@ pre.code {
   box-shadow: 0 2px 8px color-mix(in srgb, var(--vscode-widget-shadow, transparent) 70%, transparent);
 }
 
-/* The turning border.
+/* The light that runs around the border.
  *
- * A conic gradient rotated by an animated custom property, masked to the card's outline so only the
- * border itself moves. The colour is the editor's focus colour fading into nothing, so on any
- * theme it is the same accent the workbench uses to say "this is where the attention is".
+ * ⚠️ It was a conic gradient turning about the card's CENTRE, masked to the outline. On a box four
+ * times wider than it is tall an angle is not a distance: the arc raced down the short sides and
+ * crawled along the long ones, so it read as "left, top, right, bottom" rather than as one light
+ * going round — "it goes left, top, right, bottom and not cleanly around".
  *
- * `@property` is what makes an angle animatable at all — without it a custom property interpolates
- * as a string and the gradient jumps between frames instead of turning. */
-@property --hc-angle {
-  syntax: "<angle>";
-  initial-value: 0deg;
-  inherits: false;
-}
+ * Now a light that follows the PERIMETER itself: `offset-path: border-box` is the box's own outline,
+ * rounded corners included, and `offset-distance` from 0 to 100 % moves along it at constant
+ * speed. Two of them on the same path and clock: a bright core clipped to the ring line, and a soft
+ * halo outside it that makes it read as light rather than as paint. The elements are drawn by the
+ * composer (`composerRing()`), hidden at rest.
+ *
+ * ⚠️ 4 s a lap, which is the editor's own figure for its chat input. Faster reads as a loading
+ * spinner — something that demands attention — where this should read as a surface quietly alive. */
 .composer.working .composer-card {
   border-color: transparent;
 }
-.composer.working .composer-card::before {
-  content: "";
+.composer-ring,
+.composer-halo {
+  display: none;
   position: absolute;
   inset: var(--ring-inset);
   border-radius: inherit;
+  pointer-events: none;
+}
+.composer.working .composer-ring,
+.composer.working .composer-halo {
+  display: block;
+}
+/* Composited to a ring: fill the box, subtract everything but the `--ring` edge, so the light is
+   only ever seen ON the line. */
+.composer-ring {
   padding: var(--ring);
-  background: conic-gradient(
-    from var(--hc-angle),
-    transparent 0deg,
-    color-mix(in srgb, var(--vscode-focusBorder) 25%, transparent) 60deg,
-    var(--vscode-focusBorder) 110deg,
-    color-mix(in srgb, var(--vscode-focusBorder) 25%, transparent) 160deg,
-    transparent 220deg
-  );
-  /* Composited to a ring: fill the rectangle, then subtract everything but the 1px edge. Drawing
-     four rotating edges by hand is the alternative, and it does not round the corners. */
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   mask-composite: exclude;
-  animation: hc-rotate 1.6s linear infinite;
-  pointer-events: none;
 }
-@keyframes hc-rotate {
-  to {
-    --hc-angle: 360deg;
+/* The halo is not clipped: it is the glow spilling OUTSIDE the line. Behind the card itself
+   (`z-index: -1`, the card not being a stacking context), so the card's own background hides the
+   inner half and nothing ever glows over the text being typed. */
+.composer-halo {
+  z-index: -1;
+}
+.composer-ring-light,
+.composer-halo-light {
+  position: absolute;
+  top: 0;
+  left: 0;
+  offset-path: border-box;
+  offset-rotate: auto;
+  animation: hc-travel 4s linear infinite;
+}
+.composer-ring-light {
+  width: 160px;
+  height: 14px;
+  background: radial-gradient(
+    closest-side,
+    color-mix(in srgb, var(--vscode-focusBorder) 30%, white) 0%,
+    var(--vscode-focusBorder) 35%,
+    color-mix(in srgb, var(--vscode-focusBorder) 45%, transparent) 65%,
+    transparent 100%
+  );
+}
+.composer-halo-light {
+  width: 180px;
+  height: 26px;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--vscode-focusBorder) 55%, transparent), transparent);
+  filter: blur(8px);
+  opacity: 0.7;
+}
+@keyframes hc-travel {
+  from {
+    offset-distance: 0%;
   }
+  to {
+    offset-distance: 100%;
+  }
+}
+/* ⚠️ The ring was there, and hidden — by the focus outline.
+ *
+ * Both draw `--ring` at `--ring-inset`, on purpose, so the card never changes size. But the box
+ * KEEPS focus after Enter, which is to say for every turn sent from the keyboard, and a solid 70%
+ * outline under a turning arc of the same colour leaves nothing to see turn: the arc only showed
+ * once something else took the focus — typically once the answer was arriving and the reader
+ * clicked in it. Reported as « rajouter cet effet dès le début de la réponse (aussi lors du
+ * raisonnement) ».
+ *
+ * So while working the outline steps down to a faint track: same position and weight (still no
+ * jump), dim enough that the arc running over it is the thing you see. */
+.composer.working .composer-card,
+.composer.working .composer-card:focus-within {
+  outline: var(--ring) solid color-mix(in srgb, var(--vscode-focusBorder) 18%, transparent);
+  outline-offset: var(--ring-inset);
 }
 /* Motion is a preference, and someone who has switched it off in the operating system has said so
    about every interface, not only about this one. The ring stays, still, as a plain accent. */
+/* Somebody who has asked their system for less motion has asked for it here too. The transitions
+ * above are the only ones added for feel rather than for information, so they are the ones that go
+ * — the panel keeps every state it had, it simply arrives at them at once. */
 @media (prefers-reduced-motion: reduce) {
-  .composer.working .composer-card::before {
-    animation: none;
+  .btn {
+    transition: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Still, as a plain accent on the whole line: the light stops travelling and the halo goes. */
+  .composer.working .composer-ring {
     background: var(--vscode-focusBorder);
     opacity: 0.5;
+  }
+  .composer-ring-light,
+  .composer-halo-light {
+    animation: none;
+    display: none;
   }
   .md.live > *:last-child::after {
     animation: none;
@@ -2658,6 +3046,15 @@ pre.code {
   font-size: var(--fs-meta);
   color: var(--muted);
   white-space: nowrap;
+}
+/* The day's spend, once it is near its cap. Warning colours rather than a new palette: what is
+ * about to start interrupting the user is the editor's own idea of a warning. */
+.composer-cost.near {
+  color: var(--vscode-editorWarning-foreground, var(--muted));
+}
+.composer-cost.over {
+  color: var(--vscode-editorError-foreground, var(--muted));
+  font-weight: 600;
 }
 
 /* ── Skills ───────────────────────────────────────────────────────────────────────────────────
@@ -2842,6 +3239,31 @@ pre.code::-webkit-scrollbar-track {
 .jump-to-end:hover {
   background: var(--hover);
 }
+
+/* While an answer is being written below.
+ *
+ * A reader who has scrolled up loses the one signal that the turn is still going: the text growing
+ * at the bottom. This is the control they would use to go back, so it is where that fact belongs.
+ *
+ * A ring that expands out of the disc and fades, rather than anything that moves the button: it
+ * sits in a strip a few pixels tall between the last answer and the composer, and a control that
+ * moves there touches one of the two. The ring is drawn outside the disc's own edge, so it costs
+ * no layout — it is one shadow growing, which is what makes it cheap enough to run for the whole
+ * length of an answer. */
+.jump-to-end.answering {
+  border-color: color-mix(in srgb, var(--vscode-focusBorder, var(--vscode-textLink-foreground)) 65%, var(--border-strong));
+  color: var(--vscode-focusBorder, var(--vscode-textLink-foreground));
+  animation: jump-answering 1.8s ease-out infinite;
+}
+@keyframes jump-answering {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--vscode-focusBorder, var(--vscode-textLink-foreground)) 45%, transparent);
+  }
+  70%,
+  100% {
+    box-shadow: 0 0 0 5px transparent;
+  }
+}
 .jump-to-end .ico {
   /* The chevron points down; it is drawn pointing down already, so nothing to rotate — but it must
      lead the label, which is the direction of travel. */
@@ -2958,6 +3380,18 @@ pre.code::-webkit-scrollbar-track {
   .plan.live .plan-step.running .plan-mark {
     animation: none;
   }
+  /* Someone who has asked for less movement still has to be able to tell an open question from a
+     decided one, and an answer being written from a finished one — so the animations stop and the
+     state they carried is stated in colour instead. Nothing is lost but the motion. */
+  .approval:not(.answered),
+  .approval.egress:not(.answered),
+  .approval:not(.answered) .approval-ico,
+  .jump-to-end.answering {
+    animation: none;
+  }
+  .jump-to-end.answering {
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--vscode-focusBorder, var(--vscode-textLink-foreground)) 35%, transparent);
+  }
 }
 
 /* The approval scope, carried by the shield's colour. The one state worth noticing from across the
@@ -3067,27 +3501,57 @@ pre.code code {
   top: 50%;
   border-top: 1px solid var(--border);
 }
+/* The transcript's first question has no previous turn to be separated from, so it gets no line and
+   no label: its way back lives in its own header, which is the one place a turn with no bar above it
+   can carry one. */
+.turn-rule.opening {
+  margin-top: var(--sp-2);
+}
+.turn-rule.opening::before {
+  display: none;
+}
 
-.checkpoint-btn {
+/* The way back, sitting ON the line between two turns.
+ *
+ * ⚠️ This class was `.checkpoint-btn` and styled nothing for a while: the button it dressed had been
+ * moved into the message header, and the rules stayed behind. Dead CSS is worse than none — it reads
+ * as the live styling of whatever you are looking at.
+ *
+ * No border in the resting state, which is the request: « supprimer les borders pour que ce soit
+ * homogene avec le theme du reste de la sidebar ». What makes the label readable over the rule is
+ * the panel's own background breaking the line behind it, not an outline around it. The border
+ * appears on hover, where it means "this is a button" at the moment that answer is wanted. */
+.turn-restore {
   position: relative;
   z-index: 1;
+  gap: var(--sp-1);
   padding: 2px var(--sp-3);
   border-radius: 999px;
-  border: 1px solid var(--border-strong);
-  /* Sits ON the line: the panel's own background is what breaks the rule behind the label. */
+  border: 1px solid transparent;
+  /* The panel's own background is what breaks the rule behind the label. */
   background: var(--vscode-sideBar-background, var(--vscode-editor-background));
   color: var(--muted);
   font-size: var(--fs-meta);
 }
-.checkpoint-btn:hover {
+.turn-restore .ico {
+  /* Smaller than the word beside it: the glyph is the hint, the label is the control. */
+  width: 12px;
+  height: 12px;
+  opacity: 0.8;
+}
+.turn-restore:hover {
   color: var(--vscode-foreground);
   background: var(--hover);
+}
+.turn-restore:focus-visible {
   border-color: var(--vscode-focusBorder);
 }
 /* A partial checkpoint cannot put everything back, and says so before it is pressed rather than
    afterwards. */
-.checkpoint-btn.partial {
+.turn-restore.partial {
   color: var(--vscode-editorWarning-foreground, var(--muted));
+}
+.turn-restore.partial:hover {
   border-style: dashed;
 }
 
@@ -3107,6 +3571,13 @@ pre.code code {
      controls, which reads as a second toolbar rather than as a measurement. The labels are one
      word each so that the line holds. */
   flex-wrap: nowrap;
+}
+/* Two controls and two readings on one line, and neither control may shrink: a provider reduced to
+   "Open…" or an approval scope reduced to "Au…" is a control nobody can read. They are one short word
+   each, so the line holds. */
+.composer-footer .btn.provider,
+.composer-footer .btn.approval-scope {
+  flex: 0 0 auto;
 }
 /* The same weight as everything beside it.
  *
@@ -3338,14 +3809,25 @@ pre.code code {
   height: 13px;
   opacity: 0.8;
 }
-/* The name identifies and is kept whole; the folder disambiguates and is what gives way. */
+/* The name identifies and gives way LAST; the folder disambiguates and gives way first.
+ *
+ * "Last", not "never", and that is the fix. The name was `flex: 0 0 auto` — it could not shrink at
+ * all — so a long one pushed the cross out of a box with `overflow: hidden`: present in the DOM,
+ * off the screen, and the attachment could not be removed at all. A source member path or a
+ * generated file name is long enough on its own, with no folder to give way on its behalf.
+ *
+ * Both may shrink now, and the order between them is the shrink factor rather than a rule saying
+ * one of them cannot: the folder yields a thousand times more readily, so it is still gone before
+ * the first character of the name is. What never yields is the cross, which is the only control
+ * here and the whole reason the chip is interactive. */
 .chip .chip-label {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  min-width: 2.5em;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .chip .chip-dir {
-  flex: 0 1 auto;
+  flex: 0 999 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3592,7 +4074,11 @@ pre.code code {
 }
 .chip-label {
   direction: ltr;
-  flex: 0 0 auto;
+  /* See `.chip .chip-label` above: it gives way last, not never. */
+  flex: 0 1 auto;
+  min-width: 2.5em;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .chip-dir {
   color: var(--muted);
@@ -3820,9 +4306,53 @@ pre.code code {
   padding-left: 16px;
   padding-right: 16px;
 }
+/* ⚠️⚠️ THE COMPOSER FOLLOWS THE SCREEN, NOT THE CONTENT — and this is the defect behind « le bouton
+ * skills and sub-agent disparait quand on diminue la largeur de la sidebar ».
+ *
+ * The panel has a width floor: below it the BODY stops shrinking and the page scrolls sideways, which
+ * is right for a transcript holding code. But the composer was inside that body, so a 300-pixel side
+ * bar left it 470 pixels wide with its right-hand end — skills, the microphone, the send — simply off
+ * screen. Nothing was clipped and nothing was broken; the controls were somewhere you had to scroll
+ * to, which to anybody using it is indistinguishable from gone.
+ *
+ * So the box you type in is pinned to the view rather than to the body: the viewport's width LESS the
+ * scrollbar's, and `sticky` at `left: 0` so it stays put while the transcript scrolls under it. The
+ * floor goes on protecting the reading surface; the controls stop being a consequence of it. */
 .composer {
+  position: sticky;
+  left: 0;
+  /* ⚠️ NOT `100vw`. A viewport unit counts the vertical scrollbar, which the content box does not —
+   * so `width: 100vw` is permanently a scrollbar wider than the space there is, and it forced a
+   * horizontal overflow on EVERY screen. The damage was not subtle: with the page then laid out
+   * wider than the view, sentences were cut off at the right edge all through the panel, which is
+   * what « la page Permissions […] est vraiment incomprehensible » turned out to be. The page was
+   * fine; it was being drawn off the edge.
+   *
+   * `--scrollbar-gutter` is measured by the page itself at startup, which is what that measurement
+   * was for. */
+  /* The page's own measured width — see `publishPanelWidth`. `100vw` counts the scrollbar and
+   * `100vw - gutter` carries the error of two measurements; this is the one number that answers the
+   * question. The fallback is for the instant before the first measurement lands. */
+  width: var(--panel-width, 100%);
+  max-width: var(--panel-width, 100%);
   padding-left: 12px;
   padding-right: 12px;
+}
+/* And once it is the screen's width, it has to survive the screen being small. Below this the chips
+ * drop their labels and become what they already are under the word — an icon with a menu — so every
+ * control stays reachable instead of three of them being pushed out of sight. The mode keeps its
+ * word: it is the one chip whose icon alone says nothing, and it is also the shortest.
+ *
+ * 430 px is where the five controls plus the three on the right stop fitting with their labels, by
+ * the same measurement that set the floor. */
+@media (max-width: 430px) {
+  .composer-toolbar .btn.model .lbl,
+  .composer-toolbar .btn.reasoning .lbl {
+    display: none;
+  }
+  .composer-toolbar .btn.model {
+    min-width: 0;
+  }
 }
 .screen-lede,
 .screen-note {
@@ -3834,4 +4364,499 @@ pre.code code {
 .history-footer {
   padding-left: var(--sp-1);
   padding-right: var(--sp-1);
+}
+
+/* Somewhere to drop a screenshot.
+ *
+ * The whole composer card is the target, not the text area: dropping on the chips or on the toolbar
+ * is the same intent, and a target that only accepts its own middle is a target people miss. The
+ * cue is the focus border the panel already uses for "this is where your input is going" — a colour
+ * of our own here would be the one place in the panel that has one. */
+.composer-card.drop-target {
+  outline: 2px dashed var(--vscode-focusBorder, var(--vscode-textLink-foreground));
+  outline-offset: 2px;
+}
+
+/* A turn blocked on a question is not a turn that is working, and the row under the box is where
+ * the difference belongs: the same place that says what the answer runs on and what it has cost. */
+.composer-waiting {
+  color: var(--vscode-focusBorder, var(--vscode-textLink-foreground));
+  font-weight: 600;
+}
+
+/* The context bar: what the window is holding, under the ring that says how full it is.
+ *
+ * Colours from the editor's own chart palette rather than chosen here. That is the invariant this
+ * panel has kept from the start — not one hex value — and it is also the only way five slices stay
+ * distinguishable under a theme nobody has seen yet, including high contrast. */
+.context-bar {
+  display: flex;
+  width: 100%;
+  height: 8px;
+  margin: 6px 0 8px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--vscode-editorWidget-border, var(--vscode-panel-border));
+}
+.context-bar.over {
+  outline: 1px solid var(--vscode-editorWarning-foreground);
+  outline-offset: 1px;
+}
+.context-slice {
+  display: block;
+  height: 100%;
+  min-width: 1px;
+}
+.context-slice.free {
+  background: transparent;
+}
+.context-slice.s0, .context-dot.s0 { background: var(--vscode-charts-blue); }
+.context-slice.s1, .context-dot.s1 { background: var(--vscode-charts-green); }
+.context-slice.s2, .context-dot.s2 { background: var(--vscode-charts-orange); }
+.context-slice.s3, .context-dot.s3 { background: var(--vscode-charts-purple); }
+.context-slice.s4, .context-dot.s4 { background: var(--vscode-charts-yellow); }
+
+.context-legend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 1px 2px;
+  font-size: 11px;
+}
+.context-dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 2px;
+}
+.context-legend-label {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--vscode-foreground);
+}
+.context-legend-size {
+  flex: 0 0 auto;
+  color: var(--vscode-descriptionForeground);
+  font-variant-numeric: tabular-nums;
+}
+
+/* "À savoir" — adjacent to the answer, and quieter than it.
+ *
+ * A left rule rather than a box: a box reads as a warning, and most of what appears here is not a
+ * warning — it is something true that nobody asked about. */
+.notices {
+  margin: 8px 0 2px;
+  padding: 2px 0 2px 10px;
+  border-left: 2px solid var(--vscode-editorWidget-border, var(--vscode-panel-border));
+}
+.notices-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--vscode-descriptionForeground);
+  margin-bottom: 3px;
+}
+.notices-list {
+  margin: 0;
+  padding-left: 14px;
+  font-size: 12px;
+  color: var(--vscode-foreground);
+}
+.notice {
+  margin: 2px 0;
+}
+.notice.unverified::marker,
+.notice.tool::marker {
+  color: var(--vscode-descriptionForeground);
+}
+.notice-where {
+  margin-left: 6px;
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+}
+.notices-foot {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+}
+
+/* ── Dictation ────────────────────────────────────────────────────────────────────────────── */
+
+/* The microphone, and the one state it has.
+ *
+ * `recording` is the only visual state this control needs, and it has to be unmistakable from across
+ * a room: a button that looks like it is listening and is not costs the user a whole spoken
+ * paragraph. So it is the theme's own error colour — not because recording is an error, but because
+ * that is the one hue in every theme that means "this is live and you should notice". */
+/* ── Listening: the box breathes with the voice ───────────────────────────────────────────────
+ *
+ * ⚠️ Asked for in these words: « changer l'animation pour faire des petites vibrations sur les bord en
+ * fonction de l'intonation de la voix (comme des onde sonore qui sont plus grande quand on parle fort
+ * et plus petite est discrète quand on parle bas) ». So there are no keyframes: `--voice` is the
+ * loudness the extension measured from the recording as it is written, and the edge follows it.
+ *
+ * A ring on a timer says "something is happening". A ring that follows the voice says "I can hear
+ * you", which is the question somebody dictating is actually asking — and the one a microphone has
+ * never been able to answer in this panel before.
+ *
+ * ⚠️ Thin, and in the workbench's accent. The old one was two pixels of RED, which is the colour this
+ * interface uses for a refusal and for an error: « trop grande et en rouge au lieu d'être aux couleurs
+ * du vscode ». A microphone that is working is neither of those things.
+ *
+ * Where the recorder writes its file only when it stops — the Windows one — no level ever arrives and
+ * the edge sits at its resting size. A bar that does not move beats one that invents a voice. */
+.composer.listening .composer-card {
+  border-color: transparent;
+}
+.composer.listening .composer-card::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  border: 1px solid var(--vscode-textLink-foreground, var(--vscode-focusBorder));
+  opacity: calc(0.35 + 0.5 * var(--voice, 0));
+  /* Fractions of a pixel on purpose: this is a shimmer along an edge, not a box changing size. */
+  transform: scale(calc(1 + 0.004 * var(--voice, 0)));
+  box-shadow: 0 0 calc(2px + 10px * var(--voice, 0))
+    color-mix(in srgb, var(--vscode-textLink-foreground, var(--vscode-focusBorder)) calc(14% + 30% * var(--voice, 0)), transparent);
+  transition: opacity 90ms linear, transform 90ms linear, box-shadow 90ms linear;
+  pointer-events: none;
+}
+/* No voice to follow — the recorder writes its file only when it stops. It breathes, slowly, so the
+   box plainly says "listening" without claiming to hear anything in particular. */
+.composer.listening.quiet .composer-card::before {
+  animation: hc-breathe 2.6s ease-in-out infinite;
+}
+@keyframes hc-breathe {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.7; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .composer.listening .composer-card::before {
+    transition: none;
+    transform: none;
+    box-shadow: none;
+    animation: none;
+    opacity: 0.6;
+  }
+}
+
+/* ⚠️ The workbench's accent, not red. Red is the colour this interface uses for a refusal and for an
+   error, and a microphone that is working is neither — « l'animation atour de la zone de saisie est
+   trop grande et en rouge au lieu d'être aux couleurs du vscode comme le reste de la sidebar ». */
+.btn.mic.recording {
+  color: var(--vscode-textLink-foreground, var(--vscode-foreground));
+}
+.btn.mic.recording::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  border: 1px solid currentColor;
+  /* Driven by the voice rather than by a clock: `--voice` is the loudness the extension measured,
+     0 to 1. No keyframes at all — a ring that pulses on a timer says "something is happening", and
+     one that follows the voice says "I can hear you", which is the question somebody dictating is
+     actually asking. */
+  opacity: calc(0.3 + 0.6 * var(--voice, 0));
+  transform: scale(calc(1 + 0.06 * var(--voice, 0)));
+  transition: opacity 120ms linear, transform 120ms linear;
+  pointer-events: none;
+}
+/* Someone who switched motion off in the operating system said so about every interface. The ring
+   stays, still, because the state still has to be visible. */
+@media (prefers-reduced-motion: reduce) {
+  .btn.mic.recording::after {
+    transition: none;
+    transform: none;
+    opacity: 0.7;
+  }
+}
+
+/* "Listening…", "Transcribing…", or why it could not. One line, next to the control it describes:
+   a dialog for "listening" would be a dialog to dismiss while talking. */
+.composer-note {
+  font-size: var(--fs-meta);
+  color: var(--muted);
+  margin-right: auto;
+}
+
+/* ── The send, once there is something to send ─────────────────────────────────────────────── */
+
+/*
+ * ⚠️ The reasoning written beside this button — "the send is special is a thing a toolbar says by
+ * position, not by paint" — is right about an EMPTY composer and wrong about a full one. On an empty
+ * box there is nothing to emphasise and position is enough. The moment a question is in the box, the
+ * one control that will send it should not take the same number of looks to find as the attach
+ * button beside it, and in a captured frame of the real panel it plainly did: six ghost icons in a
+ * row, the last of them the only one that matters.
+ *
+ * So the emphasis is INFORMATION rather than decoration. It appears when the state changes — "this
+ * will do something now" — and a composer with nothing in it looks exactly as it did.
+ */
+.composer.ready .btn.send {
+  color: var(--vscode-button-foreground, var(--vscode-editor-background));
+  background: var(--vscode-button-background, var(--vscode-focusBorder));
+  border-radius: var(--radius);
+}
+.composer.ready .btn.send:hover {
+  background: var(--vscode-button-hoverBackground, var(--vscode-focusBorder));
+}
+/* Not while a turn is running: that button is Stop, and a filled Stop on a composer the user has
+   already typed the NEXT question into would read as "send", which is the one misreading that costs
+   a turn. */
+.composer.working .btn.send {
+  color: inherit;
+  background: none;
+}
+/* ⚠️ Stop is red, and filled. "the Stop button when the AI answers, can you make it red so it stands
+ * out". The worry above was a filled Stop being misread as Send — red is the one fill that cannot be:
+ * it is the colour of halting, and nothing else in the composer wears it. A fixed red rather than
+ * the theme's error colour, which is a pale foreground on dark themes and would put the white
+ * square on a pink. */
+:root {
+  --stop: #d93a3a;
+  --stop-hover: #b92e2e;
+}
+.composer .btn.send.stop,
+.composer.working .btn.send.stop {
+  color: #fff;
+  background: var(--stop);
+  border-radius: var(--radius);
+}
+.composer .btn.send.stop:hover,
+.composer.working .btn.send.stop:hover {
+  background: var(--stop-hover);
+}
+.composer .btn.send.stop:focus-visible {
+  outline: var(--ring) solid color-mix(in srgb, var(--stop) 55%, white);
+  outline-offset: 1px;
+}
+
+/* ── Vertical rhythm between turns ─────────────────────────────────────────────────────────── */
+
+/*
+ * Measured from a capture of the real panel rather than guessed: between the end of one answer and
+ * the rule that opens the next turn there were 16px of answer margin, 16px of rule margin and 12px
+ * of question margin stacked — 44px of nothing in a 280px-wide column where the subject is a
+ * conversation. The rule already carries the separation; the margins were saying it three times.
+ *
+ * The pair stays tight (a reply close to what it answers) and the BOUNDARY keeps its air, which is
+ * the distinction the rule was introduced to make in the first place.
+ */
+.turn-rule {
+  margin: var(--sp-4) 0 var(--sp-3);
+}
+.turn-rule.opening {
+  margin-top: var(--sp-1);
+}
+
+/* A folded step list is a list, not prose: it does not get the reasoning block's own scroller or its
+   pre-wrap, and its rows keep the step grid they already have. */
+.collapsible.steps-folded > .collapsible-body {
+  white-space: normal;
+  max-height: none;
+  overflow: visible;
+  padding: var(--sp-1) 0 0;
+  border-top: none;
+}
+.collapsible.steps-folded > .collapsible-head {
+  color: var(--muted);
+}
+
+/* A field's problem, under the field.
+ *
+ * A warning and a refusal look different because they ARE different: "this is probably not what you
+ * meant" and "this cannot be stored" lead to different actions. Colouring both the same teaches
+ * people to ignore the first, which is the one that is usually right. */
+.setup-problem {
+  font-size: var(--fs-meta);
+  color: var(--vscode-editorWarning-foreground, var(--muted));
+  margin: calc(var(--sp-1) * -1) 0 var(--sp-2);
+}
+.setup-problem.fatal {
+  color: var(--vscode-errorForeground);
+}
+
+/* ── Aeration ──────────────────────────────────────────────────────────────────────────────── */
+
+/*
+ * Florian, after a release whose design changes he could not find: « c'est toujours aussi compliqué
+ * de comprendre les menus, settings, etc et surtout c'est pas suffisamment aéré on ne comprend rien
+ * du tout ».
+ *
+ * He is right, and the previous pass was too timid to show up at all. The measured state: 4px between
+ * controls, 3px of vertical padding inside them, 18px line-height — five controls and a model name
+ * packed into a 280px row with nothing between them. At that density the eye cannot tell where one
+ * control ends and the next begins, so the row reads as one undifferentiated strip of words. No
+ * amount of better labelling fixes that; the spacing has to change first.
+ *
+ * These are deliberately whole steps of the scale, not fractions of one. A change nobody can see is
+ * a change that was not worth making — which is the actual lesson of the previous attempt.
+ */
+
+/* ⚠️ The row under the composer keeps the 30 px target — « garder […] la barre tout en bas à
+   l'identique ». The row INSIDE the box goes back to 24, which is where it was before and which is
+   the one real difference left against the editor's own chat: « la seule reel difference avec le
+   design de github copilot cest les boutons qui sont plus petit ». Looked at side by side rather
+   than argued about, which is how it should have been settled the first time. */
+.composer-toolbar .btn {
+  padding: 3px var(--sp-2);
+  line-height: 18px;
+}
+.composer-footer .btn {
+  padding: 5px var(--sp-3);
+  line-height: 20px;
+}
+/* The maker's mark in the picker, at the size of the row's own text rather than of a button's icon. */
+.ci-vendor {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  margin-right: var(--sp-2);
+  opacity: 0.85;
+}
+
+/* Air between them, and MORE air between the two groups than within one — that difference is what
+   makes a row parse as "these three belong together, those two do not" without a single label. */
+.composer-toolbar {
+  gap: var(--sp-3);
+  /* ⚠️ ONE ROW. Wrapping was introduced here to stop the model name shrinking to "qwe…", and it cost
+     two things that matter more:
+       • the controls reordered on screen — `+`, mode, model and thinking jumped ABOVE the mic, the
+         skills and the send, which is not where anybody put them;
+       • and the panel lost its floor. A row that wraps no longer DEMANDS its width, so nothing
+         resisted the side bar being dragged shut, where before the content held it open.
+     Pressure goes back to the model name, which has a floor of its own and a tooltip carrying the
+     full id — the one label that can give up characters without giving up its meaning. */
+  flex-wrap: nowrap;
+}
+.composer-toolbar .toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  /* The left group gives up width before anything else does: the model name inside it has a floor
+     and a tooltip, and everything to its right is an icon that cannot be made narrower. */
+  min-width: 0;
+}
+.composer-toolbar .toolbar-group.end {
+  /* Icons do not shrink. A send button squeezed to nine pixels is not a send button. */
+  flex: 0 0 auto;
+}
+/* The hairline that says the groups are different kinds of thing: what this message carries on one
+   side, what to do with it on the other. One pixel, at the panel's quietest border colour — a
+   separator that has to be noticed is a separator that is too loud. */
+.composer-toolbar .toolbar-group.end {
+  margin-left: auto;
+  padding-left: var(--sp-3);
+  border-left: 1px solid var(--border);
+}
+
+/* The readings, with room, and the two numbers at opposite ends of the row.
+ *
+ * ⚠️ This is where "40k tokens for $3.60" came from: the context size and the conversation's total
+ * sat side by side and were read as a ratio. The fix is not a word of prose wedged between them
+ * (tried, and « c'est moche et inutile »), it is to stop putting them next to each other. */
+.composer-footer {
+  gap: var(--sp-3);
+  padding: var(--sp-2) 0 0;
+}
+.composer-footer .composer-cost {
+  margin-left: auto;
+  padding-left: var(--sp-3);
+}
+/* The separator dot earned its place when the row was cramped; with real gaps it is one more mark to
+   parse. */
+.composer-footer .composer-sep {
+  display: none;
+}
+
+/* The box itself gets room to breathe around what is typed in it. */
+.composer-card {
+  padding: var(--sp-3);
+}
+
+/* ── The settings screen ───────────────────────────────────────────────────────────────────── */
+
+/* Same diagnosis, same remedy: cards packed edge to edge read as one wall of text. A card is a
+   decision — "which provider", "which model" — and a decision needs a boundary the eye can find. */
+.setup {
+  gap: var(--sp-5);
+  padding: var(--sp-5) var(--sp-4) var(--sp-5);
+}
+.setup-card {
+  padding: var(--sp-4);
+  border-radius: var(--radius-lg);
+}
+.setup-card-head {
+  padding: 0;
+  min-height: 28px;
+}
+.setup-card-title {
+  font-size: var(--fs-body);
+}
+/* The sentence under a heading is the one that says what the card is FOR. It was the same size and
+   nearly the same colour as everything else, so it read as more of the same rather than as the
+   explanation. */
+.setup-card-hint {
+  margin: var(--sp-2) 0 var(--sp-3);
+  line-height: 1.5;
+}
+.setup-field {
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-2);
+}
+.setup-input {
+  padding: 6px var(--sp-3);
+}
+.setup-links {
+  gap: var(--sp-2);
+  margin-top: var(--sp-3);
+}
+
+/* Room above the first turn.
+ *
+ * ⚠️ The transcript opens scrolled to its end, and the restore for the FIRST question sits at the
+ * very top of the content. With six pixels of padding, a conversation that overflows by a hair clips
+ * it — which is how a control that exists, and has a test saying it exists, was reported missing
+ * three times. A photograph of a one-exchange conversation showed it 24px above the first visible
+ * pixel.
+ *
+ * The padding is not the whole answer (the restore is now on the question itself too, where it is
+ * reachable without scrolling anywhere), but a transcript whose first line is flush against the frame
+ * reads as cut off whatever else is true. */
+.transcript {
+  padding-top: var(--sp-4);
+}
+
+/* The one control in the message row that does not wait for a pointer.
+ *
+ * ⚠️ Everything in `.entry-actions` sits at `opacity: 0` until the block is hovered — right for copy,
+ * pin and delete, wrong for the way back. This project already wrote the reason, about the rule above
+ * the turn: "visible without hovering, unlike everything else attached to a message, because it is
+ * the only one that puts files back and something that overwrites the working tree should never be
+ * discovered by accident." The reasoning was sound and lived on the wrong control.
+ *
+ * Quiet until hovered, but PRESENT: a shape at the edge of the message that the eye finds when it is
+ * looked for, rather than a control that does not exist until the mouse happens to pass. */
+/* ⚠️ The first version of this put the button inside `.entry-actions` and tried to exempt it with
+   `opacity: 1`. That does nothing: opacity is not inherited, it MULTIPLIES — a child of a parent at
+   zero cannot be opaque. The control lives in the header instead, which has no hover gate at all.
+
+   Quiet, not loud: it sits at the end of the name row, dim until the message is hovered. Present
+   enough to be found when looked for, which is the whole requirement. */
+.entry-head .btn.restore-here {
+  opacity: 0.5;
+  margin-left: auto;
+}
+.entry.user .entry-head .btn.restore-here {
+  /* The question's header is reversed, so "the far end" is the other side. */
+  margin-left: 0;
+  margin-right: auto;
+}
+.entry-block:hover .entry-head .btn.restore-here,
+.entry-head .btn.restore-here:hover,
+.entry-head .btn.restore-here:focus-visible {
+  opacity: 1;
 }

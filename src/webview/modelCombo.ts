@@ -19,18 +19,21 @@
 //
 //   • COLOUR COMES FROM THE THEME. The sidebar hard-codes #34d399 and friends because a native
 //     <option> cannot be styled. Here the rows are real elements, so a band maps to one of VS
-//     Code's own chart colours and the picker reads correctly on light, dark and high-contrast
+//     Code's own chart colors and the picker reads correctly on light, dark and high-contrast
 //     themes without knowing which one is on.
 //   • THE QUALITY METRIC FOLLOWS THE MODE. The sidebar ranks by the active tab's specialty; the
 //     equivalent here is the mode, so switching from chat to agent re-ranks the list by how well
 //     each model drives a tool loop rather than by how well it answers a question.
 
-import { button, el, formatContext, icon, ICON } from "./dom.js";
+import { button, el, formatContext, icon, ICON, vendorIcon } from "./dom.js";
 import { prefs, setPrefs } from "./prefs.js";
+import { vendorSlug } from "../core/router/vendorIcon.js";
 import { t } from "../shared/i18n.js";
 import type { ToExtension, UiModel, UiState } from "../shared/protocol.js";
 import { priceTier, PRICE_TIER_ORDER, type PriceTier } from "../core/models/tiers.js";
 import { recommend } from "../core/models/recommend.js";
+import { HIVEY_VARIANTS, isHivey } from "../core/router/hivey.js";
+import { isDirectVendor } from "../core/providers/vendors.js";
 
 /** A row in the list, after the model has been priced and grouped. */
 interface ComboItem {
@@ -49,16 +52,16 @@ interface ComboItem {
 }
 
 /**
- * Price bucket → colour.
+ * Price bucket → color.
  *
- * These were `--vscode-charts-*` and that was a mistake worth naming: chart colours are FILL
- * colours, chosen to sit behind a legend as a solid block. At eleven pixels of text they are
+ * These were `--vscode-charts-*` and that was a mistake worth naming: chart colors are FILL
+ * colors, chosen to sit behind a legend as a solid block. At eleven pixels of text they are
  * muddy, and `charts.orange` in particular is a dark amber that disappears on a dark background.
  * The tokens below are the ones the editor uses for TEXT it needs you to read — the same green a
  * new file gets in the explorer, the same amber a warning gets, the same red an error gets.
  *
- * Only the ends are coloured. A mid-priced model gets the ordinary foreground, because colouring
- * every row means colouring nothing: if all five buckets shout, the two that matter stop being
+ * Only the ends are colored. A mid-priced model gets the ordinary foreground, because coloring
+ * every row means coloring nothing: if all five buckets shout, the two that matter stop being
  * visible.
  */
 const TIER_COLOUR: Record<PriceTier, string> = {
@@ -81,12 +84,55 @@ function tierLabel(tier: PriceTier): string {
 
 const TIERS: PriceTier[] = ["free", "cheap", "affordable", "moderate", "expensive"];
 
-/** `$3.00/M`, or the word that says the question does not arise. */
+function usd(value: number): string {
+  return `$${value >= 1 ? value.toFixed(2) : value.toFixed(3)}`;
+}
+
+/**
+ * `$3.00/M`, a span for a preset, or the word that says the question does not arise.
+ *
+ * ⚠️ A preset gets a SPAN, because it is four models and a single figure made two different presets
+ * read as identical: "how come the Hivey Pro and Hivey Smart models come out at the same price?".
+ * The span is still the input price — that is all this badge has room for — but it is now a
+ * claim the preset can keep, rather than one role's figure standing in for four.
+ */
 function priceBadge(model: UiModel): string {
   if (model.local) return t("local");
   if (!model.inUsd && !model.outUsd) return t("free");
-  const value = model.inUsd;
-  return `$${value >= 1 ? value.toFixed(2) : value.toFixed(3)}/M`;
+  if (model.roles?.length) {
+    const low = Math.min(...model.roles.map((r) => r.inUsd));
+    const high = Math.max(...model.roles.map((r) => r.inUsd));
+    if (high > low) return `${usd(low)}–${usd(high)}/M`;
+  }
+  return `${usd(model.inUsd)}/M`;
+}
+
+/**
+ * What a preset is, in one line a row can hold: the model that answers an ordinary question.
+ *
+ * That is the role the two paid presets differ on, and therefore the only thing worth the space. The
+ * detail used to be `model.id` — the literal string `hivey/smart` under a label reading "Hivey Pro",
+ * which told a reader nothing they could not see.
+ */
+function presetDetail(model: UiModel): string | undefined {
+  const everyday = model.roles?.find((r) => r.role === "everyday");
+  return everyday ? t("{0} on an ordinary question", everyday.model) : undefined;
+}
+
+/** Every role, its model and its price — and where a cheaper preset already goes. */
+function presetTitle(model: UiModel): string {
+  const lines = (model.roles ?? []).map((r) => {
+    const price = r.inUsd || r.outUsd ? t("{0} in · {1} out", usd(r.inUsd), usd(r.outUsd)) : t("free");
+    const shared = r.sameAsCheaper ? ` — ${t("the same model {0} already uses", r.sameAsCheaper)}` : "";
+    return `${r.role}: ${r.model} (${price})${shared}`;
+  });
+  // ⚠️ Said rather than hidden. A dearer preset reaching for the model a cheaper one already uses is
+  // not a defect — it means the strongest current model was already inside the cheaper budget, so the
+  // dearer one had nothing better to buy. Unsaid, the two presets read as decorative.
+  if ((model.roles ?? []).some((r) => r.sameAsCheaper)) {
+    lines.push("", t("Where a role is shared, the dearer preset had nothing better to buy that day."));
+  }
+  return lines.join("\n");
 }
 
 function toItems(state: UiState): ComboItem[] {
@@ -95,7 +141,7 @@ function toItems(state: UiState): ComboItem[] {
     return {
       value: `${model.provider}|${model.id}`,
       label: model.name || model.id,
-      detail: model.id,
+      detail: (model.roles?.length ? presetDetail(model) : undefined) ?? model.id,
       provider: model.provider,
       vendor,
       tier: model.local ? "free" : priceTier(model.inUsd, model.outUsd),
@@ -105,11 +151,24 @@ function toItems(state: UiState): ComboItem[] {
       // free, and they are not the same offer: one keeps working on a train, the other is a shared
       // machine somebody else can reboot. Collapsing them would hide the only difference that
       // matters when choosing between them.
-      group: model.local
-        ? model.loopback === false
-          ? t("On your network")
-          : t("On your machine")
-        : vendorLabel(vendor),
+      group:
+        // A gateway is the user's own infrastructure, like the two below it, and it belongs with
+        // them rather than alphabetically among the vendors. It is also usually a short list — the
+        // three or four models a proxy has been given — and the point of a short list is that you
+        // can switch between them without hunting: "so I can switch easily between the models
+        // available through the gateway".
+        model.provider === "openai-compatible"
+          ? t("On your gateway")
+          : model.local
+            ? model.loopback === false
+              ? t("On your network")
+              : t("On your machine")
+            : // A model served by the vendor's own API is not the same row as the same model behind
+              // OpenRouter: another account, another bill, another rate limit. Grouped under the
+              // account rather than under the vendor name, so the two never look like duplicates.
+              isDirectVendor(model.provider)
+              ? t("Your account: {0}", vendor)
+              : vendorLabel(vendor),
       model,
     };
   });
@@ -117,8 +176,13 @@ function toItems(state: UiState): ComboItem[] {
   // Inside a group: best first, then cheapest. Across groups: local first, then vendors A-Z. The
   // local models lead because they are the ones that cost nothing and send nothing, which is the
   // whole argument of this extension — burying them under Anthropic would contradict it.
+  // Yours first, then everyone else's. A gateway ranks with the local runtimes whether or not its
+  // address happens to be on this machine: it is infrastructure the user runs, it is the short list
+  // they switch between, and sorting it as "g" between DeepSeek and Google buried it.
+  const mine = (i: ComboItem): number => (i.local ? 0 : i.provider === "openai-compatible" ? 1 : 2);
   items.sort((a, b) => {
-    if (a.local !== b.local) return a.local ? -1 : 1;
+    const rank = mine(a) - mine(b);
+    if (rank !== 0) return rank;
     if (a.group !== b.group) return a.group.localeCompare(b.group);
     return a.model.inUsd - b.model.inUsd || a.label.localeCompare(b.label);
   });
@@ -140,9 +204,17 @@ function toItems(state: UiState): ComboItem[] {
     })
     .filter((i) => i !== undefined) as ComboItem[];
 
+  // The presets, in their own group at the top. They are not a vendor and they are not four
+  // hundred rows to search through: they are the answer to "I do not want to choose a model", which
+  // is a different question from the one the rest of this list answers, and it belongs above it.
+  const hint = new Map(HIVEY_VARIANTS.map((v) => [v.id as string, v.hint]));
+  const presets = items
+    .filter((i) => isHivey(i.model.id))
+    .map((i) => ({ ...i, group: t("Hivey"), why: hint.get(i.model.id) }));
+
   const current = items.find((i) => i.current);
-  const rest = current ? items.filter((i) => i !== current) : items;
-  return [...(current ? [{ ...current, group: t("Current") }] : []), ...recommended, ...rest];
+  const rest = (current ? items.filter((i) => i !== current) : items).filter((i) => !isHivey(i.model.id));
+  return [...(current ? [{ ...current, group: t("Current") }] : []), ...presets.filter((i) => !i.current), ...recommended, ...rest];
 }
 
 function vendorLabel(vendor: string): string {
@@ -179,17 +251,37 @@ function applySort(items: ComboItem[]): ComboItem[] {
 // ── The panel ──────────────────────────────────────────────────────────────────────────────────
 
 let open: HTMLElement | undefined;
+/** Redraws the open picker's rows from a newer state. Set while one is open, cleared with it. */
+let rebuild: ((next: UiState) => void) | undefined;
 
 export function closeModelCombo(): void {
   open?.remove();
   open = undefined;
+  rebuild = undefined;
 }
 
 export function isModelComboOpen(): boolean {
   return Boolean(open);
 }
 
+/**
+ * A model that appeared while the picker was open.
+ *
+ * The picker captures the state it was opened with, so a list arriving afterwards changed nothing
+ * under it — and the whole point of asking the machine what it serves at the moment the picker
+ * opens is that the answer lands a fraction of a second later. Without this the model somebody had
+ * just pulled appeared only the second time they looked.
+ */
+export function refreshModelCombo(next: UiState): void {
+  if (open) rebuild?.(next);
+}
+
 export function openModelCombo(anchor: HTMLElement, state: UiState, send: (m: ToExtension) => void): void {
+  // Ask whether anything has appeared on the user's own machines since the list was built. Cheap by
+  // construction — it touches loopback and the gateway and nothing else — and this is the moment it
+  // matters: somebody who has just run `ollama pull` in a terminal is about to look for the model
+  // here. The answer arrives as a new state, which redraws the list under the open picker.
+  send({ type: "pollModels" });
   closeModelCombo();
 
   const panel = el("div", "combo");
@@ -218,9 +310,41 @@ export function openModelCombo(anchor: HTMLElement, state: UiState, send: (m: To
   const buildList = () => {
     if (!list) return;
     list.textContent = "";
-    const matching = applySort(toItems(state).filter((item) => passes(item, query.trim().toLowerCase())));
+    const typed = query.trim();
+    const matching = applySort(toItems(state).filter((item) => passes(item, typed.toLowerCase())));
+
+    // A gateway is not a catalogue.
+    //
+    // It serves whatever it has been given — qwen, deepseek, a fine-tune with a name nobody else
+    // uses — and plenty of proxies answer nothing at all on `/models`, which is optional in the
+    // OpenAI API. There was then no row to pick and no way to name a model except by editing
+    // settings.json, which is not something the picker should send anybody off to do. So a name
+    // typed into the search box is offered as a choice on the gateway when nothing matches it.
+    const gateway = state.models.find((m) => m.provider === "openai-compatible");
+    const known = state.models.some((m) => m.id === typed);
+    if (gateway && typed.length > 1 && !known) {
+      const use = el("div", "combo-group", t("On your gateway"));
+      list.append(use);
+      list.append(
+        row({
+          value: typed,
+          label: typed,
+          detail: t("use this name on the gateway — it serves what it has, not a catalogue"),
+          provider: "openai-compatible",
+          vendor: t("gateway"),
+          tier: "free",
+          local: Boolean(gateway.local),
+          current: false,
+          group: t("On your gateway"),
+          model: { ...gateway, id: typed, name: typed, current: false },
+        }),
+      );
+    }
+
     if (!matching.length) {
-      list.append(el("div", "combo-empty", state.modelsLoading ? t("Loading…") : t("No model matches.")));
+      if (!gateway || typed.length <= 1 || known) {
+        list.append(el("div", "combo-empty", state.modelsLoading ? t("Loading…") : t("No model matches.")));
+      }
       return;
     }
     let lastGroup: string | undefined;
@@ -233,8 +357,22 @@ export function openModelCombo(anchor: HTMLElement, state: UiState, send: (m: To
     }
   };
 
+  // Keeps the open picker honest about a list that arrives after it. The search text and the caret
+  // live in the DOM and are not touched: only the rows are redrawn.
+  rebuild = (next: UiState) => {
+    state = next;
+    buildList();
+  };
+
   const row = (item: ComboItem): HTMLElement => {
     const node = el("button", `combo-item${item.current ? " sel" : ""}`);
+    // The maker's mark, before the name, exactly as on the button that opens this list — the picker
+    // and the control it fills have to agree, or choosing a model shows one face and selecting it
+    // shows another.
+    node.append(
+      vendorIcon(vendorSlug(item.model.id) ?? vendorSlug(item.model.server ?? "") ?? "", "ci-vendor") ??
+        icon("chip", "ci-vendor"),
+    );
     const main = el("div", "ci-main");
     const name = el("div", "ci-name");
     // The label is the part that may be clipped; the tag is not. Putting the ellipsis on the
@@ -250,8 +388,8 @@ export function openModelCombo(anchor: HTMLElement, state: UiState, send: (m: To
     main.append(el("div", `ci-detail${item.why ? " why" : ""}`, detail));
     node.append(main);
 
-    // Each segment keeps its OWN colour: the quality estimate in its band's colour, the price in
-    // its bucket's. A single colour for the pair would make one of the two numbers a lie.
+    // Each segment keeps its OWN color: the quality estimate in its band's color, the price in
+    // its bucket's. A single color for the pair would make one of the two numbers a lie.
     const badge = el("div", "ci-badge");
     const price = el("span", "ci-price", priceBadge(item.model));
     price.style.color = TIER_COLOUR[item.tier];
@@ -262,7 +400,9 @@ export function openModelCombo(anchor: HTMLElement, state: UiState, send: (m: To
       ? item.model.loopback === false
         ? t("Served by {0} on your network: nothing leaves it, nothing is billed.", item.model.server ?? item.model.baseUrl ?? "")
         : t("Served on your machine by {0}: nothing leaves, nothing is billed.", item.model.server ?? "")
-      : t("Input {0} $/M · output {1} $/M", item.model.inUsd, item.model.outUsd);
+      : item.model.roles?.length
+        ? presetTitle(item.model)
+        : t("Input {0} $/M · output {1} $/M", item.model.inUsd, item.model.outUsd);
     node.addEventListener("mousedown", (ev) => {
       ev.preventDefault();
       pick(item);
@@ -315,7 +455,7 @@ export function openModelCombo(anchor: HTMLElement, state: UiState, send: (m: To
     const wrap = el("div", "combo-filters");
     const p = prefs();
 
-    const section = (title: string, options: Array<{ id: string; label: string; colour?: string }>, selected: string[], key: "tiers" | "providers") => {
+    const section = (title: string, options: Array<{ id: string; label: string; color?: string }>, selected: string[], key: "tiers" | "providers") => {
       const box = el("div", "combo-filter-sec");
       box.append(el("div", "combo-filter-title", title));
       const rows = el("div", "combo-filter-rows");
@@ -335,7 +475,7 @@ export function openModelCombo(anchor: HTMLElement, state: UiState, send: (m: To
         });
         label.append(input);
         const text = el("span", "combo-filter-label", option.label);
-        if (option.colour) text.style.color = option.colour;
+        if (option.color) text.style.color = option.color;
         label.append(text);
         rows.append(label);
       }
@@ -346,7 +486,7 @@ export function openModelCombo(anchor: HTMLElement, state: UiState, send: (m: To
     wrap.append(
       section(
         t("Price"),
-        TIERS.map((tier) => ({ id: tier, label: tierLabel(tier), colour: TIER_COLOUR[tier] })),
+        TIERS.map((tier) => ({ id: tier, label: tierLabel(tier), color: TIER_COLOUR[tier] })),
         p.tiers,
         "tiers",
       ),
@@ -445,7 +585,15 @@ export function openModelCombo(anchor: HTMLElement, state: UiState, send: (m: To
     const rect = anchor.getBoundingClientRect();
     // The trigger sits at the bottom of the sidebar, so the panel opens upwards whenever it fits —
     // and the panel is never wider than the view, which on a 300 px sidebar is the common case.
-    panel.style.width = `${Math.min(Math.max(rect.width, 320), window.innerWidth - 16)}px`;
+    // As wide as the PANEL allows, not as wide as the control that opened it.
+    //
+    // `rect` is the model button, which is small, so the floor won every time and the picker was
+    // 320 px in a panel of any width — every model name truncated at the same place, every price
+    // pushed against it, and a row of three buttons at the bottom that did not fit on one line and
+    // was clipped by the widget's own `overflow: hidden`. Widening the panel did nothing, which is
+    // the tell: a floating element that ignores the room it has been given.
+    const room = window.innerWidth - 16;
+    panel.style.width = `${Math.max(Math.min(rect.width, room), Math.min(room, 520))}px`;
     const height = panel.offsetHeight;
     const above = rect.top - height - 6;
     panel.style.top = `${above > 8 ? above : Math.min(rect.bottom + 6, Math.max(8, window.innerHeight - height - 8))}px`;

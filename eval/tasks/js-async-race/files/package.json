@@ -1,0 +1,5 @@
+{
+  "name": "cache",
+  "type": "module",
+  "private": true
+}
