@@ -24,6 +24,7 @@ import { headToTokens } from "../../core/util/tokens.js";
 import { SECTION } from "../config.js";
 import { request } from "../../core/util/http.js";
 import { sseData, sseLines } from "../../core/util/sse.js";
+import { scaledTokens } from "../../core/context/scale.js";
 
 const MAX_TOKENS = 6000;
 
@@ -438,7 +439,7 @@ export class McpManager {
         const result = await session.client.callTool(descriptor.name, args, ctx.signal);
         ctx.report(t("{0}: {1}", session.config.name, label));
         const text = flattenContent(result.content);
-        return { content: headToTokens(text || "(the tool returned nothing)", MAX_TOKENS), isError: result.isError };
+        return { content: headToTokens(text || "(the tool returned nothing)", scaledTokens(MAX_TOKENS, 0.1)), isError: result.isError };
       },
     };
 

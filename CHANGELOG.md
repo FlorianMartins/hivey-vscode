@@ -21,6 +21,18 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **⚠️ Plus aucune limite manuelle de contexte ou de tokens : tout suit la fenêtre du modèle choisi.**
+  « supprime toutes les limites en terme de contexte ou de token même pour les modèles cloud, il faut
+  s'adapter aux limites des modèles ». Les plafonds fixes des outils deviennent une part de la fenêtre
+  du modèle utilisé, sans jamais descendre sous l'ancien chiffre : lecture de fichier (24 000
+  caractères → un quart de la fenêtre), sortie de commande (8 000 → 15 %), règles du dépôt (1 200
+  tokens → 5 %), diffs git (5 000 → 15 %), outils MCP, IBM i, ARCAD et notes de connaissance (→ 10 %).
+  La réserve gardée pour la réponse passe d'un cinquième de la fenêtre à la place d'une réponse.
+  Les pièces jointes n'ont plus de plafond par défaut (`context.attachmentTokens` = 0) et la question
+  « cette requête est très grosse » est désactivée par défaut (`budget.perRequestTokens` = 0) — les
+  plafonds en argent demandent toujours avant une requête payante. Chez Anthropic, qui exige une
+  longueur maximale, l'extension demande 64 000 tokens et, si le modèle en accepte moins, lit sa vraie
+  limite dans le refus de l'API, la retient et renvoie aussitôt la requête.
 - **⚠️ Plus de longueur maximale de réponse par défaut, et une tâche n'est plus jamais recommencée
   depuis le début.** « Le modèle a consommé tout son budget de réponse en raisonnement… comment ça
   alors qu'il est en local ? ». Ce n'était pas un budget : la conversation avait rempli toute la fenêtre

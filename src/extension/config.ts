@@ -19,7 +19,6 @@ import { makeProvider, type Provider, type ProviderId } from "../core/providers/
 import { defaultEndpoints, endpointSettingKey, REMOTE_VENDORS, vendor } from "../core/providers/vendors.js";
 import { isLocalEndpoint, isSelfHostedProvider } from "../core/redaction/index.js";
 import { checkEndpoint, describeMissingEndpoint, describeUnusableEndpoint, looksLikeApiKey } from "../core/providers/endpoint.js";
-import { ATTACHMENT_CEILING_TOKENS } from "../core/util/tokens.js";
 import type { RedactionLevel, RedactionPolicy } from "../core/redaction/types.js";
 import type { EscalationPolicy, RouterConfig } from "../core/router/route.js";
 
@@ -317,7 +316,7 @@ function readSettingsRaw(scope?: vscode.Uri): Settings {
       // from the same value typed by the user, and the whole point is to derive the budget from the
       // model's window unless someone has actually chosen a figure. See `core/context/budget.ts`.
       maxTokens: explicit<number>(c, "context.maxTokens"),
-      attachmentTokens: c.get<number>("context.attachmentTokens", ATTACHMENT_CEILING_TOKENS),
+      attachmentTokens: c.get<number>("context.attachmentTokens", 0),
       repoMap: c.get<boolean>("context.repoMap", true),
     },
     knowledge: {

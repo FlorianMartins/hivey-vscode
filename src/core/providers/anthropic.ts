@@ -19,6 +19,18 @@ export interface AnthropicOptions {
   version?: string;
 }
 
+/**
+ * The most a model may write, learned from the API's own refusal, per model.
+ *
+ * ⚠️ "adapt to the models' own limits, don't add manual limits". The API demands a `max_tokens`, and
+ * a fixed figure is a cap on every model that could write more. So the turn asks for a generous
+ * one, and a model that cannot go that far says so — "max_tokens: 64000 > 32000, which is the
+ * maximum allowed number of output tokens for …" — and the request is sent again at exactly its
+ * limit, which is remembered.
+ */
+const learnedMaxOutput = new Map<string, number>();
+const GENEROUS_MAX_OUTPUT = 64_000;
+
 export class AnthropicProvider implements Provider {
   readonly id = "anthropic";
   readonly baseUrl: string;
@@ -48,8 +60,8 @@ export class AnthropicProvider implements Provider {
 
     const body: Record<string, unknown> = {
       model: req.model,
-      // The API demands a figure. With no cap asked for, one no current model reaches by accident.
-      max_tokens: req.maxTokens ?? 32000,
+      // The API demands a figure. With no cap asked for: the model's own, once it has said it.
+      max_tokens: req.maxTokens ?? learnedMaxOutput.get(req.model) ?? GENEROUS_MAX_OUTPUT,
       stream: true,
       messages: rest.map((m, index) => {
         if (m.role === "tool") {
@@ -97,18 +109,28 @@ export class AnthropicProvider implements Provider {
       body["tools"] = req.tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.parameters }));
     }
 
-    const res = await request(`${this.baseUrl}/messages`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": this.opts.apiKey.trim(),
-        "anthropic-version": this.opts.version ?? "2023-06-01",
-      },
-      body: JSON.stringify(body),
-      signal: req.signal,
-      timeoutMs: 180_000,
-      label: "chat",
-    });
+    const send = () =>
+      request(`${this.baseUrl}/messages`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": this.opts.apiKey.trim(),
+          "anthropic-version": this.opts.version ?? "2023-06-01",
+        },
+        body: JSON.stringify(body),
+        signal: req.signal,
+        timeoutMs: 180_000,
+        label: "chat",
+      });
+    let res = await send();
+    if (!res.ok && req.maxTokens === undefined) {
+      const said = await describeHttpError(res);
+      const limit = maxOutputFromRefusal(said);
+      if (!limit) throw new Error(said);
+      learnedMaxOutput.set(req.model, limit);
+      body["max_tokens"] = limit;
+      res = await send();
+    }
     if (!res.ok || !res.body) throw new Error(await describeHttpError(res));
 
     let text = "";
@@ -204,4 +226,10 @@ function safeJson(s: string): unknown {
   } catch {
     return {};
   }
+}
+
+/** The model's own output limit, from a refusal of a larger `max_tokens`; 0 when it is not one. */
+export function maxOutputFromRefusal(message: string): number {
+  const m = /max_tokens:\s*(\d+)\s*>\s*(\d+)/.exec(message);
+  return m && Number(m[2]) < Number(m[1]) ? Number(m[2]) : 0;
 }

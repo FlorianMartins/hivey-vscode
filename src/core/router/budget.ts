@@ -47,7 +47,7 @@ export class MemorySpendStore implements SpendStore {
  *
  * `package.json` declares the same numbers to the editor, and a test asserts the two agree.
  */
-export const SHIPPED_LIMITS = { perRequestUsd: 2, dailyUsd: 20, perRequestTokens: 200_000 } as const;
+export const SHIPPED_LIMITS = { perRequestUsd: 2, dailyUsd: 20, perRequestTokens: 0 } as const;
 
 export interface BudgetLimits {
   perRequestUsd: number;

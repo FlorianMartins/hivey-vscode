@@ -20,6 +20,7 @@ import { t } from "../../shared/i18n.js";
 import type { Tool, ToolResult } from "../../core/agent/loop.js";
 import { headToTokens } from "../../core/util/tokens.js";
 import { request } from "../../core/util/http.js";
+import { scaledTokens } from "../../core/context/scale.js";
 
 const EXTENSION_ID = "arcadsoftware.arcad-elias";
 const MAX_TOKENS = 5000;
@@ -162,7 +163,7 @@ export function buildArcadTools(deps: ArcadDeps): Tool[] {
       }
       const result = await vscode.commands.executeCommand(entry.command);
       ctx.report(t("ARCAD: {0}", entry.id));
-      return { content: result === undefined ? `Ran ${entry.command}.` : headToTokens(String(result), MAX_TOKENS) };
+      return { content: result === undefined ? `Ran ${entry.command}.` : headToTokens(String(result), scaledTokens(MAX_TOKENS, 0.1)) };
     },
   };
 
@@ -213,7 +214,7 @@ export function buildArcadTools(deps: ArcadDeps): Tool[] {
       const text = await response.text();
       ctx.report(t("ARCAD {0} {1} → {2}", method, path, response.status));
       return {
-        content: headToTokens(`HTTP ${response.status}\n${text}`, MAX_TOKENS),
+        content: headToTokens(`HTTP ${response.status}\n${text}`, scaledTokens(MAX_TOKENS, 0.1)),
         isError: !response.ok,
       };
     },

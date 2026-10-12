@@ -153,7 +153,7 @@ In VS Code's settings, search for `hiveyCode`.
 | `privacy.customTerms` | Your customer and project names, to be pseudonymised |
 | `privacy.egressPolicy` | `ask-always` so you are asked every time |
 | `budget.dailyUsd` | The daily spend cap |
-| `budget.perRequestTokens` | The size beyond which a request is questioned |
+| `budget.perRequestTokens` | The size beyond which a request is questioned — 0 (the default): never, the model's own window is the limit |
 | `ibmi.writableLibraries` | The libraries an agent may change ([chapter 11](11-ibm-i.md)) |
 | `language` | For a machine whose editor is in one language and whose user is in another |
 

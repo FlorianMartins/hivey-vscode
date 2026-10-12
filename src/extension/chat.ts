@@ -141,6 +141,7 @@ import { perFileBudget } from "../core/util/tokens.js";
 import { buildTools } from "./tools.js";
 import { McpManager } from "./integrations/mcp.js";
 import { WorkspaceContext, relative } from "./workspace.js";
+import { setActiveWindow } from "../core/context/scale.js";
 
 const HISTORY_KEY = "hiveyCode.sessions";
 const PERMISSIONS_KEY = "hiveyCode.permissions";
@@ -401,6 +402,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
   /** The selected model's own window, 0 when nothing knows it. */
   private modelWindow(s: Settings): number {
+    // Every tool cap follows the window it reads here — see core/context/scale.ts.
+    const window = this.resolveWindow(s);
+    setActiveWindow(window);
+    return window;
+  }
+
+  private resolveWindow(s: Settings): number {
     // What the server itself said beats any catalogue: it is the window that refuses requests.
     const learned = this.learnedWindow(s);
     if (learned) return learned;

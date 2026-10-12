@@ -16,6 +16,7 @@ import * as vscode from "vscode";
 import { t } from "../../shared/i18n.js";
 import type { Tool, ToolResult } from "../../core/agent/loop.js";
 import { headToTokens } from "../../core/util/tokens.js";
+import { scaledTokens } from "../../core/context/scale.js";
 
 const MAX_DIFF_TOKENS = 5000;
 
@@ -147,7 +148,7 @@ export async function gitChangesSummary(): Promise<string | undefined> {
   const unstaged = await repo.diff(false).catch(() => "");
   const diff = [staged && `# Staged\n${staged}`, unstaged && `# Not staged\n${unstaged}`].filter(Boolean).join("\n\n");
   if (!diff.trim()) return `${statusText(repo)}`;
-  return `${statusText(repo)}\n\n${headToTokens(diff, MAX_DIFF_TOKENS)}`;
+  return `${statusText(repo)}\n\n${headToTokens(diff, scaledTokens(MAX_DIFF_TOKENS, 0.15))}`;
 }
 
 export function buildGitTools(): Tool[] {
@@ -191,7 +192,7 @@ export function buildGitTools(): Tool[] {
           : await repo.diffWithHEAD(path)
         : await repo.diff(staged);
       ctx.report(t("diffed {0}", path ?? (staged ? t("the index") : t("the working tree"))));
-      return { content: text.trim() ? headToTokens(text, MAX_DIFF_TOKENS) : "No differences." };
+      return { content: text.trim() ? headToTokens(text, scaledTokens(MAX_DIFF_TOKENS, 0.15)) : "No differences." };
     },
   };
 
@@ -260,7 +261,7 @@ export function buildGitTools(): Tool[] {
       const path = String(args["path"] ?? "");
       const text = await repo.blame(path);
       ctx.report(t("blamed {0}", path));
-      return { content: headToTokens(text, MAX_DIFF_TOKENS) };
+      return { content: headToTokens(text, scaledTokens(MAX_DIFF_TOKENS, 0.15)) };
     },
   };
 
@@ -284,7 +285,7 @@ export function buildGitTools(): Tool[] {
       const path = String(args["path"] ?? "");
       const text = await repo.show(ref, path);
       ctx.report(t("read {0} at {1}", path, ref));
-      return { content: headToTokens(text, MAX_DIFF_TOKENS) };
+      return { content: headToTokens(text, scaledTokens(MAX_DIFF_TOKENS, 0.15)) };
     },
   };
 

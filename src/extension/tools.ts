@@ -34,6 +34,7 @@ import { runCommandInTerminal } from "./terminal.js";
 import { withHooks, type Hooks } from "./hooks.js";
 import { buildSymbolTools } from "./symbols.js";
 import { isAbsolutePath, tidyPath, underRoot } from "../core/fs/within.js";
+import { scaledChars } from "../core/context/scale.js";
 
 /**
  * Whether two paths differing only in case are the same file.
@@ -195,7 +196,7 @@ export function buildTools(deps: ToolDeps): Tool[] {
       // file ends there.
       const from = args["from"] === undefined ? undefined : Number(args["from"]);
       const to = args["to"] === undefined ? undefined : Number(args["to"]);
-      const slice = sliceLines(doc.getText(), from, to, MAX_READ_CHARS);
+      const slice = sliceLines(doc.getText(), from, to, scaledChars(MAX_READ_CHARS, 0.25));
       ctx.report(
         slice.from === 1 && slice.to === slice.total
           ? t("read {0} ({1} lines)", relative(uri), doc.lineCount)

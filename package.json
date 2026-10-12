@@ -1682,7 +1682,7 @@
           },
           "hiveyCode.budget.perRequestTokens": {
             "type": "number",
-            "default": 200000,
+            "default": 0,
             "description": "%config.budget.perRequestTokens%"
           },
           "hiveyCode.budget.dailyUsd": {
@@ -1880,7 +1880,7 @@
           },
           "hiveyCode.context.attachmentTokens": {
             "type": "number",
-            "default": 16000,
+            "default": 0,
             "markdownDescription": "%config.context.attachmentTokens%"
           },
           "hiveyCode.context.repoMap": {

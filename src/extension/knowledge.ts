@@ -41,6 +41,7 @@ import { HttpKnowledgeStore, type KnowledgeStore } from "../core/knowledge/store
 import { request } from "../core/util/http.js";
 import { headToTokens } from "../core/util/tokens.js";
 import { readSettings, type Settings } from "./config.js";
+import { scaledTokens } from "../core/context/scale.js";
 
 const MAX_NOTE_TOKENS = 4000;
 const FOLDER = ".hiveycode";
@@ -338,7 +339,7 @@ export function buildKnowledgeTools(settings: () => Settings): Tool[] {
       const header = [`# ${note.title}`, note.tags.length ? `Tags: ${note.tags.join(", ")}` : "", note.updated ? `Updated: ${note.updated}` : ""]
         .filter(Boolean)
         .join("\n");
-      return { content: headToTokens(`${header}\n\n${note.body}`, MAX_NOTE_TOKENS) };
+      return { content: headToTokens(`${header}\n\n${note.body}`, scaledTokens(MAX_NOTE_TOKENS, 0.1)) };
     },
   };
 
