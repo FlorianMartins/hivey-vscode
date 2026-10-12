@@ -358,8 +358,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   }
 
   /** Ask the server for the window of the selected model, once per address and model. */
-  private async discoverWindow(s: Settings): Promise<void> {
-    if (isHivey(s.chat.model) || this.learnedWindow(s)) return;
+  private async discoverWindow(s: Settings, refresh = false): Promise<void> {
+    // A turn asks only once; the model-list refresh asks every time, because a server can be given
+    // a different window (2 × 69632 became 2 × 83968) and a remembered figure would never move.
+    if (isHivey(s.chat.model) || (!refresh && this.learnedWindow(s))) return;
     try {
       const provider = await providerFor(s, this.keys, s.chat.provider);
       const tokens = (await provider.contextWindow?.(s.chat.model)) ?? 0;
@@ -1714,7 +1716,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     try {
       const settings = readSettings();
       this.models = await listModels(settings, this.keys, settings.chat.model);
-      void this.discoverWindow(settings);
+      void this.discoverWindow(settings, true);
     } catch (err) {
       this.log.appendLine(`[models] ${(err as Error).message}`);
     } finally {
