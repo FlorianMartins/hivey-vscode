@@ -1,0 +1,7 @@
+{
+  "title": "Two decimals assumed for every currency",
+  "kind": "bug",
+  "prompt": "convert.js rounds every converted amount to two decimals, which is wrong for the currencies that have none and for the ones that have three: a yen amount comes out with centimes that do not exist. Use each currency's own number of minor units. The tests say which currencies and what is expected.",
+  "check": "node --test",
+  "timeoutMs": 180000
+}

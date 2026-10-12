@@ -47,12 +47,22 @@ export function modelsScreen(state: UiState, send: (m: ToExtension) => void, rer
   );
 
   const presets = matching.filter((m) => isHivey(m.id));
-  const local = matching.filter((m) => m.local);
+  // The gateway is its own bucket, ahead of "on your machine" and separate from it.
+  //
+  // It was falling into the local one, because an internal proxy has a loopback or RFC1918 address
+  // and is therefore marked local — so a gateway serving the same names as the laptop's Ollama
+  // produced six rows under "On your machine", three of them apparently duplicates. The picker had
+  // already learned this lesson and grown its own group; this screen had not, and the two
+  // disagreeing is why it looked right in one place and wrong in the other.
+  const gateway = matching.filter((m) => m.provider === "openai-compatible");
+  const local = matching.filter((m) => m.local && m.provider !== "openai-compatible");
   // Served by a vendor the user pays directly. Kept out of "Remote", which is the OpenRouter
   // catalogue: the same model appears in both, and the difference — whose account is billed — is
   // the only thing that separates the two rows.
-  const own = matching.filter((m) => !m.local && isDirectVendor(m.provider));
-  const remote = matching.filter((m) => !m.local && !isHivey(m.id) && !isDirectVendor(m.provider));
+  const own = matching.filter((m) => !m.local && m.provider !== "openai-compatible" && isDirectVendor(m.provider));
+  const remote = matching.filter(
+    (m) => !m.local && m.provider !== "openai-compatible" && !isHivey(m.id) && !isDirectVendor(m.provider),
+  );
 
   const list = el("div", "models-list");
   // The presets first, and not because they are better: they answer a different question. Everything
@@ -73,6 +83,15 @@ export function modelsScreen(state: UiState, send: (m: ToExtension) => void, rer
     list.append(sectionTitle(t("On your machine"), t("No cost, no data leaves.")));
     for (const m of local) list.append(modelRow(m, send));
   }
+  if (gateway.length) {
+    list.append(
+      sectionTitle(
+        t("On your gateway"),
+        t("Whatever your proxy has been given. Nothing is billed through this extension, which has no price list for it."),
+      ),
+    );
+    for (const m of gateway) list.append(modelRow(m, send));
+  }
   if (own.length) {
     list.append(
       sectionTitle(
@@ -89,7 +108,7 @@ export function modelsScreen(state: UiState, send: (m: ToExtension) => void, rer
     list.append(
       sectionTitle(
         t("Remote"),
-        t("Prices in dollars per million tokens. What leaves is pseudonymised and counted against the budget."),
+        t("Prices in dollars per million tokens. What leaves is pseudonymized and counted against the budget."),
       ),
     );
     for (const [vendor, models] of byVendor(remote)) {
@@ -154,23 +173,55 @@ function modelRow(model: UiModel, send: (m: ToExtension) => void): HTMLElement {
   if (model.local) {
     stats.append(stat(t("free"), t("local")));
   } else {
-    stats.append(stat(formatPrice(model.inUsd), t("input")));
-    stats.append(stat(formatPrice(model.outUsd), t("output")));
+    // ⚠️ A span for a preset, not one role's figure. This row showed the price of the model that
+    // answers an ORDINARY turn and called it the preset's price, which made Hivey Smart and Hivey Pro
+    // read as identical — their two everyday models charge the same $2/M to read. The span is a claim
+    // the preset can keep; the tooltip below carries the four roles.
+    stats.append(stat(span(model, "inUsd"), t("input")));
+    stats.append(stat(span(model, "outUsd"), t("output")));
     if (model.cachedInUsd) stats.append(stat(formatPrice(model.cachedInUsd), t("cache")));
   }
   row.append(stats);
 
-  // A preset has four prices, and the row can show one. It shows the ordinary turn's — the one met
-  // most often — and says so here rather than letting the figure be read as the whole bill.
   const preset = HIVEY_VARIANTS.find((v) => v.id === model.id);
   row.title = preset
-    ? `${preset.hint}\n${t("The figures are those of an ordinary turn; a chore costs less and a hard question more.")}`
+    ? [
+        preset.hint,
+        "",
+        // Every role, named, with its price — and where a dearer preset reaches the model a cheaper one
+        // already uses, which is the fact that explains why two presets can cost the same at both ends.
+        ...(model.roles ?? []).map((r) => {
+          const price = r.inUsd || r.outUsd ? t("{0} in · {1} out", formatPrice(r.inUsd), formatPrice(r.outUsd)) : t("free");
+          return `${r.role}: ${r.model} (${price})${r.sameAsCheaper ? ` — ${t("the same model {0} already uses", r.sameAsCheaper)}` : ""}`;
+        }),
+        ...((model.roles ?? []).some((r) => r.sameAsCheaper)
+          ? ["", t("Where a role is shared, the dearer preset had nothing better to buy that day.")]
+          : []),
+        // The window is the smallest of the four, because that is the one you can rely on everywhere.
+        t("The context shown is the smallest of its roles — the window you can count on whatever it is doing."),
+      ].join("\n")
     : model.local
       ? t("Served by a local endpoint: no cost, and nothing leaves.")
       : t("Input {0} $/M · output {1} $/M", model.inUsd, model.outUsd) +
         (model.cachedInUsd ? t(" · cached {0} $/M", model.cachedInUsd) : "");
   row.addEventListener("click", () => send({ type: "setModel", model: model.id, provider: model.provider }));
   return row;
+}
+
+/**
+ * One price, or the two ends of a preset's.
+ *
+ * A preset routes four roles to four models, so a single figure is at best one quarter of the answer.
+ * When all four agree there is nothing to span and the plain figure is the honest one.
+ */
+function span(model: UiModel, which: "inUsd" | "outUsd"): string {
+  const roles = model.roles ?? [];
+  if (roles.length) {
+    const low = Math.min(...roles.map((r) => r[which]));
+    const high = Math.max(...roles.map((r) => r[which]));
+    if (high > low) return `${formatPrice(low)}–${formatPrice(high)}`;
+  }
+  return formatPrice(model[which]);
 }
 
 function stat(value: string, label: string): HTMLElement {

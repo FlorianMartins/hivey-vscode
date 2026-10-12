@@ -9,6 +9,8 @@ import * as vscode from "vscode";
 import { isDocumentUri } from "./models.js";
 import { t } from "../shared/i18n.js";
 import { buildRepoMap, isMappable, type MapFile } from "../core/context/repomap.js";
+import { contextBudget } from "../core/context/budget.js";
+import { fileExcerpt } from "../core/context/outline.js";
 import type { ContextItem } from "../core/session/session.js";
 import { estimateTokens, headToTokens, perFileBudget } from "../core/util/tokens.js";
 import { EgressGate } from "./egress.js";
@@ -22,12 +24,31 @@ const MAX_FILE_BYTES = 200_000;
 export class WorkspaceContext {
   private map?: { text: string; builtAt: number; focus: string; files: number; omitted: number };
   private dirty = true;
+  /**
+   * Bumped when a file appears or disappears — not when one is saved.
+   *
+   * The repository map is frozen for the life of a conversation, which is right: re-ranking it every
+   * time a tab changes rewrites the cacheable prefix for no gain. But a map frozen against a
+   * STRUCTURE that no longer exists is a different thing. In agent mode the agent creates files
+   * itself, and it then went on reasoning about a repository those files were not in — asking for
+   * something it had just written and being told it was not there.
+   *
+   * A save does not bump it: the file was already on the list, and its symbols moving is not worth
+   * rebuilding the prefix for.
+   */
+  private structure = 0;
   private readonly recent: string[] = [];
 
   constructor(private readonly disposables: vscode.Disposable[]) {
     const watcher = vscode.workspace.createFileSystemWatcher("**/*");
-    watcher.onDidCreate(() => (this.dirty = true));
-    watcher.onDidDelete(() => (this.dirty = true));
+    watcher.onDidCreate(() => {
+      this.dirty = true;
+      this.structure += 1;
+    });
+    watcher.onDidDelete(() => {
+      this.dirty = true;
+      this.structure += 1;
+    });
     disposables.push(watcher);
     disposables.push(
       vscode.workspace.onDidSaveTextDocument((doc) => {
@@ -47,6 +68,12 @@ export class WorkspaceContext {
 
   invalidate(): void {
     this.dirty = true;
+    this.structure += 1;
+  }
+
+  /** Changes whenever a file appears or disappears. A frozen map built at another value is stale. */
+  structureVersion(): number {
+    return this.structure;
   }
 
   /** Paths of every file open in a visible editor, most relevant first. */
@@ -117,7 +144,17 @@ export class WorkspaceContext {
    * refusal, which is a conversation; a `.env` that attaches itself because it happens to be the
    * open tab is the exact failure the block list exists to prevent, and it would happen silently.
    */
-  activeContext(maxTokens = 3000, settings?: Settings): ContextItem | undefined {
+  /**
+   * The file on screen, or what is selected in it.
+   *
+   * `maxTokens` has no default any more, and that is the fix. It used to be 3 000 — about two
+   * hundred lines of prose — chosen when the whole context budget was 8 000 and never revisited
+   * when the budget started following the model's window. It is the attachment the user is least
+   * aware of and most likely to be asking about, so the effect was a document silently cut to its
+   * first two hundred lines while an explicitly attached one was sent in full: "it only reads the
+   * first 200 lines and not the whole file".
+   */
+  activeContext(maxTokens: number, settings?: Settings): ContextItem | undefined {
     const ed = vscode.window.activeTextEditor;
     if (!ed) return undefined;
     // What this excludes is everything that is technically a text document without being a file
@@ -137,12 +174,7 @@ export class WorkspaceContext {
         untrusted: true,
       };
     }
-    return {
-      kind: "file",
-      label: rel,
-      body: headToTokens(ed.document.getText(), maxTokens),
-      untrusted: true,
-    };
+    return excerptItem(rel, ed.document.getText(), maxTokens);
   }
 
   /**
@@ -152,35 +184,21 @@ export class WorkspaceContext {
    * the thing you are asking about — and wrong the rest of the time. Attaching the file that three
    * highlighted lines live in was not possible without first clicking somewhere to clear them.
    */
-  activeFileContext(maxTokens = 6000): ContextItem | undefined {
+  activeFileContext(maxTokens: number): ContextItem | undefined {
     const ed = vscode.window.activeTextEditor;
     if (!ed) return undefined;
-    return {
-      kind: "file",
-      label: relative(ed.document.uri),
-      body: headToTokens(ed.document.getText(), maxTokens),
-      untrusted: true,
-    };
+    return excerptItem(relative(ed.document.uri), ed.document.getText(), maxTokens);
   }
 
   /** Turn a path the user picked into a context item, refusing the ones policy forbids. */
-  async fileContext(uri: vscode.Uri, settings: Settings, maxTokens = perFileBudget(settings.context.maxTokens)): Promise<ContextItem | undefined> {
+  async fileContext(uri: vscode.Uri, settings: Settings, maxTokens = perFileBudget(contextBudget(settings.context.maxTokens, 0))): Promise<ContextItem | undefined> {
     const rel = relative(uri);
     if (EgressGate.isBlocked(rel, settings.privacy.blockedGlobs)) {
       void vscode.window.showWarningMessage(t("Hivey Code: {0} is excluded by the privacy policy and will not be attached.", rel));
       return undefined;
     }
     const doc = await vscode.workspace.openTextDocument(uri);
-    const text = doc.getText();
-    return {
-      kind: "file",
-      // How much was kept, not just that something was lost. "(truncated)" tells the reader a
-      // decision was made and nothing about whether it matters; the numbers let them judge, and
-      // raise the context budget if it does.
-      label: `${rel}${estimateTokens(text) > maxTokens ? t(" (first {0} of {1} tokens)", maxTokens, estimateTokens(text)) : ""}`,
-      body: headToTokens(text, maxTokens),
-      untrusted: true,
-    };
+    return excerptItem(rel, doc.getText(), maxTokens);
   }
 
   /**
@@ -191,7 +209,7 @@ export class WorkspaceContext {
    * nobody asked about. The label carries the line numbers, so the model — and the user reading the
    * chip — knows this is an excerpt rather than the file.
    */
-  async rangeContext(uri: vscode.Uri, range: vscode.Range, settings: Settings, maxTokens = perFileBudget(settings.context.maxTokens)): Promise<ContextItem | undefined> {
+  async rangeContext(uri: vscode.Uri, range: vscode.Range, settings: Settings, maxTokens = perFileBudget(contextBudget(settings.context.maxTokens, 0))): Promise<ContextItem | undefined> {
     const rel = relative(uri);
     if (EgressGate.isBlocked(rel, settings.privacy.blockedGlobs)) {
       void vscode.window.showWarningMessage(t("Hivey Code: {0} is excluded by the privacy policy and will not be attached.", rel));
@@ -233,4 +251,26 @@ export function relative(uri: vscode.Uri): string {
   // ambiguous — `src/index.ts` exists in both halves of a two-folder workspace, and the model, the
   // transcript and the tool that has to find the file again all get the same name for two files.
   return vscode.workspace.asRelativePath(uri, (vscode.workspace.workspaceFolders?.length ?? 0) > 1);
+}
+
+/**
+ * One file as a context item, whole when it fits and as an outline plus its head when it does not.
+ *
+ * The label carries what happened, because "(truncated)" says a decision was made and nothing about
+ * whether it matters. A reader who knows the file was 40 000 tokens and that all 180 of its symbols
+ * are listed can judge whether to narrow the question or raise the budget; a reader who is told
+ * "truncated" can only worry.
+ */
+function excerptItem(label: string, text: string, maxTokens: number): ContextItem {
+  const excerpt = fileExcerpt(label, text, maxTokens);
+  const total = estimateTokens(text);
+  const note = excerpt.outlined
+    ? t("outline of {0} symbols + head, {1} of {2} tokens", excerpt.symbols, maxTokens, total)
+    : total > maxTokens
+      ? t("first {0} of {1} tokens", maxTokens, total)
+      : "";
+  // The note rides BESIDE the name. Appended to it, it made the chip wider than the row and pushed
+  // the cross that removes the attachment off the screen — so the one thing the chip is for became
+  // impossible. It is still said, in the tooltip, where a remark about a file belongs.
+  return { kind: "file", label, body: excerpt.body, untrusted: true, ...(note ? { note } : {}) };
 }

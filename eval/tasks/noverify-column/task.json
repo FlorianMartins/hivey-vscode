@@ -1,0 +1,7 @@
+{
+  "title": "Add a column to a table",
+  "kind": "noverify",
+  "prompt": "Add a nullable `deleted_at` text column to the `notes` table in schema.sql.",
+  "check": "rm -f db.sqlite && sqlite3 db.sqlite < schema.sql && sqlite3 db.sqlite < seed.sql && [ \"$(sqlite3 db.sqlite 'select count(*) from notes')\" = 3 ] && sqlite3 db.sqlite 'select deleted_at from notes limit 1' >/dev/null",
+  "timeoutMs": 180000
+}

@@ -81,6 +81,21 @@ export interface CheckpointBearer {
   checkpoint?: FileSnapshot[];
   /** True when something the turn changed could not be held. Restoring is then partial, and says so. */
   checkpointPartial?: boolean;
+  /**
+   * How many shell commands the turn ran.
+   *
+   * ⚠️ Separate from `checkpointPartial` because it is a different, larger hole and it needs its own
+   * sentence. A checkpoint is built in `confirmEdit` — the moment the user approves an edit — so it
+   * holds exactly the files the EDIT TOOLS touched. A command is opaque: `prettier --write`, `sed
+   * -i`, a codemod, a build that regenerates a stylesheet all rewrite files nobody snapshotted,
+   * because nothing knew which files to snapshot before the command ran.
+   *
+   * Restoring then puts back the tool edits and leaves everything the command did in place, and the
+   * dialog used to say "2 file(s) go back to how they were" — or, worse, on a turn whose only writes
+   * came from a command, "that turn changed no file, so nothing on disk moves". Both are false in
+   * the direction that costs work. The count is kept so the dialog can say it.
+   */
+  checkpointCommands?: number;
 }
 
 /**
@@ -120,11 +135,82 @@ export function describeRestore(
     files: (n: number) => string;
     created: (n: number) => string;
     partial: string;
+    commands: (n: number) => string;
   },
+  commands = 0,
 ): string {
   const created = snapshots.filter((s) => s.before === undefined).length;
   const lines = [words.files(snapshots.length - created)];
   if (created) lines.push(words.created(created));
   if (partial) lines.push(words.partial);
+  // Last, and unconditional on there being snapshots: a turn whose only writes came from a command
+  // has no snapshots at all, and that is precisely the case where saying nothing is worst.
+  if (commands > 0) lines.push(words.commands(commands));
   return lines.join(" ");
+}
+
+/** Whether restoring this entry leaves known changes behind. */
+export function restoreIsComplete(entry: CheckpointBearer): boolean {
+  return !entry.checkpointPartial && !entry.checkpointCommands;
+}
+
+/**
+ * What the transcript draws above one entry: the separating line, the way back, or neither.
+ *
+ * This lives here, in tested code, because conflating the two cost every conversation the ability
+ * to undo its own first turn. The transcript used to decide both at once — `if (!first && role ===
+ * "user")` — which is correct for a SEPARATOR and wrong for everything attached to one. The line
+ * has nothing to separate at the top of a transcript; the restore has everything to undo there,
+ * since the opening turn is the one where the agent is let loose on an untouched repository.
+ *
+ * Two decisions, so two fields. A renderer cannot accidentally drop one by dropping the other.
+ *
+ * @param role the entry's role: only a question starts a turn.
+ * @param isFirst whether this is the transcript's first drawn entry.
+ */
+export function turnBoundary(role: "user" | "assistant", isFirst: boolean): { restore: boolean; line: boolean } | undefined {
+  if (role !== "user") return undefined;
+  return { restore: true, line: !isFirst };
+}
+
+/** One thing the transcript draws, in order. */
+export type TranscriptPiece =
+  | { kind: "rule"; id: string; opening: boolean }
+  /**
+   * `first` is the opening question of the conversation, and it is here rather than recomputed in
+   * the renderer for the reason this whole function exists: the way back is drawn in two different
+   * places depending on it, and a renderer that worked out "am I the first?" by itself would be the
+   * untested loop all over again.
+   */
+  | { kind: "entry"; id: string; first: boolean };
+
+/**
+ * What the transcript emits, as a list, without a DOM.
+ *
+ * ⚠️ This exists because "the first question has a restore" was reported as false THREE times while
+ * the code said it was true. `turnBoundary` had a test and returned `{ restore: true }` for the
+ * opening turn, and that test could not see whether the renderer called it, skipped the entry
+ * first, or drew the result at all. A decision that is tested in isolation and applied in a loop
+ * nothing tests is a decision nobody has checked.
+ *
+ * So the loop's own output is a value. The renderer turns these into nodes and does nothing else.
+ *
+ * @param entries the conversation, in order.
+ * @param opts `visible` filters by search; `streaming` is drawn by the live turn, not here.
+ */
+export function transcriptPieces(
+  entries: Array<{ id: string; role: "user" | "assistant"; streaming?: boolean }>,
+  opts: { visible?: (id: string) => boolean } = {},
+): TranscriptPiece[] {
+  const out: TranscriptPiece[] = [];
+  let first = true;
+  for (const entry of entries) {
+    if (opts.visible && !opts.visible(entry.id)) continue;
+    if (entry.streaming) continue;
+    const boundary = turnBoundary(entry.role, first);
+    if (boundary?.restore) out.push({ kind: "rule", id: entry.id, opening: !boundary.line });
+    out.push({ kind: "entry", id: entry.id, first });
+    first = false;
+  }
+  return out;
 }

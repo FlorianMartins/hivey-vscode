@@ -10,8 +10,14 @@
 // it governs and a new tool cannot forget to have one.
 
 import * as vscode from "vscode";
+import { describeSlice, sliceLines } from "../core/fs/slice.js";
+import { findUnique } from "../core/text/findText.js";
+import { cappedAt, describeCap } from "../core/agent/capped.js";
+import { searchPattern } from "../core/agent/regex.js";
 import { t } from "../shared/i18n.js";
 import { parsePlan, planSummary, PLAN_TOOL_DESCRIPTION, type Plan } from "../core/agent/plan.js";
+import { NOTE_ASIDE_TOOL, type Notice } from "../core/session/notices.js";
+import { editProblems } from "../core/agent/afterEdit.js";
 import type { Tool, ToolResult } from "../core/agent/loop.js";
 import { headToTokens } from "../core/util/tokens.js";
 import { EgressGate } from "./egress.js";
@@ -25,8 +31,21 @@ import { arcadInstalled, buildArcadTools, type ArcadDeps } from "./integrations/
 import { buildKnowledgeTools } from "./knowledge.js";
 import type { McpManager } from "./integrations/mcp.js";
 import { runCommandInTerminal } from "./terminal.js";
+import { withHooks, type Hooks } from "./hooks.js";
+import { buildSymbolTools } from "./symbols.js";
+import { isAbsolutePath, tidyPath, underRoot } from "../core/fs/within.js";
 
-const MAX_READ_TOKENS = 6000;
+/**
+ * Whether two paths differing only in case are the same file.
+ *
+ * Windows only. macOS folds by default and can be configured not to, and a case difference in a
+ * path a model produced is far more likely to be an invention than a real file — so there the
+ * stricter answer is also the more useful one.
+ */
+const FOLD_CASE = process.platform === "win32";
+
+/** Characters, not tokens: a line budget has to be cut at a line boundary, which is a character count. */
+const MAX_READ_CHARS = 24_000;
 const MAX_MATCHES = 60;
 
 function root(): vscode.Uri {
@@ -53,17 +72,63 @@ function root(): vscode.Uri {
  *                   is matched against them.
  */
 function resolve(path: string, settings: Settings): vscode.Uri {
-  const clean = path.replace(/^\.\//, "");
-  // A tool call is model output, and model output can be steered by a file it just read. Escaping
-  // the workspace is refused here rather than trusted to the model's good manners.
-  if (clean.startsWith("/") || clean.includes("..")) {
+  const folders = vscode.workspace.workspaceFolders ?? [];
+
+  // An absolute path is not a path outside the workspace, and the rule that treated the two as one
+  // thing is what made agent mode stop changing files. `/home/me/proj/src/a.ts` IS `src/a.ts` when
+  // that folder is open, and it is the spelling the editor itself puts in diagnostics, terminal
+  // output and stack traces — so a model that read one and named it back was told its own correct
+  // answer "leaves the workspace", once per attempted edit. Containment is decided by resolving
+  // the path and looking at where it landed; see `underRoot`.
+  if (isAbsolutePath(path)) {
+    const placed = underRoot(
+      path,
+      folders.map((f) => f.uri.path),
+      FOLD_CASE,
+    );
+    if (placed) {
+      // Checked on the part under the root, not on what the model typed: the privacy list is
+      // written in workspace-relative globs, and `**/.env*` matches `.env` and not `/home/me/.env`.
+      if (EgressGate.isBlocked(placed.relative, settings.privacy.blockedGlobs)) {
+        throw new Error(`Refused: “${path}” is excluded by the privacy policy.`);
+      }
+      const folder = folders.find((f) => f.uri.path === placed.root)!;
+      return placed.relative ? vscode.Uri.joinPath(folder.uri, placed.relative) : folder.uri;
+    }
+    // No folder open, or outside all of them: an open tab is still somewhere the user chose to
+    // work, and naming it by its full path is the obvious thing to do.
+    const exact = openFileUris().find((uri) => tidyPath(uri.path) === tidyPath(path));
+    if (exact) {
+      // The same list as every other branch. A tab is a place the user chose, not an exemption:
+      // `~/.ssh/id_rsa` left open in the editor would otherwise be readable just by naming it in
+      // full. The leading slash is dropped because the list is written workspace-relative, and
+      // `**/.env*` needs a segment to begin matching against.
+      if (EgressGate.isBlocked(tidyPath(path).replace(/^\/+/, ""), settings.privacy.blockedGlobs)) {
+        throw new Error(`Refused: “${path}” is excluded by the privacy policy.`);
+      }
+      return exact;
+    }
+    throw new Error(
+      folders.length
+        ? `Refused: “${path}” is outside the folder(s) open in the editor.`
+        : `Refused: “${path}” is not one of the open files, and no folder is open.`,
+    );
+  }
+
+  // A relative path. A tool call is model output, and model output can be steered by a file it just
+  // read, so climbing out of the workspace is refused here rather than trusted to the model's good
+  // manners — and `..` is REFUSED rather than resolved, which is the promise `docs/THREAT-MODEL.md`
+  // makes and the stronger of the two available rules. Resolving it would also be correct, since
+  // containment is checked afterwards either way; it would buy nothing but `src/sub/../a.ts`, and
+  // it would mean a guarantee stated in prose no longer matched the code literally.
+  const clean = tidyPath(path).replace(/^\.\//, "");
+  if (!clean || clean.includes("..")) {
     throw new Error(`Refused: “${path}” leaves the workspace.`);
   }
   if (EgressGate.isBlocked(clean, settings.privacy.blockedGlobs)) {
     throw new Error(`Refused: “${path}” is excluded by the privacy policy.`);
   }
 
-  const folders = vscode.workspace.workspaceFolders ?? [];
   if (folders.length > 1) {
     const named = folders.find((f) => clean === f.name || clean.startsWith(`${f.name}/`));
     if (named) {
@@ -85,6 +150,8 @@ function resolve(path: string, settings: Settings): vscode.Uri {
 
 export interface ToolDeps {
   settings: () => Settings;
+  /** The workspace's own commands, run around every tool call. Absent means none are configured. */
+  hooks?: Hooks;
   /** Shows a diff and returns what the user chose. */
   confirmEdit?: (uri: vscode.Uri, next: string) => Promise<boolean>;
   /** The Elias credentials, read from the keychain when an ARCAD call needs them. */
@@ -93,6 +160,8 @@ export interface ToolDeps {
   mcp?: McpManager;
   /** Where the agent's plan goes when it updates one. Absent means the plan tool is not offered. */
   onPlan?: (plan: Plan) => void;
+  /** Where an aside goes. Absent means the tool is not offered — the user switched the section off. */
+  onNotice?: (notice: Notice) => void;
 }
 
 export function buildTools(deps: ToolDeps): Tool[] {
@@ -102,10 +171,16 @@ export function buildTools(deps: ToolDeps): Tool[] {
     parallel: () => true,
     schema: {
       name: "read_file",
-      description: "Read a file from the workspace. Returns its text, truncated if very large.",
+      description:
+        "Read a file from the workspace. Give `from` and `to` (1-based line numbers) to read part of " +
+        "a large file; the result always says which lines came back and how to read on.",
       parameters: {
         type: "object",
-        properties: { path: { type: "string", description: "Path relative to the workspace root." } },
+        properties: {
+          path: { type: "string", description: "Path relative to the workspace root." },
+          from: { type: "number", description: "First line to return, 1-based. Default 1." },
+          to: { type: "number", description: "Last line to return, 1-based and inclusive. Default: the end." },
+        },
         required: ["path"],
       },
     },
@@ -113,8 +188,20 @@ export function buildTools(deps: ToolDeps): Tool[] {
     async run(args, ctx): Promise<ToolResult> {
       const uri = resolve(String(args["path"] ?? ""), s());
       const doc = await vscode.workspace.openTextDocument(uri);
-        ctx.report(t("read {0} ({1} lines)", relative(uri), doc.lineCount));
-      return { content: headToTokens(doc.getText(), MAX_READ_TOKENS) };
+      // ⚠️ A range, and a notice that says how to get the rest. This returned the head of the file and
+      // nothing else, so on anything long the model could not reach the part it needed and resorted
+      // to `sed` through run_command — slower, approval-gated, and where a real session started
+      // going wrong. A tool that truncates without saying how to continue has told the model the
+      // file ends there.
+      const from = args["from"] === undefined ? undefined : Number(args["from"]);
+      const to = args["to"] === undefined ? undefined : Number(args["to"]);
+      const slice = sliceLines(doc.getText(), from, to, MAX_READ_CHARS);
+      ctx.report(
+        slice.from === 1 && slice.to === slice.total
+          ? t("read {0} ({1} lines)", relative(uri), doc.lineCount)
+          : t("read {0} (lines {1}-{2} of {3})", relative(uri), slice.from, slice.to, slice.total),
+      );
+      return { content: slice.text + describeSlice(slice, relative(uri)) };
     },
   };
 
@@ -134,8 +221,11 @@ export function buildTools(deps: ToolDeps): Tool[] {
       const glob = String(args["glob"] ?? "**/*");
       const limit = Math.min(Number(args["limit"] ?? 100), 300);
       const uris = await vscode.workspace.findFiles(glob, undefined, limit);
+      // ⚠️ Said, not swallowed. A listing cut at its limit and reported as a plain list has told the
+      // model those are all the files there are. See `core/agent/capped.ts`.
+      const cut = describeCap(cappedAt(uris.length, limit), "files", "Pass a narrower `glob`, or raise `limit` (max 300).");
       ctx.report(t("{0} file(s) for {1}", uris.length, glob));
-      return { content: uris.map(relative).join("\n") || "(no match)" };
+      return { content: (uris.map(relative).join("\n") || "(no match)") + cut };
     },
   };
 
@@ -155,8 +245,14 @@ export function buildTools(deps: ToolDeps): Tool[] {
       const pattern = String(args["pattern"] ?? "");
       const glob = String(args["glob"] ?? "**/*");
       let re: RegExp;
+      let literal = false;
       try {
-        re = new RegExp(pattern, "g");
+        // Same handling as the terminal client's search: one dialect difference and one "that is not
+        // a regex at all", fixed in one place, or the two surfaces answer the same pattern
+        // differently.
+        const found = searchPattern(pattern, "g");
+        re = found.re;
+        literal = found.literal;
       } catch (err) {
         return { content: `Invalid regular expression: ${(err as Error).message}`, isError: true };
       }
@@ -175,8 +271,15 @@ export function buildTools(deps: ToolDeps): Tool[] {
           /* unreadable file */
         }
       }
-      ctx.report(t("{0} match(es) for /{1}/", out.length, pattern));
-      return { content: out.join("\n") || "(no match)" };
+      ctx.report(
+        literal ? t("{0} match(es) for “{1}”", out.length, pattern) : t("{0} match(es) for /{1}/", out.length, pattern),
+      );
+      // Said, because the model must not take `total(` for a working regular expression.
+      const note = literal ? "(searched as plain text: that pattern is not a valid regular expression)\n" : "";
+      // And said when the list was cut: sixty matches reported as sixty, out of two hundred, is a
+      // complete picture the model does not have.
+      const cut = describeCap(cappedAt(out.length, MAX_MATCHES), "matches", "Narrow the pattern, or pass a `glob` to search fewer files.");
+      return { content: note + (out.join("\n") || "(no match)") + cut };
     },
   };
 
@@ -229,17 +332,28 @@ export function buildTools(deps: ToolDeps): Tool[] {
       } catch {
         existed = false;
       }
+      // Held, so the save afterwards acts on the document this tool opened rather than on one found
+      // again by comparing URI strings. See `saveAfterEdit`.
+      let doc: vscode.TextDocument | undefined;
       if (existed) {
-        const doc = await vscode.workspace.openTextDocument(uri);
+        doc = await vscode.workspace.openTextDocument(uri);
         edit.replace(uri, new vscode.Range(0, 0, doc.lineCount, 0), content);
       } else {
+        // `createFile` with contents writes the file itself, so there is nothing to save after it.
         edit.createFile(uri, { contents: new TextEncoder().encode(content), overwrite: false });
       }
       const ok = await vscode.workspace.applyEdit(edit);
       ctx.report(existed ? t("edited {0}", relative(uri)) : t("created {0}", relative(uri)));
-      return ok
-        ? { content: `Wrote ${relative(uri)} (${content.split("\n").length} lines).`, display: { uri: uri.toString() } }
-        : { content: "The editor refused the edit.", isError: true };
+      if (!ok) return { content: "The editor refused the edit.", isError: true };
+      // Through to disk before anything reads the file. See `saveAfterEdit`.
+      const unsaved = doc ? await saveAfterEdit(uri, doc) : "";
+      // The same report as `edit_file`: writing a whole file is at least as likely to break it as
+      // replacing a snippet, and the model has even less reason to suspect it did.
+      const problems = await errorsAfterEdit(uri);
+      return {
+        content: `Wrote ${relative(uri)} (${content.split("\n").length} lines).${problems ? `\n${problems}` : ""}${unsaved}`,
+        display: { uri: uri.toString() },
+      };
     },
   };
 
@@ -247,11 +361,22 @@ export function buildTools(deps: ToolDeps): Tool[] {
     schema: {
       name: "edit_file",
       description:
-        "Replace an exact snippet in a file. `old` must appear exactly once. This is the preferred way to change existing code: it is reviewable and it cannot silently rewrite the rest of the file.",
+        "Replace an exact snippet in a file. `old` must appear exactly once. Omit `new`, or pass an " +
+        "empty string, to DELETE the snippet. This is the preferred way to change existing code: it " +
+        "is reviewable and it cannot silently rewrite the rest of the file.",
       parameters: {
         type: "object",
-        properties: { path: { type: "string" }, old: { type: "string" }, new: { type: "string" } },
-        required: ["path", "old", "new"],
+        properties: {
+          path: { type: "string" },
+          old: { type: "string" },
+          // ⚠️ NOT required, and the difference is a feature the tool did not have. Deleting a snippet
+          // means replacing it with nothing — and with `new` required, a model doing that either sends
+          // `""` and meets a provider that drops empty arguments, or omits the field and fails schema
+          // validation. Reported from a real session in the model's own words: "The empty `new`
+          // parameter is rejected." It shelled out to Node to delete two lines.
+          new: { type: "string", description: "The replacement. Omit it, or pass \"\", to delete the snippet." },
+        },
+        required: ["path", "old"],
       },
     },
     approval: (args) => t("edit {0}", String(args["path"])),
@@ -261,22 +386,136 @@ export function buildTools(deps: ToolDeps): Tool[] {
       const newText = String(args["new"] ?? "");
       const doc = await vscode.workspace.openTextDocument(uri);
       const text = doc.getText();
-      const first = text.indexOf(oldText);
-      if (first < 0) return { content: "That snippet does not appear in the file. Read it again.", isError: true };
-      if (text.indexOf(oldText, first + 1) >= 0) {
-        return { content: "That snippet appears more than once. Include more surrounding lines.", isError: true };
+      // ⚠️ Not `indexOf`. A file holding `é` as `e` + a combining accent and a model writing it as a
+      // single code point are the same text on screen and different strings to `indexOf` — so the
+      // tool said "that snippet does not appear in the file" about a snippet plainly in the file. A
+      // real session worked the cause out and began routing around it: "so I'm splitting the edit
+      // into small pieces without accents". See `core/text/findText.ts`.
+      const found = findUnique(text, oldText);
+      if ("problem" in found) {
+        return {
+          content:
+            found.problem === "absent"
+              ? "That snippet does not appear in the file. Read it again — use read_file with `from` and `to` if it is long."
+              : "That snippet appears more than once. Include more surrounding lines.",
+          isError: true,
+        };
       }
-      const next = text.slice(0, first) + newText + text.slice(first + oldText.length);
+      const first = found.start;
+      const next = text.slice(0, first) + newText + text.slice(found.end);
       if (deps.confirmEdit && !(await deps.confirmEdit(uri, next))) {
         return { content: "The user rejected the change after reviewing the diff.", isError: true };
       }
       const edit = new vscode.WorkspaceEdit();
-      edit.replace(uri, new vscode.Range(doc.positionAt(first), doc.positionAt(first + oldText.length)), newText);
+      // `found.end`, not `first + oldText.length`: when the match came through normalisation the two
+      // differ, and replacing the wrong span leaves half a character behind.
+      edit.replace(uri, new vscode.Range(doc.positionAt(first), doc.positionAt(found.end)), newText);
       const ok = await vscode.workspace.applyEdit(edit);
       ctx.report(t("edited {0}", relative(uri)));
-      return ok ? { content: `Edited ${relative(uri)}.` } : { content: "The editor refused the edit.", isError: true };
+      if (!ok) return { content: "The editor refused the edit.", isError: true };
+      // ⚠️ And CHECK. `applyEdit` returning true has been seen alongside a document that did not
+      // change — reported as "edit_file reported two successful changes, but elCoord didn't
+      // change". A tool that reports success it has not verified sends the model to spend its
+      // remaining steps disbelieving its own trace, which is exactly what that session did.
+      if (doc.getText() === text) {
+        return {
+          content: "The editor accepted the edit but the file did not change. Read it again before trying anything else.",
+          isError: true,
+        };
+      }
+      // Through to disk before anything reads the file, with the document this tool already opened —
+      // see `saveAfterEdit` for why looking it up again was not safe.
+      const unsaved = await saveAfterEdit(uri, doc);
+      // What the edit did, from the editor rather than from the model's opinion of its own diff.
+      const problems = await errorsAfterEdit(uri);
+      return { content: `Edited ${relative(uri)}.${problems ? `\n${problems}` : ""}${unsaved}` };
     },
   };
+
+  /**
+   * The errors the editor reports for a file just edited, after waiting for it to catch up.
+   *
+   * A language server parses on change and debounces, so asking immediately gets the state from
+   * before the edit. The wait is bounded and resolves early on the first diagnostics change for this
+   * file: a long wait would make every edit feel slow, and no wait would make this report the past.
+   *
+   * Errors only — a warning is a style opinion, and an edit that printed warnings would be noise on
+   * every turn. And nothing is returned when there are none: see `editProblems` for why silence is
+   * the honest answer rather than "no problems found".
+   */
+  async function errorsAfterEdit(uri: vscode.Uri): Promise<string> {
+    await new Promise<void>((resolve) => {
+      const timer = setTimeout(finish, 400);
+      const sub = vscode.languages.onDidChangeDiagnostics((e) => {
+        if (e.uris.some((u) => u.toString() === uri.toString())) finish();
+      });
+      function finish(): void {
+        clearTimeout(timer);
+        sub.dispose();
+        resolve();
+      }
+    });
+    const errors = vscode.languages
+      .getDiagnostics(uri)
+      .filter((d) => d.severity === vscode.DiagnosticSeverity.Error)
+      .map((d) => ({ line: d.range.start.line + 1, message: d.message }));
+    return editProblems(relative(uri), errors);
+  }
+
+  /**
+   * Write an applied edit through to disk.
+   *
+   * ⚠️⚠️ A `WorkspaceEdit` lands in the editor's in-memory document, not in the file. Without this,
+   * an approved edit leaves the buffer showing the new code while the file on disk still holds the
+   * old — and the very next step of an agent turn reads the DISK: `run_command` running the tests, a
+   * watcher rebuilding a stylesheet, a compiler, git. The agent then grades itself on code it did not
+   * write, "fixes" what was never broken, and compounds. It is the quietest possible failure, because
+   * the screen is right.
+   *
+   * Saving is correct rather than merely convenient here: `confirmEdit` showed the user this exact
+   * content and they pressed Apply. Leaving it unwritten is not a second safety net, it is a
+   * divergence between what the editor shows and what every other tool reads.
+   *
+   * Returns what to tell the model when the save did not happen, so a turn that proceeds on stale
+   * bytes at least knows it is doing so.
+   */
+  async function saveAfterEdit(uri: vscode.Uri, known?: vscode.TextDocument): Promise<string> {
+    // ⚠️⚠️ The document the CALLER already opened, not one looked up again.
+    //
+    // This used to re-find it with `textDocuments.find(d => d.uri.toString() === uri.toString())`,
+    // and that had two faults which together produced the worst report of this project so far: an
+    // agent whose own tools contradicted each other. From a real session —
+    //
+    //     "The tools contradict each other. The editor's diagnostics report copierDepuis at line
+    //       6545, while search_text and git_diff don't see it."
+    //
+    // Diagnostics read the editor's BUFFER; `search_text` and `git_diff` read the DISK. The edit was
+    // in one and not the other, so the model spent a dozen steps re-reading, re-checking and
+    // disbelieving itself — and ran out of steps before answering.
+    //
+    //   • A STRING COMPARE OF URIS IS NOT AN IDENTITY TEST. `openTextDocument` normalises what it
+    //     returns — drive-letter case, percent-encoding, a trailing slash — so the comparison can
+    //     fail on the very document that was just edited.
+    //   • AND A FAILED LOOKUP RETURNED SUCCESS. `if (!doc?.isDirty) return ""` reads "nothing to
+    //     save" and also catches "I could not find it", which are opposite facts. The one case this
+    //     function exists to catch was the one it reported as fine.
+    //
+    // So the caller passes the document it holds. The fallback stays for callers that have none, and
+    // it now distinguishes "not open" from "not dirty" instead of merging them into silence.
+    const doc =
+      known ??
+      vscode.workspace.textDocuments.find((d) => d.uri.toString() === uri.toString()) ??
+      // Paths compare more reliably than URI strings: same file, different spelling of the same URI.
+      vscode.workspace.textDocuments.find((d) => d.uri.fsPath === uri.fsPath);
+    if (!doc) {
+      // Said rather than swallowed. A file edited through a document nothing can find is a file whose
+      // change may never reach the disk, and the model has to know that before it runs the tests.
+      return `\nWARNING: ${relative(uri)} was edited but the editor did not hand back a document to save. Verify with git_diff before trusting a command's output.`;
+    }
+    if (!doc.isDirty) return "";
+    if (await doc.save()) return "";
+    return `\nWARNING: ${relative(uri)} was changed in the editor but could NOT be saved to disk. Commands you run will still read the old file.`;
+  }
 
   const runCommand: Tool = {
     schema: {
@@ -325,7 +564,7 @@ export function buildTools(deps: ToolDeps): Tool[] {
     ...(gitAvailable() ? buildGitTools() : []),
     // The same gate as the menu: a model that is told it can read source members on a machine with
     // no partition will try, and spend a turn discovering what the settings already knew.
-    ...(ibmiEnabled(readSettings().ibmi.integration) ? buildIbmiTools() : []),
+    ...(ibmiEnabled(readSettings().ibmi.integration) ? buildIbmiTools(readSettings().ibmi.writableLibraries) : []),
     ...(arcadInstalled() && deps.arcad ? buildArcadTools(deps.arcad) : []),
     // Same gate as the rest: a model told it can consult a knowledge base that is switched off
     // spends a call finding out. Off by default, because a base nobody asked for is a folder of
@@ -385,7 +624,33 @@ export function buildTools(deps: ToolDeps): Tool[] {
     },
   };
 
-  return [
+  /**
+   * Something the model noticed and was not asked about.
+   *
+   * A tool rather than a convention about prose, for the reason the plan is a tool: a convention is
+   * a request, and what comes back from a request has no shape. And it is RECORDED, not acted on —
+   * the whole value is that the finding reaches the person without the diff growing something they
+   * did not ask for.
+   */
+  const noteAside: Tool = {
+    schema: NOTE_ASIDE_TOOL,
+    // Nothing to approve: it changes nothing and reads nothing. A dialog here would be a dialog
+    // about a sentence.
+    approval: () => false,
+    parallel: () => true,
+    async run(args, ctx): Promise<ToolResult> {
+      const what = String(args["what"] ?? "").trim();
+      if (!what) return { content: "An aside needs something to say.", isError: true };
+      const where = String(args["where"] ?? "").trim();
+      deps.onNotice?.({ kind: "noticed", text: what, ...(where ? { where } : {}) });
+      ctx.report(t("noted: {0}", what.slice(0, 60)));
+      // Terse, and it says the thing the model has to hear: this was not a fix.
+      return { content: "Noted for the user. Do not change it." };
+    },
+  };
+
+  return withHooks([
+    ...buildSymbolTools(),
     readFile,
     listFiles,
     searchText,
@@ -394,6 +659,7 @@ export function buildTools(deps: ToolDeps): Tool[] {
     editFile,
     runCommand,
     ...(deps.onPlan ? [updatePlan] : []),
+    ...(deps.onNotice ? [noteAside] : []),
     ...integrations,
-  ];
+  ], deps.hooks);
 }

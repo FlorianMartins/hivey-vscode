@@ -11,6 +11,12 @@
 //
 //   • EXACTLY ONE STEP IS IN PROGRESS. A plan with three things happening at once is not a plan, it
 //     is a list — and the panel's whole design is "show the current step, count the rest".
+//   • AN UNFINISHED PLAN IS EVIDENCE. Added later, and it is the one thing here that changes an
+//     outcome rather than an appearance: a turn that ends with steps of its OWN plan outstanding is
+//     a turn that declared itself finished against its own list. That is the shape of evidence
+//     `router/outcome.ts` escalates on (ADR-0009), so `planVerdict` below hands it over. It also
+//     retires the reason the terminal client was never given this tool — "a tool whose output
+//     nothing displays spends tokens for nothing" was true while the plan was only a display.
 //   • THE LIST ONLY GROWS AND SETTLES. Steps keep their identity across updates, so a step marked
 //     done cannot quietly become pending again, and the display does not reshuffle under the eye of
 //     someone reading it.
@@ -95,3 +101,34 @@ export const PLAN_TOOL_DESCRIPTION = [
   "Exactly one step may be 'running' at a time. Titles are short and imperative, in the user's language.",
   "Do not call it for a single-step task: a one-line plan is noise.",
 ].join(" ");
+
+export interface PlanVerdict {
+  /** True when the plan itself says there is work left. */
+  unfinished: boolean;
+  /** Why, in the words a dialog shows and a hand-over note carries. */
+  why: string;
+  left: PlanStep[];
+}
+
+/**
+ * What the plan says about a turn that has just ended.
+ *
+ * Conservative in the same direction as `verifyTurn`, and for the same reason: **no plan at all is
+ * not unfinished work**. Plenty of good turns never needed one, and treating their absence as a
+ * failure would escalate every short answer — which is exactly what made the old keyword-based
+ * escalation worthless.
+ *
+ * A `skipped` step counts as settled. The model decided it was not needed, and a plan that could
+ * only ever be completed would be a plan nobody could correct halfway.
+ */
+export function planVerdict(plan: Plan | undefined): PlanVerdict {
+  const left = (plan?.steps ?? []).filter((s) => s.state === "pending" || s.state === "running");
+  if (!left.length) return { unfinished: false, why: "nothing in the plan is outstanding", left: [] };
+  return {
+    unfinished: true,
+    why: `the turn ended with ${left.length} step(s) of its own plan outstanding (${left
+      .map((s) => `"${s.title}"`)
+      .join(", ")})`,
+    left,
+  };
+}

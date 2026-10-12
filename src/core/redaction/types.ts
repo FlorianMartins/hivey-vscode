@@ -1,12 +1,12 @@
 // What the redaction pipeline knows about a piece of text before it may leave the machine.
 
-/** Every category the detectors can recognise. Ordered from "never send" to "context noise". */
+/** Every category the detectors can recognize. Ordered from "never send" to "context noise". */
 export type FindingKind =
   | "secret" // credentials, tokens, private keys — never leave, even redacted
   | "identity" // people: e-mail addresses, phone numbers, user names in paths
   | "infra" // machines: hostnames, IP addresses, internal URLs
   | "path" // filesystem layout that leaks a user or a company
-  | "term"; // organisation-specific words the operator listed (client names, codenames)
+  | "term"; // organization-specific words the operator listed (client names, codenames)
 
 export interface Finding {
   kind: FindingKind;

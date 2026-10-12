@@ -7,7 +7,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { changedLines, diffLines, unifiedDiff } from "../src/core/text/diff.js";
+import { changedLines, diffLines, unifiedDiff, changeSize, describeChangeSize } from "../src/core/text/diff.js";
 
 test("identical texts produce nothing at all", () => {
   assert.equal(unifiedDiff("a.ts", "one\ntwo\n", "one\ntwo\n"), "");
@@ -96,4 +96,21 @@ test("an enormous diff is cut, and says so", () => {
   const cut = unifiedDiff("f", before, after, { maxChars: 500 });
   assert.ok(cut.length <= 520, `still ${cut.length} characters`);
   assert.match(cut, /diff truncated/);
+});
+
+test("a change says how big it is", () => {
+  // ⚠️ The approval said "Apply the change to compteur.ts?" and nothing else, so a two-line fix and a
+  // four-hundred-line rewrite asked exactly the same question. Scale is what decides a quick yes
+  // from a careful read.
+  assert.deepEqual(changeSize("a\nb\nc\n", "a\nB\nc\nd\n"), { added: 2, removed: 1 });
+  assert.deepEqual(changeSize("a\n", "a\n"), { added: 0, removed: 0 });
+  assert.deepEqual(changeSize("", "a\nb\n"), { added: 2, removed: 0 });
+});
+
+test("the size reads as a diff stat, and says nothing when nothing changed", () => {
+  assert.equal(describeChangeSize({ added: 12, removed: 3 }), "+12 −3");
+  assert.equal(describeChangeSize({ added: 4, removed: 0 }), "+4");
+  assert.equal(describeChangeSize({ added: 0, removed: 7 }), "−7");
+  // Nothing at all rather than "+0 −0", which the caller uses to drop the clause entirely.
+  assert.equal(describeChangeSize({ added: 0, removed: 0 }), "");
 });
