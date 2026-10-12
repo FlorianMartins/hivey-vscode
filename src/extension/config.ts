@@ -37,6 +37,10 @@ export interface Settings {
     /** Ask for Anthropic's prompt cache through OpenRouter. Off: it changes the request's shape. */
     promptCache: boolean;
   };
+  agent: {
+    /** Model requests one agent turn may make. 0: no limit — it runs until done or stopped. */
+    maxSteps: number;
+  };
   /** Speaking instead of typing. Off until configured — see `core/dictation/dictation.ts`. */
   dictation: DictationSettings;
   /** Whether the panel takes the editor's colours or Hivey's own. See `media/style.css`. */
@@ -254,6 +258,7 @@ function readSettingsRaw(scope?: vscode.Uri): Settings {
       promptCache: c.get<boolean>("chat.promptCache", false),
       maxOutputTokens: c.get<number>("chat.maxOutputTokens", 8192),
     },
+    agent: { maxSteps: Math.max(0, Math.floor(c.get<number>("agent.maxSteps", 0) || 0)) },
     appearance: c.get<"editor" | "hivey">("appearance", "editor"),
     dictation: {
       command: c.get<string>("dictation.command", ""),

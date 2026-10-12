@@ -175,6 +175,17 @@ test("the step budget stops a loop that will not end", async () => {
   assert.equal(t.calls.length, 3);
 });
 
+test("with no step limit a long task runs to its end — past the old cap of thirty", async () => {
+  // "remove that cap, the model has to be able to do what it is asked from A to Z".
+  const t = tool("a");
+  const long = Array.from({ length: 45 }, (_, i) => ({ toolCalls: [{ id: `c${i}`, name: "a", args: `{"n":${i}}` }] }));
+  const provider = scriptedProvider([...long, { text: "all done" }]);
+  const r = await runTurn({ ...base, provider, tools: [t], maxSteps: Infinity });
+  assert.equal(r.stoppedBecause, "answer");
+  assert.equal(t.calls.length, 45);
+  assert.match(r.text, /all done/);
+});
+
 test("redaction happens on the way out and is undone on the way in", async () => {
   const provider = scriptedProvider([{ text: "the address ⟨EMAIL_1⟩ is invalid" }]);
   const r = await runTurn({
@@ -519,7 +530,7 @@ test("⚠️ the same call repeated is not run again, and a model that insists i
   const provider = scriptedProvider([{ toolCalls: [{ id: "1", name: "read_file", args: '{"path":"a.ts"}' }] }]);
   const r = await runTurn({ ...base, provider, tools: [read] });
   assert.equal(read.calls.length, 2, "run twice, then refused");
-  assert.equal(r.stoppedBecause, "max-steps", "the turn ends instead of spending all its steps");
+  assert.equal(r.stoppedBecause, "repeating", "the turn ends instead of spending all its steps");
   assert.ok(provider.seen.length <= 6, `${provider.seen.length} requests — it should stop early, not at 30`);
   const told = provider.seen.at(-1)!.messages.filter((m) => m.role === "tool").at(-1)!;
   assert.match(String(told.content), /already made this exact call/);

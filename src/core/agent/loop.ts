@@ -80,6 +80,11 @@ export interface TurnOptions {
   /** Messages built from the session (system prompt, ambient context, transcript). */
   messages: ChatMessage[];
   tools?: Tool[];
+  /**
+   * How many model requests one turn may make. `Infinity` for none: the extension's own agent turn
+   * runs until the task is done, the user presses stop, or the model goes round in circles — which
+   * the repeat detector catches without a count. See `DEFAULT_MAX_STEPS` for everyone else.
+   */
   maxSteps?: number;
   /**
    * Asked once, when the model stops calling tools: is this really finished?
@@ -160,7 +165,7 @@ export interface TurnResult {
   selfChecked: boolean;
   /** The cap a provider's refusal forced the last request down to, when one did. */
   shortenedTo?: number;
-  stoppedBecause: "answer" | "max-steps" | "cancelled";
+  stoppedBecause: "answer" | "max-steps" | "repeating" | "cancelled";
   /**
    * The model ran out of output budget rather than finishing.
    *
@@ -346,7 +351,7 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
     // turn ends here rather than spending the rest of its steps — or hours — on the same thing.
     if (repeatNudges > MAX_REPEAT_NUDGES) {
       opts.report?.("the model kept repeating the same tool call — the turn was stopped");
-      return done("max-steps");
+      return done("repeating");
     }
 
     // Fitted BEFORE it is sent, when the window is known: the estimate counts ~4 characters a

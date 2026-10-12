@@ -1359,6 +1359,12 @@
             "default": 8192,
             "markdownDescription": "%config.chat.maxOutputTokens%"
           },
+          "hiveyCode.agent.maxSteps": {
+            "type": "number",
+            "default": 0,
+            "minimum": 0,
+            "markdownDescription": "%config.agent.maxSteps%"
+          },
           "hiveyCode.chat.promptCache": {
             "type": "boolean",
             "default": false,

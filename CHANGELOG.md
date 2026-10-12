@@ -21,6 +21,15 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **⚠️ Le mode agent n'a plus de limite d'étapes : il va au bout de la tâche.** « il ne finit pas
+  les tâches […] retire cette bride, j'ai besoin que le modèle puisse faire ce qu'on lui demande de A
+  à Z ». Un tour d'agent s'arrêtait d'office après 30 requêtes au modèle — en pleine refonte, après
+  avoir lu, modifié et lancé les tests — avec pour seul signe une ligne d'état qui disparaissait aussitôt.
+  Par défaut il n'y a plus de limite : le tour s'arrête quand la tâche est finie, quand on appuie sur
+  Stop, ou quand le modèle répète le même appel (détecteur de boucles). Le nouveau réglage
+  `hiveyCode.agent.maxSteps` permet d'en remettre une ; si elle est atteinte, ou si le détecteur de
+  boucles arrête le tour, un avis reste affiché sous la réponse et un bouton **Continuer** relance la
+  tâche là où elle s'est arrêtée.
 - **⚠️ Un agent qui tourne en rond est arrêté.** « il tourne en rond depuis 12h sur une requête ».
   Seul le plafond de 30 étapes par tour arrêtait un modèle qui relisait le même fichier ou relançait
   la même recherche. Désormais, la même lecture (même outil, mêmes arguments) faite une troisième

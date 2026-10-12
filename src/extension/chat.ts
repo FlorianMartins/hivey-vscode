@@ -4770,6 +4770,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         // window is known: a fallback model elsewhere has its own.
         ...(useModel === model && this.modelWindow(settings) ? { contextWindow: this.modelWindow(settings) } : {}),
         recall: this.recallFor(this.session.id),
+        // ⚠️ "remove that cap, the model has to be able to do what it is asked from A to Z". Thirty
+        // requests stopped a real task half-way — silently, after reading, editing and testing — and
+        // it looked like the model giving up. No count by default: stop, and the repeat detector
+        // for a model going round in circles, are what end a turn that should not go on.
+        maxSteps: settings.agent.maxSteps > 0 ? settings.agent.maxSteps : Infinity,
         // Never an effort a model cannot use. The control is hidden when `canReason` is false, but a
         // stored preference survives a model change — so switching to a plain model went on sending
         // `effort: "high"` to an endpoint with no idea what to do with it. Hidden is not unsent.
@@ -5060,8 +5065,18 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         );
       }
 
-      if (result.stoppedBecause === "max-steps") {
-        this.post({ type: "status", text: t("Stopped after the maximum number of steps.") });
+      // Said where it stays — under the answer — and with the way on, in one click. A status line
+      // vanished with the next redraw, and the turn read as the model stopping for no reason.
+      if (result.stoppedBecause === "max-steps" || result.stoppedBecause === "repeating") {
+        const why =
+          result.stoppedBecause === "max-steps"
+            ? t("Stopped after {0} steps (hiveyCode.agent.maxSteps) before the task was finished.", settings.agent.maxSteps)
+            : t("Stopped: the model kept repeating the same call.");
+        answer.notices = [...(answer.notices ?? []), { kind: "tool", text: why }];
+        const resume = t("Continue");
+        void vscode.window.showWarningMessage(why, resume).then(async (choice) => {
+          if (choice === resume) await this.ask(t("Continue the task where you stopped."));
+        });
       }
       this.persist();
 
