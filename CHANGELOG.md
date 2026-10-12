@@ -32,10 +32,14 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
   chat), un appel d'outil à moitié écrit est écarté, et si la réponse reste incomplète le panneau le
   dit.
 
-- **La lueur autour de la zone de saisie : propre dans les coins, sans flou.** La version précédente
-  déplaçait un rectangle de lumière qui pivotait d'un quart de tour d'un coup dans chaque angle
-  (« effet de casse ») avec un halo flouté. La lumière est maintenant le **trait du cadre lui-même**
-  (SVG aux mêmes coins arrondis) : une tête nette et une traîne qui s'estompe, à vitesse constante.
+- **Bordure de la zone de saisie : un dégradé qui circule, net et discret.** « c'est vraiment pas
+  beau, je veux un rendu propre et futuriste comme sur le chat de GitHub Copilot ». Les versions
+  précédentes faisaient voyager une lumière (arc, rectangle, trait pointillé) et l'œil la suivait :
+  à-coups, cassures dans les coins, flou. Plus rien ne voyage : tout le cadre est éclairé d'un trait
+  fin aux couleurs du thème (accent, violet, cyan — ambre, corail, cyan en apparence Hivey) dont le
+  dégradé tourne lentement, avec une lueur très douce à l'extérieur seulement.
+
+- **Bouton Stop : l'icône est rouge, plus le fond.** Plus sobre ; un léger voile rouge au survol.
 
 - **Une conversation trop longue pour le contexte du serveur est résumée, puis la question est
   reposée — au lieu de finir en erreur.** Le serveur local tourne désormais avec un peu moins de
@@ -50,16 +54,6 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
   pour Qwen3.8). Ces trois tâches partent maintenant avec `reasoning_effort: "none"` vers le modèle
   local et votre propre gateway. Les réponses que vous lisez gardent leur réflexion, et les
   fournisseurs cloud ne sont pas touchés.
-
-- **⚠️ La lueur fait vraiment le tour du cadre.** « il fait gauche, haut, droite, bas et pas le tour
-  proprement ». C'était un dégradé conique tournant autour du **centre** : sur un cadre quatre fois
-  plus large que haut, un angle n'est pas une distance, et l'arc filait sur les petits côtés et se
-  traînait sur les grands. La lumière suit maintenant le **périmètre** (`offset-path: border-box`),
-  coins arrondis compris, à vitesse constante : un cœur lumineux sur le trait et un halo doux à
-  l'extérieur, jamais par-dessus le texte. Immobile si le système demande moins d'animations.
-
-- **Le bouton Stop est rouge.** Rempli, carré blanc sur rouge, pendant que l'IA raisonne, agit ou
-  répond — la seule couleur qui ne peut pas se lire comme « envoyer ».
 
 - **⚠️ Ce que lit le modèle est en anglais, quelle que soit la langue de l'interface.** « tous les
   skills, tools, etc sont en Français […] passer tout en anglais ». Les corps des skills, leurs noms

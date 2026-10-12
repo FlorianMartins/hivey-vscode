@@ -2759,95 +2759,76 @@ pre.code {
   box-shadow: 0 2px 8px color-mix(in srgb, var(--vscode-widget-shadow, transparent) 70%, transparent);
 }
 
-/* The light that runs around the border.
+/* The working border: a gradient that flows around the whole outline.
  *
- * Third version, and the reasons the first two were replaced are the specification:
- *  - a conic gradient turning about the card's CENTRE: on a box four times wider than tall an angle
- *    is not a distance, so it raced down the short sides and crawled along the long ones — "it goes
- *    left, top, right, bottom and not cleanly around";
- *  - a 160 px light moved along `offset-path` and ROTATED to follow it: in each corner it swung a
- *    quarter turn at once, half of it on each side, and its 8 px-blurred halo smeared the edges —
- *    "like a blur effect […] like a break at the corners".
+ * Fourth version. The earlier ones each drew a LIGHT that travels — a conic arc, a rotating
+ * rectangle, a dashed stroke — and the eye followed the object: it raced on the short sides,
+ * broke at the corners, smeared. "it really doesn't look good, I want a clean, futuristic look
+ * like the GitHub Copilot chat — this looks messy".
  *
- * Now the light IS the outline: an SVG rect with the card's own corner radius, stroked with a dash
- * that runs along it. A dash bends exactly with the curve because it is drawn on it, and
- * `pathLength="100"` makes every length a share of the perimeter, so the speed is the same on
- * every side whatever the box measures. Three strokes, ends aligned, sharing one clock: a faint long
- * tail, a nearer tail and the head — bright, crisp, a 2 px shadow at most.
+ * So nothing travels. The whole border is lit, always, with a soft gradient of the theme's accent,
+ * violet and cyan, and the GRADIENT turns slowly (`@property` makes the angle animatable). With
+ * no object to follow, speed is not something the eye can measure, and a mask keeps it a crisp
+ * 1.5 px line with the card's own corners. A faint glow sits outside the line, behind the card,
+ * so nothing ever blurs over the text.
  *
- * Each stroke is `len` long and its END advances from 0 to 100: dashoffset `len` → `len - 100`.
- * ⚠️ 4 s a lap, the editor's own figure for its chat input: alive, never a spinner. */
+ * 6 s a turn: alive, never a spinner. */
+@property --hc-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+.composer {
+  --flow-a: var(--vscode-focusBorder);
+  --flow-b: var(--vscode-charts-purple, #b180d7);
+  --flow-c: var(--vscode-charts-blue, #4daafc);
+}
+:root[data-appearance="hivey"] .composer {
+  --flow-a: #ffab2e;
+  --flow-b: #ff7a59;
+  --flow-c: #5fd0f5;
+}
 .composer.working .composer-card {
   border-color: transparent;
 }
-.composer-ring {
+.composer-ring,
+.composer-glow {
   display: none;
   position: absolute;
-  /* The border box: absolute insets measure from the padding box, inside the 1 px border. */
   inset: -1px;
-  width: calc(100% + 2px);
-  height: calc(100% + 2px);
-  overflow: visible;
+  border-radius: inherit;
   pointer-events: none;
+  background: conic-gradient(
+    from var(--hc-angle),
+    var(--flow-a),
+    var(--flow-b),
+    var(--flow-c),
+    var(--flow-a)
+  );
+  animation: hc-flow 6s linear infinite;
 }
-.composer.working .composer-ring {
+.composer.working .composer-ring,
+.composer.working .composer-glow {
   display: block;
 }
-.composer-ring rect {
-  x: 0;
-  y: 0;
-  width: 100%;
-  height: 100%;
-  rx: var(--radius-lg);
-  ry: var(--radius-lg);
-  fill: none;
-  stroke: var(--vscode-focusBorder);
-  stroke-width: var(--ring);
-  stroke-linecap: round;
-  animation-duration: 4s;
-  animation-timing-function: linear;
-  animation-iteration-count: infinite;
+/* The line itself: everything but the edge masked away. */
+.composer-ring {
+  padding: 1.5px;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
 }
-.composer-ring .ring-tail-far {
-  stroke-dasharray: 34 66;
-  animation-name: hc-run-34;
-  opacity: 0.16;
+/* The glow: the same gradient, softened, BEHIND the card (`z-index: -1`; the card is not a stacking
+   context), so only what spills outside the edge is seen. */
+.composer-glow {
+  z-index: -1;
+  filter: blur(6px);
+  opacity: 0.35;
 }
-.composer-ring .ring-tail {
-  stroke-dasharray: 18 82;
-  animation-name: hc-run-18;
-  opacity: 0.4;
-}
-.composer-ring .ring-head {
-  stroke-dasharray: 7 93;
-  animation-name: hc-run-7;
-  stroke: color-mix(in srgb, var(--vscode-focusBorder) 70%, white);
-  filter: drop-shadow(0 0 2px var(--vscode-focusBorder));
-}
-/* One keyframe set per length: a custom property inside @keyframes is not interpolated here, so
-   the dash stood still. Each stroke's END runs from 0 to 100 — dashoffset `len` → `len - 100`. */
-@keyframes hc-run-34 {
-  from {
-    stroke-dashoffset: 34;
-  }
+@keyframes hc-flow {
   to {
-    stroke-dashoffset: -66;
-  }
-}
-@keyframes hc-run-18 {
-  from {
-    stroke-dashoffset: 18;
-  }
-  to {
-    stroke-dashoffset: -82;
-  }
-}
-@keyframes hc-run-7 {
-  from {
-    stroke-dashoffset: 7;
-  }
-  to {
-    stroke-dashoffset: -93;
+    --hc-angle: 360deg;
   }
 }
 /* ⚠️ The ring was there, and hidden — by the focus outline.
@@ -2878,16 +2859,12 @@ pre.code {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  /* Still, as a plain accent on the whole line: the light stops travelling and the halo goes. */
-  /* Still: the whole outline as one quiet line, no travelling light. */
-  .composer-ring rect {
+  /* Still: the same gradient, not turning, and no glow. */
+  .composer-ring {
     animation: none;
-    display: none;
   }
-  .composer-ring .ring-tail {
-    display: inline;
-    stroke-dasharray: none;
-    opacity: 0.5;
+  .composer-glow {
+    display: none !important;
   }
   .md.live > *:last-child::after {
     animation: none;
@@ -4622,27 +4599,26 @@ pre.code code {
   color: inherit;
   background: none;
 }
-/* ⚠️ Stop is red, and filled. "the Stop button when the AI answers, can you make it red so it stands
- * out". The worry above was a filled Stop being misread as Send — red is the one fill that cannot be:
- * it is the colour of halting, and nothing else in the composer wears it. A fixed red rather than
- * the theme's error colour, which is a pale foreground on dark themes and would put the white
- * square on a pink. */
+/* ⚠️ Stop is a red ICON, not a red button. "make the icon red rather than a red background with
+ * the icon inside, for a cleaner, more minimal look". Red is still the one colour nothing else in
+ * the composer wears — that is what keeps it from being misread as Send — and a bare icon sits in
+ * the toolbar like its neighbours instead of shouting over them. Hover adds a faint red wash. */
 :root {
-  --stop: #d93a3a;
-  --stop-hover: #b92e2e;
+  --stop: #e5484d;
 }
 .composer .btn.send.stop,
 .composer.working .btn.send.stop {
-  color: #fff;
-  background: var(--stop);
-  border-radius: var(--radius);
+  color: var(--stop);
+  background: none;
 }
 .composer .btn.send.stop:hover,
 .composer.working .btn.send.stop:hover {
-  background: var(--stop-hover);
+  color: var(--stop);
+  background: color-mix(in srgb, var(--stop) 14%, transparent);
+  border-radius: var(--radius);
 }
 .composer .btn.send.stop:focus-visible {
-  outline: var(--ring) solid color-mix(in srgb, var(--stop) 55%, white);
+  outline: var(--ring) solid color-mix(in srgb, var(--stop) 55%, transparent);
   outline-offset: 1px;
 }
 

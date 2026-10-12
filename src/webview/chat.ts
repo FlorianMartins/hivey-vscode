@@ -1125,25 +1125,15 @@ export function restoreDraft(draft: Draft | undefined): void {
 }
 
 /**
- * The light that runs around the composer while a turn is working — see `.composer-ring` in the
- * stylesheet. Always present and hidden at rest, so a turn starting only has to toggle a class on
- * the composer (`setStreaming`) rather than rebuild it.
+ * The flowing border shown while a turn is working — see `.composer-ring` in the stylesheet: the
+ * line itself and, behind the card, its faint glow. Always present and hidden at rest, so a turn
+ * starting only has to toggle a class on the composer (`setStreaming`) rather than rebuild it.
  */
 function composerRing(): Element[] {
-  const NS = "http://www.w3.org/2000/svg";
-  const svg = document.createElementNS(NS, "svg");
-  svg.setAttribute("class", "composer-ring");
-  svg.setAttribute("aria-hidden", "true");
-  // Back to front: the faint long tail, the nearer tail, the bright head. The
-  // geometry (size, corner radius, dashes) is all in the stylesheet; `pathLength` makes every
-  // length a share of the perimeter, whatever the box measures.
-  for (const part of ["ring-tail-far", "ring-tail", "ring-head"]) {
-    const rect = document.createElementNS(NS, "rect");
-    rect.setAttribute("class", part);
-    rect.setAttribute("pathLength", "100");
-    svg.append(rect);
-  }
-  return [svg];
+  const glow = el("div", "composer-glow");
+  const ring = el("div", "composer-ring");
+  for (const node of [glow, ring]) node.setAttribute("aria-hidden", "true");
+  return [glow, ring];
 }
 
 function composer(state: UiState, deps: ChatDeps): HTMLElement {
