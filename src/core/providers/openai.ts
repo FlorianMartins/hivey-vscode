@@ -267,9 +267,14 @@ export class OpenAICompatibleProvider implements Provider {
     // (several providers send the id only on the first fragment).
     const partial = new Map<number, { id: string; name: string; args: string }>();
 
+    // Whether the provider ever said it was done: a `finish_reason`, or the `[DONE]` sentinel. A
+    // stream that simply stops without either was cut — see `ChatResult.interrupted`.
+    let finished = false;
     for await (const line of sseLines(res.body, req.signal)) {
+      if (line === "data: [DONE]" || line === "data:[DONE]") finished = true;
       const payload = sseData(line) as any;
       if (!payload) continue;
+      if (payload.choices?.[0]?.finish_reason) finished = true;
       if (payload.error) throw new Error(payload.error.message ?? String(payload.error));
       const choice = payload.choices?.[0];
       if (payload.usage) {
@@ -330,7 +335,8 @@ export class OpenAICompatibleProvider implements Provider {
     // budget was the reason. Complete calls are kept; an unfinished one is dropped, and "length"
     // survives so the loop can ask for the rest. Seen live on Qwen3.8 through llama.cpp: "Here is
     // the plan, then I'll get started:" and then nothing, 8192 tokens later.
-    const cut = stopReason === "length";
+    // An interrupted stream is cut too: a call still being written when the connection closed is half a call.
+    const cut = stopReason === "length" || (!finished && !req.signal?.aborted);
     const usable = cut ? toolCalls.filter((c) => isCompleteJson(c.args)) : toolCalls;
     if (usable.length && !cut) stopReason = "tool_calls";
 
@@ -341,6 +347,8 @@ export class OpenAICompatibleProvider implements Provider {
       usage,
       stopReason,
       ...(this.lastShortened ? { shortenedTo: this.lastShortened } : {}),
+      // ⚠️ Cut, not finished — unless the user stopped it, in which case it is neither news nor a fault.
+      ...(!finished && !req.signal?.aborted ? { interrupted: true } : {}),
     };
   }
 

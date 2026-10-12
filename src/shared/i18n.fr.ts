@@ -1171,6 +1171,8 @@ export const FR: Record<string, string> = {
   "Choose a microphone to dictate: this machine has several inputs.":
     "Choisissez un micro pour dicter : cette machine a plusieurs entrées.",
   "Choose a microphone": "Choisir un micro",
+  "The reply was interrupted before it finished (the connection to the model was closed). Ask it to continue.":
+    "La réponse a été interrompue avant la fin (la connexion au modèle a été coupée). Demandez-lui de continuer.",
   "The conversation no longer fits the model's context: summarizing it, then asking again…":
     "La conversation ne tient plus dans le contexte du modèle : résumé en cours, puis la question est reposée…",
   "This question and its attachments do not fit the model's context window. Detach a file or narrow the selection, then ask again.":

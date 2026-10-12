@@ -279,6 +279,44 @@ test("⚠️ a side task on a self-hosted server is sent with thinking off — a
   assert.equal((await sent("openai", true)).reasoning_effort, undefined, "a cloud is not touched");
 });
 
+test("⚠️ a stream that stops without ever finishing is reported as interrupted, not as an answer", async () => {
+  // "it cuts off in the middle sometimes": the connection closed (a server restarted, a proxy
+  // dropped it) and the half answer read as a whole one, because nothing checked that the provider
+  // had said it was done.
+  const cut = await serve((_req, res) => {
+    res.writeHead(200, { "Content-Type": "text/event-stream" });
+    res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: "The first half of" } }] })}\n\n`);
+    res.end(); // no finish_reason, no [DONE]
+  });
+  const r = await new OpenAICompatibleProvider({ id: "local", baseUrl: cut.url, isLocal: true }).chat({
+    model: "m",
+    messages: [{ role: "user", content: "hi" }],
+  });
+  await cut.close();
+  assert.equal(r.text, "The first half of");
+  assert.equal(r.interrupted, true);
+
+  // A stream that finished says so, and is not flagged — by [DONE] alone, or by finish_reason alone.
+  const whole = await serve((_req, res) => sse(res, [{ choices: [{ delta: { content: "All of it." } }] }]));
+  const w = await new OpenAICompatibleProvider({ id: "local", baseUrl: whole.url, isLocal: true }).chat({
+    model: "m",
+    messages: [{ role: "user", content: "hi" }],
+  });
+  await whole.close();
+  assert.equal(w.interrupted, undefined);
+  const byReason = await serve((_req, res) => {
+    res.writeHead(200, { "Content-Type": "text/event-stream" });
+    res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: "Done." }, finish_reason: "stop" }] })}\n\n`);
+    res.end();
+  });
+  const b = await new OpenAICompatibleProvider({ id: "local", baseUrl: byReason.url, isLocal: true }).chat({
+    model: "m",
+    messages: [{ role: "user", content: "hi" }],
+  });
+  await byReason.close();
+  assert.equal(b.interrupted, undefined);
+});
+
 test("reasoning effort is translated per provider, not passed through", async () => {
   // OpenRouter normalizes it under `reasoning`; an OpenAI-shaped gateway takes `reasoning_effort`.
   const or = await serve((_req, res) => sse(res, [{ choices: [{ delta: { content: "x" } }] }]));

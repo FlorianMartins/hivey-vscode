@@ -4867,6 +4867,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       // chat turn with no tools to carry on with — it is said, not left to look finished. That was
       // the whole of the "it stops, it is stuck" report: nothing on screen distinguished a reply
       // that ended from one the budget ended.
+      // The same for a stream the connection cut and the continuations could not complete: said,
+      // never left to look like a finished answer.
+      if (result.interrupted && !ctl.signal.aborted) {
+        const why = t("The reply was interrupted before it finished (the connection to the model was closed). Ask it to continue.");
+        this.log.appendLine("[turn] reply stream interrupted before finish_reason");
+        this.post({ type: "status", text: why, ok: false });
+        turnNotices.push({ kind: "tool", text: why });
+      }
       if (result.truncated && result.text.trim() && !ctl.signal.aborted) {
         const why = t("The reply was cut off at the output limit ({0} tokens). Raise hiveyCode.chat.maxOutputTokens, or ask it to continue.", settings.chat.maxOutputTokens);
         this.log.appendLine(`[turn] reply cut off at max_tokens=${settings.chat.maxOutputTokens}`);

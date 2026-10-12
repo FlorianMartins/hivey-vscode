@@ -112,6 +112,12 @@ export interface ChatResult {
   usage: Usage;
   stopReason: "stop" | "length" | "tool_calls" | "error";
   /**
+   * The stream ended without the provider ever saying it had finished — no `finish_reason`, no
+   * `[DONE]`: the connection closed under it (a server restarted, a proxy dropped it). What arrived
+   * is real but incomplete, and must not be taken for a finished answer.
+   */
+  interrupted?: boolean;
+  /**
    * The answer cap a refusal forced this request down to, when one did.
    *
    * Present only when a provider refused the request for its size and said what it could afford —

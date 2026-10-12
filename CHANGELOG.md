@@ -6,6 +6,19 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **⚠️ Une réponse coupée en plein milieu n'est plus prise pour une réponse finie.** « il coupe en
+  plein milieu parfois ». Quand la connexion au modèle se ferme avant la fin (serveur redémarré,
+  proxy qui coupe), le flux s'arrêtait sans le marqueur de fin (`finish_reason` / `[DONE]`) et le
+  texte reçu devenait « la réponse », sans rien dire. Le flux interrompu est maintenant détecté, le
+  modèle est relancé pour **continuer là où il s'est arrêté** (deux fois au plus, y compris en mode
+  chat), un appel d'outil à moitié écrit est écarté, et si la réponse reste incomplète le panneau le
+  dit.
+
+- **La lueur autour de la zone de saisie : propre dans les coins, sans flou.** La version précédente
+  déplaçait un rectangle de lumière qui pivotait d'un quart de tour d'un coup dans chaque angle
+  (« effet de casse ») avec un halo flouté. La lumière est maintenant le **trait du cadre lui-même**
+  (SVG aux mêmes coins arrondis) : une tête nette et une traîne qui s'estompe, à vitesse constante.
+
 - **Une conversation trop longue pour le contexte du serveur est résumée, puis la question est
   reposée — au lieu de finir en erreur.** Le serveur local tourne désormais avec un peu moins de
   contexte par conversation (le décodage spéculatif qui double la vitesse occupe une part de la

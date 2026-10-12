@@ -162,6 +162,8 @@ export interface TurnResult {
    * mode that asks the model to investigate before it writes.
    */
   truncated: boolean;
+  /** The last reply's stream was cut before the model finished — see `ChatResult.interrupted`. */
+  interrupted?: boolean;
 }
 
 /**
@@ -193,6 +195,9 @@ const CONTINUE_AFTER_CUT =
   "Your previous reply was cut off by the output token limit before you finished, and any tool call you were writing was lost. " +
   "Continue from where you stopped without repeating what you already wrote. " +
   "If you were writing a large file, a long plan or a big edit, split it into several smaller tool calls, each well under the limit.";
+const CONTINUE_AFTER_INTERRUPT =
+  "Your previous reply was interrupted before you finished (the connection to you was closed), and any tool call you were writing was lost. " +
+  "Continue exactly from where you stopped, without repeating what you already wrote.";
 
 /**
  * Below this there is nothing worth caching, and marking it costs money.
@@ -251,6 +256,8 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
   let reasoning = "";
   /** Set by the last response that ran out of output budget. See `TurnResult.truncated`. */
   let truncated = false;
+  /** Set by the last response whose stream was cut. See `TurnResult.interrupted`. */
+  let interrupted = false;
   /** How many times this turn has asked for the rest of a reply the cap cut off. */
   let continuations = 0;
 
@@ -292,6 +299,7 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
     if (typeof res.usage.costUsd === "number") usage.costUsd = (usage.costUsd ?? 0) + res.usage.costUsd;
 
     truncated = res.stopReason === "length";
+    interrupted = Boolean(res.interrupted);
     if (res.shortenedTo) shortenedTo = res.shortenedTo;
     const answer = opts.afterResponse ? opts.afterResponse(res.text) : res.text;
     if (answer) text = text ? `${text}\n${answer}` : answer;
@@ -312,6 +320,18 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
       opts.report?.("the reply hit the output limit — asking the model to continue");
       working.push({ role: "assistant", content: res.text || "(cut off)" });
       working.push({ role: "user", content: CONTINUE_AFTER_CUT });
+      continue;
+    }
+    // ⚠️ The stream was CUT — the connection closed before the model said it was done (a server
+    // restarted, a proxy dropped it). "it cuts off in the middle sometimes". What arrived is half
+    // an answer that read as a whole one. Asked to carry on, in any mode — continuing a text has no
+    // side effect — bounded like the cap above; if the server is really gone the next request
+    // fails loudly, which is the honest outcome.
+    if (interrupted && !res.toolCalls.length && continuations < MAX_CONTINUATIONS) {
+      continuations++;
+      opts.report?.("the reply was interrupted before it finished — asking the model to continue");
+      working.push({ role: "assistant", content: res.text || "(interrupted)" });
+      working.push({ role: "user", content: CONTINUE_AFTER_INTERRUPT });
       continue;
     }
 
@@ -461,6 +481,7 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
       trace,
       stoppedBecause,
       truncated,
+      ...(interrupted ? { interrupted: true } : {}),
       selfChecked,
       ...(shortenedTo ? { shortenedTo } : {}),
     };

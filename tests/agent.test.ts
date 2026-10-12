@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { runTurn, type Tool } from "../src/core/agent/loop.js";
 import type { ChatRequest, ChatResult, Provider } from "../src/core/providers/types.js";
 
-type Scripted = { text?: string; toolCalls?: Array<{ id: string; name: string; args: string }>; truncated?: boolean; reasoning?: string };
+type Scripted = { text?: string; toolCalls?: Array<{ id: string; name: string; args: string }>; truncated?: boolean; reasoning?: string; interrupted?: boolean };
 
 function scriptedProvider(script: Scripted[]): Provider & { seen: ChatRequest[] } {
   let i = 0;
@@ -27,6 +27,7 @@ function scriptedProvider(script: Scripted[]): Provider & { seen: ChatRequest[] 
         toolCalls: s.toolCalls ?? [],
         usage: { promptTokens: 10, completionTokens: 5, cachedTokens: 0 },
         stopReason: s.truncated ? "length" : s.toolCalls?.length ? "tool_calls" : "stop",
+        ...(s.interrupted ? { interrupted: true } : {}),
       };
     },
     async listModels() {
@@ -409,4 +410,25 @@ test("arguments the vault does not know are left exactly as they are", async () 
     messages: [{ role: "user", content: "write it" }],
   });
   assert.equal(seen[0]?.["body"], "⟨UNKNOWN_9⟩");
+});
+
+test("⚠️ a reply whose stream was cut is continued, in chat mode too", async () => {
+  // "it cuts off in the middle sometimes" — the connection closed before the model finished. No
+  // tools here: continuing a text has no side effect, so chat mode is continued as well.
+  const provider = scriptedProvider([
+    { text: "The first half of the answer", interrupted: true },
+    { text: "and the end of it." },
+  ]);
+  const r = await runTurn({ ...base, provider });
+  assert.equal(provider.seen.length, 2, "asked to continue once");
+  assert.match(String(provider.seen[1]!.messages.at(-1)!.content), /interrupted before you finished/);
+  assert.match(r.text, /The first half of the answer\s+and the end of it\./);
+  assert.equal(r.interrupted, undefined, "the turn finished in the end");
+});
+
+test("continuing after an interruption is bounded, and the turn says it stayed interrupted", async () => {
+  const provider = scriptedProvider([{ text: "again cut", interrupted: true }]);
+  const r = await runTurn({ ...base, provider });
+  assert.equal(provider.seen.length, 3, "one reply and two continuations, then it stops");
+  assert.equal(r.interrupted, true);
 });

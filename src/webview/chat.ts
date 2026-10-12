@@ -1129,13 +1129,21 @@ export function restoreDraft(draft: Draft | undefined): void {
  * stylesheet. Always present and hidden at rest, so a turn starting only has to toggle a class on
  * the composer (`setStreaming`) rather than rebuild it.
  */
-function composerRing(): HTMLElement[] {
-  const ring = el("div", "composer-ring");
-  ring.append(el("span", "composer-ring-light"));
-  const halo = el("div", "composer-halo");
-  halo.append(el("span", "composer-halo-light"));
-  for (const node of [ring, halo]) node.setAttribute("aria-hidden", "true");
-  return [halo, ring];
+function composerRing(): Element[] {
+  const NS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(NS, "svg");
+  svg.setAttribute("class", "composer-ring");
+  svg.setAttribute("aria-hidden", "true");
+  // Back to front: the faint long tail, the nearer tail, the bright head. The
+  // geometry (size, corner radius, dashes) is all in the stylesheet; `pathLength` makes every
+  // length a share of the perimeter, whatever the box measures.
+  for (const part of ["ring-tail-far", "ring-tail", "ring-head"]) {
+    const rect = document.createElementNS(NS, "rect");
+    rect.setAttribute("class", part);
+    rect.setAttribute("pathLength", "100");
+    svg.append(rect);
+  }
+  return [svg];
 }
 
 function composer(state: UiState, deps: ChatDeps): HTMLElement {
