@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { runTurn, type Tool } from "../src/core/agent/loop.js";
 import type { ChatRequest, ChatResult, Provider } from "../src/core/providers/types.js";
 
-type Scripted = { text?: string; toolCalls?: Array<{ id: string; name: string; args: string }>; truncated?: boolean; reasoning?: string };
+type Scripted = { text?: string; toolCalls?: Array<{ id: string; name: string; args: string }>; truncated?: boolean; reasoning?: string; interrupted?: boolean };
 
 function scriptedProvider(script: Scripted[]): Provider & { seen: ChatRequest[] } {
   let i = 0;
@@ -27,6 +27,7 @@ function scriptedProvider(script: Scripted[]): Provider & { seen: ChatRequest[] 
         toolCalls: s.toolCalls ?? [],
         usage: { promptTokens: 10, completionTokens: 5, cachedTokens: 0 },
         stopReason: s.truncated ? "length" : s.toolCalls?.length ? "tool_calls" : "stop",
+        ...(s.interrupted ? { interrupted: true } : {}),
       };
     },
     async listModels() {
@@ -409,4 +410,102 @@ test("arguments the vault does not know are left exactly as they are", async () 
     messages: [{ role: "user", content: "write it" }],
   });
   assert.equal(seen[0]?.["body"], "⟨UNKNOWN_9⟩");
+});
+
+test("⚠️ a reply whose stream was cut is continued, in chat mode too", async () => {
+  // "it cuts off in the middle sometimes" — the connection closed before the model finished. No
+  // tools here: continuing a text has no side effect, so chat mode is continued as well.
+  const provider = scriptedProvider([
+    { text: "The first half of the answer", interrupted: true },
+    { text: "and the end of it." },
+  ]);
+  const r = await runTurn({ ...base, provider });
+  assert.equal(provider.seen.length, 2, "asked to continue once");
+  assert.match(String(provider.seen[1]!.messages.at(-1)!.content), /interrupted before you finished/);
+  assert.match(r.text, /The first half of the answer\s+and the end of it\./);
+  assert.equal(r.interrupted, undefined, "the turn finished in the end");
+});
+
+test("continuing after an interruption is bounded, and the turn says it stayed interrupted", async () => {
+  const provider = scriptedProvider([{ text: "again cut", interrupted: true }]);
+  const r = await runTurn({ ...base, provider });
+  assert.equal(provider.seen.length, 3, "one reply and two continuations, then it stops");
+  assert.equal(r.interrupted, true);
+});
+
+test("⚠️ a turn that outgrows the context mid-way shortens old tool outputs and goes on", async () => {
+  // "HTTP 400 Bad Request: request (69882 tokens) exceeds the available context size (69632
+  // tokens)" — in the MIDDLE of an agent turn: tool results piled up and nothing trimmed them.
+  const big = "line of a long build log\n".repeat(2000); // ~48 000 characters
+  const read = tool("read_file", { run: async () => ({ content: big }) });
+  let calls = 0;
+  const seen: string[][] = [];
+  const provider: Provider = {
+    id: "fake",
+    baseUrl: "http://127.0.0.1:11434/v1",
+    isLocal: true,
+    async chat(req): Promise<ChatResult> {
+      calls++;
+      seen.push(req.messages.filter((m) => m.role === "tool").map((m) => m.content));
+      const toolChars = req.messages.filter((m) => m.role === "tool").reduce((n, m) => n + m.content.length, 0);
+      if (calls <= 2) {
+        return { text: "", reasoning: "", toolCalls: [{ id: `c${calls}`, name: "read_file", args: "{}" }], usage: { promptTokens: 1, completionTokens: 1, cachedTokens: 0 }, stopReason: "tool_calls" };
+      }
+      if (toolChars > 60_000) throw new Error("HTTP 400 Bad Request: request (69882 tokens) exceeds the available context size (69632 tokens), try increasing it");
+      return { text: "Done, from what fitted.", reasoning: "", toolCalls: [], usage: { promptTokens: 1, completionTokens: 1, cachedTokens: 0 }, stopReason: "stop" };
+    },
+    async listModels() {
+      return [];
+    },
+  };
+  const r = await runTurn({ ...base, provider, tools: [read] });
+  assert.equal(r.text, "Done, from what fitted.", "the turn finished instead of dying on the error");
+  const last = seen.at(-1)!;
+  assert.match(last[0]!, /characters of this output were removed to fit/, "the OLDEST output was shortened");
+  assert.equal(last[1], big, "the latest output — the one the next step is about — is left whole");
+});
+
+test("⚠️ with the window known, the turn is fitted BEFORE it is sent — no error at all", async () => {
+  // "we can't leave a limit like that": the server's refusal is the last line of defence, not the
+  // mechanism. Knowing the window, the loop shortens old tool outputs before asking.
+  const big = "line of a long build log\n".repeat(4000); // ~96 000 characters ≈ 24 000 tokens each
+  const read = tool("read_file", { run: async () => ({ content: big }) });
+  let calls = 0;
+  let largest = 0;
+  const provider: Provider = {
+    id: "fake",
+    baseUrl: "http://127.0.0.1:11434/v1",
+    isLocal: true,
+    async chat(req): Promise<ChatResult> {
+      calls++;
+      const chars = req.messages.reduce((n, m) => n + m.content.length, 0);
+      largest = Math.max(largest, chars);
+      if (chars / 4 > 69632) throw new Error("request (80000 tokens) exceeds the available context size (69632 tokens)");
+      if (calls <= 3) {
+        return { text: "", reasoning: "", toolCalls: [{ id: `c${calls}`, name: "read_file", args: "{}" }], usage: { promptTokens: 1, completionTokens: 1, cachedTokens: 0 }, stopReason: "tool_calls" };
+      }
+      return { text: "All read.", reasoning: "", toolCalls: [], usage: { promptTokens: 1, completionTokens: 1, cachedTokens: 0 }, stopReason: "stop" };
+    },
+    async listModels() {
+      return [];
+    },
+  };
+  const r = await runTurn({ ...base, provider, tools: [read], contextWindow: 69632 });
+  assert.equal(r.text, "All read.");
+  assert.ok(largest / 4 <= 69632 * 0.9, `a request of ~${Math.round(largest / 4)} tokens was sent`);
+});
+
+test("when nothing is left to shorten, the context error stands", async () => {
+  const provider: Provider = {
+    id: "fake",
+    baseUrl: "http://127.0.0.1:11434/v1",
+    isLocal: true,
+    async chat(): Promise<ChatResult> {
+      throw new Error("HTTP 400 Bad Request: request (80000 tokens) exceeds the available context size (69632 tokens)");
+    },
+    async listModels() {
+      return [];
+    },
+  };
+  await assert.rejects(runTurn({ ...base, provider }), /exceeds the available context size/);
 });

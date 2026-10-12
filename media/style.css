@@ -2759,84 +2759,76 @@ pre.code {
   box-shadow: 0 2px 8px color-mix(in srgb, var(--vscode-widget-shadow, transparent) 70%, transparent);
 }
 
-/* The light that runs around the border.
+/* The working border: a gradient that flows around the whole outline.
  *
- * ⚠️ It was a conic gradient turning about the card's CENTRE, masked to the outline. On a box four
- * times wider than it is tall an angle is not a distance: the arc raced down the short sides and
- * crawled along the long ones, so it read as "left, top, right, bottom" rather than as one light
- * going round — "it goes left, top, right, bottom and not cleanly around".
+ * Fourth version. The earlier ones each drew a LIGHT that travels — a conic arc, a rotating
+ * rectangle, a dashed stroke — and the eye followed the object: it raced on the short sides,
+ * broke at the corners, smeared. "it really doesn't look good, I want a clean, futuristic look
+ * like the GitHub Copilot chat — this looks messy".
  *
- * Now a light that follows the PERIMETER itself: `offset-path: border-box` is the box's own outline,
- * rounded corners included, and `offset-distance` from 0 to 100 % moves along it at constant
- * speed. Two of them on the same path and clock: a bright core clipped to the ring line, and a soft
- * halo outside it that makes it read as light rather than as paint. The elements are drawn by the
- * composer (`composerRing()`), hidden at rest.
+ * So nothing travels. The whole border is lit, always, with a soft gradient of the theme's accent,
+ * violet and cyan, and the GRADIENT turns slowly (`@property` makes the angle animatable). With
+ * no object to follow, speed is not something the eye can measure, and a mask keeps it a crisp
+ * 1.5 px line with the card's own corners. A faint glow sits outside the line, behind the card,
+ * so nothing ever blurs over the text.
  *
- * ⚠️ 4 s a lap, which is the editor's own figure for its chat input. Faster reads as a loading
- * spinner — something that demands attention — where this should read as a surface quietly alive. */
+ * 6 s a turn: alive, never a spinner. */
+@property --hc-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+.composer {
+  --flow-a: var(--vscode-focusBorder);
+  --flow-b: var(--vscode-charts-purple, #b180d7);
+  --flow-c: var(--vscode-charts-blue, #4daafc);
+}
+:root[data-appearance="hivey"] .composer {
+  --flow-a: #ffab2e;
+  --flow-b: #ff7a59;
+  --flow-c: #5fd0f5;
+}
 .composer.working .composer-card {
   border-color: transparent;
 }
 .composer-ring,
-.composer-halo {
+.composer-glow {
   display: none;
   position: absolute;
-  inset: var(--ring-inset);
+  inset: -1px;
   border-radius: inherit;
   pointer-events: none;
+  background: conic-gradient(
+    from var(--hc-angle),
+    var(--flow-a),
+    var(--flow-b),
+    var(--flow-c),
+    var(--flow-a)
+  );
+  animation: hc-flow 6s linear infinite;
 }
 .composer.working .composer-ring,
-.composer.working .composer-halo {
+.composer.working .composer-glow {
   display: block;
 }
-/* Composited to a ring: fill the box, subtract everything but the `--ring` edge, so the light is
-   only ever seen ON the line. */
+/* The line itself: everything but the edge masked away. */
 .composer-ring {
-  padding: var(--ring);
+  padding: 1.5px;
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   mask-composite: exclude;
 }
-/* The halo is not clipped: it is the glow spilling OUTSIDE the line. Behind the card itself
-   (`z-index: -1`, the card not being a stacking context), so the card's own background hides the
-   inner half and nothing ever glows over the text being typed. */
-.composer-halo {
+/* The glow: the same gradient, softened, BEHIND the card (`z-index: -1`; the card is not a stacking
+   context), so only what spills outside the edge is seen. */
+.composer-glow {
   z-index: -1;
+  filter: blur(6px);
+  opacity: 0.35;
 }
-.composer-ring-light,
-.composer-halo-light {
-  position: absolute;
-  top: 0;
-  left: 0;
-  offset-path: border-box;
-  offset-rotate: auto;
-  animation: hc-travel 4s linear infinite;
-}
-.composer-ring-light {
-  width: 160px;
-  height: 14px;
-  background: radial-gradient(
-    closest-side,
-    color-mix(in srgb, var(--vscode-focusBorder) 30%, white) 0%,
-    var(--vscode-focusBorder) 35%,
-    color-mix(in srgb, var(--vscode-focusBorder) 45%, transparent) 65%,
-    transparent 100%
-  );
-}
-.composer-halo-light {
-  width: 180px;
-  height: 26px;
-  background: radial-gradient(closest-side, color-mix(in srgb, var(--vscode-focusBorder) 55%, transparent), transparent);
-  filter: blur(8px);
-  opacity: 0.7;
-}
-@keyframes hc-travel {
-  from {
-    offset-distance: 0%;
-  }
+@keyframes hc-flow {
   to {
-    offset-distance: 100%;
+    --hc-angle: 360deg;
   }
 }
 /* ⚠️ The ring was there, and hidden — by the focus outline.
@@ -2867,15 +2859,12 @@ pre.code {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  /* Still, as a plain accent on the whole line: the light stops travelling and the halo goes. */
-  .composer.working .composer-ring {
-    background: var(--vscode-focusBorder);
-    opacity: 0.5;
-  }
-  .composer-ring-light,
-  .composer-halo-light {
+  /* Still: the same gradient, not turning, and no glow. */
+  .composer-ring {
     animation: none;
-    display: none;
+  }
+  .composer-glow {
+    display: none !important;
   }
   .md.live > *:last-child::after {
     animation: none;
@@ -4610,27 +4599,26 @@ pre.code code {
   color: inherit;
   background: none;
 }
-/* ⚠️ Stop is red, and filled. "the Stop button when the AI answers, can you make it red so it stands
- * out". The worry above was a filled Stop being misread as Send — red is the one fill that cannot be:
- * it is the colour of halting, and nothing else in the composer wears it. A fixed red rather than
- * the theme's error colour, which is a pale foreground on dark themes and would put the white
- * square on a pink. */
+/* ⚠️ Stop is a red ICON, not a red button. "make the icon red rather than a red background with
+ * the icon inside, for a cleaner, more minimal look". Red is still the one colour nothing else in
+ * the composer wears — that is what keeps it from being misread as Send — and a bare icon sits in
+ * the toolbar like its neighbours instead of shouting over them. Hover adds a faint red wash. */
 :root {
-  --stop: #d93a3a;
-  --stop-hover: #b92e2e;
+  --stop: #e5484d;
 }
 .composer .btn.send.stop,
 .composer.working .btn.send.stop {
-  color: #fff;
-  background: var(--stop);
-  border-radius: var(--radius);
+  color: var(--stop);
+  background: none;
 }
 .composer .btn.send.stop:hover,
 .composer.working .btn.send.stop:hover {
-  background: var(--stop-hover);
+  color: var(--stop);
+  background: color-mix(in srgb, var(--stop) 14%, transparent);
+  border-radius: var(--radius);
 }
 .composer .btn.send.stop:focus-visible {
-  outline: var(--ring) solid color-mix(in srgb, var(--stop) 55%, white);
+  outline: var(--ring) solid color-mix(in srgb, var(--stop) 55%, transparent);
   outline-offset: 1px;
 }
 

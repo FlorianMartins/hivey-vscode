@@ -112,6 +112,12 @@ export interface ChatResult {
   usage: Usage;
   stopReason: "stop" | "length" | "tool_calls" | "error";
   /**
+   * The stream ended without the provider ever saying it had finished — no `finish_reason`, no
+   * `[DONE]`: the connection closed under it (a server restarted, a proxy dropped it). What arrived
+   * is real but incomplete, and must not be taken for a finished answer.
+   */
+  interrupted?: boolean;
+  /**
    * The answer cap a refusal forced this request down to, when one did.
    *
    * Present only when a provider refused the request for its size and said what it could afford —
@@ -140,6 +146,8 @@ export interface Provider {
   /** Fill-in-the-middle. Absent on providers whose models cannot do it. */
   complete?(req: CompletionRequest): Promise<string>;
   listModels(): Promise<string[]>;
+  /** The runtime context window the server gives this model, 0 when it does not say. */
+  contextWindow?(model: string): Promise<number>;
 }
 
 export const EMPTY_USAGE: Usage = { promptTokens: 0, completionTokens: 0, cachedTokens: 0 };

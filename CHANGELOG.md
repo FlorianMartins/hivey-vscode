@@ -6,6 +6,63 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **⚠️⚠️ La limite de contexte du serveur est connue, et respectée avant d'être atteinte.** « le
+  auto-compact ne fonctionne clairement pas […] on ne peut pas laisser une limite comme ça ». Un
+  modèle auto-hébergé n'est dans aucun catalogue : sa fenêtre était inconnue, le budget retombait à
+  son plancher de 8000 tokens, et rien n'empêchait un tour de grossir jusqu'au refus du serveur.
+  Désormais :
+  - la fenêtre **réelle** est lue sur le serveur (`context_length` / `n_ctx` de `/models`), apprise
+    aussi de son message de refus, et mémorisée par adresse et modèle ;
+  - l'historique, la proposition de résumé et le résumé lui-même sont dimensionnés dessus ;
+  - avant **chaque** requête d'un tour d'agent, les anciennes sorties d'outils sont raccourcies si le
+    tour approche de la limite — plus d'erreur, l'agent continue ;
+  - en dernier recours, plus d'erreur brute : un message clair avec deux boutons, **Résumer la
+    conversation** et **Nouvelle conversation**.
+
+- **⚠️ Un tour d'agent qui dépasse le contexte en cours de route ne s'arrête plus sur une erreur.**
+  « HTTP 400 Bad Request: request (69882 tokens) exceeds the available context size (69632
+  tokens) ». Les résultats d'outils s'accumulent dans un tour et rien ne les réduisait : un long tour
+  mourait à mi-parcours, travail à moitié fait. Les sorties d'outils les plus anciennes sont
+  maintenant raccourcies (leur début est gardé, et le modèle est prévenu qu'il lit un extrait) du
+  nombre de tokens que le serveur indique manquer, plus de quoi répondre, puis l'étape est reposée —
+  trois fois au plus. La dernière sortie reste entière. Une conversation trop longue avant même le
+  tour reste couverte par le résumé automatique.
+
+- **⚠️ Les boutons et menus suivent la langue choisie pour Hivey Code, même avec VS Code en
+  anglais.** « le texte des boutons en survol est encore en anglais quand on sélectionne Français —
+  "Search this conversation", "New conversation" […] quand vscode est en anglais ». Ces infobulles
+  sont dessinées par VS Code, qui prend leur texte dans `package.nls.*.json` selon SA langue
+  d'affichage, et une extension ne peut pas renommer une commande à l'exécution. Chaque commande et
+  sous-menu placés dans un menu ont donc désormais deux jumeaux aux titres écrits en toutes lettres
+  (anglais et français), et VS Code affiche celui de la langue choisie (clé de contexte
+  `hiveyCode.l10n`). Généré par `npm run menus` et vérifié par les tests. Seules la page des réglages
+  et la palette de commandes suivent encore la langue de VS Code.
+
+- **⚠️ Régression : des textes affichés étaient repassés en anglais.** « le texte est repassé en
+  anglais […] donc c'est une régression ». En passant en anglais ce que lit le modèle, des textes
+  que **vous** lisez y étaient passés aussi : l'expansion d'une commande tapée (`/explain` devient
+  votre message), les instructions des actions sur la sélection et des commandes de l'éditeur
+  (placées dans la zone de saisie), l'en-tête du résumé. Ils suivent de nouveau votre langue ; seul
+  ce que le modèle est le seul à lire (skills qu'il charge lui-même, outils) reste en anglais. Des
+  tests vérifient désormais que chaque corps de skill garde sa traduction.
+
+- **⚠️ Une réponse coupée en plein milieu n'est plus prise pour une réponse finie.** « il coupe en
+  plein milieu parfois ». Quand la connexion au modèle se ferme avant la fin (serveur redémarré,
+  proxy qui coupe), le flux s'arrêtait sans le marqueur de fin (`finish_reason` / `[DONE]`) et le
+  texte reçu devenait « la réponse », sans rien dire. Le flux interrompu est maintenant détecté, le
+  modèle est relancé pour **continuer là où il s'est arrêté** (deux fois au plus, y compris en mode
+  chat), un appel d'outil à moitié écrit est écarté, et si la réponse reste incomplète le panneau le
+  dit.
+
+- **Bordure de la zone de saisie : un dégradé qui circule, net et discret.** « c'est vraiment pas
+  beau, je veux un rendu propre et futuriste comme sur le chat de GitHub Copilot ». Les versions
+  précédentes faisaient voyager une lumière (arc, rectangle, trait pointillé) et l'œil la suivait :
+  à-coups, cassures dans les coins, flou. Plus rien ne voyage : tout le cadre est éclairé d'un trait
+  fin aux couleurs du thème (accent, violet, cyan — ambre, corail, cyan en apparence Hivey) dont le
+  dégradé tourne lentement, avec une lueur très douce à l'extérieur seulement.
+
+- **Bouton Stop : l'icône est rouge, plus le fond.** Plus sobre ; un léger voile rouge au survol.
+
 - **Une conversation trop longue pour le contexte du serveur est résumée, puis la question est
   reposée — au lieu de finir en erreur.** Le serveur local tourne désormais avec un peu moins de
   contexte par conversation (le décodage spéculatif qui double la vitesse occupe une part de la
@@ -19,16 +76,6 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
   pour Qwen3.8). Ces trois tâches partent maintenant avec `reasoning_effort: "none"` vers le modèle
   local et votre propre gateway. Les réponses que vous lisez gardent leur réflexion, et les
   fournisseurs cloud ne sont pas touchés.
-
-- **⚠️ La lueur fait vraiment le tour du cadre.** « il fait gauche, haut, droite, bas et pas le tour
-  proprement ». C'était un dégradé conique tournant autour du **centre** : sur un cadre quatre fois
-  plus large que haut, un angle n'est pas une distance, et l'arc filait sur les petits côtés et se
-  traînait sur les grands. La lumière suit maintenant le **périmètre** (`offset-path: border-box`),
-  coins arrondis compris, à vitesse constante : un cœur lumineux sur le trait et un halo doux à
-  l'extérieur, jamais par-dessus le texte. Immobile si le système demande moins d'animations.
-
-- **Le bouton Stop est rouge.** Rempli, carré blanc sur rouge, pendant que l'IA raisonne, agit ou
-  répond — la seule couleur qui ne peut pas se lire comme « envoyer ».
 
 - **⚠️ Ce que lit le modèle est en anglais, quelle que soit la langue de l'interface.** « tous les
   skills, tools, etc sont en Français […] passer tout en anglais ». Les corps des skills, leurs noms

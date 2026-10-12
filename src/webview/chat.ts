@@ -1125,17 +1125,15 @@ export function restoreDraft(draft: Draft | undefined): void {
 }
 
 /**
- * The light that runs around the composer while a turn is working — see `.composer-ring` in the
- * stylesheet. Always present and hidden at rest, so a turn starting only has to toggle a class on
- * the composer (`setStreaming`) rather than rebuild it.
+ * The flowing border shown while a turn is working — see `.composer-ring` in the stylesheet: the
+ * line itself and, behind the card, its faint glow. Always present and hidden at rest, so a turn
+ * starting only has to toggle a class on the composer (`setStreaming`) rather than rebuild it.
  */
-function composerRing(): HTMLElement[] {
+function composerRing(): Element[] {
+  const glow = el("div", "composer-glow");
   const ring = el("div", "composer-ring");
-  ring.append(el("span", "composer-ring-light"));
-  const halo = el("div", "composer-halo");
-  halo.append(el("span", "composer-halo-light"));
-  for (const node of [ring, halo]) node.setAttribute("aria-hidden", "true");
-  return [halo, ring];
+  for (const node of [glow, ring]) node.setAttribute("aria-hidden", "true");
+  return [glow, ring];
 }
 
 function composer(state: UiState, deps: ChatDeps): HTMLElement {
@@ -2276,7 +2274,10 @@ function expandSlash(text: string, state?: UiState): { text: string; attach: boo
   const match = matchSlash(text, state);
   if (!match?.prompt) return undefined;
   const extra = text.slice(match.name.length).trim();
-  return { text: extra ? `${match.prompt}\n\n${extra}` : match.prompt, attach: match.attach ?? false };
+  // In the person's language: the expansion becomes THEIR message, on screen and in the transcript.
+  // The English body is what the model gets when it loads the skill itself (`use_skill`).
+  const prompt = t(match.prompt);
+  return { text: extra ? `${prompt}\n\n${extra}` : prompt, attach: match.attach ?? false };
 }
 
 function submit(area: HTMLTextAreaElement, deps: ChatDeps): void {

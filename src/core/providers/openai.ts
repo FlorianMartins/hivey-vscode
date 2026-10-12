@@ -267,9 +267,14 @@ export class OpenAICompatibleProvider implements Provider {
     // (several providers send the id only on the first fragment).
     const partial = new Map<number, { id: string; name: string; args: string }>();
 
+    // Whether the provider ever said it was done: a `finish_reason`, or the `[DONE]` sentinel. A
+    // stream that simply stops without either was cut — see `ChatResult.interrupted`.
+    let finished = false;
     for await (const line of sseLines(res.body, req.signal)) {
+      if (line === "data: [DONE]" || line === "data:[DONE]") finished = true;
       const payload = sseData(line) as any;
       if (!payload) continue;
+      if (payload.choices?.[0]?.finish_reason) finished = true;
       if (payload.error) throw new Error(payload.error.message ?? String(payload.error));
       const choice = payload.choices?.[0];
       if (payload.usage) {
@@ -330,7 +335,8 @@ export class OpenAICompatibleProvider implements Provider {
     // budget was the reason. Complete calls are kept; an unfinished one is dropped, and "length"
     // survives so the loop can ask for the rest. Seen live on Qwen3.8 through llama.cpp: "Here is
     // the plan, then I'll get started:" and then nothing, 8192 tokens later.
-    const cut = stopReason === "length";
+    // An interrupted stream is cut too: a call still being written when the connection closed is half a call.
+    const cut = stopReason === "length" || (!finished && !req.signal?.aborted);
     const usable = cut ? toolCalls.filter((c) => isCompleteJson(c.args)) : toolCalls;
     if (usable.length && !cut) stopReason = "tool_calls";
 
@@ -341,6 +347,8 @@ export class OpenAICompatibleProvider implements Provider {
       usage,
       stopReason,
       ...(this.lastShortened ? { shortenedTo: this.lastShortened } : {}),
+      // ⚠️ Cut, not finished — unless the user stopped it, in which case it is neither news nor a fault.
+      ...(!finished && !req.signal?.aborted ? { interrupted: true } : {}),
     };
   }
 
@@ -414,6 +422,27 @@ export class OpenAICompatibleProvider implements Provider {
       });
     } catch {
       // A warm-up that fails is not an error the user needs: the next real request will report it.
+    }
+  }
+
+  /**
+   * The context window this server gives a model, when it says: llama-swap and llama.cpp report
+   * `context_length` / `context_window` / `meta.n_ctx` in /models — the RUNTIME window, which is
+   * what refuses a request, not the model's training maximum. 0 when the server does not say.
+   *
+   * ⚠️ Without it the extension sized everything from a catalogue that has never heard of a
+   * self-hosted model, fell back to its 8000-token floor, and let a turn grow until the server
+   * refused it: "request (69882 tokens) exceeds the available context size (69632 tokens)".
+   */
+  async contextWindow(model: string): Promise<number> {
+    try {
+      const res = await request(`${this.baseUrl}/models`, { headers: this.headers(), timeoutMs: 15_000, label: "model list" });
+      if (!res.ok) return 0;
+      const json = (await res.json()) as any;
+      const entry = (json.data ?? []).find((m: any) => m?.id === model);
+      return contextWindowOf(entry);
+    } catch {
+      return 0;
     }
   }
 
@@ -634,4 +663,14 @@ export function isCompleteJson(args: string): boolean {
   } catch {
     return false;
   }
+}
+
+/** The runtime context window a /models entry reports, 0 when it reports none. */
+export function contextWindowOf(entry: unknown): number {
+  const e = (entry ?? {}) as Record<string, any>;
+  for (const value of [e["context_length"], e["context_window"], e["meta"]?.["n_ctx"], e["max_context_length"]]) {
+    const n = Number(value);
+    if (Number.isFinite(n) && n > 0) return Math.floor(n);
+  }
+  return 0;
 }

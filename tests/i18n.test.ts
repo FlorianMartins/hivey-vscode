@@ -90,7 +90,9 @@ test("the table does not translate strings that no longer exist", () => {
   const files = walk("src").filter((f) => f.endsWith(".ts") && !f.includes("i18n"));
   const sources = files.map((f) => readFileSync(f, "utf8"));
   const source = sources.join("\n");
-  const used = translatedIn(sources);
+  // A string handed to `en()` is reachable too: it is kept English for the model, and shown through
+  // a variable where the person sees it — a typed skill's body is translated with `t(match.prompt)`.
+  const used = new Set([...translatedIn(sources), ...translatedIn(sources, "en")]);
   const stale = translationKeys("fr").filter((key) => !used.has(key) && !source.includes(`"${key.replace(/\n/g, "\\n")}"`));
   assert.deepEqual(stale, [], `entries for strings the code no longer uses:\n${stale.join("\n")}`);
 });
@@ -104,10 +106,11 @@ test("the table does not translate strings that no longer exist", () => {
  * interface showed four paragraphs of English, and it was found on a screenshot, which was the only
  * place left to find it.
  */
-function translatedIn(sources: string[]): Set<string> {
+function translatedIn(sources: string[], fn: "t" | "en" = "t"): Set<string> {
   const out = new Set<string>();
+  const call = new RegExp(`(?<![A-Za-z0-9_.$])${fn}\\(\\s*("(?:[^"\\\\]|\\\\.)*"(?:\\s*\\+\\s*"(?:[^"\\\\]|\\\\.)*")*)`, "g");
   for (const source of sources) {
-    for (const m of source.matchAll(/(?<![A-Za-z0-9_.$])t\(\s*("(?:[^"\\]|\\.)*"(?:\s*\+\s*"(?:[^"\\]|\\.)*")*)/g)) {
+    for (const m of source.matchAll(call)) {
       const key = [...m[1]!.matchAll(/"((?:[^"\\]|\\.)*)"/g)]
         .map((part) => part[1]!)
         .join("")

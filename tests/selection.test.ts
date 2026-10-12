@@ -40,11 +40,10 @@ test("the lightbulb gets a couple of rows, not the whole catalogue", () => {
   assert.ok(lit.length >= 1 && lit.length <= 3, `${lit.length} rows on the lightbulb`);
 });
 
-test("the label follows the interface language; the instruction the model reads stays English", () => {
-  // "all the skills, tools, etc. are in French […] switch everything to English". What a person
-  // reads
-  // is translated; what the model reads is the product's own instructions, in English — the reply
-  // language is said separately, by `languageDirective`.
+test("the label and the instruction follow the interface language — both are shown to the person", () => {
+  // The instruction is placed in the person's composer and becomes their message, so it is shown
+  // text and follows their language. What ONLY the model reads (skills it loads itself, tool
+  // descriptions and results) stays English — see `en()` in shared/i18n.ts.
   try {
     setLanguage("fr");
     const fr = selectionActions();
@@ -52,7 +51,9 @@ test("the label follows the interface language; the instruction the model reads 
     const en = selectionActions();
     for (let i = 0; i < en.length; i++) {
       assert.notEqual(fr[i]!.label, en[i]!.label, `${en[i]!.id} label not translated`);
-      assert.equal(fr[i]!.instruction, en[i]!.instruction, `${en[i]!.id} instruction must not be translated`);
+      // ⚠️ Translated after all: the instruction is placed in the person's composer and becomes their
+      // message — "the text is back in English (hover, etc.) … so it's a regression".
+      assert.notEqual(fr[i]!.instruction, en[i]!.instruction, `${en[i]!.id} instruction not translated`);
     }
   } finally {
     setLanguage("en");

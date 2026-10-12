@@ -95,6 +95,11 @@ export interface TurnOptions {
   maxTokens?: number;
   /** A side task — see `ChatRequest.chore`. Thinking is switched off for it on a self-hosted server. */
   chore?: boolean;
+  /**
+   * The server's runtime context window, when known. Checked BEFORE each request: a turn that has
+   * grown past it gets its oldest tool outputs shortened first, rather than an error from the server.
+   */
+  contextWindow?: number;
   temperature?: number;
   reasoning?: ReasoningEffort;
   signal?: AbortSignal;
@@ -162,6 +167,8 @@ export interface TurnResult {
    * mode that asks the model to investigate before it writes.
    */
   truncated: boolean;
+  /** The last reply's stream was cut before the model finished — see `ChatResult.interrupted`. */
+  interrupted?: boolean;
 }
 
 /**
@@ -189,10 +196,55 @@ const DEFAULT_MAX_STEPS = 30;
  * cannot spend the whole step budget doing it.
  */
 const MAX_CONTINUATIONS = 2;
+
+/** How many times one turn shortens old tool outputs before giving up on fitting the window. */
+const MAX_SHRINKS = 3;
+/** Room left for the answer once the request fits again, in tokens. */
+const ANSWER_ROOM_TOKENS = 6000;
+/** A tool output keeps this many characters of its head when shortened. */
+const KEPT_HEAD_CHARS = 1500;
+
+/**
+ * The server's "does not fit" refusal, and by how many tokens — llama.cpp says
+ * "request (69882 tokens) exceeds the available context size (69632 tokens)" or "input (N tokens)
+ * is larger than the max context size (M tokens)". Other providers say less; an unknown excess is
+ * taken as a quarter of what is being sent, which is decided by the caller's shrink.
+ */
+export function contextOverflow(message: string): { excess: number } | undefined {
+  if (!/exceeds the available context size|larger than the max context size|exceed_context_size|context_length_exceeded|maximum context length/i.test(message)) {
+    return undefined;
+  }
+  const m = /\((\d+) tokens\)[^(]*\((\d+) tokens\)/.exec(message);
+  return { excess: m ? Math.max(0, Number(m[1]) - Number(m[2])) : 0 };
+}
+
+/**
+ * Shorten the OLDEST tool outputs in place until about `tokens` have been taken out. A tool output
+ * keeps its head and says how much was cut, so the model knows it is looking at an excerpt and can
+ * read again what it needs. The latest output is left whole: it is the one the next step is about.
+ * Returns whether anything was shortened.
+ */
+export function shrinkToolOutputs(messages: ChatMessage[], tokens: number): boolean {
+  const target = Math.max(tokens, 1000) * 4; // characters, at the usual ~4 per token
+  const tools = messages.map((m, i) => ({ m, i })).filter(({ m }) => m.role === "tool" && m.content.length > KEPT_HEAD_CHARS + 200);
+  const lastTool = messages.reduce((last, m, i) => (m.role === "tool" ? i : last), -1);
+  let saved = 0;
+  for (const { m, i } of tools) {
+    if (saved >= target) break;
+    if (i === lastTool) continue;
+    const cut = m.content.length - KEPT_HEAD_CHARS;
+    m.content = `${m.content.slice(0, KEPT_HEAD_CHARS)}\n[… ${cut} more characters of this output were removed to fit the model's context window — read it again if you need the rest.]`;
+    saved += cut;
+  }
+  return saved > 0;
+}
 const CONTINUE_AFTER_CUT =
   "Your previous reply was cut off by the output token limit before you finished, and any tool call you were writing was lost. " +
   "Continue from where you stopped without repeating what you already wrote. " +
   "If you were writing a large file, a long plan or a big edit, split it into several smaller tool calls, each well under the limit.";
+const CONTINUE_AFTER_INTERRUPT =
+  "Your previous reply was interrupted before you finished (the connection to you was closed), and any tool call you were writing was lost. " +
+  "Continue exactly from where you stopped, without repeating what you already wrote.";
 
 /**
  * Below this there is nothing worth caching, and marking it costs money.
@@ -251,12 +303,25 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
   let reasoning = "";
   /** Set by the last response that ran out of output budget. See `TurnResult.truncated`. */
   let truncated = false;
+  /** Set by the last response whose stream was cut. See `TurnResult.interrupted`. */
+  let interrupted = false;
   /** How many times this turn has asked for the rest of a reply the cap cut off. */
   let continuations = 0;
+  /** How many times this turn has shortened old tool outputs to fit the context window. */
+  let shrinkAttempts = 0;
 
   for (let step = 0; step < maxSteps; step++) {
     if (opts.signal?.aborted) return done("cancelled");
 
+    // Fitted BEFORE it is sent, when the window is known: the estimate counts ~4 characters a
+    // token and code packs tighter, so a tenth is kept in hand, plus room for the answer.
+    if (opts.contextWindow && opts.contextWindow > 0) {
+      const limit = Math.floor(opts.contextWindow * 0.9) - ANSWER_ROOM_TOKENS;
+      const estimate = estimateMessageTokens(working);
+      if (estimate > limit && shrinkToolOutputs(working, estimate - limit)) {
+        opts.report?.("the turn was approaching the model's context window — older tool outputs were shortened");
+      }
+    }
     const prepared = opts.beforeRequest ? await opts.beforeRequest(working) : working;
     const outgoing = opts.promptCache ? withRollingCacheMark(prepared) : prepared;
     let res: ChatResult;
@@ -276,6 +341,20 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
       );
     } catch (err) {
       if (opts.signal?.aborted) return done("cancelled");
+      // ⚠️ The turn outgrew the server's context window MID-WAY: "request (69882 tokens) exceeds
+      // the available context size (69632 tokens)". Tool results pile up inside a turn and nothing
+      // trimmed them, so a long agent turn died on an error after doing half its work. The oldest
+      // tool outputs are shortened — their head is kept, which is where a listing or a log says
+      // what it is — by what the server says is missing plus room to answer, and the same step is
+      // asked again. Bounded; when nothing is left to shorten the error stands, and the extension's
+      // own recovery (summarize, ask again) handles a conversation too long before the turn began.
+      const overflow = contextOverflow(String((err as Error)?.message ?? err));
+      if (overflow && shrinkAttempts < MAX_SHRINKS && shrinkToolOutputs(working, overflow.excess + ANSWER_ROOM_TOKENS)) {
+        shrinkAttempts++;
+        opts.report?.("the turn no longer fit the model's context — older tool outputs were shortened");
+        step--;
+        continue;
+      }
       throw err;
     }
 
@@ -292,6 +371,7 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
     if (typeof res.usage.costUsd === "number") usage.costUsd = (usage.costUsd ?? 0) + res.usage.costUsd;
 
     truncated = res.stopReason === "length";
+    interrupted = Boolean(res.interrupted);
     if (res.shortenedTo) shortenedTo = res.shortenedTo;
     const answer = opts.afterResponse ? opts.afterResponse(res.text) : res.text;
     if (answer) text = text ? `${text}\n${answer}` : answer;
@@ -312,6 +392,18 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
       opts.report?.("the reply hit the output limit — asking the model to continue");
       working.push({ role: "assistant", content: res.text || "(cut off)" });
       working.push({ role: "user", content: CONTINUE_AFTER_CUT });
+      continue;
+    }
+    // ⚠️ The stream was CUT — the connection closed before the model said it was done (a server
+    // restarted, a proxy dropped it). "it cuts off in the middle sometimes". What arrived is half
+    // an answer that read as a whole one. Asked to carry on, in any mode — continuing a text has no
+    // side effect — bounded like the cap above; if the server is really gone the next request
+    // fails loudly, which is the honest outcome.
+    if (interrupted && !res.toolCalls.length && continuations < MAX_CONTINUATIONS) {
+      continuations++;
+      opts.report?.("the reply was interrupted before it finished — asking the model to continue");
+      working.push({ role: "assistant", content: res.text || "(interrupted)" });
+      working.push({ role: "user", content: CONTINUE_AFTER_INTERRUPT });
       continue;
     }
 
@@ -461,6 +553,7 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
       trace,
       stoppedBecause,
       truncated,
+      ...(interrupted ? { interrupted: true } : {}),
       selfChecked,
       ...(shortenedTo ? { shortenedTo } : {}),
     };

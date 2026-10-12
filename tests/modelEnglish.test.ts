@@ -35,6 +35,14 @@ test("the panel still shows the hint in the person's language", () => {
   }
 });
 
+test("⚠️ a typed skill expands in the person's language — every body keeps its French translation", () => {
+  // The expansion of `/explain` becomes the person's own message, on screen: it was left in English
+  // and read as a regression ("the text is back in English"). The webview translates it with
+  // `t(match.prompt)`, a variable the coverage test cannot see — so this checks it directly.
+  const missing = BUILTIN_SKILLS.filter((sk) => sk.prompt).map((sk) => sk.prompt!).filter((p) => !(p in FR));
+  assert.deepEqual(missing, [], `skill bodies with no French entry:\n${missing.map((m) => m.slice(0, 80)).join("\n")}`);
+});
+
 test("every skill hint keeps its French translation for the panel", () => {
   // The hints are translated at display time, through a variable the coverage test cannot see —
   // so this one checks them directly, or a hint would quietly fall back to English in the panel.
