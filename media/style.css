@@ -2822,9 +2822,12 @@ pre.code {
 .composer-comet {
   display: none;
 }
+/* Sixth version: « c'est vraiment le blur extérieur qui rend le résultat horrible […] juste retirer le
+ * blur extérieur ». The light was drawn twice: in the line, and in the blurred glow behind the card,
+ * where the 220 px violet disc became a smear around the whole box. The glow is gone; the line, its
+ * track and the light running all the way round it are unchanged. Nothing leaves the edge. */
 @supports (offset-path: border-box) {
-  .composer-ring,
-  .composer-glow {
+  .composer-ring {
     background: conic-gradient(
       from 200deg,
       color-mix(in srgb, var(--flow-a) 30%, transparent),
@@ -2843,7 +2846,8 @@ pre.code {
     height: 220px;
     offset-path: border-box;
     offset-rotate: 0deg;
-    /* A white-hot core in the violet, so the head reads on a 1.5 px line, fading into a long tail. */
+    /* A white-hot core in the violet, so the head reads on a 1.5 px line, fading into a long tail —
+       seen only through the line (the ring's mask). */
     background: radial-gradient(
       closest-side,
       color-mix(in srgb, var(--flow-b) 55%, white),
@@ -2852,9 +2856,6 @@ pre.code {
       transparent
     );
     animation: hc-comet 3.5s linear infinite;
-  }
-  .composer-glow {
-    opacity: 0.8;
   }
 }
 @keyframes hc-comet {
@@ -2865,8 +2866,7 @@ pre.code {
     offset-distance: 100%;
   }
 }
-.composer.working .composer-ring,
-.composer.working .composer-glow {
+.composer.working .composer-ring {
   display: block;
 }
 /* The line itself: everything but the edge masked away. */
@@ -2877,12 +2877,9 @@ pre.code {
   mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   mask-composite: exclude;
 }
-/* The glow: the same gradient, softened, BEHIND the card (`z-index: -1`; the card is not a stacking
-   context), so only what spills outside the edge is seen. */
+/* No glow: it was the blur. The element stays in the markup, never drawn. */
 .composer-glow {
-  z-index: -1;
-  filter: blur(6px);
-  opacity: 0.35;
+  display: none !important;
 }
 @keyframes hc-flow {
   to {

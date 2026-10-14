@@ -284,6 +284,24 @@ test("⚠️ a side task on a self-hosted server is sent with thinking off — a
   assert.equal((await sent("openai", false)).reasoning_effort, undefined, "a cloud turn on Direct is not touched either");
 });
 
+test("an earlier step's thinking goes back as reasoning_content — to a self-hosted server only", async () => {
+  const sent = async (id: string) => {
+    const s = await serve((_req, res) => sse(res, [{ choices: [{ delta: { content: "x" }, finish_reason: "stop" }] }]));
+    await new OpenAICompatibleProvider({ id, baseUrl: s.url, isLocal: id === "local", apiKey: "k" }).chat({
+      model: "m",
+      messages: [
+        { role: "user", content: "hi" },
+        { role: "assistant", content: "", reasoning: "think first", toolCalls: [{ id: "c", name: "read_file", args: "{}" }] },
+        { role: "tool", toolCallId: "c", content: "file" },
+      ],
+    });
+    await s.close();
+    return (s.requests[0]!.body.messages as Array<Record<string, unknown>>)[1]!;
+  };
+  assert.equal((await sent("local")).reasoning_content, "think first", "Qwen's template renders it inside <think>");
+  assert.equal((await sent("openai")).reasoning_content, undefined, "a cloud is never sent the field");
+});
+
 test("a self-hosted server is asked for its reading progress, and the progress reaches the caller", async () => {
   // The queue indicator: on llama.cpp, silence after a request is the queue and progress is the
   // reading — see core/agent/waiting.ts.

@@ -252,6 +252,14 @@ export function shrinkToolOutputs(messages: ChatMessage[], tokens: number, keptA
   const tools = messages.map((m, i) => ({ m, i })).filter(({ m }) => m.role === "tool" && m.content.length > KEPT_HEAD_CHARS + 200);
   const lastTool = messages.reduce((last, m, i) => (m.role === "tool" ? i : last), -1);
   let saved = 0;
+  // The thinking of older steps goes first: it led to calls whose results are still here, and the
+  // last two steps' thinking is what the next one builds on.
+  const thinkers = messages.filter((m) => m.role === "assistant" && m.reasoning);
+  for (const m of thinkers.slice(0, -2)) {
+    if (saved >= target) break;
+    saved += m.reasoning!.length;
+    delete m.reasoning;
+  }
   for (const { m, i } of tools) {
     if (saved >= target) break;
     if (i === lastTool) continue;
@@ -499,7 +507,8 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
     }
 
     opts.onStep?.({ step, toolCalls: res.toolCalls });
-    working.push({ role: "assistant", content: res.text, toolCalls: res.toolCalls });
+    // With the thinking that led to these calls: the next step continues it rather than redoing it.
+    working.push({ role: "assistant", content: res.text, toolCalls: res.toolCalls, ...(res.reasoning ? { reasoning: res.reasoning } : {}) });
 
     // Every call gets a result message, including the ones that were refused or failed. A missing
     // result is a protocol error with most providers and a silent hang with the rest.

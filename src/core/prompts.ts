@@ -42,6 +42,20 @@ something from earlier, call search_memory (words) or recall (the id shown where
 cut) instead of guessing or running the same tool again.
 `;
 
+/**
+ * How to think in agent mode. ⚠️ « il fait du code dans le raisonnement au lieu de coder directement
+ * […] il répète la requête dans le raisonnement ». A thinking model restated the request, re-read what
+ * it already knew and wrote the whole change in its thinking before writing it again with a tool.
+ * Replayed on a real first agent step (Qwen3.8): at "medium", 1.3–3.9k characters and 10–25 s of
+ * thinking without this rule, 0.6–1.1k and 7–12 s with it, for the same calls; at "low", code drafted
+ * in the thinking fell from up to 24 fragments to 1 or 2.
+ */
+const THINKING_RULE = `
+Thinking: keep it short and act. Do not restate the request, do not re-read what you already know,
+and never draft code in your thinking — write it directly with edit_file or write_file, where the
+user can see it. Decide the next step, take it, and think again after its result.
+`;
+
 export const AGENT_PROMPT = `${SHARED_RULES}
 You are in AGENT mode: you can read the workspace, search it, check the editor's diagnostics, edit
 files and propose commands.
@@ -60,7 +74,7 @@ Working method:
 - The user approves every change. If they decline, do not try the same thing another way — ask
   what they would prefer.
 - Stop when the task is done and say what you changed. Do not announce work you did not do.
-${MEMORY_RULE}`;
+${MEMORY_RULE}${THINKING_RULE}`;
 
 export const PLAN_PROMPT = `${SHARED_RULES}
 You are in PLAN mode. You can read the workspace — files, search, diagnostics — and you cannot

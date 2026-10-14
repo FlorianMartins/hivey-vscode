@@ -40,6 +40,20 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **⚠️ Le modèle refaisait sa réflexion à chaque étape et rédigeait le code dans sa réflexion.**
+  « il fait du code dans le raisonnement au lieu de coder directement […] il répète la requête dans
+  le raisonnement […] même en bref est ultra poussé ». Deux causes. 1) À chaque étape d'un tour
+  d'agent, l'extension renvoyait au modèle ses actions précédentes SANS la réflexion qui les avait
+  décidées ; le gabarit de Qwen l'affichait comme une réflexion vide, et le modèle reconstituait tout
+  depuis le début, étape après étape. La réflexion de chaque étape est maintenant renvoyée
+  (`reasoning_content`, serveurs auto-hébergés seulement) et, quand le contexte se remplit, les plus
+  anciennes partent en premier. 2) Une consigne de travail dans le mode agent : réflexion courte, ne
+  pas recopier la demande, ne jamais rédiger le code dans la réflexion mais l'écrire directement avec
+  les outils. Mesuré sur la même tâche réelle (14 modules, vrai VS Code, vrai Qwen) : 93 s au lieu de
+  166 s, 2 690 caractères de réflexion pour les 34 étapes du tour.
+- **Bordure de saisie : le flou extérieur est retiré.** « c'est vraiment le blur extérieur qui rend
+  le résultat horrible ». Le halo flouté derrière la zone de saisie disparaît ; le trait, ses couleurs
+  et la lumière qui en fait le tour sont inchangés.
 - **⚠️ Qwen réfléchissait au maximum même pour les petites tâches.** « il semble faire trop de
   raisonnement même pour les petites tâches […] il fait des choses parfois incompréhensibles ». Le
   niveau « Direct » du panneau n'envoyait rien au serveur, et rien voulait dire le défaut du gabarit

@@ -190,10 +190,13 @@ export class OpenAICompatibleProvider implements Provider {
       stream: true,
       messages: req.messages.map((m, index) => {
         if (m.role === "tool") return { role: "tool", tool_call_id: m.toolCallId, content: m.content };
+        // The thinking behind an earlier step, back to the model that had it — see `ChatMessage.reasoning`.
+        const thought = m.role === "assistant" && m.reasoning && isSelfHostedProvider(this.id) ? { reasoning_content: m.reasoning } : {};
         if (m.toolCalls?.length) {
           return {
             role: m.role,
             content: m.content || null,
+            ...thought,
             tool_calls: m.toolCalls.map((t) => ({ id: t.id, type: "function", function: { name: t.name, arguments: t.args } })),
           };
         }
@@ -224,7 +227,7 @@ export class OpenAICompatibleProvider implements Provider {
             ],
           };
         }
-        return { role: m.role, content: m.content };
+        return { role: m.role, content: m.content, ...thought };
       }),
     };
     if (req.maxTokens) body["max_tokens"] = req.maxTokens;

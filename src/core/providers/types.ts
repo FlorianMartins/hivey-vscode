@@ -50,6 +50,15 @@ export interface ChatMessage {
   images?: ImagePart[];
   toolCalls?: ToolCall[];
   toolCallId?: string;
+  /**
+   * What the model thought before this assistant message, given back to it on the next step of the
+   * same turn. ⚠️ « il répète la requête dans le raisonnement » — every step of an agent turn sent
+   * the model its own earlier calls WITHOUT the thinking behind them, and Qwen's template renders
+   * that as an empty <think></think>: the model saw itself acting on no thought, and worked the whole
+   * problem out again, step after step. Sent only to self-hosted servers (llama.cpp:
+   * `reasoning_content`); a cloud either has its own signed form of this or refuses the field.
+   */
+  reasoning?: string;
   /** Marks a prefix that is worth caching remotely (system prompt + repo map). */
   cacheable?: boolean;
 }
