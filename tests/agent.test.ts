@@ -638,3 +638,16 @@ test("a reply cut because the server's window filled is asked again after shorte
   assert.ok(older.content.length < big.length, "after the older output was shortened");
   assert.match(older.content, /recall \{"id":"m\d+"/, "and the shortened output says how to have it back");
 });
+
+test("the thinking behind a step is given back with it on the next step — the model continues instead of starting over", async () => {
+  // « il répète la requête dans le raisonnement » : each step re-derived the whole analysis, because
+  // its earlier calls came back with no thought behind them.
+  const t = tool("read_file");
+  const provider = scriptedProvider([
+    { reasoning: "The banner comes from surveillerVersion; read guilde.js first.", toolCalls: [{ id: "c1", name: "read_file", args: "{}" }] },
+    { text: "done" },
+  ]);
+  await runTurn({ ...base, provider, tools: [t] });
+  const step = provider.seen[1]!.messages.find((m) => m.role === "assistant" && m.toolCalls?.length)!;
+  assert.equal(step.reasoning, "The banner comes from surveillerVersion; read guilde.js first.");
+});

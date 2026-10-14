@@ -29,10 +29,12 @@ export function estimateTokens(text: string): number {
  * shown on the consent card, and the number the spending cap is checked against. A measurement that
  * compares two different things teaches something, and what it teaches is wrong.
  */
-export function estimateMessageTokens(messages: Array<{ content: string; images?: unknown[] }>): number {
-  // ~4 tokens of framing per message on every chat API.
+export function estimateMessageTokens(messages: Array<{ content: string; images?: unknown[]; reasoning?: string }>): number {
+  // ~4 tokens of framing per message on every chat API. The thinking given back with an earlier
+  // step is sent too (see `ChatMessage.reasoning`), so it is counted.
   return messages.reduce(
-    (sum, m) => sum + estimateTokens(m.content) + 4 + (m.images?.length ?? 0) * IMAGE_TOKENS,
+    (sum, m) =>
+      sum + estimateTokens(m.content) + (m.reasoning ? estimateTokens(m.reasoning) : 0) + 4 + (m.images?.length ?? 0) * IMAGE_TOKENS,
     0,
   );
 }
