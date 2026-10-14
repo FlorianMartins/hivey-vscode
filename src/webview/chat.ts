@@ -2138,17 +2138,14 @@ function roundTokens(n: number): number {
 
 function reasoningButton(state: UiState, deps: ChatDeps): HTMLElement {
   // The model's own levels when its server said which it has — « le mode de réflexion doit
-  // correspondre aux modes de raisonnement des modèles utilisés » — each with the name the model
-  // gives it and its default marked; the usual four otherwise.
+  // correspondre aux modes de raisonnement des modèles utilisés » — and only those, its default
+  // marked in the hint; the usual four otherwise. Our own words on the button, not the vendor's:
+  // « laisser le texte Bref, Standard et Approfondi […] pour un rendu plus propre ».
   const levels = state.reasoningLevels;
   const offered = levels
     ? REASONING.filter((r) => levels.some((l) => l.id === r.id)).map((r) => {
         const own = levels.find((l) => l.id === r.id)!;
-        return {
-          ...r,
-          label: r.id === "none" ? r.label : `${r.label} · ${own.native}`,
-          hint: own.isDefault ? `${r.hint} ${t("The model's own default.")}` : r.hint,
-        };
+        return { ...r, hint: own.isDefault ? `${r.hint} ${t("The model's own default.")}` : r.hint };
       })
     : REASONING;
   const current = offered.find((r) => r.id === state.reasoning) ?? offered[0]!;
