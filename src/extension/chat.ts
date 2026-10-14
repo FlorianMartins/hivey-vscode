@@ -4906,6 +4906,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           if (ctl.signal.aborted || !toolCalls.length) return;
           const first = toolCalls[0]!;
           const call = callSignature(first.name, safeArgs(first.args));
+          // The next step's thinking starts a paragraph of its own in the saved answer.
+          if (thought && !thought.endsWith("\n\n")) thought += "\n\n";
           this.post({ type: "toolStart", tool: first.name, ...(call ? { call } : {}), ...(toolCalls.length > 1 ? { count: toolCalls.length } : {}) });
         },
         onToolResult: ({ call, result }) => {

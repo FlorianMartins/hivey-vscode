@@ -462,6 +462,18 @@ class LiveTurn {
     // thinking, and only jumped once the first word of the answer appeared. "When the model thinks,
     // the chat does not go to the last message."
     following(() => {
+      // ⚠️ One block PER STEP. « comment ils font pour réfléchir, agir, reprendre la réflexion » — the
+      // thinking of every step of a turn went into one block, so twenty steps read as one giant
+      // deliberation before anything was done. A step's thinking now closes when the action it
+      // decided starts, titled with that action, and the next step thinks in a block of its own:
+      // think → act → think, as it actually happened.
+      if (this.thinking && this.stepEnded) {
+        this.foldThinking();
+        this.archiveThinking(this.thinking.wrap);
+        this.thinking = undefined;
+        this.followThinking = true;
+      }
+      this.stepEnded = false;
       if (!this.thinking) {
         const wrap = reasoningBlock("", { open: true });
         // Lit while it is being written, like the composer's ring: the frame says "this is still
@@ -476,7 +488,11 @@ class LiveTurn {
           this.followThinking = body.scrollHeight - body.scrollTop - body.clientHeight <= 2;
         });
         this.thinking = { wrap, body };
-        this.body.prepend(wrap);
+        if (!this.thoughts) {
+          this.thoughts = el("div", "thoughts");
+          this.body.prepend(this.thoughts);
+        }
+        this.thoughts.append(wrap);
       }
       this.thinking.body.textContent = (this.thinking.body.textContent ?? "") + chunk;
     });
@@ -494,6 +510,37 @@ class LiveTurn {
 
   /** Whether the reasoning box still follows its own tail. False once the reader scrolls it. */
   private followThinking = true;
+  /** Every step's thinking, in order — see `appendReasoning`. */
+  private thoughts?: HTMLElement;
+  /** An action started since the last thinking arrived: the next thinking is a new step's. */
+  private stepEnded = false;
+
+  /**
+   * A finished step's thinking, into ONE folded list above the current one — twenty steps must not
+   * become twenty lines again. "12 earlier steps of thinking"; each opens on its own, titled with the
+   * action it decided.
+   */
+  private earlier?: { wrap: HTMLElement; list: HTMLElement; count: number };
+  private archiveThinking(block: HTMLElement): void {
+    if (!this.thoughts) return;
+    if (!this.earlier) {
+      const list = el("div", "thoughts-earlier");
+      const wrap = collapsible("", list, { open: false });
+      wrap.classList.add("reasoning", "reasoning-earlier");
+      this.earlier = { wrap, list, count: 0 };
+      this.thoughts.prepend(wrap);
+    }
+    this.earlier.list.append(block);
+    this.earlier.count += 1;
+    const title = this.earlier.wrap.querySelector<HTMLElement>(".collapsible-head > span");
+    if (title) title.textContent = t("{0} earlier steps of thinking", this.earlier.count);
+  }
+
+  /** The action this step's thinking decided, as the title of its block. */
+  private titleThinking(tool: string, call?: string): void {
+    const title = this.thinking?.wrap.querySelector<HTMLElement>(".collapsible-head > span");
+    if (title && !this.stepEnded) title.textContent = `${t("Reasoning")} → ${[tool, call].filter(Boolean).join(" ")}`;
+  }
 
   /**
    * The plan, redrawn in place.
@@ -566,6 +613,11 @@ class LiveTurn {
 
   /** The action under way, on the folded line. */
   toolStart(tool: string, call?: string, count?: number): void {
+    // The thinking that led here is done: titled with what it decided, folded, and the next thinking
+    // opens a block of its own.
+    this.titleThinking(tool, call);
+    this.foldThinking();
+    this.stepEnded = true;
     this.stepsHost();
     if (!this.stepsNow) return;
     this.stepsNow.replaceChildren(

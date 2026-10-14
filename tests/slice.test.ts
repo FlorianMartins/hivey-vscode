@@ -9,7 +9,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { describeSlice, sliceLines } from "../src/core/fs/slice.js";
+import { describeSlice, PAGE_LINES, sliceLines } from "../src/core/fs/slice.js";
 
 const FILE = Array.from({ length: 200 }, (_, i) => `line ${i + 1}`).join("\n");
 
@@ -71,4 +71,15 @@ test("a reversed range is read forwards", () => {
   const slice = sliceLines(FILE, 50, 10);
   assert.equal(slice.from, 50);
   assert.equal(slice.to, 50);
+});
+
+test("a read that names no end returns one page and says how to read on — like Claude Code's Read", () => {
+  // A 13,783-line guilde.js read whole put ~35k tokens into the turn on its first step.
+  const text = Array.from({ length: 13_783 }, (_, i) => `l${i + 1}`).join("\n");
+  const first = sliceLines(text, undefined, undefined, 10_000_000);
+  assert.equal(first.from, 1);
+  assert.equal(first.to, PAGE_LINES);
+  assert.match(describeSlice(first, "guilde.js"), new RegExp(`from: ${PAGE_LINES + 1}`));
+  assert.equal(sliceLines(text, 6000, undefined, 10_000_000).to, 6000 + PAGE_LINES - 1, "a page from where it was asked");
+  assert.equal(sliceLines(text, 1, 13_783, 10_000_000).to, 13_783, "an explicit range is honoured whole");
 });
