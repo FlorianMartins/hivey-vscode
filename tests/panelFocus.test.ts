@@ -249,3 +249,14 @@ test("the picker and the button it fills wear the same face", () => {
   // should be reads as a failure to load, not as "we have no mark for this house".
   assert.match(combo, /icon\("chip", "ci-vendor"\)/);
 });
+
+test("the suggested next request is the empty composer's placeholder, and Tab or an arrow takes it", () => {
+  // « remplacer "Que puis-je faire pour vous ?" grisé par une potentielle correction/amélioration […]
+  // la touche Tab ou flèche […] que le texte grisé devienne un prompt […] avec la touche Entrée ».
+  const source = readFileSync("src/webview/chat.ts", "utf8");
+  const composer = source.slice(source.indexOf('const area = el("textarea"'), source.indexOf("card.append(area)"));
+  assert.match(composer, /area\.placeholder = suggestion/, "the suggestion is not shown in the empty box");
+  assert.match(composer, /ev\.key === "Tab" \|\| ev\.key === "ArrowRight" \|\| ev\.key === "ArrowLeft"/);
+  assert.match(composer, /!area\.value/, "Tab would replace what the user already typed");
+  assert.match(composer, /area\.value = suggestion/);
+});

@@ -50,6 +50,20 @@ cut) instead of guessing or running the same tool again.
  * thinking without this rule, 0.6–1.1k and 7–12 s with it, for the same calls; at "low", code drafted
  * in the thinking fell from up to 24 fragments to 1 or 2.
  */
+/**
+ * Do what was asked — all of it, and only it. ⚠️ « il voit tellement large qu'il veut s'occuper de
+ * tout et il met beaucoup de temps […] alors que Claude Code fait ce qu'on lui demande et ensuite il
+ * propose une suggestion de la prochaine action ». Completeness is kept on purpose: what the change
+ * needs in order to work is part of the change, so precision is not traded for speed. What it noticed
+ * beyond that is one line at the end, which the panel turns into the suggested next request.
+ */
+const SCOPE_RULE = `
+Scope: do what was asked, completely — including what the change needs in order to work (imports,
+call sites, a test it breaks) — and nothing else. Do not fix, refactor or improve what was not asked.
+If you notice something worth doing next, do not do it: name it in one short line at the end of
+your answer, so the user can ask for it.
+`;
+
 const THINKING_RULE = `
 Thinking: keep it short and act. Do not restate the request, do not re-read what you already know,
 and never draft code in your thinking — write it directly with edit_file or write_file, where the
@@ -78,7 +92,7 @@ Working method:
 - The user approves every change. If they decline, do not try the same thing another way — ask
   what they would prefer.
 - Stop when the task is done and say what you changed. Do not announce work you did not do.
-${MEMORY_RULE}${THINKING_RULE}`;
+${MEMORY_RULE}${SCOPE_RULE}${THINKING_RULE}`;
 
 export const PLAN_PROMPT = `${SHARED_RULES}
 You are in PLAN mode. You can read the workspace — files, search, diagnostics — and you cannot

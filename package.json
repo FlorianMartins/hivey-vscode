@@ -1366,6 +1366,11 @@
             "minimum": 0,
             "markdownDescription": "%config.agent.maxSteps%"
           },
+          "hiveyCode.chat.suggestNext": {
+            "type": "boolean",
+            "default": true,
+            "markdownDescription": "%config.chat.suggestNext%"
+          },
           "hiveyCode.chat.promptCache": {
             "type": "boolean",
             "default": false,

@@ -145,6 +145,7 @@ import { setActiveWindow } from "../core/context/scale.js";
 import { WaitWatch, type WaitLabel } from "../core/agent/waiting.js";
 import { isSelfHostedProvider } from "../core/redaction/index.js";
 import { choicesFor, levelsFromRefusal, type ModelReasoning } from "../core/router/reasoningLevels.js";
+import { nextStepMessages, parseNextStep } from "../core/session/nextStep.js";
 
 const HISTORY_KEY = "hiveyCode.sessions";
 const PERMISSIONS_KEY = "hiveyCode.permissions";
@@ -779,6 +780,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         !s.context.autoCompact &&
         shouldSuggestCompact(contextTokens, budgetTokens, this.session.entries.filter((e) => e.included).length),
       busy: this.turn !== undefined,
+      ...(this.suggestion && !this.turn ? { suggestion: this.suggestion } : {}),
       appearance: s.appearance,
       panelMinWidth: Math.max(0, Math.round(s.panel.minWidth)),
       // Only when there is somewhere to transcribe. See `core/dictation/dictation.ts`.
@@ -931,6 +933,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
   newSession(): void {
     this.wizard = undefined;
+    this.suggestion = undefined;
     this.persist();
     const mode = this.session.mode;
     this.session = new Session();
@@ -4271,6 +4274,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private async ask(text: string): Promise<void> {
     if (!text.trim()) return;
     this.screen = "chat";
+    // Whatever was suggested belonged to the last answer.
+    this.suggestion = undefined;
 
     // `#context` and `@participant` are resolved here, on this machine, before anything is built
     // and long before anything is sent. The mentions stay in the text the user sees — removing
@@ -5195,6 +5200,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         });
       }
       this.persist();
+      // The next request, suggested — once the answer is in, on every model: a few hundred tokens
+      // with thinking off, pseudonymized like the turn itself and sent only where sending is already
+      // agreed (see `EgressGate.quiet`).
+      if (settings.chat.suggestNext && !ctl.signal.aborted && answer.text.trim()) {
+        void this.suggestNext(settings, lastUser?.text ?? "", answer.text);
+      }
 
       // The turn is over and the evidence is in. This is the only place in the extension that
       // decides to spend money on the strength of something that HAPPENED rather than something
@@ -5348,6 +5359,43 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       // own) and then asks again. See `recoverFromOverflow`.
       if (overflowed && this.turn === undefined) setTimeout(() => void this.recoverFromOverflow(), 0);
       if (saturated && this.turn === undefined) setTimeout(() => void this.continueAfterCompact(), 0);
+    }
+  }
+
+  /** The suggested next request — see core/session/nextStep.ts. Cleared by the next question. */
+  private suggestion?: string;
+
+  private async suggestNext(settings: Settings, question: string, answer: string): Promise<void> {
+    const sessionId = this.session.id;
+    try {
+      // A chore: on a preset, the cheap tier answers it, and the provider follows the model.
+      const providerId: ProviderId = isHivey(settings.chat.model) ? "openrouter" : settings.chat.provider;
+      const model = hiveyModel(settings.chat.model, "chore");
+      const baseUrl = safeUrl(settings, providerId);
+      const vault = new Vault();
+      const language = detectLanguage(question, settings.language === "en" ? "en" : "fr");
+      const prepared = this.gate.quiet(
+        nextStepMessages(question, answer, language),
+        settings,
+        { provider: providerId, model, baseUrl, isLocal: isLocalEndpoint(baseUrl) },
+        vault,
+      );
+      if (!prepared) return;
+      const provider = await providerFor(settings, this.keys, providerId);
+      const res = await provider.chat({
+        model,
+        messages: prepared.messages,
+        maxTokens: 80,
+        chore: true,
+        reasoning: effortToSend(model, "none"),
+      });
+      const next = parseNextStep(vault.restore(res.text));
+      // A suggestion for a conversation that has moved on is a suggestion for nothing.
+      if (!next || this.session.id !== sessionId || this.turn) return;
+      this.suggestion = next;
+      this.sendState();
+    } catch (err) {
+      this.log.appendLine(`[next] no suggestion: ${String((err as Error)?.message ?? err)}`);
     }
   }
 

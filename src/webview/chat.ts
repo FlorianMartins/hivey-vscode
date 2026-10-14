@@ -1244,12 +1244,19 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
   // on the screen. A placeholder is read once and then in the way for ever.
   // Phrased as the assistant offering rather than the user being instructed. "Describe the change"
   // is a form label; "What can I do for you?" is the sentence someone actually answers.
-  area.placeholder =
-    state.mode === "agent"
+  // ⚠️ The suggested next request when there is one — « remplacer "Que puis-je faire pour vous ?"
+  // grisé par une potentielle correction/amélioration […] la touche Tab ou flèche pour que le texte
+  // grisé devienne un prompt […] avec la touche Entrée ». Tab, or either arrow in the empty box,
+  // makes it the text; Enter sends it like anything typed.
+  const suggestion = state.suggestion;
+  area.placeholder = suggestion
+    ? `${suggestion}   ⇥ ${t("Tab")}`
+    : state.mode === "agent"
       ? t("What can I do for you?")
       : state.mode === "plan"
         ? t("What can we plan together?")
         : t("Ask a question…");
+  if (suggestion) area.classList.add("has-suggestion");
   area.addEventListener("input", () => {
     autoGrow(area);
     markReady(area);
@@ -1259,6 +1266,14 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
     slashHints(hints, area, deps);
   });
   area.addEventListener("keydown", (ev) => {
+    if (suggestion && !area.value && (ev.key === "Tab" || ev.key === "ArrowRight" || ev.key === "ArrowLeft") && !ev.shiftKey) {
+      ev.preventDefault();
+      area.value = suggestion;
+      area.setSelectionRange(suggestion.length, suggestion.length);
+      autoGrow(area);
+      markReady(area);
+      return;
+    }
     if (ev.key === "Enter" && !ev.shiftKey) {
       ev.preventDefault();
       submit(area, deps);

@@ -403,6 +403,8 @@ export interface UiState {
    * the panel self-correcting.
    */
   busy: boolean;
+  /** The suggested next request, shown greyed in the empty composer; Tab takes it. See core/session/nextStep.ts. */
+  suggestion?: string;
   /**
    * Which palette the panel paints itself with.
    *

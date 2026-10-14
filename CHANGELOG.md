@@ -6,6 +6,18 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Ajouté
 
+- **⚠️ Comme Claude Code : faire ce qui est demandé, puis suggérer la suite.** « il voit tellement
+  large qu'il veut s'occuper de tout et il met beaucoup de temps […] alors que Claude Code fait ce qu'on
+  lui demande et ensuite il propose une suggestion de la prochaine action ». En mode agent, sur tous les
+  modèles : la demande est faite entièrement — y compris ce dont le changement a besoin pour fonctionner
+  (imports, appels, test cassé) — et rien d'autre ; ce que l'agent remarque au-delà est signalé en une
+  ligne. Après la réponse, une petite requête (réflexion coupée) propose la prochaine demande, affichée
+  en grisé dans la zone de saisie à la place de « Que puis-je faire pour vous ? » : **Tab** (ou une
+  flèche) en fait votre texte, **Entrée** l'envoie. Sur un modèle distant, cette requête est
+  pseudonymisée et n'est envoyée que là où vous avez déjà accepté d'envoyer. Réglage
+  `hiveyCode.chat.suggestNext` (activé par défaut). Essai réel : la demande du bandeau faite
+  entièrement en 64 s, et la suggestion « Supprime la route serveur /guilde/version maintenant. ».
+
 - **Indicateur de file d'attente.** « quand deux travaillent en même temps […] éviter d'avoir le
   ressenti d'attendre sans rien faire ». Sur un serveur llama.cpp à une seule place, une requête
   attend son tour pendant que celle d'une autre personne se termine. Le tour de l'IA apparaît

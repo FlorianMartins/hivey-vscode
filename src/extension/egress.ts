@@ -126,6 +126,31 @@ export class EgressGate {
     return { messages: redacted, vault, findings, estimatedTokens };
   }
 
+  /**
+   * The same redaction, and NO question: for a side request nobody asked for — the suggested next
+   * request — that is worth sending only where sending is already agreed. Self-hosted or local: as
+   * is. Elsewhere: pseudonymized, and only when the user has already consented for this host and
+   * model (or trusts every remote). A credential in it, or no consent yet: nothing is sent.
+   */
+  quiet(
+    messages: ChatMessage[],
+    settings: Settings,
+    target: { provider: string; model: string; baseUrl: string; isLocal: boolean },
+    vault = new Vault(),
+  ): PreparedRequest | undefined {
+    if (target.isLocal || trustsSelfHosted(settings, target.provider)) {
+      return { messages, vault, findings: [], estimatedTokens: estimateMessageTokens(messages) };
+    }
+    const { messages: redacted, findings, hasSecret } = redactMessages(messages, vault, redactionPolicy(settings));
+    if (hasSecret) return undefined;
+    const policy = settings.privacy.egressPolicy;
+    const key = `${safeHost(target.baseUrl)}|${target.model}`;
+    const agreed =
+      policy === "trust" || this.consented.has(key) || this.state.get<string[]>(CONSENT_KEY, []).includes(key);
+    if (!agreed) return undefined;
+    return { messages: redacted, vault, findings, estimatedTokens: estimateMessageTokens(redacted) };
+  }
+
   private async consent(
     settings: Settings,
     target: { provider: string; model: string; baseUrl: string },

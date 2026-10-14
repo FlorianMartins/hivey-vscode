@@ -38,6 +38,8 @@ export interface Settings {
     maxOutputTokens: number;
     /** Ask for Anthropic's prompt cache through OpenRouter. Off: it changes the request's shape. */
     promptCache: boolean;
+    /** Suggest the next request in the empty composer after each answer. See core/session/nextStep.ts. */
+    suggestNext: boolean;
   };
   agent: {
     /** Model requests one agent turn may make. 0: no limit — it runs until done or stopped. */
@@ -260,6 +262,7 @@ function readSettingsRaw(scope?: vscode.Uri): Settings {
       provider: c.get<ProviderId>("chat.provider", "local"),
       model: c.get<string>("chat.model", "qwen2.5-coder:7b"),
       promptCache: c.get<boolean>("chat.promptCache", false),
+      suggestNext: c.get<boolean>("chat.suggestNext", true),
       maxOutputTokens: Math.max(0, Math.floor(c.get<number>("chat.maxOutputTokens", 0) || 0)),
     },
     agent: { maxSteps: Math.max(0, Math.floor(c.get<number>("agent.maxSteps", 0) || 0)) },
