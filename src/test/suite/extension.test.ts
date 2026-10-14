@@ -1273,6 +1273,118 @@ suite("Hivey Code", () => {
   });
 
   /**
+   * « garde l'auto compact par défaut » : a conversation near the window is summarized BEFORE the
+   * next question is sent — the server never has to refuse it.
+   */
+  test("auto-compact: a conversation near the window is summarized before the next question", async () => {
+    const ext = vscode.extensions.getExtension(ID)!;
+    await ext.activate();
+
+    const long = "word ".repeat(4000);
+    const stub = await scriptedStub([
+      { text: `First answer. ${long}` },
+      { text: `Second answer. ${long}` },
+      { text: "Two long answers about the banner." },
+      { text: "Third answer, after the summary." },
+    ]);
+    const config = vscode.workspace.getConfiguration(SECTION);
+    const before = {
+      provider: config.get("chat.provider"),
+      model: config.get("chat.model"),
+      local: config.get("endpoints.local"),
+      confirm: config.get("privacy.confirmSend"),
+      budget: config.get("context.maxTokens"),
+    };
+    await config.update("chat.provider", "local", vscode.ConfigurationTarget.Global);
+    await config.update("chat.model", "stub-model", vscode.ConfigurationTarget.Global);
+    await config.update("endpoints.local", `http://127.0.0.1:${stub.port}/v1`, vscode.ConfigurationTarget.Global);
+    await config.update("privacy.confirmSend", "never", vscode.ConfigurationTarget.Global);
+    await config.update("context.maxTokens", 8000, vscode.ConfigurationTarget.Global);
+
+    try {
+      await vscode.commands.executeCommand("hiveyCode.newSession");
+      await vscode.commands.executeCommand("hiveyCode.askWith", "First question?");
+      await vscode.commands.executeCommand("hiveyCode.askWith", "Second question?");
+      await vscode.commands.executeCommand("hiveyCode.askWith", "Third question?");
+      for (let i = 0; i < 100 && stub.bodies().length < 4; i++) await new Promise((r) => setTimeout(r, 100));
+
+      assert.equal(stub.bodies().length, 4, `expected two answers, a summary, then the question — got ${stub.bodies().length}`);
+      assert.match(stub.bodies()[2]!, /Second answer\./, "the third request is the summary of what came before");
+      const asked = stub.bodies()[3]!;
+      assert.match(asked, /Third question\?/);
+      assert.match(asked, /Summary of the conversation so far/);
+      assert.doesNotMatch(asked, /First answer\./, "the long answers were sent again in full");
+    } finally {
+      await config.update("chat.provider", before.provider, vscode.ConfigurationTarget.Global);
+      await config.update("chat.model", before.model, vscode.ConfigurationTarget.Global);
+      await config.update("endpoints.local", before.local, vscode.ConfigurationTarget.Global);
+      await config.update("privacy.confirmSend", before.confirm, vscode.ConfigurationTarget.Global);
+      await config.update("context.maxTokens", before.budget, vscode.ConfigurationTarget.Global);
+      stub.close();
+    }
+  });
+
+  /**
+   * ⚠️ « il y a encore un message d'erreur quand on arrive au bout du context ». The window fills in
+   * the MIDDLE of a task — after the agent has acted — so the question cannot simply be asked again.
+   * With auto-compact on (the default): no error; what was done is written down, the conversation is
+   * summarized, and the task carries on.
+   */
+  test("a task that fills the context half-way is summarized and carries on — no error", async () => {
+    const ext = vscode.extensions.getExtension(ID)!;
+    await ext.activate();
+
+    const stub = await scriptedStub([
+      { text: "First answer." },
+      { text: "Second answer." },
+      { tool: { name: "update_plan", args: { steps: [{ title: "Fix the banner", state: "running" }] } } },
+      { status: 400, error: "request (140000 tokens) exceeds the available context size (139264 tokens), try increasing it" },
+      { text: "Two questions answered, then a banner fix was under way." },
+      { text: "Banner fixed, after the summary." },
+    ]);
+    const config = vscode.workspace.getConfiguration(SECTION);
+    const before = {
+      provider: config.get("chat.provider"),
+      model: config.get("chat.model"),
+      local: config.get("endpoints.local"),
+      confirm: config.get("privacy.confirmSend"),
+    };
+    await config.update("chat.provider", "local", vscode.ConfigurationTarget.Global);
+    await config.update("chat.model", "stub-model", vscode.ConfigurationTarget.Global);
+    await config.update("endpoints.local", `http://127.0.0.1:${stub.port}/v1`, vscode.ConfigurationTarget.Global);
+    await config.update("privacy.confirmSend", "never", vscode.ConfigurationTarget.Global);
+
+    try {
+      await vscode.commands.executeCommand("hiveyCode.newSession");
+      await vscode.commands.executeCommand("hiveyCode.setMode", "agent");
+      await vscode.commands.executeCommand("hiveyCode.askWith", "First question?");
+      await vscode.commands.executeCommand("hiveyCode.askWith", "Second question?");
+      await vscode.commands.executeCommand("hiveyCode.askWith", "Fix the banner.");
+
+      for (let i = 0; i < 100 && stub.bodies().length < 6; i++) await new Promise((r) => setTimeout(r, 100));
+      await new Promise((r) => setTimeout(r, 300));
+
+      await vscode.commands.executeCommand("hiveyCode.exportSession");
+      const exported = vscode.window.activeTextEditor?.document.getText() ?? "";
+      await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
+      assert.equal(stub.bodies().length, 6, `expected step, refusal, summary, carry-on — got ${stub.bodies().length} requests`);
+      assert.match(exported, /Banner fixed, after the summary\./, `the task did not carry on:\n${exported.slice(0, 1500)}`);
+      assert.doesNotMatch(exported, /exceeds the available context size|no longer fits/, "the saturation was shown as an error");
+      const summary = stub.bodies()[4]!;
+      assert.match(summary, /context filled up here\. Steps already done: update_plan/, "the summary did not learn what was done");
+      const carryOn = stub.bodies()[5]!;
+      assert.match(carryOn, /Summary of the conversation so far/);
+      assert.match(carryOn, /Continue the task where you stopped\./);
+    } finally {
+      await config.update("chat.provider", before.provider, vscode.ConfigurationTarget.Global);
+      await config.update("chat.model", before.model, vscode.ConfigurationTarget.Global);
+      await config.update("endpoints.local", before.local, vscode.ConfigurationTarget.Global);
+      await config.update("privacy.confirmSend", before.confirm, vscode.ConfigurationTarget.Global);
+      stub.close();
+    }
+  });
+
+  /**
    * A gateway offers ITS models, and you can switch between them.
    *
    * "When a gateway is configured it should offer only the models the proxy serves." It offered

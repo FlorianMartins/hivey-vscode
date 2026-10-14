@@ -1883,6 +1883,11 @@
             "default": 0,
             "markdownDescription": "%config.context.attachmentTokens%"
           },
+          "hiveyCode.context.autoCompact": {
+            "type": "boolean",
+            "default": true,
+            "markdownDescription": "%config.context.autoCompact%"
+          },
           "hiveyCode.context.repoMap": {
             "type": "boolean",
             "default": true,

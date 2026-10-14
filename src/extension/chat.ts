@@ -58,7 +58,7 @@ import {
   readStreamFileText,
 } from "./integrations/ibmi.js";
 import { filterHistory, searchTranscript, upsertSession } from "../core/session/history.js";
-import { compactBrief, digestEntries, sessionAsContext, shouldSuggestCompact } from "../core/session/digest.js";
+import { compactBrief, digestEntries, sessionAsContext, shouldAutoCompact, shouldSuggestCompact } from "../core/session/digest.js";
 import {
   ALWAYS_ON,
   BUILTIN_SKILLS,
@@ -776,6 +776,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       // No offer when it happens by itself: a banner proposing what is already scheduled to
       // happen at that exact threshold is a question with one answer.
       suggestCompact:
+        !s.context.autoCompact &&
         shouldSuggestCompact(contextTokens, budgetTokens, this.session.entries.filter((e) => e.included).length),
       busy: this.turn !== undefined,
       appearance: s.appearance,
@@ -4303,6 +4304,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this.session.add({ role: "user", text, context: context.length ? context : undefined });
     this.attachments = [];
     this.sendState();
+    // Summarized by itself before it is sent, when the conversation nears the window — the question
+    // is kept out of the summary and asked after it. See `shouldAutoCompact`.
+    if (
+      settings.context.autoCompact &&
+      shouldAutoCompact(this.contextTokens(), this.budgetTokensFor(settings), this.session.entries.filter((e) => e.included).length)
+    ) {
+      this.log.appendLine("[context] near the window: summarizing before the question");
+      await this.compactAroundLastQuestion();
+    }
     await this.runTurn();
   }
 
@@ -4701,6 +4711,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
     /** The server refused the FIRST request for lack of context — see `recoverFromOverflow`. */
     let overflowed = false;
+    /** The window filled in the middle of the task: summarize, then carry on. See `continueAfterCompact`. */
+    let saturated = false;
     try {
       const provider = await providerFor(settings, this.keys, providerId);
 
@@ -4976,7 +4988,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         // or done yet: summarized, then asked again — once — after this turn has ended. The server
         // runs with less context per conversation since speculative decoding took its share of the
         // GPU, so a long conversation that used to fit can now not.
-        if (untouched && !ctl.signal.aborted && !this.recoveringOverflow && isContextOverflow(String((err as Error)?.message ?? err))) {
+        if (
+          untouched &&
+          settings.context.autoCompact &&
+          !ctl.signal.aborted &&
+          !this.recoveringOverflow &&
+          isContextOverflow(String((err as Error)?.message ?? err))
+        ) {
           overflowed = true;
           throw err;
         }
@@ -5221,6 +5239,39 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         // Not an error the user has to act on: the recovery below takes over.
         this.post({ type: "status", text: t("The conversation no longer fits the model's context: summarizing it, then asking again…") });
       }
+      // ⚠️ « il y a encore un message d'erreur quand on arrive au bout du context ». The window filled
+      // during the task — after reads, edits, commands — and nothing the loop could shorten was left.
+      // Not an error: what was done is written down (the summary reads text, not steps), then the
+      // conversation is summarized and the task carries on where it stopped — or, with auto-compact
+      // off, the person is asked, with one click to do exactly that.
+      else if (!ctl.signal.aborted && isContextOverflow(message)) {
+        const said = /\((\d+) tokens\)[^(]*\((\d+) tokens\)/.exec(message);
+        if (said) this.learnWindow(this.windowKey(settings), Number(said[2]));
+        const last = this.session.entries[this.session.entries.length - 1];
+        const entry = last?.role === "assistant" ? last : this.session.add({ role: "assistant", text: "", model });
+        const done = steps.filter((x) => x.ok).map((x) => x.call || x.tool);
+        if (steps.length) entry.steps = steps;
+        entry.text = [
+          entry.text.trim(),
+          t("(The model's context filled up here. Steps already done: {0}.)", done.length ? done.join("; ") : t("none yet")),
+        ]
+          .filter(Boolean)
+          .join("\n\n");
+        this.persist();
+        if (settings.context.autoCompact) {
+          saturated = true;
+          this.post({ type: "status", text: t("The model's context is full: summarizing the conversation, then carrying on with the task…") });
+        } else {
+          const question = t("The model's context is full. Summarize the conversation and carry on with the task?");
+          this.post({ type: "status", text: question });
+          const go = t("Summarize and continue");
+          const fresh = t("New conversation");
+          void vscode.window.showInformationMessage(question, go, fresh).then(async (choice) => {
+            if (choice === go) await this.continueAfterCompact();
+            else if (choice === fresh) await vscode.commands.executeCommand("hiveyCode.newSession");
+          });
+        }
+      }
       // A turn the user stopped has no error to report. Cancellation surfaces as a failure at
       // whatever layer noticed first, and showing that to someone who pressed stop tells them their
       // own decision went wrong.
@@ -5296,11 +5347,48 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       // After the turn is fully released, never from inside it: recovery summarizes (a turn of its
       // own) and then asks again. See `recoverFromOverflow`.
       if (overflowed && this.turn === undefined) setTimeout(() => void this.recoverFromOverflow(), 0);
+      if (saturated && this.turn === undefined) setTimeout(() => void this.continueAfterCompact(), 0);
     }
   }
 
   /** Set while a recovery runs, so a conversation that still does not fit fails plainly, once. */
   private recoveringOverflow = false;
+
+  /**
+   * Summarize everything BEFORE the last question, then put the question back after the summary —
+   * `compact()` summarizes every included exchange and would otherwise swallow the very question it
+   * is making room for. `undefined` when there is no question to keep.
+   */
+  private async compactAroundLastQuestion(): Promise<boolean | undefined> {
+    const question = [...this.session.entries].reverse().find((e) => e.role === "user");
+    if (!question) return undefined;
+    const { text, context } = question;
+    this.session.drop(question.id);
+    const compacted = await this.compact();
+    this.session.add({ role: "user", text, ...(context?.length ? { context } : {}) });
+    this.persist();
+    this.sendState();
+    return compacted;
+  }
+
+  /**
+   * The window filled in the middle of a task: summarize the whole conversation — the task so far
+   * included, its steps written into its answer — and carry on where it stopped.
+   */
+  private async continueAfterCompact(): Promise<void> {
+    if (this.recoveringOverflow || this.turn) return;
+    this.recoveringOverflow = true;
+    try {
+      const compacted = await this.compact();
+      if (!compacted) return;
+      this.session.add({ role: "user", text: t("Continue the task where you stopped.") });
+      this.persist();
+      this.sendState();
+      await this.runTurn();
+    } finally {
+      this.recoveringOverflow = false;
+    }
+  }
 
   /**
    * The conversation stopped fitting the server's context window: summarize what came BEFORE the
@@ -5315,16 +5403,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const entries = this.session.entries;
     const failed = entries[entries.length - 1];
     if (failed?.role === "assistant" && !failed.text) this.session.drop(failed.id);
-    const question = [...this.session.entries].reverse().find((e) => e.role === "user");
-    if (!question) return;
-    const { text, context } = question;
     this.recoveringOverflow = true;
     try {
-      this.session.drop(question.id);
-      const compacted = await this.compact();
-      this.session.add({ role: "user", text, ...(context?.length ? { context } : {}) });
-      this.persist();
-      this.sendState();
+      const compacted = await this.compactAroundLastQuestion();
+      if (compacted === undefined) return;
       if (!compacted) {
         // Nothing earlier to summarize: this one question, with what is attached to it, is larger
         // than the model can read. Said as such, with the two things that make it fit.
