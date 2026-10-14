@@ -40,6 +40,15 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **⚠️ Plus d'erreur quand le contexte est plein : la conversation se résume d'elle-même et la
+  tâche continue.** « il y a encore un message d'erreur quand on arrive au bout du context […] garde
+  l'auto compact par défaut qui ne semble pas fonctionner ». La version automatique avait été retirée :
+  il ne restait qu'une proposition à 70 % et une erreur à 100 %. Désormais
+  (`hiveyCode.context.autoCompact`, activé par défaut) : avant l'envoi d'une question, une conversation
+  arrivée aux trois quarts du budget est résumée, et la question part après le résumé ; si le contexte
+  se remplit en pleine tâche, ce qui a déjà été fait est noté dans la réponse, la conversation est
+  résumée, et la tâche reprend là où elle s'était arrêtée. Réglage désactivé : au lieu de l'erreur,
+  la question « Résumer la conversation et continuer la tâche ? », avec un bouton.
 - **⚠️ Un comportement d'agent plus proche de Claude.** « Claude lui fait mouche en 15 secondes, et
   me répond "C'est bon c'est fait" ». Trois changements, mesurés sur un site de test réaliste (un
   `guilde.js` de 5 665 lignes, vrai VS Code, vrai Qwen) : 60 à 63 s au lieu de 96 s, contexte plafonné

@@ -118,6 +118,21 @@ export function sessionAsContext(
 export const COMPACT_RATIO = 0.7;
 export const COMPACT_FLOOR_TOKENS = 6000;
 
+/**
+ * When the conversation is summarized by itself, before a question is sent (`context.autoCompact`).
+ *
+ * ⚠️ « garde l'auto compact par défaut […] qui ne semble pas fonctionner » — it did not: the automatic
+ * version had been removed, and what was left was an offer at 70 % and an error at 100 %. Three
+ * quarters of the budget leaves the turn about to start a quarter of the window for its tool outputs,
+ * which the loop shortens as it goes; past that a long agent turn was the one that hit the wall.
+ */
+export const AUTO_COMPACT_RATIO = 0.75;
+
+export function shouldAutoCompact(contextTokens: number, budgetTokens: number, exchanges: number): boolean {
+  if (budgetTokens <= 0 || contextTokens < COMPACT_FLOOR_TOKENS || exchanges < 4) return false;
+  return contextTokens / budgetTokens >= AUTO_COMPACT_RATIO;
+}
+
 export function shouldSuggestCompact(contextTokens: number, budgetTokens: number, exchanges: number): boolean {
   if (budgetTokens <= 0) return false;
   if (contextTokens < COMPACT_FLOOR_TOKENS) return false;

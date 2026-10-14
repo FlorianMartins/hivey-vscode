@@ -62,6 +62,7 @@
   "config.knowledge.scope.both": "Both, the repository's winning when a note exists in each",
   "config.knowledge.endpoint": "A base served over HTTP instead of the files on this machine — for a team that keeps one in a service. Four routes: `GET /notes`, `GET /notes/{id}`, `PUT /notes/{id}`, `DELETE /notes/{id}`. Empty means the files.",
   "config.knowledge.indexTokens": "Ceiling for the list of note titles carried on every question. Beyond it the oldest are left out of the list and stay reachable by search.",
+  "config.context.autoCompact": "Summarize the conversation by itself when it nears the model's context window, and carry on — before a question is sent, and in the middle of a task, which then resumes where it stopped. **On by default.** Off: you are asked instead, with one click to summarize and continue.",
   "config.context.repoMap": "Attach a map of the repository's symbols rather than whole files.",
   "config.privacy.customTerms": "Organization-specific words to always replace before a remote request: client names, project names, internal brands.",
   "config.escalation.policy": "When the local model is not enough (context too large, a diagnosis or architecture question): `never` refuses, `ask` offers, `auto` switches to the escalation model on its own.",

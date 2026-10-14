@@ -83,6 +83,8 @@ export interface Settings {
     /** The most one attached file may take, whatever the budget. 0 = no ceiling. */
     attachmentTokens: number;
     repoMap: boolean;
+    /** Summarize the conversation by itself when it nears the window, and carry on. See `ChatPanel.autoCompact`. */
+    autoCompact: boolean;
   };
   knowledge: {
     enabled: boolean;
@@ -318,6 +320,7 @@ function readSettingsRaw(scope?: vscode.Uri): Settings {
       maxTokens: explicit<number>(c, "context.maxTokens"),
       attachmentTokens: c.get<number>("context.attachmentTokens", 0),
       repoMap: c.get<boolean>("context.repoMap", true),
+      autoCompact: c.get<boolean>("context.autoCompact", true),
     },
     knowledge: {
       enabled: c.get<boolean>("knowledge.enabled", false),

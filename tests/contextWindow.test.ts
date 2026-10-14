@@ -3,7 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { contextBudget, repoMapBudget, CONTEXT_FLOOR_TOKENS } from "../src/core/context/budget.js";
-import { shouldSuggestCompact, COMPACT_RATIO } from "../src/core/session/digest.js";
+import { shouldSuggestCompact, shouldAutoCompact, AUTO_COMPACT_RATIO, COMPACT_RATIO } from "../src/core/session/digest.js";
 
 test("a figure the user typed is obeyed, including a small one", () => {
   assert.equal(contextBudget(4000, 1_000_000), 4000);
@@ -72,4 +72,12 @@ test("a conversation on a modern model survives more than three exchanges before
     exchanges >= 10,
     `summarizing begins after ${exchanges} exchanges on a 200k model (budget ${budget}, ratio ${COMPACT_RATIO})`,
   );
+});
+
+test("auto-compact fires at three quarters of the budget, never on a short or tiny conversation", () => {
+  assert.equal(shouldAutoCompact(80_000, 100_000, 6), true);
+  assert.equal(shouldAutoCompact(70_000, 100_000, 6), false, "below three quarters");
+  assert.equal(shouldAutoCompact(90_000, 100_000, 2), false, "two exchanges cannot be summarized into fewer");
+  assert.equal(shouldAutoCompact(5_000, 6_000, 8), false, "under the floor");
+  assert.equal(AUTO_COMPACT_RATIO, 0.75);
 });
