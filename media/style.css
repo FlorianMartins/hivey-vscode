@@ -3641,18 +3641,17 @@ pre.code code {
 .btn.provider:hover {
   color: var(--vscode-foreground);
 }
-.btn.provider.local .ico {
-  color: var(--vscode-gitDecoration-addedResourceForeground, var(--vscode-charts-green));
-  opacity: 1;
-}
-.btn.provider.remote .ico {
+/* « passer sur le thème de VS Code comme le reste du design » : the provider's icon and chevron take
+   the theme's accent — the colour the mode button next to the box already wears — whichever service
+   answers. The tooltip still says what leaves the machine. */
+.btn.provider .ico,
+.btn.model .ico {
   color: var(--vscode-textLink-foreground, var(--vscode-foreground));
   opacity: 1;
 }
-/* The approval scope, drawn the same way as its neighbour: « passer l'icone et la petite flèche en
- * couleur comme pour le choix du mode ». Muted words, a coloured shield and chevron — and the colour
- * says how much runs unasked: green when everything is asked, blue inside the folder, the warning colour
- * when nothing is. */
+/* The approval scope, drawn the same way as its neighbour. « Ask » is the default, so it wears the
+ * theme's accent like every other control here; « Dans ce dossier » is green; « Ne jamais demander »
+ * keeps the warning colour. */
 .btn.approval-scope {
   color: var(--muted);
 }
@@ -3663,10 +3662,10 @@ pre.code code {
   opacity: 1;
 }
 .btn.approval-scope.perm-scope-off .ico {
-  color: var(--vscode-gitDecoration-addedResourceForeground, var(--vscode-charts-green));
+  color: var(--vscode-textLink-foreground, var(--vscode-foreground));
 }
 .btn.approval-scope.perm-scope-workspace .ico {
-  color: var(--vscode-textLink-foreground, var(--vscode-charts-blue));
+  color: var(--vscode-gitDecoration-addedResourceForeground, var(--vscode-charts-green));
 }
 .btn.approval-scope.perm-scope-all .ico {
   color: var(--vscode-editorWarning-foreground, #cca700);
