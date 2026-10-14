@@ -40,6 +40,10 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **Couleurs du thème sous la zone de saisie.** « Ask » — le réglage par défaut — prend la couleur
+  d'accent du thème (comme « Agent »), « Dans ce dossier » passe en vert, « Ne jamais demander » garde
+  la couleur d'avertissement. L'icône du fournisseur (Local, cloud, passerelle) et celle du modèle,
+  avec leur petite flèche, prennent aussi la couleur d'accent du thème, pour un design homogène.
 - **⚠️ Le modèle refaisait sa réflexion à chaque étape et rédigeait le code dans sa réflexion.**
   « il fait du code dans le raisonnement au lieu de coder directement […] il répète la requête dans
   le raisonnement […] même en bref est ultra poussé ». Deux causes. 1) À chaque étape d'un tour
