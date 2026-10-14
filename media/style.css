@@ -4415,9 +4415,35 @@ pre.code code {
  * 430 px is where the five controls plus the three on the right stop fitting with their labels, by
  * the same measurement that set the floor. */
 @media (max-width: 430px) {
-  .composer-toolbar .btn.model .lbl,
-  .composer-toolbar .btn.reasoning .lbl {
+  /* The model's name only: it is the one label that can grow without limit. The thinking level
+     keeps its word — « le mode de réflexion se replie et affiche que l'icône […] mais retire le texte
+     qui indique le mode » — a sparkle alone does not say whether it is Brief or Deep. */
+  .composer-toolbar .btn.model .lbl {
     display: none;
+  }
+  /* And when even that does not fit, the left group goes onto a second line rather than clipping
+     the thinking level out of sight — `overflow: hidden` on this group was cutting it whole. */
+  .composer-toolbar .toolbar-group:not(.end) {
+    flex-wrap: wrap;
+    row-gap: 2px;
+    overflow: visible;
+  }
+  /* What makes it fit on one line first: the chevrons go (the button still opens its menu, and the
+     hover says so) and the gaps tighten. */
+  .composer-toolbar .toolbar-group:not(.end) .btn .ico.trailing {
+    display: none;
+  }
+  .composer-toolbar .toolbar-group,
+  .composer-toolbar {
+    gap: 2px;
+  }
+  /* On two lines, speak and send sit on the last one — where the send button always is. */
+  .composer-toolbar {
+    align-items: flex-end;
+  }
+  .composer-toolbar .toolbar-group:not(.end) .btn {
+    padding-left: 5px;
+    padding-right: 5px;
   }
   .composer-toolbar .btn.model {
     min-width: 0;
@@ -4889,6 +4915,28 @@ pre.code code {
 .composer-footer .composer-cost {
   margin-left: auto;
   padding-left: var(--sp-3);
+}
+/* ⚠️ « Lo… », « Deman… » : the rule above says neither control may shrink, and the `.btn.tiny` rule
+   further up let them — it is later in the sheet and as specific. The two controls keep their whole
+   word; the reading on the right is what gives way, cut with an ellipsis, then the gaps tighten. */
+.composer-footer .btn.tiny.provider,
+.composer-footer .btn.tiny.approval-scope {
+  flex: 0 0 auto;
+}
+.composer-footer .composer-cost {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (max-width: 430px) {
+  .composer-footer {
+    gap: var(--sp-1);
+  }
+  .composer-footer .composer-cost {
+    padding-left: var(--sp-1);
+  }
 }
 /* The separator dot earned its place when the row was cramped; with real gaps it is one more mark to
    parse. */

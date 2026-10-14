@@ -40,6 +40,10 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **Panneau étroit : plus de libellés tronqués ni cachés.** En bas, « Local » et « Demander » gardent
+  leur mot entier (c'est le compteur de tokens qui cède la place) ; dans la barre de saisie, le niveau
+  de réflexion garde son texte (« Standard ») au lieu de n'afficher que son icône — et, s'il ne tient
+  pas, la barre passe proprement sur deux lignes au lieu de le cacher.
 - **Niveaux de réflexion : nos mots seulement.** Le menu affiche « Bref », « Standard » et « Approfondi »
   sans le nom technique du modèle (low, medium, xhigh) ; seuls les niveaux que le modèle possède sont
   proposés, et son niveau par défaut reste signalé dans l'infobulle.
