@@ -173,14 +173,15 @@ export function buildTools(deps: ToolDeps): Tool[] {
     schema: {
       name: "read_file",
       description:
-        "Read a file from the workspace. Give `from` and `to` (1-based line numbers) to read part of " +
-        "a large file; the result always says which lines came back and how to read on.",
+        "Read a file from the workspace, one page of up to 2000 lines at a time. On a large file, find " +
+        "the place first with search_text (it gives the line), then read around it with `from` and `to` " +
+        "(1-based). The result always says which lines came back and how to read on.",
       parameters: {
         type: "object",
         properties: {
           path: { type: "string", description: "Path relative to the workspace root." },
           from: { type: "number", description: "First line to return, 1-based. Default 1." },
-          to: { type: "number", description: "Last line to return, 1-based and inclusive. Default: the end." },
+          to: { type: "number", description: "Last line to return, 1-based and inclusive. Default: one page (2000 lines) after `from`." },
         },
         required: ["path"],
       },

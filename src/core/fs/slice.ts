@@ -36,11 +36,22 @@ export interface Slice {
  * @param maxChars the budget. The range is cut at a LINE boundary, never mid-line: half a line of
  *   source is worse than one line fewer, because it reads as a syntax error that is not there.
  */
+/**
+ * Lines a read returns when it names no end: one page, like Claude Code's own Read.
+ *
+ * ⚠️ Not a limit — every line stays one call away, and the result says which. « fais en sorte que le
+ * comportement soit similaire à celui de claude opus » : with no page, one read of a 13,783-line
+ * guilde.js put ~35k tokens into the turn, the context went from 1.4k to 45k in three steps, and every
+ * later step carried the whole file — slower, and more for the model to chew over. A page makes the
+ * model look for the place first (search_text gives the line) and read there.
+ */
+export const PAGE_LINES = 2000;
+
 export function sliceLines(text: string, from?: number, to?: number, maxChars = 24_000): Slice {
   const lines = text.split("\n");
   const total = lines.length;
   const start = Math.max(1, Math.min(from ?? 1, total));
-  const end = Math.max(start, Math.min(to ?? total, total));
+  const end = Math.max(start, Math.min(to ?? start + PAGE_LINES - 1, total));
   const wanted = lines.slice(start - 1, end);
 
   let used = 0;

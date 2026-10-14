@@ -255,6 +255,7 @@ export const FR: Record<string, string> = {
   "Working…": "Au travail…",
   "{0} failed": "{0} en échec",
   "+{0} in parallel": "+{0} en parallèle",
+  "{0} earlier steps of thinking": "{0} réflexions précédentes",
   "The model's own default.": "Le réglage par défaut du modèle.",
   "Stopped.": "Arrêté.",
   "Stream file (IFS)…": "Fichier de flux (IFS)…",

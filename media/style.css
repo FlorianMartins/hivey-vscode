@@ -4721,6 +4721,19 @@ pre.code code {
   margin-top: var(--sp-1);
 }
 
+/* The thinking of earlier steps, one folded list: inside it, each step's block is a single line. */
+.reasoning-earlier > .collapsible-body {
+  max-height: none;
+  overflow: visible;
+  padding: var(--sp-1) 0 0;
+}
+.thoughts-earlier > .collapsible {
+  margin: 0 0 var(--sp-1);
+}
+.thoughts > .collapsible + .collapsible {
+  margin-top: var(--sp-1);
+}
+
 /* A folded step list is a list, not prose: it does not get the reasoning block's own scroller or its
    pre-wrap, and its rows keep the step grid they already have. */
 .collapsible.steps-folded > .collapsible-body {

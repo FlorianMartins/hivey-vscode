@@ -40,6 +40,21 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **⚠️ Un comportement d'agent plus proche de Claude.** « Claude lui fait mouche en 15 secondes, et
+  me répond "C'est bon c'est fait" ». Trois changements, mesurés sur un site de test réaliste (un
+  `guilde.js` de 5 665 lignes, vrai VS Code, vrai Qwen) : 60 à 63 s au lieu de 96 s, contexte plafonné
+  à 26 000 tokens au lieu de 55 000, aucune question, une réponse qui commence par « C'est fait ».
+  1. **Lecture par pages**, comme le Read de Claude Code : sans plage demandée, `read_file` renvoie une
+     page de 2 000 lignes et dit comment lire la suite. Rien n'est inaccessible ; mais une seule
+     lecture d'un fichier de 13 783 lignes mettait ~35 000 tokens dans le tour, que chaque étape
+     suivante traînait ensuite.
+  2. **Explorer comme Claude** : sur un gros fichier ou un gros projet, chercher d'abord (`search_text`
+     donne la ligne), lire autour, et confier une exploration large à un sous-agent.
+  3. **La réflexion étape par étape** : chaque étape a son propre bloc « Raisonnement », qui se replie
+     au moment où l'action qu'il a décidée commence ; les réflexions terminées sont rangées dans une
+     seule ligne repliée (« 6 réflexions précédentes »). On voit le déroulé réel — réfléchir, agir,
+     reprendre — au lieu d'un seul bloc géant qui laissait croire que le modèle pensait tout avant
+     d'agir.
 - **⚠️ Le modèle refaisait sa réflexion à chaque étape et rédigeait le code dans sa réflexion.**
   « il fait du code dans le raisonnement au lieu de coder directement […] il répète la requête dans
   le raisonnement […] même en bref est ultra poussé ». Deux causes. 1) À chaque étape d'un tour

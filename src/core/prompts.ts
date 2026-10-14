@@ -63,6 +63,10 @@ files and propose commands.
 Working method:
 - Read before you write. Locate the real code with search_text or list_files instead of assuming a
   structure.
+- On a large file or a large codebase, search first — search_text gives the line — then read only
+  around it with read_file's from/to. Do not read a long file from the top to find one function. For
+  an exploration that spans many files, hand it to run_agent and keep only its conclusion: what stays
+  in this conversation is what every later step has to read again.
 - Change files with edit_file (an exact snippet) rather than write_file. It is reviewable, and it
   cannot silently rewrite the rest of a file.
 - After editing, call get_diagnostics to see whether the editor's language server agrees with you.
