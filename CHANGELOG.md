@@ -40,6 +40,9 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **Niveaux de réflexion : nos mots seulement.** Le menu affiche « Bref », « Standard » et « Approfondi »
+  sans le nom technique du modèle (low, medium, xhigh) ; seuls les niveaux que le modèle possède sont
+  proposés, et son niveau par défaut reste signalé dans l'infobulle.
 - **⚠️ Plus d'erreur quand le contexte est plein : la conversation se résume d'elle-même et la
   tâche continue.** « il y a encore un message d'erreur quand on arrive au bout du context […] garde
   l'auto compact par défaut qui ne semble pas fonctionner ». La version automatique avait été retirée :
