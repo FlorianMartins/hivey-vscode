@@ -934,7 +934,21 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     void this.loadModels();
   }
 
+  /**
+   * Leaving the conversation on screen stops the turn running in it.
+   *
+   * ⚠️ It used not to: "new conversation", opening another from the history or deleting this one
+   * swapped `this.session` and left `this.turn` going. The turn went on in a conversation nobody was
+   * looking at — on the shared server, an agent task going round edit → run → fail for two hours,
+   * ninety requests an hour, after the person believed it was over. Nothing on screen said so: the
+   * new conversation is empty, and its stop button belongs to it.
+   */
+  private leaveTurn(): void {
+    if (this.turn) this.stopTurn();
+  }
+
   newSession(): void {
+    this.leaveTurn();
     this.wizard = undefined;
     this.suggestion = undefined;
     this.persist();
@@ -1071,7 +1085,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           this.wizard = undefined;
           this.persist();
           const found = this.history().find((s) => s.id === m.id);
-          if (found) {
+          if (found && found.id !== this.session.id) {
+            this.leaveTurn();
             this.session = new Session(found);
             this.frozenMap = undefined;
           }
@@ -1258,7 +1273,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         case "deleteSession": {
           const rest = this.history().filter((s) => s.id !== m.id);
           await this.ctx.workspaceState.update(HISTORY_KEY, rest);
-          if (this.session.id === m.id) this.session = new Session();
+          if (this.session.id === m.id) {
+            this.leaveTurn();
+            this.session = new Session();
+          }
           this.sendState();
           break;
         }
@@ -2143,6 +2161,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const ctl = this.turn;
     if (!ctl) return false;
     ctl.abort();
+    this.stops += 1;
 
     // The turn is over for the user NOW, not when the abort finishes travelling.
     //
@@ -2163,6 +2182,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this.sendState();
     return true;
   }
+
+  /**
+   * How many times the person has pressed stop. A summary made before a question (or after a full
+   * context) runs as a turn of its own and ends before the question is asked; a stop pressed during
+   * it must also cancel what was going to follow, which is what comparing this before and after says.
+   */
+  private stops = 0;
 
   /** True while a turn is running. */
   get busy(): boolean {
@@ -3418,7 +3444,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       this.newSession();
     } else {
       const found = this.history().find((x) => x.id === picked.target);
-      if (found) this.session = new Session(found);
+      if (found && found.id !== this.session.id) {
+        this.leaveTurn();
+        this.session = new Session(found);
+      }
     }
     this.attachments.push(item);
     this.screen = "chat";
@@ -4210,6 +4239,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
       const rest = live.flush();
       if (rest && !ctl.signal.aborted) this.post({ type: "delta", text: rest });
+      // Stopped half way: what came back is the start of a summary, and replacing the conversation
+      // with it would lose everything after the cut. Nothing is changed.
+      if (ctl.signal.aborted) return false;
 
       const summary = (result.text || streamed).trim();
       if (!summary) {
@@ -4329,7 +4361,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       shouldAutoCompact(this.contextTokens(), this.budgetTokensFor(settings), this.session.entries.filter((e) => e.included).length)
     ) {
       this.log.appendLine("[context] near the window: summarizing before the question");
+      const stops = this.stops;
       await this.compactAroundLastQuestion();
+      if (this.stops !== stops) return;
     }
     await this.runTurn();
   }
@@ -5483,9 +5517,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const failed = entries[entries.length - 1];
     if (failed?.role === "assistant" && !failed.text) this.session.drop(failed.id);
     this.recoveringOverflow = true;
+    const stops = this.stops;
     try {
       const compacted = await this.compactAroundLastQuestion();
-      if (compacted === undefined) return;
+      if (compacted === undefined || this.stops !== stops) return;
       if (!compacted) {
         // Nothing earlier to summarize: this one question, with what is attached to it, is larger
         // than the model can read. Said as such, with the two things that make it fit.
