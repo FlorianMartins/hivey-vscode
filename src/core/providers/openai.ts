@@ -124,7 +124,11 @@ export class OpenAICompatibleProvider implements Provider {
         headers: this.headers(),
         body: JSON.stringify(attempt),
         signal,
-        timeoutMs: this.opts.timeoutMs ?? 180_000,
+        // ⚠️ No deadline on the user's own server. One slot serves its users in turn, and a request
+        // queued behind somebody else's long turn was cut at 180 s with "sent nothing within 180s" —
+        // a failure for what is only a wait, and one the panel already shows as "In the queue…".
+        // A server that is not there fails at once (connection refused); Stop ends any other wait.
+        timeoutMs: this.opts.timeoutMs ?? (isSelfHostedProvider(this.id) ? Infinity : 180_000),
         label: "chat",
       });
 

@@ -23,6 +23,7 @@ import { estimateMessageTokens } from "../util/tokens.js";
 import { restoreDeep } from "../redaction/index.js";
 import { t } from "../../shared/i18n.js";
 import type { RecallStore } from "./recall.js";
+import { isWrongLanguage, withReplyLanguage } from "../prompts.js";
 
 export interface ToolContext {
   /** Cancels when the user stops the turn. */
@@ -135,6 +136,13 @@ export interface TurnOptions {
   beforeRequest?: (messages: ChatMessage[]) => Promise<ChatMessage[]> | ChatMessage[];
   /** Applied to text coming back, to put real values behind the placeholders. */
   afterResponse?: (text: string) => string;
+  /**
+   * The user's language, held for the whole turn: the rule and the reminder go on every request (see
+   * `withReplyLanguage`), and a note written in another language goes through `translate`.
+   */
+  replyLanguage?: "en" | "fr";
+  /** Puts a note back in the user's language — a small request, thinking off. Undefined: left as is. */
+  translate?: (text: string, lang: "en" | "fr", signal?: AbortSignal) => Promise<string | undefined>;
   /**
    * Put the real values back into a tool call's arguments, before anything looks at them.
    *
@@ -364,7 +372,7 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
     // Going round in circles: told twice to stop repeating the same call and doing it again. The
     // turn ends here rather than spending the rest of its steps — or hours — on the same thing.
     if (repeatNudges > MAX_REPEAT_NUDGES) {
-      opts.report?.("the model kept repeating the same tool call — the turn was stopped");
+      opts.report?.(t("the model kept repeating the same tool call — the turn was stopped"));
       return done("repeating");
     }
 
@@ -374,10 +382,11 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
       const limit = Math.floor(opts.contextWindow * 0.9) - ANSWER_ROOM_TOKENS;
       const estimate = Math.ceil(estimateMessageTokens(working) * tokenRatio);
       if (estimate > limit && shrinkToolOutputs(working, estimate - limit, keptAs)) {
-        opts.report?.("the turn was approaching the model's context window — older tool outputs were shortened");
+        opts.report?.(t("the turn was approaching the model's context window — older tool outputs were shortened"));
       }
     }
-    const prepared = opts.beforeRequest ? await opts.beforeRequest(working) : working;
+    const prepared0 = opts.beforeRequest ? await opts.beforeRequest(working) : working;
+    const prepared = opts.replyLanguage ? withReplyLanguage(prepared0, opts.replyLanguage) : prepared0;
     const outgoing = opts.promptCache ? withRollingCacheMark(prepared) : prepared;
     let res: ChatResult;
     try {
@@ -406,7 +415,7 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
       const overflow = contextOverflow(String((err as Error)?.message ?? err));
       if (overflow && shrinkAttempts < MAX_SHRINKS && shrinkToolOutputs(working, overflow.excess + ANSWER_ROOM_TOKENS, keptAs)) {
         shrinkAttempts++;
-        opts.report?.("the turn no longer fit the model's context — older tool outputs were shortened");
+        opts.report?.(t("the turn no longer fit the model's context — older tool outputs were shortened"));
         step--;
         continue;
       }
@@ -445,9 +454,20 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
       shrinkToolOutputs(working, Math.max(res.usage.completionTokens, ANSWER_ROOM_TOKENS) + ANSWER_ROOM_TOKENS, keptAs)
     ) {
       shrinkAttempts++;
-      opts.report?.("the model's context window filled up mid-reply — older tool outputs were shortened and the step asked again");
+      opts.report?.(t("the model's context window filled up mid-reply — older tool outputs were shortened and the step asked again"));
       step--;
       continue;
+    }
+
+    // The safety net behind the language rule: a note the model wrote in another language is put back
+    // in the user's — before it is kept, so what the user reads and what the model reads next agree.
+    if (opts.replyLanguage && opts.translate && res.text.trim() && isWrongLanguage(res.text, opts.replyLanguage)) {
+      try {
+        const fixed = await opts.translate(res.text, opts.replyLanguage, opts.signal);
+        if (fixed?.trim()) res = { ...res, text: fixed.trim() };
+      } catch {
+        /* left as written: a note in the wrong language beats a turn that fails over it */
+      }
     }
 
     truncated = res.stopReason === "length";
@@ -469,7 +489,7 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
     const thoughtOnly = !res.text.trim() && Boolean(res.reasoning?.trim());
     if (truncated && !thoughtOnly && !res.toolCalls.length && tools.length && continuations < MAX_CONTINUATIONS) {
       continuations++;
-      opts.report?.("the reply hit the output limit — asking the model to continue");
+      opts.report?.(t("the reply hit the output limit — asking the model to continue"));
       working.push({ role: "assistant", content: res.text || "(cut off)" });
       working.push({ role: "user", content: CONTINUE_AFTER_CUT });
       continue;
@@ -481,7 +501,7 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
     // fails loudly, which is the honest outcome.
     if (interrupted && !res.toolCalls.length && continuations < MAX_CONTINUATIONS) {
       continuations++;
-      opts.report?.("the reply was interrupted before it finished — asking the model to continue");
+      opts.report?.(t("the reply was interrupted before it finished — asking the model to continue"));
       working.push({ role: "assistant", content: res.text || "(interrupted)" });
       working.push({ role: "user", content: CONTINUE_AFTER_INTERRUPT });
       continue;
@@ -551,7 +571,7 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
         planned.push({ call, settled: parsed.error ?? "Those arguments could not be read.", parallel: false });
         continue;
       }
-      if (parsed.repaired) opts.report?.(`repaired the arguments of ${call.name}`);
+      if (parsed.repaired) opts.report?.(t("repaired the arguments of {0}", call.name));
       // Before the schema check, the approval and the tool — see `restoreArgs`. Only placeholders
       // this vault issued are put back; anything else is left exactly as the model sent it.
       const real = opts.restoreArgs ? restoreDeep(parsed.args, opts.restoreArgs) : parsed.args;
@@ -637,7 +657,7 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
       let end = i;
       while (end < planned.length && planned[end]!.parallel) end += 1;
       const batch = planned.slice(i, end);
-      if (batch.length > 1) opts.report?.(`${batch.length} in parallel`);
+      if (batch.length > 1) opts.report?.(t("{0} in parallel", batch.length));
       await Promise.all(batch.map(execute));
       i = end;
     }

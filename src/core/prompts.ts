@@ -240,6 +240,61 @@ const ENGLISH_WORDS = new Set([
   "do", "not", "it", "of", "to", "in", "my", "should", "would", "could",
 ]);
 
+/**
+ * The reply language, held for the WHOLE of an agent turn.
+ *
+ * ⚠️ « dans les réponses il continue de basculer entre les langues ». Measured on a real step
+ * replayed 20 times: the final write-up stayed in the user's language, the short notes BETWEEN tool
+ * calls did not — 5 English paragraphs out of 14, written right after English code and the model's
+ * own English thinking. A reminder appended to the tool output alone changed nothing (the model reads
+ * it as tool data); the rule in the system prompt PLUS that reminder brought it to 2 out of 10. Both
+ * go on the copy that is sent: the stored transcript is untouched, the system text only changes when
+ * the user's language does, and the reminder sits on the step that was going to change anyway.
+ */
+export function withReplyLanguage<M extends { role: string; content: string }>(messages: M[], lang: "en" | "fr"): M[] {
+  const name = lang === "fr" ? "French" : "English";
+  const rule =
+    `\nLanguage: the user writes in ${name}. Every sentence you write for them is in ${name} — short notes ` +
+    `between tool calls included, even right after reading code, logs or your own reasoning in another ` +
+    `language. Code, identifiers and file names stay as they are.\n`;
+  const reminder =
+    `\n\n[Reply language: ${name}. Every sentence you write for the user — notes between tool calls ` +
+    `included — is in ${name}.]`;
+  const firstSystem = messages.findIndex((m) => m.role === "system");
+  const lastIndex = messages.length - 1;
+  return messages.map((m, i) => {
+    let content = m.content;
+    if (i === firstSystem) content += rule;
+    if (i === lastIndex && m.role === "tool") content += reminder;
+    return content === m.content ? m : { ...m, content };
+  });
+}
+
+/**
+ * Is this text, which the model wrote for the user, in the wrong language? Only a passage long
+ * enough to tell — a dozen words — and only when the detector is sure: anything it cannot decide
+ * falls back to the expected language, so a code-heavy note is never "translated".
+ */
+export function isWrongLanguage(text: string, lang: "en" | "fr"): boolean {
+  const prose = text.replace(/```[\s\S]*?```/g, " ").replace(/`[^`]*`/g, " ");
+  if ((prose.match(/[a-zàâçéèêëîïôûùüÿœ']+/gi) ?? []).length < 12) return false;
+  return detectLanguage(prose, lang) !== lang;
+}
+
+/** The request that puts a note back in the user's language — the safety net behind the rule above. */
+export function translationMessages(text: string, lang: "en" | "fr"): Array<{ role: "system" | "user"; content: string }> {
+  const name = lang === "fr" ? "French" : "English";
+  return [
+    {
+      role: "system",
+      content:
+        `Translate the user's message into ${name}. Keep code, identifiers, file names, paths, commands and ` +
+        `Markdown exactly as they are. Reply with the translation only — no preamble, no quotes.`,
+    },
+    { role: "user", content: text },
+  ];
+}
+
 /** Restated after the transcript every turn, where a model reads it last. */
 export function languageDirective(lang: "en" | "fr"): string {
   const name = lang === "fr" ? "French" : "English";

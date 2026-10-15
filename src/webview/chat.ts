@@ -23,6 +23,7 @@ import { planComplete, planSummary, type Plan } from "../core/agent/plan.js";
 import { contextBreakdown, OTHER } from "../core/context/breakdown.js";
 import type { Notice } from "../core/session/notices.js";
 import { providerIsReady, whatIsMissing, type ProviderState } from "../core/providers/ready.js";
+import { stepText } from "../shared/stepText.js";
 
 const MODES: Array<{ id: Mode; label: string; hint: string }> = [
   { id: "chat", label: t("Chat"), hint: t("Answers from what you attach. No access to the repository.") },
@@ -975,7 +976,7 @@ export function stepRow(s: { tool: string; summary: string; ok: boolean; call?: 
   row.append(icon(s.ok ? "check" : "cross", "step-ico"));
   row.append(el("span", "step-tool", s.tool));
   if (s.call) row.append(el("code", "step-call", s.call));
-  const summary = s.call && s.summary.startsWith(s.call) ? "" : s.summary;
+  const summary = s.call && s.summary.startsWith(s.call) ? "" : stepText(s.summary);
   if (summary) row.append(el("span", "step-summary", summary));
   // The whole of both, for a line the panel had to cut.
   row.title = [s.call, s.summary].filter(Boolean).join("\n");
