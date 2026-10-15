@@ -608,10 +608,29 @@ function renderEntry(entry: UiEntry, state: UiState, deps: ChatDeps, first = fal
   // turn wants the shape of it before the prose.
   if (entry.plan) wrap.append(planBlock(entry.plan, false));
   if (entry.notices?.length) wrap.append(noticesBlock(entry.notices));
-  if (entry.reasoning) wrap.append(reasoningBlock(entry.reasoning));
-  if (entry.steps?.length) wrap.append(stepList(entry.steps));
+  // ⚠️ Step by step when the turn was recorded that way: « on a du mal à comprendre quelle réponse va
+  // avec quelle action et quel raisonnement sur les longues tâches ». Each stretch of the turn is its
+  // block — thinking and actions — then the words written there, in the order they happened.
+  const bySegment = entry.role === "assistant" && !entry.error && (entry.segments?.length ?? 0) > 0;
+  if (bySegment) {
+    const actions = {
+      onCopy: (code: string) => deps.send({ type: "copy", text: code }),
+      onInsert: (code: string) => deps.send({ type: "insertCode", code }),
+      onInsertAtCursor: (code: string) => deps.send({ type: "insertCode", code, atCursor: true }),
+      onApply: (code: string, language: string) => deps.send({ type: "applyCode", code, language }),
+    };
+    for (const seg of entry.segments!) {
+      if (seg.reasoning?.trim() || seg.steps?.length) wrap.append(segmentBlock(seg, false).wrap);
+      if (seg.text?.trim()) wrap.append(markdown(seg.text, actions, state.searchQuery || undefined));
+    }
+  } else {
+    if (entry.reasoning) wrap.append(reasoningBlock(entry.reasoning));
+    if (entry.steps?.length) wrap.append(stepList(entry.steps));
+  }
 
-  if (entry.error) {
+  if (bySegment) {
+    // Drawn above, segment by segment.
+  } else if (entry.error) {
     wrap.append(el("div", "error", entry.error));
     wrap.append(
       button({ label: t("Retry"), className: "btn tiny", onClick: () => deps.send({ type: "retry" }) }),
@@ -950,16 +969,18 @@ export function stepList(steps: Array<{ tool: string; summary: string; ok: boole
 /** "9 steps · 3 commands · 1 edit" — what is inside, so the fold can be left shut. */
 export function stepSummary(steps: Array<{ tool: string; ok: boolean }>): string {
   const count = (names: string[]): number => steps.filter((s) => names.includes(s.tool)).length;
-  const parts = [t("{0} steps", steps.length)];
+  // One of each reads as one: "1 étapes · 1 commandes" was the plural printed on every short step.
+  const n = (count: number, one: string, many: string): string => (count === 1 ? t(one) : t(many, count));
+  const parts = [n(steps.length, "1 step", "{0} steps")];
   const commands = count(["run_command"]);
   // Counted by what they DID, not by tool name: `write_file` and `edit_file` are one thing to
   // somebody deciding whether to open this, and "1 write, 2 edits" is a distinction the reader did
   // not ask for.
   const edits = count(["edit_file", "write_file"]);
   const reads = count(["read_file", "list_files", "search_text"]);
-  if (edits) parts.push(t("{0} edits", edits));
-  if (commands) parts.push(t("{0} commands", commands));
-  if (!edits && !commands && reads) parts.push(t("{0} reads", reads));
+  if (edits) parts.push(n(edits, "1 edit", "{0} edits"));
+  if (commands) parts.push(n(commands, "1 command", "{0} commands"));
+  if (!edits && !commands && reads) parts.push(n(reads, "1 read", "{0} reads"));
   return parts.join(" · ");
 }
 
@@ -1018,6 +1039,35 @@ export function collapsible(
  * Which makes the state a property of the TURN rather than a preference of the reader, and that is
  * why there is no setting for it: the right answer changes halfway through, by itself.
  */
+/**
+ * One stretch of an agent turn: what the model thought and the actions it took, in one block whose
+ * title says what was done — then the words it wrote there follow it. See core/session/segments.ts.
+ */
+export function segmentBlock(
+  seg: { reasoning?: string; steps?: Array<{ tool: string; summary: string; ok: boolean; call?: string }> },
+  open: boolean,
+): { wrap: HTMLElement; thought: HTMLElement; steps: HTMLElement; title: HTMLElement } {
+  const wrap = reasoningBlock("", { open });
+  wrap.classList.add("segment-block");
+  const body = wrap.querySelector<HTMLElement>(".collapsible-body")!;
+  const thought = el("div", "segment-thought", seg.reasoning ?? "");
+  thought.hidden = !seg.reasoning;
+  const steps = el("div", "steps");
+  for (const s of seg.steps ?? []) steps.append(stepRow(s));
+  body.replaceChildren(thought, steps);
+  const title = wrap.querySelector<HTMLElement>(".collapsible-head > span")!;
+  title.textContent = segmentTitle(Boolean(seg.reasoning), seg.steps ?? []);
+  return { wrap, thought, steps, title };
+}
+
+/** "Reasoning · 3 steps · 1 edit", or "Actions · …" for a step that did not think aloud. */
+export function segmentTitle(thought: boolean, steps: Array<{ tool: string; ok: boolean }>): string {
+  const head = thought ? t("Reasoning") : t("Actions");
+  if (!steps.length) return head;
+  const failed = steps.filter((s) => !s.ok).length;
+  return `${head} · ${stepSummary(steps)}${failed ? ` · ${t("{0} failed", failed)}` : ""}`;
+}
+
 export function reasoningBlock(body: string, opts: { open?: boolean } = {}): HTMLElement {
   const wrap = collapsible(t("Reasoning"), body, opts);
   // Its own class, so the frame can carry a colour of its own: a plain grey box among grey boxes

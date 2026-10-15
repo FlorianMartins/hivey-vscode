@@ -95,6 +95,8 @@ export interface UiEntry {
   reasoning?: string;
   context?: UiContextItem[];
   steps?: UiStep[];
+  /** The answer as it happened: thinking and actions, then the words written there, step by step. */
+  segments?: Array<{ reasoning?: string; steps?: UiStep[]; text?: string }>;
 }
 
 export interface UiSession {
@@ -611,6 +613,8 @@ export type ToPanel =
   | { type: "status"; text: string; tool?: string; ok?: boolean; call?: string }
   /** A tool is starting: what the folded step list shows as "in progress". `count` > 1 for a parallel batch. */
   | { type: "toolStart"; tool: string; call?: string; count?: number }
+  /** A note was rewritten after it streamed (put back in the user's language). */
+  | { type: "replaceText"; from: string; to: string }
   /** What the live turn is waiting for — the server's queue, the reading of the conversation — or "" when it is not. */
   | { type: "activity"; text: string; hint?: string }
   | { type: "turnStart" }

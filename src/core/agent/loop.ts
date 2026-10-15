@@ -143,6 +143,8 @@ export interface TurnOptions {
   replyLanguage?: "en" | "fr";
   /** Puts a note back in the user's language — a small request, thinking off. Undefined: left as is. */
   translate?: (text: string, lang: "en" | "fr", signal?: AbortSignal) => Promise<string | undefined>;
+  /** A note was rewritten after it streamed — the text as streamed, then as kept. */
+  onTranslated?: (from: string, to: string) => void;
   /**
    * Put the real values back into a tool call's arguments, before anything looks at them.
    *
@@ -464,7 +466,11 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
     if (opts.replyLanguage && opts.translate && res.text.trim() && isWrongLanguage(res.text, opts.replyLanguage)) {
       try {
         const fixed = await opts.translate(res.text, opts.replyLanguage, opts.signal);
-        if (fixed?.trim()) res = { ...res, text: fixed.trim() };
+        if (fixed?.trim()) {
+          const restore = (s: string): string => (opts.afterResponse ? opts.afterResponse(s) : s);
+          opts.onTranslated?.(restore(res.text), restore(fixed.trim()));
+          res = { ...res, text: fixed.trim() };
+        }
       } catch {
         /* left as written: a note in the wrong language beats a turn that fails over it */
       }

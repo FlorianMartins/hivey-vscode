@@ -148,6 +148,7 @@ import { choicesFor, levelsFromRefusal, type ModelReasoning } from "../core/rout
 import { nextStepMessages, parseNextStep } from "../core/session/nextStep.js";
 import { stepText } from "../shared/stepText.js";
 import { translationMessages } from "../core/prompts.js";
+import { SegmentBuilder } from "../core/session/segments.js";
 
 const HISTORY_KEY = "hiveyCode.sessions";
 const PERMISSIONS_KEY = "hiveyCode.permissions";
@@ -707,6 +708,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       ...(e.plan ? { plan: e.plan } : {}),
       reasoning: e.reasoning,
       steps: e.steps,
+      ...(e.segments?.length ? { segments: e.segments } : {}),
       context: e.context?.map((c) => ({ kind: c.kind, label: c.label, tokens: estimateTokens(c.body) })),
     };
   }
@@ -2411,6 +2413,16 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     for (const entry of this.session.entries) {
       lines.push(`## ${entry.role === "user" ? t("You") : "Hivey Code"}${entry.included ? "" : ` — ${t("out of context")}`}`);
       if (entry.role === "assistant" && entry.model) lines.push(`*${entry.model}*`, "");
+      // In the order it happened when the turn was recorded that way: each stretch's actions, then
+      // the words written there — the same reading as the panel's (see core/session/segments.ts).
+      if (entry.segments?.length && !entry.error) {
+        for (const seg of entry.segments) {
+          for (const step of seg.steps ?? []) lines.push(`- \`${step.tool}\` — ${stepText(step.summary)}`);
+          if (seg.steps?.length) lines.push("");
+          if (seg.text?.trim()) lines.push(seg.text.trim(), "");
+        }
+        continue;
+      }
       lines.push(entry.text.trim(), "");
       // A failure is part of the record. An export that quietly drops it is a record that lies by
       // omission — and it is the document somebody attaches when they report that nothing works.
@@ -4838,6 +4850,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       const imageKey = `${providerId}::${model}`;
       let sendMessages = this.isVisionless(imageKey) ? withoutImages(prepared.messages) : prepared.messages;
       const turnLanguage = detectLanguage(withoutModelText(lastUser?.text ?? ""), language());
+      // The answer as it happens, step by step — see core/session/segments.ts.
+      const segments = new SegmentBuilder();
+      // The same array, filled as the turn runs: what is saved with the answer, and what a redraw shows.
+      answer.segments = segments.segments;
       // What each request is waiting for, beside "thinking…" — see core/agent/waiting.ts.
       const wait = new WaitWatch(
         (label) => {
@@ -4870,6 +4886,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         // The user's language, held for the whole turn — see `withReplyLanguage` and `translate`.
         replyLanguage: turnLanguage,
         translate: (text, lang, signal) => this.translateNote(settings, text, lang, signal),
+        onTranslated: (from, to) => {
+          segments.replace(from, to);
+          if (!ctl.signal.aborted) this.post({ type: "replaceText", from, to });
+        },
         recall: this.recallFor(this.session.id),
         // ⚠️ "remove that cap, the model has to be able to do what it is asked from A to Z". Thirty
         // requests stopped a real task half-way — silently, after reading, editing and testing — and
@@ -4915,12 +4935,18 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             // Placeholders are resolved as they stream, so the user never reads their own data
             // through a marker — including one the packet boundary cut in two.
             const shown = liveText.push(deltaText);
-            if (shown) this.post({ type: "delta", text: shown });
+            if (shown) {
+              segments.text(shown);
+              this.post({ type: "delta", text: shown });
+            }
           }
           if (deltaThought) {
             thought += deltaThought;
             const shownThought = liveThought.push(deltaThought);
-            if (shownThought) this.post({ type: "reasoning", text: shownThought });
+            if (shownThought) {
+              segments.reasoning(shownThought);
+              this.post({ type: "reasoning", text: shownThought });
+            }
           }
         },
         // The action under way, for the folded step list — a command that runs for a minute is the
@@ -4931,6 +4957,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           const call = callSignature(first.name, safeArgs(first.args));
           // The next step's thinking starts a paragraph of its own in the saved answer.
           if (thought && !thought.endsWith("\n\n")) thought += "\n\n";
+          segments.acted();
           this.post({ type: "toolStart", tool: first.name, ...(call ? { call } : {}), ...(toolCalls.length > 1 ? { count: toolCalls.length } : {}) });
         },
         onToolResult: ({ call, result }) => {
@@ -4951,6 +4978,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             signature = "";
           }
           steps.push({ tool: call.name, summary, ok: !result.isError, ...(signature ? { call: signature } : {}) });
+          segments.step({ tool: call.name, summary, ok: !result.isError, ...(signature ? { call: signature } : {}) });
           if (ctl.signal.aborted) return;
           this.post({
             type: "status",

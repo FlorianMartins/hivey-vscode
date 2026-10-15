@@ -6,7 +6,7 @@
 // rendered incrementally is the answer being streamed, because that one has to be.
 
 import { button, closeMenu, el, icon, ICON, menuIsOpen, searchInput } from "./dom.js";
-import { chatScreen, isStreaming, planBlock, reasoningBlock, setStreaming, stepRow, stepSummary, collapsible, type ChatDeps, captureDraft, restoreDraft,
+import { chatScreen, isStreaming, planBlock, setStreaming, stepRow, segmentBlock, segmentTitle, type ChatDeps, captureDraft, restoreDraft,
   NOTE_FADE_MS,
   setComposerNote,
   dictationStopped,
@@ -315,7 +315,6 @@ class LiveTurn {
   private readonly body: HTMLElement;
   private readonly activity: HTMLElement;
   private text?: HTMLElement;
-  private thinking?: { wrap: HTMLElement; body: HTMLElement; folded?: boolean };
   private buffer = "";
 
   /**
@@ -357,21 +356,199 @@ class LiveTurn {
     // for the whole of it. Once the answer starts, the same block is in the way of it. So it folds
     // itself here, exactly once: reopening it is the reader's business, and a block that shut
     // itself again on the next token would be a block nobody can read.
+    const seg = this.segmentFor("text");
     this.foldThinking();
     this.buffer += chunk;
     if (!this.text) {
       this.text = el("div", "live-text");
-      this.body.append(this.text);
+      seg.root.append(this.text);
     }
     this.scheduleRender();
   }
 
-  /** Shut the reasoning, once, when the answer takes over from it. */
+  /** Shut the current step's block, once, when its words or its actions take over from it. */
   private foldThinking(): void {
-    if (!this.thinking || this.thinking.folded) return;
-    this.thinking.folded = true;
-    this.thinking.body.hidden = true;
-    this.thinking.wrap.classList.remove("open", "thinking");
+    const seg = this.seg;
+    if (!seg?.block || seg.folded) return;
+    seg.folded = true;
+    seg.block.body.hidden = true;
+    seg.block.wrap.classList.remove("open", "thinking");
+  }
+
+  /**
+   * ⚠️ The turn, stretch by stretch. « on a du mal à comprendre quelle réponse va avec quelle action
+   * et quel raisonnement sur les longues tâches ». All the thinking used to sit in one place, all the
+   * actions in another and all the words under them, so on a long task nothing said which sentence
+   * followed which action. Each stretch is now its own block — thinking and actions — followed by the
+   * words written there, in the order they happened. A new stretch starts when the model thinks again
+   * after it has written or acted, or writes again after it has acted (see core/session/segments.ts,
+   * which records the same cut for the redraw).
+   */
+  private seg?: {
+    root: HTMLElement;
+    block?: { wrap: HTMLElement; body: HTMLElement; thought: HTMLElement; steps: HTMLElement; title: HTMLElement; now: HTMLElement };
+    done: Array<{ tool: string; ok: boolean }>;
+    thought: boolean;
+    wrote: boolean;
+    acting: boolean;
+    folded?: boolean;
+  };
+
+  private segmentFor(kind: "reasoning" | "text" | "step"): NonNullable<LiveTurn["seg"]> {
+    const s = this.seg;
+    const fresh =
+      !s ||
+      (kind === "reasoning" && (s.wrote || s.done.length > 0 || s.acting)) ||
+      (kind === "text" && (s.done.length > 0 || s.acting));
+    if (s && !fresh) return s;
+    if (s) this.closeSegment();
+    const root = el("div", "segment");
+    following(() => this.body.append(root));
+    this.seg = { root, done: [], thought: false, wrote: false, acting: false };
+    if (kind === "text") this.seg.wrote = true;
+    return this.seg;
+  }
+
+  /** The words of the stretch that is ending, drawn whole; the next stretch types its own. */
+  private closeSegment(): void {
+    this.foldThinking();
+    if (this.text && this.buffer) {
+      const rendered = markdown(this.buffer);
+      rendered.className = "md";
+      this.text.replaceChildren(...Array.from(rendered.childNodes));
+    }
+    this.text = undefined;
+    this.buffer = "";
+    this.shown = 0;
+    this.typing = false;
+    this.followThinking = true;
+  }
+
+  /** The current stretch's block, made the first time it has something to hold. */
+  private blockOf(seg: NonNullable<LiveTurn["seg"]>, open: boolean): NonNullable<NonNullable<LiveTurn["seg"]>["block"]> {
+    if (!seg.block) {
+      const made = segmentBlock({}, open);
+      const body = made.wrap.querySelector<HTMLElement>(".collapsible-body")!;
+      // A reader who scrolls the box up has said where they want to be; one who scrolls it back to
+      // the bottom has said to resume. Tracked on the box rather than guessed from the content.
+      body.addEventListener("scroll", () => {
+        // A pixel of tolerance: a fractional scrollHeight on a zoomed display never equals the sum.
+        this.followThinking = body.scrollHeight - body.scrollTop - body.clientHeight <= 2;
+      });
+      const now = el("span", "steps-now");
+      made.wrap.querySelector<HTMLElement>(".collapsible-head")!.append(now);
+      seg.block = { ...made, body, now };
+      seg.folded = !open;
+      // Above the words of the same stretch: thinking and actions first, then what was written.
+      following(() => (this.text && this.text.parentElement === seg.root ? seg.root.insertBefore(made.wrap, this.text) : seg.root.prepend(made.wrap)));
+    }
+    return seg.block;
+  }
+
+  private retitle(seg: NonNullable<LiveTurn["seg"]>): void {
+    if (seg.block) seg.block.title.textContent = segmentTitle(seg.thought, seg.done);
+  }
+
+  appendReasoning(chunk: string): void {
+    // Through `following`, like the answer itself — and that was missing.
+    //
+    // While a model thinks, its reasoning is the only thing arriving, so it is the only thing that
+    // can move the page. It was appended outside the follow, and into a block that started shut and
+    // therefore did not grow at all: the panel sat on the previous answer for the whole of the
+    // thinking, and only jumped once the first word of the answer appeared. "When the model thinks,
+    // the chat does not go to the last message."
+    following(() => {
+      const seg = this.segmentFor("reasoning");
+      if (!seg.block) {
+        // Open while it is written — the same `reasoningBlock("", { open: true })` as before, now one per
+        // stretch — and lit, like the composer's ring: the frame says "this is still going".
+        this.blockOf(seg, true).wrap.classList.add("thinking");
+      }
+      const block = seg.block!;
+      seg.thought = true;
+      block.thought.hidden = false;
+      block.thought.textContent = (block.thought.textContent ?? "") + chunk;
+      this.retitle(seg);
+    });
+    // ⚠️ And the block's OWN scroller, which `following` cannot reach. `.collapsible-body` is capped
+    // at 260px with `overflow-y: auto`, so the page can be perfectly positioned while the reasoning
+    // grows inside a box that never scrolls itself: you read the first screenful and the rest piles
+    // up out of sight. Reported as "it stays stuck at the top of its reasoning phase instead of
+    // scrolling along with it" — the page was following, the box was not.
+    //
+    // Not when the reader has scrolled it up themselves: someone re-reading an earlier line of the
+    // thinking has said where they want to be, and yanking them back is worse than not following.
+    const body = this.seg?.block?.body;
+    if (body && this.followThinking) body.scrollTop = body.scrollHeight;
+  }
+
+  /** Whether the reasoning box still follows its own tail. False once the reader scrolls it. */
+  private followThinking = true;
+
+  /** A note was rewritten after it streamed (put back in the user's language): the screen follows. */
+  replaceText(from: string, to: string): void {
+    if (this.buffer.includes(from)) {
+      this.buffer = this.buffer.replace(from, to);
+      this.shown = Math.min(this.shown, this.buffer.length);
+      this.scheduleRender();
+    }
+  }
+
+  /**
+   * The plan, redrawn in place.
+   *
+   * Replaced rather than appended: the model sends the WHOLE plan on every update, so appending
+   * would stack five copies of the same list down the answer. It is pinned to the top of the turn
+   * because that is where it stays useful — under the tool lines it scrolls away exactly when the
+   * turn gets long enough to need it.
+   */
+  private planNode?: HTMLElement;
+
+  setPlan(plan: Plan): void {
+    const next = planBlock(plan, true);
+    following(() => {
+      if (this.planNode) this.planNode.replaceWith(next);
+      else this.body.prepend(next);
+    });
+    this.planNode = next;
+  }
+
+  /** The action under way, on its stretch's block — folded, so the step reads as one line. */
+  toolStart(tool: string, call?: string, count?: number): void {
+    const seg = this.segmentFor("step");
+    seg.acting = true;
+    const block = this.blockOf(seg, false);
+    this.foldThinking();
+    block.now.replaceChildren(
+      el("span", "steps-now-dot pulse", "●"),
+      el("span", "step-tool", tool),
+      ...(call ? [el("code", "step-call", call)] : []),
+      ...(count && count > 1 ? [el("span", "step-summary", t("+{0} in parallel", count - 1))] : []),
+    );
+    block.now.title = [tool, call].filter(Boolean).join(" ");
+  }
+
+  appendStatus(text: string, tool?: string, ok?: boolean, call?: string): void {
+    const seg = this.segmentFor("step");
+    const block = this.blockOf(seg, false);
+    if (!tool) {
+      // Progress from a tool that is still running, not the result of one: a passing remark, shown
+      // on the block's line where the current action is, and kept in its list.
+      const row = el("div", "step");
+      row.append(el("span", "step-ico dot", "·"));
+      row.append(el("span", "step-summary", text));
+      following(() => block.steps.append(row));
+      block.now.replaceChildren(el("span", "steps-now-dot pulse", "●"), el("span", "step-summary", text));
+      block.now.title = text;
+      return;
+    }
+    const row = stepRow({ tool, summary: text, ok: ok !== false, ...(call ? { call } : {}) });
+    following(() => block.steps.append(row));
+    seg.done.push({ tool, ok: ok !== false });
+    this.retitle(seg);
+    // Done: the line says nothing more than its title until the next action starts.
+    block.now.replaceChildren();
+    block.now.title = "";
   }
 
   /**
@@ -453,211 +630,6 @@ class LiveTurn {
     following(() => this.text!.replaceChildren(...Array.from(rendered.childNodes)));
   }
 
-  appendReasoning(chunk: string): void {
-    // Through `following`, like the answer itself — and that was missing.
-    //
-    // While a model thinks, its reasoning is the only thing arriving, so it is the only thing that
-    // can move the page. It was appended outside the follow, and into a block that started shut and
-    // therefore did not grow at all: the panel sat on the previous answer for the whole of the
-    // thinking, and only jumped once the first word of the answer appeared. "When the model thinks,
-    // the chat does not go to the last message."
-    following(() => {
-      // ⚠️ One block PER STEP. « comment ils font pour réfléchir, agir, reprendre la réflexion » — the
-      // thinking of every step of a turn went into one block, so twenty steps read as one giant
-      // deliberation before anything was done. A step's thinking now closes when the action it
-      // decided starts, titled with that action, and the next step thinks in a block of its own:
-      // think → act → think, as it actually happened.
-      if (this.thinking && this.stepEnded) {
-        this.foldThinking();
-        this.archiveThinking(this.thinking.wrap);
-        this.thinking = undefined;
-        this.followThinking = true;
-      }
-      this.stepEnded = false;
-      if (!this.thinking) {
-        const wrap = reasoningBlock("", { open: true });
-        // Lit while it is being written, like the composer's ring: the frame says "this is still
-        // going" without a word to read. Removed when the answer takes over, or the turn ends.
-        wrap.classList.add("thinking");
-        const body = wrap.querySelector<HTMLElement>(".collapsible-body")!;
-        // A reader who scrolls the box up has said where they want to be; one who scrolls it back to
-        // the bottom has said to resume. Tracked on the box rather than guessed from the content,
-        // because "did the user move this" is not answerable from the text that arrived.
-        body.addEventListener("scroll", () => {
-          // A pixel of tolerance: a fractional scrollHeight on a zoomed display never equals the sum.
-          this.followThinking = body.scrollHeight - body.scrollTop - body.clientHeight <= 2;
-        });
-        this.thinking = { wrap, body };
-        if (!this.thoughts) {
-          this.thoughts = el("div", "thoughts");
-          this.body.prepend(this.thoughts);
-        }
-        this.thoughts.append(wrap);
-      }
-      this.thinking.body.textContent = (this.thinking.body.textContent ?? "") + chunk;
-    });
-    // ⚠️ And the block's OWN scroller, which `following` cannot reach. `.collapsible-body` is capped
-    // at 260px with `overflow-y: auto`, so the page can be perfectly positioned while the reasoning
-    // grows inside a box that never scrolls itself: you read the first screenful and the rest piles
-    // up out of sight. Reported as "it stays stuck at the top of its reasoning phase instead of
-    // scrolling along with it" — the page was following, the box was not.
-    //
-    // Not when the reader has scrolled it up themselves: someone re-reading an earlier line of the
-    // thinking has said where they want to be, and yanking them back is worse than not following.
-    const body = this.thinking?.body;
-    if (body && this.followThinking) body.scrollTop = body.scrollHeight;
-  }
-
-  /** Whether the reasoning box still follows its own tail. False once the reader scrolls it. */
-  private followThinking = true;
-  /** Every step's thinking, in order — see `appendReasoning`. */
-  private thoughts?: HTMLElement;
-  /** An action started since the last thinking arrived: the next thinking is a new step's. */
-  private stepEnded = false;
-
-  /**
-   * A finished step's thinking, into ONE folded list above the current one — twenty steps must not
-   * become twenty lines again. "12 earlier steps of thinking"; each opens on its own, titled with the
-   * action it decided.
-   */
-  private earlier?: { wrap: HTMLElement; list: HTMLElement; count: number };
-  private archiveThinking(block: HTMLElement): void {
-    if (!this.thoughts) return;
-    if (!this.earlier) {
-      const list = el("div", "thoughts-earlier");
-      const wrap = collapsible("", list, { open: false });
-      wrap.classList.add("reasoning", "reasoning-earlier");
-      this.earlier = { wrap, list, count: 0 };
-      this.thoughts.prepend(wrap);
-    }
-    this.earlier.list.append(block);
-    this.earlier.count += 1;
-    const title = this.earlier.wrap.querySelector<HTMLElement>(".collapsible-head > span");
-    if (title) title.textContent = t("{0} earlier steps of thinking", this.earlier.count);
-  }
-
-  /** The action this step's thinking decided, as the title of its block. */
-  private titleThinking(tool: string, call?: string): void {
-    const title = this.thinking?.wrap.querySelector<HTMLElement>(".collapsible-head > span");
-    if (title && !this.stepEnded) title.textContent = `${t("Reasoning")} → ${[tool, call].filter(Boolean).join(" ")}`;
-  }
-
-  /**
-   * The plan, redrawn in place.
-   *
-   * Replaced rather than appended: the model sends the WHOLE plan on every update, so appending
-   * would stack five copies of the same list down the answer. It is pinned to the top of the turn
-   * because that is where it stays useful — under the tool lines it scrolls away exactly when the
-   * turn gets long enough to need it.
-   */
-  private planNode?: HTMLElement;
-
-  setPlan(plan: Plan): void {
-    const next = planBlock(plan, true);
-    following(() => {
-      if (this.planNode) this.planNode.replaceWith(next);
-      else this.body.prepend(next);
-    });
-    this.planNode = next;
-  }
-
-  /**
-   * A step, and always above the answer.
-   *
-   * It used to be appended to the end of the turn, so the steps sat wherever the writing happened
-   * to be: text started, a step landed under it, more text went back above it. And at the end the
-   * turn is redrawn from the record, where steps are drawn ABOVE the answer — so everything moved
-   * one last time, exactly when the reader had settled on it. One container, placed once, and
-   * nothing shifts.
-   */
-  private steps?: HTMLElement;
-  /**
-   * ⚠️ « ça écrit plein de lignes et du coup on doit remonter pour voir la réflexion en cours ».
-   * Every step was a row, and on a long turn the rows pushed the model's live thinking off the
-   * screen. So the steps are FOLDED while the turn runs, into one line that says what is inside and
-   * what is happening now — "9 steps · 2 edits — run_command npm test" — and opens on a click to the
-   * full list. A failed step is said on that line too; opening it is the reader's business.
-   */
-  private stepsTitle?: HTMLElement;
-  private stepsNow?: HTMLElement;
-  private stepsDone: Array<{ tool: string; ok: boolean }> = [];
-
-  private stepsHost(): HTMLElement {
-    if (!this.steps) {
-      this.steps = el("div", "steps");
-      const block = collapsible("", this.steps, { open: false });
-      block.classList.add("steps-folded", "steps-live");
-      const head = block.querySelector<HTMLElement>(".collapsible-head")!;
-      this.stepsTitle = head.querySelector<HTMLElement>(":scope > span:not(.ico)") ?? head.appendChild(el("span"));
-      this.stepsNow = el("span", "steps-now");
-      head.append(this.stepsNow);
-      if (this.text) this.body.insertBefore(block, this.text);
-      else this.body.append(block);
-      this.renderStepsHead();
-    }
-    return this.steps;
-  }
-
-  private renderStepsHead(): void {
-    if (!this.stepsTitle) return;
-    // Short, at the end of the line: the action under way is what the line is for, and in a docked
-    // panel the full summary pushed it out of sight. The whole summary is the line's tooltip.
-    const failed = this.stepsDone.filter((s) => !s.ok).length;
-    this.stepsTitle.textContent = this.stepsDone.length
-      ? t("{0} steps", this.stepsDone.length) + (failed ? ` · ${t("{0} failed", failed)}` : "")
-      : t("Working…");
-    this.stepsTitle.classList.toggle("failed", failed > 0);
-    const head = this.stepsTitle.parentElement;
-    if (head) head.title = this.stepsDone.length ? stepSummary(this.stepsDone) : "";
-  }
-
-  /** The action under way, on the folded line. */
-  toolStart(tool: string, call?: string, count?: number): void {
-    // The thinking that led here is done: titled with what it decided, folded, and the next thinking
-    // opens a block of its own.
-    this.titleThinking(tool, call);
-    this.foldThinking();
-    this.stepEnded = true;
-    this.stepsHost();
-    if (!this.stepsNow) return;
-    this.stepsNow.replaceChildren(
-      el("span", "steps-now-dot pulse", "●"),
-      el("span", "step-tool", tool),
-      ...(call ? [el("code", "step-call", call)] : []),
-      ...(count && count > 1 ? [el("span", "step-summary", t("+{0} in parallel", count - 1))] : []),
-    );
-    this.stepsNow.title = [tool, call].filter(Boolean).join(" ");
-  }
-
-  appendStatus(text: string, tool?: string, ok?: boolean, call?: string): void {
-    if (!tool) {
-      // Progress from a tool that is still running, not the result of one: a passing remark, shown
-      // on the folded line where the current action is, and kept in the list.
-      const row = el("div", "step");
-      row.append(el("span", "step-ico dot", "·"));
-      row.append(el("span", "step-summary", text));
-      following(() => this.stepsHost().append(row));
-      if (this.stepsNow) {
-        this.stepsNow.replaceChildren(el("span", "steps-now-dot pulse", "●"), el("span", "step-summary", text));
-        this.stepsNow.title = text;
-      }
-      return;
-    }
-    const row = stepRow({ tool, summary: text, ok: ok !== false, ...(call ? { call } : {}) });
-    following(() => this.stepsHost().append(row));
-    this.stepsDone.push({ tool, ok: ok !== false });
-    this.renderStepsHead();
-    // Done: the line shows what was last done until the next action starts.
-    if (this.stepsNow) {
-      this.stepsNow.replaceChildren(
-        icon(ok === false ? "cross" : "check", `step-ico${ok === false ? " failed" : ""}`),
-        el("span", "step-tool", tool),
-        ...(call ? [el("code", "step-call", call)] : []),
-      );
-      this.stepsNow.title = [tool, call, text].filter(Boolean).join("\n");
-    }
-  }
-
   appendError(message: string): void {
     following(() => this.body.append(el("div", "error", message)));
   }
@@ -684,7 +656,7 @@ class LiveTurn {
     this.root.classList.remove("streaming");
     // A turn that ends while still thinking — stopped, or a model that never answered — leaves a
     // record, not a block that goes on claiming to think.
-    this.thinking?.wrap.classList.remove("thinking");
+    this.seg?.block?.wrap.classList.remove("thinking");
   }
 }
 
@@ -962,6 +934,9 @@ window.addEventListener("message", (event: MessageEvent<ToPanel>) => {
       break;
     case "plan":
       ensureLive().setPlan(m.plan);
+      break;
+    case "replaceText":
+      live?.replaceText(m.from, m.to);
       break;
     case "toolStart":
       if (live) live.toolStart(m.tool, m.call, m.count);

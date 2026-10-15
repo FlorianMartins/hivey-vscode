@@ -21,6 +21,7 @@ import type { Plan } from "../agent/plan.js";
 import type { Mode } from "./modes.js";
 import { estimateTokens, headToTokens } from "../util/tokens.js";
 import { IMAGE_TOKENS } from "../models/vision.js";
+import type { Segment } from "./segments.js";
 
 export type EntryRole = "user" | "assistant";
 
@@ -83,6 +84,8 @@ export interface Entry {
    * `run_command` lines saying "started in the terminal" name no command between them.
    */
   steps?: Array<{ tool: string; summary: string; ok: boolean; call?: string }>;
+  /** The same answer as it happened, step by step — see core/session/segments.ts. */
+  segments?: Segment[];
   /** Set on an assistant entry that failed, so it is never replayed as if it were an answer. */
   error?: string;
   /**
