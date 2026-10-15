@@ -58,6 +58,23 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **⚠️ « ai.hivey.be sent nothing within 180s » : une requête en attente n'est plus abandonnée.** Le
+  serveur auto-hébergé n'a qu'une place ; une requête qui attendait son tour derrière celle d'un autre
+  utilisateur (ou d'un banc d'essai) était coupée au bout de 180 s, avec un message anglais qui parlait
+  à tort d'un modèle en cours de chargement. Sur un serveur auto-hébergé il n'y a plus de délai pour la
+  première réponse — l'attente s'affiche « En file d'attente… », un serveur éteint échoue aussitôt, et
+  Stop reste là. Les messages d'erreur réseau sont traduits.
+- **La réponse reste dans la langue de l'utilisateur.** « dans les réponses il continue de basculer
+  entre les langues ». Ce que le panneau imprimait entre les phrases du modèle était en anglais : la
+  première ligne de chaque résultat d'outil (« Edited … », « No diagnostics. », « exit code 0 »), les
+  avis « À savoir » et les messages d'état de l'agent. Tout est traduit à l'affichage — le modèle lit
+  toujours ses outils en anglais. (La règle de langue dans les consignes, qui réduit aussi les notes du
+  modèle écrites en anglais, attend le banc de 62 tâches avant d'être activée.)
+- **Les longues tâches se lisent dans l'ordre.** « on a du mal à comprendre quelle réponse va avec
+  quelle action et quel raisonnement sur les longues tâches ». Chaque étape de l'agent est un bloc —
+  « Raisonnement · 2 étapes · 1 modification », avec la réflexion et les actions — suivi du texte écrit à
+  ce moment-là, puis l'étape suivante ; pendant le travail comme à la relecture, et dans l'export.
+  « 1 étape · 1 commande » au singulier.
 - **Ligne de commande (et banc d'évaluation) : plus de plafond de 4 096 tokens par réponse, et la
   réflexion « Standard » sur un serveur auto-hébergé, comme le panneau.** Le plafond, oublié lors de la
   suppression des limites manuelles, laissait un modèle qui réfléchit à son maximum sans rien pour

@@ -45,10 +45,9 @@ import { Session } from "../core/session/session.js";
 import { buildRepoMap } from "../core/context/repomap.js";
 import { buildCliTools } from "./tools.js";
 import { promptForMode, toolsForMode, MODES, type Mode } from "../core/session/modes.js";
-import { t, language } from "../shared/i18n.js";
+import { t } from "../shared/i18n.js";
 import { ENV } from "./env.js";
 import { isSelfHostedProvider } from "../core/redaction/index.js";
-import { detectLanguage, translationMessages } from "../core/prompts.js";
 
 interface CliConfig {
   provider: ProviderId;
@@ -494,18 +493,6 @@ async function main(): Promise<void> {
         // reply, and the evaluation harness — which drives this client — scored it as the model
         // failing.
         ...(isSelfHostedProvider(cfg.provider) ? { reasoning: "medium" as const } : {}),
-        // The user's language, held for the whole turn, with the same safety net the panel has.
-        replyLanguage: detectLanguage(text, language()),
-        translate: async (note, lang, signal) =>
-          (
-            await provider.chat({
-              model: cfg.model,
-              messages: translationMessages(note, lang),
-              chore: true,
-              reasoning: "none",
-              ...(signal ? { signal } : {}),
-            })
-          ).text,
         // The same one self-check the panel does, by the same rule: it changed files and ran
         // nothing, so finish it before saying it is done.
         selfCheck: (trace) =>
