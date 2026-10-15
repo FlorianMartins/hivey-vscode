@@ -1133,6 +1133,7 @@ export const FR: Record<string, string> = {
   "Tick everything in this family": "Cocher toute cette famille",
   "What Hivey Code may reach for": "Ce que Hivey Code peut mobiliser",
   "What can I do for you?": "Que puis-je faire pour vous ?",
+  "Tab": "Tab",
   "What can we plan together?": "Que pouvons-nous planifier ensemble ?",
   "already on, from your open files": "déjà active, d'après vos fichiers ouverts",
   "already on, from the files you have open": "déjà active, d'après les fichiers que vous avez ouverts",

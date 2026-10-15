@@ -6,6 +6,24 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Ajouté
 
+- **⚠️ Comme Claude Code : faire ce qui est demandé, puis suggérer la suite.** « il voit tellement
+  large qu'il veut s'occuper de tout et il met beaucoup de temps […] alors que Claude Code fait ce qu'on
+  lui demande et ensuite il propose une suggestion de la prochaine action ». En mode agent, sur tous les
+  modèles : la demande est faite entièrement — y compris ce dont le changement a besoin pour fonctionner
+  (imports, appels, test cassé) — et rien d'autre ; ce que l'agent remarque au-delà est signalé en une
+  ligne. Après la réponse, une petite requête (réflexion coupée) propose la prochaine demande, affichée
+  en grisé dans la zone de saisie à la place de « Que puis-je faire pour vous ? » : **Tab** (ou une
+  flèche) en fait votre texte, **Entrée** l'envoie. Sur un modèle distant, cette requête est
+  pseudonymisée et n'est envoyée que là où vous avez déjà accepté d'envoyer. Réglage
+  `hiveyCode.chat.suggestNext` (activé par défaut). Essai réel : la demande du bandeau faite
+  entièrement en 64 s, et la suggestion « Supprime la route serveur /guilde/version maintenant. ».
+  **Mesuré sur le banc des 62 tâches** (Qwen, réflexion Standard), parce qu'une consigne de périmètre
+  ne doit dégrader aucune réponse : la première rédaction (« et rien d'autre ») faisait 46 contre 48 —
+  le modèle laissait cassé ce qui dépendait de son changement et renvoyait des détails à l'utilisateur.
+  La rédaction finale dit ce que « complètement » couvre (vérifier ce qui dépend du changement, prendre
+  la lecture la plus complète d'un détail ouvert) : 48 sur 62, contre 45 pour la version précédente
+  dans les mêmes conditions, en un temps identique.
+
 - **Indicateur de file d'attente.** « quand deux travaillent en même temps […] éviter d'avoir le
   ressenti d'attendre sans rien faire ». Sur un serveur llama.cpp à une seule place, une requête
   attend son tour pendant que celle d'une autre personne se termine. Le tour de l'IA apparaît
@@ -40,6 +58,11 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **Ligne de commande (et banc d'évaluation) : plus de plafond de 4 096 tokens par réponse, et la
+  réflexion « Standard » sur un serveur auto-hébergé, comme le panneau.** Le plafond, oublié lors de la
+  suppression des limites manuelles, laissait un modèle qui réfléchit à son maximum sans rien pour
+  répondre : le tour finissait vide, et le banc le comptait comme un échec du modèle. Même version de
+  l'extension : 39 tâches réussies sur 62 avant cette correction, 48 après.
 - **Panneau étroit : plus de libellés tronqués ni cachés.** En bas, « Local » et « Demander » gardent
   leur mot entier (c'est le compteur de tokens qui cède la place) ; dans la barre de saisie, le niveau
   de réflexion garde son texte (« Standard ») au lieu de n'afficher que son icône — et, s'il ne tient

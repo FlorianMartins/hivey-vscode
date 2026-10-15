@@ -47,6 +47,7 @@ import { buildCliTools } from "./tools.js";
 import { promptForMode, toolsForMode, MODES, type Mode } from "../core/session/modes.js";
 import { t } from "../shared/i18n.js";
 import { ENV } from "./env.js";
+import { isSelfHostedProvider } from "../core/redaction/index.js";
 
 interface CliConfig {
   provider: ProviderId;
@@ -486,7 +487,12 @@ async function main(): Promise<void> {
         messages: outgoing,
         tools,
         signal: ctl.signal,
-        maxTokens: 4096,
+        // ⚠️ No answer cap, and Standard thinking on the user's own server — what the panel does
+        // (see `effectiveReasoning` in the extension). A 4096-token cap with the template's maximum
+        // thinking left a thinking model with nothing to answer with: the turn ended on an empty
+        // reply, and the evaluation harness — which drives this client — scored it as the model
+        // failing.
+        ...(isSelfHostedProvider(cfg.provider) ? { reasoning: "medium" as const } : {}),
         // The same one self-check the panel does, by the same rule: it changed files and ran
         // nothing, so finish it before saying it is done.
         selfCheck: (trace) =>

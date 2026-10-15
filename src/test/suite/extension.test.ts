@@ -1273,6 +1273,46 @@ suite("Hivey Code", () => {
   });
 
   /**
+   * « Claude Code fait ce qu'on lui demande et ensuite il propose une suggestion de la prochaine
+   * action » : once the answer is in, one small request asks for the next one, in the user's language.
+   */
+  test("after an answer, the next request is suggested by one small request", async () => {
+    const ext = vscode.extensions.getExtension(ID)!;
+    await ext.activate();
+    const stub = await scriptedStub([{ text: "Le bandeau est retiré. La route /guilde/version ne sert plus." }, { text: "Supprime la route /guilde/version" }]);
+    const config = vscode.workspace.getConfiguration(SECTION);
+    const before = {
+      provider: config.get("chat.provider"),
+      model: config.get("chat.model"),
+      local: config.get("endpoints.local"),
+      confirm: config.get("privacy.confirmSend"),
+    };
+    await config.update("chat.provider", "local", vscode.ConfigurationTarget.Global);
+    await config.update("chat.model", "stub-model", vscode.ConfigurationTarget.Global);
+    await config.update("endpoints.local", `http://127.0.0.1:${stub.port}/v1`, vscode.ConfigurationTarget.Global);
+    await config.update("privacy.confirmSend", "never", vscode.ConfigurationTarget.Global);
+    await config.update("chat.suggestNext", true, vscode.ConfigurationTarget.Global);
+    try {
+      await vscode.commands.executeCommand("hiveyCode.newSession");
+      await vscode.commands.executeCommand("hiveyCode.askWith", "Retire le bandeau de version, je ne veux plus le voir.");
+      for (let i = 0; i < 50 && stub.bodies().length < 2; i++) await new Promise((r) => setTimeout(r, 100));
+      assert.equal(stub.bodies().length, 2, "no suggestion was asked for after the answer");
+      const asked = JSON.parse(stub.bodies()[1]!);
+      assert.match(asked.messages[0].content, /You suggest the user's next request/);
+      assert.match(asked.messages[1].content, /La route \/guilde\/version ne sert plus/, "the answer is what the suggestion reads");
+      assert.match(asked.messages[1].content, /in French/, "the suggestion is asked for in the user's language");
+      assert.equal(asked.reasoning_effort, "none", "thinking is off for it");
+    } finally {
+      await config.update("chat.suggestNext", false, vscode.ConfigurationTarget.Global);
+      await config.update("chat.provider", before.provider, vscode.ConfigurationTarget.Global);
+      await config.update("chat.model", before.model, vscode.ConfigurationTarget.Global);
+      await config.update("endpoints.local", before.local, vscode.ConfigurationTarget.Global);
+      await config.update("privacy.confirmSend", before.confirm, vscode.ConfigurationTarget.Global);
+      stub.close();
+    }
+  });
+
+  /**
    * « garde l'auto compact par défaut » : a conversation near the window is summarized BEFORE the
    * next question is sent — the server never has to refuse it.
    */
