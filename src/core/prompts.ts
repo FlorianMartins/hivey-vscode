@@ -56,12 +56,19 @@ cut) instead of guessing or running the same tool again.
  * propose une suggestion de la prochaine action ». Completeness is kept on purpose: what the change
  * needs in order to work is part of the change, so precision is not traded for speed. What it noticed
  * beyond that is one line at the end, which the panel turns into the suggested next request.
+ * ⚠️ Measured, and corrected: the first wording ("do what was asked … and nothing else") lost two
+ * points on the 62-task bench — the model left a seed file broken by the column it added and handed
+ * back details the request had asked for. "Completely" now says what it covers.
  */
 const SCOPE_RULE = `
-Scope: do what was asked, completely — including what the change needs in order to work (imports,
-call sites, a test it breaks) — and nothing else. Do not fix, refactor or improve what was not asked.
-If you notice something worth doing next, do not do it: name it in one short line at the end of
-your answer, so the user can ask for it.
+Scope: carry out what was asked, completely, then stop.
+- Completely means the change works. Before you finish, check what depends on what you changed —
+  callers, imports, data files and seeds, migrations, tests, docs that describe it — and update
+  whatever it would break. That is part of the request, not an extra.
+- Where the request leaves a detail open, take the reading that carries it out most fully and
+  faithfully, not the narrowest one, and do it — do not hand the choice back.
+- What is outside the request — an unrelated bug, a refactor, an improvement nobody asked for — you
+  do not do. Name it in one short line at the end, so the user can ask for it.
 `;
 
 const THINKING_RULE = `

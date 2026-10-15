@@ -17,6 +17,12 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
   pseudonymisée et n'est envoyée que là où vous avez déjà accepté d'envoyer. Réglage
   `hiveyCode.chat.suggestNext` (activé par défaut). Essai réel : la demande du bandeau faite
   entièrement en 64 s, et la suggestion « Supprime la route serveur /guilde/version maintenant. ».
+  **Mesuré sur le banc des 62 tâches** (Qwen, réflexion Standard), parce qu'une consigne de périmètre
+  ne doit dégrader aucune réponse : la première rédaction (« et rien d'autre ») faisait 46 contre 48 —
+  le modèle laissait cassé ce qui dépendait de son changement et renvoyait des détails à l'utilisateur.
+  La rédaction finale dit ce que « complètement » couvre (vérifier ce qui dépend du changement, prendre
+  la lecture la plus complète d'un détail ouvert) : 48 sur 62, contre 45 pour la version précédente
+  dans les mêmes conditions, en un temps identique.
 
 - **Indicateur de file d'attente.** « quand deux travaillent en même temps […] éviter d'avoir le
   ressenti d'attendre sans rien faire ». Sur un serveur llama.cpp à une seule place, une requête
@@ -52,6 +58,11 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **Ligne de commande (et banc d'évaluation) : plus de plafond de 4 096 tokens par réponse, et la
+  réflexion « Standard » sur un serveur auto-hébergé, comme le panneau.** Le plafond, oublié lors de la
+  suppression des limites manuelles, laissait un modèle qui réfléchit à son maximum sans rien pour
+  répondre : le tour finissait vide, et le banc le comptait comme un échec du modèle. Même version de
+  l'extension : 39 tâches réussies sur 62 avant cette correction, 48 après.
 - **Panneau étroit : plus de libellés tronqués ni cachés.** En bas, « Local » et « Demander » gardent
   leur mot entier (c'est le compteur de tokens qui cède la place) ; dans la barre de saisie, le niveau
   de réflexion garde son texte (« Standard ») au lieu de n'afficher que son icône — et, s'il ne tient
