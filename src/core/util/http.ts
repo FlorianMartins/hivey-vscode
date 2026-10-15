@@ -11,11 +11,19 @@
 // 3. ONE PLACE THAT KNOWS WHERE REQUESTS GO. The egress ledger and the tests both hook here, so
 //    "what did this extension send, and to whom" has a single answer.
 
+/**
+ * What kind of failure, read by code; the message is for people, in their language. Code used to
+ * match the English sentence ("sent nothing within"), which is what kept the message in English.
+ */
+import { t } from "../../shared/i18n.js";
+export type HttpFailure = "cancelled" | "unreachable" | "tls" | "timeout" | "failed";
+
 export class HttpError extends Error {
   constructor(
     message: string,
     readonly status?: number,
     readonly url?: string,
+    readonly kind?: HttpFailure,
   ) {
     super(message);
     this.name = "HttpError";
@@ -35,10 +43,15 @@ export async function request(url: string, opts: RequestOptions = {}): Promise<R
   // Whose abort was it? `fetch` rejects with the abort REASON, so without this flag a deadline we
   // set ourselves is indistinguishable from a cancellation by the user.
   let timedOut = false;
-  const timer = setTimeout(() => {
-    timedOut = true;
-    ctl.abort(new Error("timeout"));
-  }, timeoutMs);
+  // No deadline at all when there is none to keep (`Infinity`): Node turns an over-large delay into
+  // ONE millisecond, which would abort every such request at once.
+  const timer =
+    Number.isFinite(timeoutMs) && timeoutMs > 0
+      ? setTimeout(() => {
+          timedOut = true;
+          ctl.abort(new Error("timeout"));
+        }, timeoutMs)
+      : undefined;
   const unlink = linkAbort(signal ?? undefined, ctl);
   try {
     return await fetch(url, { ...init, signal: ctl.signal });
@@ -126,31 +139,42 @@ function explain(
   cancelledByCaller: boolean,
   timedOut: boolean,
 ): Error {
-  if (cancelledByCaller) return new HttpError(`${label} cancelled`, undefined, url);
+  if (cancelledByCaller) return new HttpError(t("{0} cancelled", label), undefined, url, "cancelled");
   const e = err as { name?: string; cause?: { message?: string } };
   const code = errorCode(err);
   const host = safeHost(url);
 
   if (code === "ECONNREFUSED" || code === "ENOTFOUND" || code === "EAI_AGAIN") {
     return new HttpError(
-      `Cannot reach ${host}. Is the model server running? (Ollama: \`ollama serve\`; LM Studio: enable the local server.)`,
+      t("Cannot reach {0}. Is the model server running? (Ollama: `ollama serve`; LM Studio: enable the local server.)", host),
       undefined,
       url,
+      "unreachable",
     );
   }
   if (code === "CERT_HAS_EXPIRED" || code === "UNABLE_TO_VERIFY_LEAF_SIGNATURE" || code === "SELF_SIGNED_CERT_IN_CHAIN") {
-    return new HttpError(`TLS certificate rejected for ${host}: ${code}. A corporate proxy usually needs its CA added to NODE_EXTRA_CA_CERTS.`, undefined, url);
+    return new HttpError(
+      t("TLS certificate rejected for {0}: {1}. A corporate proxy usually needs its CA added to NODE_EXTRA_CA_CERTS.", host, code),
+      undefined,
+      url,
+      "tls",
+    );
   }
   if (timedOut || e?.name === "AbortError" || code === "UND_ERR_HEADERS_TIMEOUT" || code === "UND_ERR_CONNECT_TIMEOUT") {
     return new HttpError(
-      `${host} sent nothing within ${timeoutMs >= 1000 ? `${Math.round(timeoutMs / 1000)}s` : `${timeoutMs}ms`}. On a first request this is usually the model loading into memory — try again, or keep it warm.`,
+      t(
+        "{0} sent nothing within {1}. On a first request this is usually the model loading into memory — try again, or keep it warm.",
+        host,
+        timeoutMs >= 1000 ? `${Math.round(timeoutMs / 1000)} s` : `${timeoutMs} ms`,
+      ),
       undefined,
       url,
+      "timeout",
     );
   }
   // `fetch failed` on its own says nothing; the cause usually carries the sentence that does.
   const detail = e?.cause?.message ?? (err as Error)?.message ?? String(err);
-  return new HttpError(`${label} to ${host} failed: ${detail}`, undefined, url);
+  return new HttpError(t("{0} to {1} failed: {2}", label, host, detail), undefined, url, "failed");
 }
 
 function safeHost(url: string): string {

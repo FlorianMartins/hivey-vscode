@@ -28,6 +28,7 @@
 //   • ORDERED BY WHAT IT IS ABOUT: your code, then this answer, then this session. Decreasing
 //     distance from the work, which is increasing distance from what you can act on today.
 
+import { t } from "../../shared/i18n.js";
 export type NoticeKind = "noticed" | "unverified" | "tool";
 
 export interface Notice {
@@ -83,36 +84,36 @@ export function youShouldKnow(input: NoticeInput): Notice[] {
   if (input.changed && !input.verified) {
     out.push({
       kind: "unverified",
-      text: "Nothing in this turn ran a test, a build or a compile, so the change is unverified.",
+      text: t("Nothing in this turn ran a test, a build or a compile, so the change is unverified."),
     });
   }
   for (const step of input.planLeft ?? []) {
-    out.push({ kind: "unverified", text: `Left undone from my own plan: ${step}` });
+    out.push({ kind: "unverified", text: t("Left undone from my own plan: {0}", step) });
   }
 
   // ── The state of the tool.
   if (input.toolCallsFromText) {
     out.push({
       kind: "tool",
-      text: "This model did not return tool calls through the protocol; they were read from its message. Agent mode is working, with less of a guarantee than usual.",
+      text: t("This model did not return tool calls through the protocol; they were read from its message. Agent mode is working, with less of a guarantee than usual."),
     });
   }
   if (input.shortenedTo) {
     out.push({
       kind: "tool",
-      text: `The provider would not fund a full answer, so this one was capped at ${input.shortenedTo.toLocaleString("en-US")} tokens. Add credit if it reads as cut off.`,
+      text: t("The provider would not fund a full answer, so this one was capped at {0} tokens. Add credit if it reads as cut off.", input.shortenedTo.toLocaleString("en-US")),
     });
   }
   if (input.contextFill !== undefined && input.contextFill >= 0.85) {
     out.push({
       kind: "tool",
-      text: `The context is ${Math.round(input.contextFill * 100)} % full — summarising it will keep answers sharp and cheaper.`,
+      text: t("The context is {0} % full — summarising it will keep answers sharp and cheaper.", Math.round(input.contextFill * 100)),
     });
   }
   if (input.spend && input.spend.cap > 0 && input.spend.today >= input.spend.cap * 0.8) {
     out.push({
       kind: "tool",
-      text: `Spent $${input.spend.today.toFixed(2)} of today's $${input.spend.cap.toFixed(2)} cap.`,
+      text: t("Spent ${0} of today's ${1} cap.", input.spend.today.toFixed(2), input.spend.cap.toFixed(2)),
     });
   }
 

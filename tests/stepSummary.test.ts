@@ -20,7 +20,7 @@ test("the summary says what kind of work was done, not only how much", () => {
     step("run_command"),
   ]);
   assert.match(said, /5 steps/);
-  assert.match(said, /1 edits/);
+  assert.match(said, /1 edit\b/, "one of each reads as one, not « 1 edits »");
   assert.match(said, /2 commands/);
 });
 

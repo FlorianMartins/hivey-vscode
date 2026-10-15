@@ -48,6 +48,9 @@ export function isRetryable(err: unknown): boolean {
     // 429 rate limit; 500/502/503/504 the provider having a bad minute; 408 its own timeout.
     return status === 429 || status === 408 || (status >= 500 && status < 600);
   }
+  const kind = (err as { kind?: string } | undefined)?.kind;
+  if (kind === "unreachable" || kind === "timeout") return true;
+  if (kind === "cancelled" || kind === "tls") return false;
   const message = String((err as Error | undefined)?.message ?? "").toLowerCase();
   if (!message) return false;
   // A socket that never opened or died mid-answer. The words come from `http.ts`'s own explanations
