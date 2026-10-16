@@ -148,6 +148,7 @@ import { choicesFor, levelsFromRefusal, type ModelReasoning } from "../core/rout
 import { nextStepMessages, parseNextStep } from "../core/session/nextStep.js";
 import { stepText } from "../shared/stepText.js";
 import { SegmentBuilder } from "../core/session/segments.js";
+import { translationMessages } from "../core/prompts.js";
 
 const HISTORY_KEY = "hiveyCode.sessions";
 const PERMISSIONS_KEY = "hiveyCode.permissions";
@@ -4882,6 +4883,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       // EARLIER questions are in here too, which is why one refusal used to break every turn after.
       const imageKey = `${providerId}::${model}`;
       let sendMessages = this.isVisionless(imageKey) ? withoutImages(prepared.messages) : prepared.messages;
+      const turnLanguage = detectLanguage(withoutModelText(lastUser?.text ?? ""), language());
       // The answer as it happens, step by step — see core/session/segments.ts.
       const segments = new SegmentBuilder();
       // The same array, filled as the turn runs: what is saved with the answer, and what a redraw shows.
@@ -4915,8 +4917,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         // Fitted before each request — see `RunTurnOptions.contextWindow`. Only for the model whose
         // window is known: a fallback model elsewhere has its own.
         ...(useModel === model && this.modelWindow(settings) ? { contextWindow: this.modelWindow(settings) } : {}),
-        // (The language rule and its safety net — `replyLanguage`, `translate` — are wired once the
-        // 62-task bench has shown they cost no precision; they change what the model reads.)
+        // The user's language, held for the whole turn — see `withReplyLanguage` and `translate`.
+        replyLanguage: turnLanguage,
+        translate: (text, lang, signal) => this.translateNote(settings, text, lang, signal),
         onTranslated: (from, to) => {
           segments.replace(from, to);
           if (!ctl.signal.aborted) this.post({ type: "replaceText", from, to });
@@ -5425,6 +5428,24 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       if (overflowed && this.turn === undefined) setTimeout(() => void this.recoverFromOverflow(), 0);
       if (saturated && this.turn === undefined) setTimeout(() => void this.continueAfterCompact(), 0);
     }
+  }
+
+  /**
+   * A note the model wrote in another language, put back in the user's — the safety net behind the
+   * language rule (see `withReplyLanguage`). Thinking off, a few dozen tokens; on a remote model it is
+   * pseudonymized and sent only where sending is already agreed, like the suggestion.
+   */
+  private async translateNote(settings: Settings, text: string, lang: "en" | "fr", signal?: AbortSignal): Promise<string | undefined> {
+    const providerId: ProviderId = isHivey(settings.chat.model) ? "openrouter" : settings.chat.provider;
+    const model = hiveyModel(settings.chat.model, "chore");
+    const baseUrl = safeUrl(settings, providerId);
+    const vault = new Vault();
+    const prepared = this.gate.quiet(translationMessages(text, lang), settings, { provider: providerId, model, baseUrl, isLocal: isLocalEndpoint(baseUrl) }, vault);
+    if (!prepared) return undefined;
+    const provider = await providerFor(settings, this.keys, providerId);
+    const res = await provider.chat({ model, messages: prepared.messages, chore: true, reasoning: effortToSend(model, "none"), ...(signal ? { signal } : {}) });
+    this.log.appendLine(`[language] a note in the wrong language was translated (${text.length} characters)`);
+    return vault.restore(res.text);
   }
 
   /** The suggested next request — see core/session/nextStep.ts. Cleared by the next question. */
