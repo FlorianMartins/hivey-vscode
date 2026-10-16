@@ -1,6 +1,6 @@
 # 10. The cost
 
-[← Previous chapter](09-privacy.md) · [Contents](README.md) · [Next chapter →](11-ibm-i.md)
+[← Previous chapter](09-privacy.md) · [Contents](README.md) · [Next chapter →](11-measured-quality.md)
 
 ## Why a coding assistant costs money
 
@@ -90,7 +90,7 @@ and not models:
 
 ⚠️ The middle column is not an implementation detail: the label and the identifier **do not match**.
 "Hivey Smart" is called `hivey`, and "Hivey Pro" is called `hivey/smart`. It is a legacy of two
-renamings, and it shows: the measurement table in [chapter 12](12-measured-quality.md) publishes the
+renamings, and it shows: the measurement table in [chapter 11](11-measured-quality.md) publishes the
 **identifiers**, so without this column a reader cannot connect a promise to its measured result.
 
 
@@ -194,6 +194,6 @@ the same thing. A local model costs nothing to bill, but it consumes electricity
 project's reports write "not priced" where the price is unknown, and **never $0.00**, because a zero is
 an assertion.
 
-It is the same discipline [chapter 12](12-measured-quality.md) applies to scores.
+It is the same discipline [chapter 11](11-measured-quality.md) applies to scores.
 
-[← Previous chapter](09-privacy.md) · [Contents](README.md) · [Next chapter →](11-ibm-i.md)
+[← Previous chapter](09-privacy.md) · [Contents](README.md) · [Next chapter →](11-measured-quality.md)

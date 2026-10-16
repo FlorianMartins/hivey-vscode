@@ -209,8 +209,8 @@ suite("Hivey Code", () => {
   test("open tabs are found whatever scheme serves them", async () => {
     // The fourth report of "all open editors does nothing", and the first cause that a local file
     // could never show: the tabs were filtered by `uri.scheme === "file"`. That is true on a laptop
-    // and false over SSH, in WSL, in a dev container, and on an IBM i — where every member a user
-    // of this extension opens arrives under the scheme Code for IBM i registered. Three fixes and
+    // and false over SSH, in WSL, and in a dev container — where every file a user of this extension
+    // opens arrives under the scheme the remote extension registered. Three fixes and
     // an integration test had all been written against `file:` tabs, which is why none of them
     // caught it. An untitled document is the one non-`file:` scheme available in a bare harness,
     // and it is enough: what is being tested is that the SCHEME is not the test.
@@ -473,7 +473,7 @@ suite("Hivey Code", () => {
    * "The agent said my folder was not open, and it is."
    *
    * This harness opens no folder, which is the case itself: a window with files in it and no folder
-   * — ordinary when the files come from a remote or an IBM i partition. Every file tool used to
+   * — ordinary when the files come from a remote. Every file tool used to
    * answer "No folder is open", which to somebody looking at their open files reads as the
    * extension having lost the workspace.
    */
@@ -691,7 +691,7 @@ suite("Hivey Code", () => {
       confirm: config.get("privacy.confirmSend"),
     };
     const dir = await fs.mkdtemp(join(tmpdir(), "hivey-prefix-"));
-    await fs.writeFile(join(dir, "a.sql"), "select * from QSYS2.SYSTABLES\n");
+    await fs.writeFile(join(dir, "a.sql"), "select * from customers\n");
     await fs.writeFile(join(dir, "b.py"), "def total(x):\n    return x\n");
 
     await config.update("chat.provider", "local", vscode.ConfigurationTarget.Global);
@@ -1967,7 +1967,7 @@ suite("Hivey Code", () => {
     const target = join(dir, "note.txt");
     await fs.writeFile(target, "before\n", "utf8");
     // Opened, because this harness deliberately opens no folder: the tabs are the workspace here,
-    // which is also an ordinary way to work on a file from a remote or an IBM i partition.
+    // which is also an ordinary way to work on a file from a remote.
     const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(target));
     await vscode.window.showTextDocument(doc);
 
@@ -2100,7 +2100,6 @@ suite("Hivey Code", () => {
         allowUnredacted: false,
         autoApprove: "off",
         blockedGlobs: ["**/clients/**"],
-        writableLibraries: ["TSTCFC"],
         budget: { dailyUsd: 3 },
         disabled: ["completion"],
       }),
@@ -2121,7 +2120,6 @@ suite("Hivey Code", () => {
       approve: config.get("permissions.autoApprove"),
       daily: config.get("budget.dailyUsd"),
       globs: config.get("privacy.blockedGlobs"),
-      libraries: config.get("ibmi.writableLibraries"),
       completion: config.get("completion.enabled"),
     };
     const policyBefore = process.env["HIVEY_CODE_POLICY_DIR"];
@@ -2133,7 +2131,6 @@ suite("Hivey Code", () => {
     await config.update("permissions.autoApprove", "all", vscode.ConfigurationTarget.Global);
     await config.update("budget.dailyUsd", 100, vscode.ConfigurationTarget.Global);
     await config.update("privacy.blockedGlobs", ["**/.env*"], vscode.ConfigurationTarget.Global);
-    await config.update("ibmi.writableLibraries", ["TSTCFC", "PRODCFC"], vscode.ConfigurationTarget.Global);
     await config.update("completion.enabled", true, vscode.ConfigurationTarget.Global);
 
     try {
@@ -2158,8 +2155,6 @@ suite("Hivey Code", () => {
       // The lists are added to, not replaced: a policy restricts, so it cannot remove a restriction.
       assert.ok(s.privacy.blockedGlobs.includes("**/.env*"));
       assert.ok(s.privacy.blockedGlobs.includes("**/clients/**"));
-      // And the writable libraries are narrowed to the intersection, never widened.
-      assert.deepEqual(s.ibmi.writableLibraries, ["TSTCFC"]);
 
       // What the interface says, and about whom.
       const managed = managedSettings();
@@ -2194,7 +2189,6 @@ suite("Hivey Code", () => {
       await config.update("permissions.autoApprove", before.approve, vscode.ConfigurationTarget.Global);
       await config.update("budget.dailyUsd", before.daily, vscode.ConfigurationTarget.Global);
       await config.update("privacy.blockedGlobs", before.globs, vscode.ConfigurationTarget.Global);
-      await config.update("ibmi.writableLibraries", before.libraries, vscode.ConfigurationTarget.Global);
       await config.update("completion.enabled", before.completion, vscode.ConfigurationTarget.Global);
       await fs.rm(dir, { recursive: true, force: true });
     }

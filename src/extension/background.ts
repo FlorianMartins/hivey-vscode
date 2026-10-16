@@ -77,9 +77,8 @@ function limits(): SandboxLimits {
  * The tools a background task gets.
  *
  * Deliberately small, and every path put through `underRoot` before it is touched. A background task
- * does not get the editor's diagnostics (there is no editor here), the plan tool (nobody is watching
- * it being built), or any IBM i tool (a partition is shared, and a background agent reaching one is
- * the opposite of isolated).
+ * does not get the editor's diagnostics (there is no editor here), or the plan tool (nobody is watching
+ * it being built).
  */
 function backgroundTools(worktree: string, engine: Engine | undefined): Tool[] {
   const inside = (path: string): string => {

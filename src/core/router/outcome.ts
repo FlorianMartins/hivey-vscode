@@ -47,7 +47,7 @@ export interface Verdict {
  * inside the same turn and it says nothing about the outcome. A failing test says something about
  * the outcome. Only the second kind is evidence.
  */
-const VERIFIERS = new Set(["run_command", "get_diagnostics", "ibmi_compile", "ibmi_test", "hook"]);
+const VERIFIERS = new Set(["run_command", "get_diagnostics", "hook"]);
 
 /**
  * Commands whose exit code is a judgement on the code, as opposed to an answer to a question.
@@ -71,11 +71,6 @@ const CHECK_COMMAND =
 /** Does this step's exit code say anything about whether the work is finished? */
 function isJudgement(step: TurnStep): boolean {
   if (step.tool === "get_diagnostics") return true;
-  // Always, whatever it compiled or ran. The caution that `CHECK_COMMAND` exists for does not apply
-  // here: a non-zero exit from `grep` is an answer, and a non-zero exit from CRTBNDRPG is not — the
-  // member did not compile, so no object was created at all. There is no reading of a failed
-  // compile, or of a failing test suite, under which the work is finished.
-  if (step.tool === "ibmi_compile" || step.tool === "ibmi_test") return true;
   // A hook the team wrote and attached to a tool call. Its exit code is their own check saying the
   // change is or is not acceptable, which is the definition of a verification — and unlike a shell
   // command the agent chose, nobody is using it to ask a question.
@@ -89,9 +84,8 @@ function isJudgement(step: TurnStep): boolean {
  *
  * ⚠️ This list was incomplete against the real registry, and the gap was silent in both directions
  * it feeds: `verifyTurn` deciding whether there is finished work to judge, and the learned router
- * recording whether a turn changed anything. A turn whose only change was `arcad_action` — promoting
- * code through a change-management tool, which is as consequential as this product gets — was filed
- * as having changed nothing.
+ * recording whether a turn changed anything. A turn whose only change was a knowledge-base write
+ * was filed as having changed nothing.
  *
  * `run_command` is deliberately NOT here, and that is not an oversight: a command is most often the
  * CHECK (see `isJudgement`), and nothing can tell `npm test` from `sed -i` by its name. The cost of
@@ -104,15 +98,9 @@ const MUTATORS = new Set([
   "git_commit",
   // Staging is a change to the index, which is what the next commit will be made of.
   "git_stage",
-  "ibmi_command",
-  "ibmi_compile",
-  // SQL that the production gate let through. Reading goes through the restricted half.
-  "ibmi_sql",
   // The knowledge base is a file in the repository: writing one is an edit with a different name.
   "knowledge_write",
   "knowledge_retire",
-  // A change-management action — promotion, transfer. The most consequential write in the product.
-  "arcad_action",
 ]);
 
 /**

@@ -99,25 +99,6 @@ export interface Settings {
     indexTokens: number;
   };
   /**
-   * Whether the IBM i surface is offered at all.
-   *
-   * `auto` is a connection, not an installation: on a machine where nobody uses the platform there
-   * is nothing to see, and on one where somebody does, the entries appear when they can actually
-   * work. `on` is for the case `auto` cannot cover — wanting the rows visible while disconnected,
-   * to be told to connect rather than to wonder where they went.
-   */
-  ibmi: {
-    integration: "auto" | "on" | "off";
-    /**
-     * Libraries the agent may change. Empty means the gate is off.
-     *
-     * Not a default this ships with: a default would be one company's library names handed to
-     * everybody else's. See `core/ibmi/guard.ts` for what it refuses and why it refuses an
-     * unqualified command.
-     */
-    writableLibraries: string[];
-  };
-  /**
    * Which families are in play, which individual skills are off inside them, and whether the open
    * files are allowed to bring a family in by themselves.
    */
@@ -332,10 +313,6 @@ function readSettingsRaw(scope?: vscode.Uri): Settings {
       indexTokens: c.get<number>("knowledge.indexTokens", 1200),
       folders: c.get<string[]>("knowledge.folders", []),
     },
-    ibmi: {
-      integration: c.get<"auto" | "on" | "off">("ibmi.integration", "auto"),
-      writableLibraries: c.get<string[]>("ibmi.writableLibraries", []),
-    },
     skills: {
       // What was CHOSEN. What is in play is this plus what the open files imply — `familiesInPlay`,
       // once per conversation. Until it existed this comment claimed families "default to the ones
@@ -406,7 +383,6 @@ function restrict(raw: Settings): Settings {
       deniedCommands: raw.permissions.deniedCommands,
       deniedPaths: raw.permissions.deniedPaths,
       autoApprove: raw.permissions.autoApprove,
-      writableLibraries: raw.ibmi.writableLibraries,
       budget: raw.budget,
     },
     state,
@@ -444,7 +420,6 @@ function restrict(raw: Settings): Settings {
     budget: narrowed.budget,
     notices: raw.notices,
     knowledge: { ...raw.knowledge, enabled: raw.knowledge.enabled && !featureDisabled(state, "knowledge") },
-    ibmi: { ...raw.ibmi, writableLibraries: narrowed.writableLibraries },
     permissions: {
       ...raw.permissions,
       autoApprove: narrowed.autoApprove,
@@ -476,7 +451,6 @@ export function managedSettings(): { organisation?: string; keys: string[]; refu
       deniedCommands: raw.permissions.deniedCommands,
       deniedPaths: raw.permissions.deniedPaths,
       autoApprove: raw.permissions.autoApprove,
-      writableLibraries: raw.ibmi.writableLibraries,
       budget: raw.budget,
     },
     state,
@@ -573,31 +547,6 @@ export class Keys {
 
   delete(provider: ProviderId): Thenable<void> {
     return this.secrets.delete(Keys.id(provider));
-  }
-
-  /**
-   * The ARCAD Elias credentials.
-   *
-   * Kept here rather than under `arcad.*` in settings.json for the reason every credential in this
-   * extension is: settings.json is synchronised between machines and committed by accident, and a
-   * password to a change-management server governs what reaches production.
-   */
-  async arcad(): Promise<{ user: string; password: string } | undefined> {
-    const raw = await this.secrets.get(`${SECTION}.arcad`);
-    if (!raw) return undefined;
-    try {
-      return JSON.parse(raw) as { user: string; password: string };
-    } catch {
-      return undefined;
-    }
-  }
-
-  storeArcad(user: string, password: string): Thenable<void> {
-    return this.secrets.store(`${SECTION}.arcad`, JSON.stringify({ user, password }));
-  }
-
-  clearArcad(): Thenable<void> {
-    return this.secrets.delete(`${SECTION}.arcad`);
   }
 }
 

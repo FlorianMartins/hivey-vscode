@@ -85,7 +85,7 @@ retrouver est une permission qu'on ne peut pas retirer.
 
 Un détail mesuré, et il est instructif : en mode Agent, savoir si le modèle a **réellement agi** est
 une information distincte de savoir s'il a **réussi**. Le banc d'essai du projet compte les deux
-([chapitre 12](12-la-qualite-mesuree.md)), et sur un petit modèle local le résultat a été : 51 tâches
+([chapitre 11](11-la-qualite-mesuree.md)), et sur un petit modèle local le résultat a été : 51 tâches
 sur 56 où **aucune action n'a été tentée**. Le modèle écrivait la modification dans un bloc de code
 et demandait « souhaitez-vous que je procède ? ».
 

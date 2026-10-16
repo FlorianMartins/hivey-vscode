@@ -242,11 +242,6 @@ export function buildDefinitionTools(deps: DefinitionDeps, definitions: Definiti
       "git_branches",
       "git_blame",
       "git_show",
-      "ibmi_member",
-      "ibmi_members",
-      "ibmi_objects",
-      "ibmi_library_list",
-      "ibmi_sql",
     ]);
     const readOnly = (name: string): boolean => {
       const agent = definitions.agents.find((a) => a.name === name);
@@ -341,7 +336,7 @@ export async function createDefinition(kind: "skill" | "agent"): Promise<void> {
 
   const name = await vscode.window.showInputBox({
     prompt: kind === "skill" ? t("Name of the skill — what you will type after the slash") : t("Name of the sub-agent"),
-    placeHolder: kind === "skill" ? "review-rpg" : "db-explorer",
+    placeHolder: kind === "skill" ? "review-api" : "db-explorer",
     validateInput: (value) =>
       /^[a-z0-9][a-z0-9-]{0,38}[a-z0-9]$/.test(value.trim())
         ? undefined

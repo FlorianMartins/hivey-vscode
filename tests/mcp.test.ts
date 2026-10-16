@@ -8,7 +8,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { LineFramer, McpClient, PROTOCOL_VERSION, flattenContent, type McpTransport } from "../src/core/mcp/client.js";
-import { formatRows, isReadOnlySql, parseMemberRef } from "../src/core/ibmi/sql.js";
 
 /** A server that answers from a table of handlers, and records what it was sent. */
 function fakeServer(handlers: Record<string, (params: any) => unknown> = {}) {
@@ -38,7 +37,7 @@ function fakeServer(handlers: Record<string, (params: any) => unknown> = {}) {
 
 const INIT = () => ({
   protocolVersion: PROTOCOL_VERSION,
-  serverInfo: { name: "arcad-elias", version: "1.2.3" },
+  serverInfo: { name: "docs-server", version: "1.2.3" },
   capabilities: { tools: {}, resources: {} },
 });
 
@@ -49,7 +48,7 @@ test("the handshake announces the client, reads the server, and confirms it is r
   const client = new McpClient({ transport: server.transport, clientName: "hivey-code", clientVersion: "9.9.9" });
   await client.initialize();
 
-  assert.equal(client.serverName, "arcad-elias");
+  assert.equal(client.serverName, "docs-server");
   assert.equal(client.serverVersion, "1.2.3");
   assert.equal(server.sent[0].method, "initialize");
   assert.equal(server.sent[0].params.clientInfo.name, "hivey-code");
@@ -199,66 +198,4 @@ test("binary content is named, not inlined", () => {
 test("an embedded resource contributes its text", () => {
   assert.equal(flattenContent([{ type: "resource", resource: { uri: "file:///a", text: "body" } }]), "body");
   assert.match(flattenContent([{ type: "resource", resource: { uri: "file:///a" } }]), /file:\/\/\/a/);
-});
-
-// ── Db2 for i: what runs without asking ──────────────────────────────────────────────────────
-
-test("plain reads are recognized as reads", () => {
-  assert.ok(isReadOnlySql("select * from qgpl.custmast"));
-  assert.ok(isReadOnlySql("SELECT * FROM QSYS2.SYSTABLES FETCH FIRST 10 ROWS ONLY"));
-  assert.ok(isReadOnlySql("with t as (select 1 from sysibm.sysdummy1) select * from t"));
-  assert.ok(isReadOnlySql("values current date"));
-  assert.ok(isReadOnlySql("-- what is in there?\nselect count(*) from qgpl.orders"));
-});
-
-test("anything that can change data is not", () => {
-  for (const statement of [
-    "update qgpl.custmast set bal = 0",
-    "delete from qgpl.orders",
-    "insert into qgpl.log values('x')",
-    "drop table qgpl.t",
-    "call qsys2.qcmdexc('CLRPFM QGPL/CUSTMAST')",
-    "create table qgpl.t (a int)",
-    "grant all on qgpl.custmast to public",
-  ]) {
-    assert.equal(isReadOnlySql(statement), false, `${statement} was treated as a read`);
-  }
-});
-
-test("a write smuggled behind a read is refused", () => {
-  // The two shapes that make a naive "does it start with select" check dangerous.
-  assert.equal(isReadOnlySql("select 1 from sysibm.sysdummy1; delete from qgpl.orders"), false);
-  assert.equal(isReadOnlySql("with d as (delete from qgpl.orders) select * from d"), false);
-  assert.equal(isReadOnlySql("/* select */ update qgpl.t set a = 1"), false);
-  assert.equal(isReadOnlySql(""), false);
-  assert.equal(isReadOnlySql("   "), false);
-});
-
-test("both ways of writing a member reference are accepted", () => {
-  assert.deepEqual(parseMemberRef("QGPL/QRPGLESRC(CALCVAT)"), {
-    library: "QGPL",
-    sourceFile: "QRPGLESRC",
-    member: "CALCVAT",
-  });
-  assert.deepEqual(parseMemberRef("/QGPL/QRPGLESRC/CALCVAT.RPGLE"), {
-    library: "QGPL",
-    sourceFile: "QRPGLESRC",
-    member: "CALCVAT",
-  });
-  assert.equal(parseMemberRef("mylib/qddssrc(custmast)").library, "MYLIB", "the platform is uppercase");
-  assert.throws(() => parseMemberRef("just-a-name"), /not a member reference/);
-});
-
-test("a result set reads as a table, and says when it was cut", () => {
-  const rows = Array.from({ length: 5 }, (_, i) => ({ CUSNBR: i, CUSNAM: `Customer ${i}` }));
-  const table = formatRows(rows, 3);
-  assert.match(table, /CUSNBR/);
-  assert.match(table, /Customer 0/);
-  assert.match(table, /2 more rows/);
-  assert.equal(formatRows([]), "0 rows.");
-  assert.ok(!formatRows(rows, 3).includes("Customer 4"));
-});
-
-test("a null cell is empty, not the word null", () => {
-  assert.ok(!formatRows([{ A: null, B: 1 }]).includes("null"));
 });

@@ -160,8 +160,8 @@ export class WorkspaceContext {
     // What this excludes is everything that is technically a text document without being a file
     // anybody is working on: an output channel, a settings editor, the release notes, a git
     // revision. It used to allow `file:` and `untitled:` and refuse the rest, which meant the
-    // editor's own tab was never offered as context to anyone working over SSH, in a container, or
-    // on an IBM i — the file in front of them, refused for being somewhere other than a local disk.
+    // editor's own tab was never offered as context to anyone working over SSH or in a container —
+    // the file in front of them, refused for being somewhere other than a local disk.
     if (settings && !isDocumentUri(ed.document.uri)) return undefined;
     const rel = relative(ed.document.uri);
     if (settings && EgressGate.isBlocked(rel, settings.privacy.blockedGlobs)) return undefined;

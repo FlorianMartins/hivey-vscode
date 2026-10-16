@@ -25,8 +25,6 @@ import type { Settings } from "./config.js";
 import type { WorkspaceContext } from "./workspace.js";
 import { relative } from "./workspace.js";
 import { gitChangesSummary } from "./integrations/git.js";
-import { ibmiConnected, ibmiInstance } from "./integrations/ibmi.js";
-import { parseMemberRef, formatRows, isReadOnlySql } from "../core/ibmi/sql.js";
 import { perFileBudget } from "../core/util/tokens.js";
 
 /**
@@ -106,7 +104,7 @@ async function resolveOne(mention: Mention, deps: ResolveDeps): Promise<ContextI
       for (const group of vscode.window.tabGroups.all) {
         for (const tab of group.tabs) {
           // Same rule as "attach all open editors", and for the same reason: `#open` returned
-          // nothing at all over SSH, in a container, or on an IBM i, because every tab there is
+          // nothing at all over SSH, or in a container, because every tab there is
           // served under a scheme that is not `file`.
           if (!(tab.input instanceof vscode.TabInputText)) continue;
           const uri = tab.input.uri;
@@ -186,51 +184,8 @@ async function resolveOne(mention: Mention, deps: ResolveDeps): Promise<ContextI
       }
       return { kind: "symbol", label: name, body: headToTokens(lines.join("\n\n"), deps.attachmentTokens), untrusted: true };
     }
-
-    case "member": {
-      const ref = mention.argument;
-      if (!ref) return undefined;
-      const conn = requireIbmi();
-      const { library, sourceFile, member } = parseMemberRef(ref);
-      const text = await conn.getContent().downloadMemberContent(library, sourceFile, member);
-      return {
-        kind: "member",
-        label: `${library}/${sourceFile}(${member})`,
-        body: headToTokens(text, deps.attachmentTokens),
-        untrusted: true,
-      };
-    }
-
-    case "sql": {
-      const statement = mention.argument;
-      if (!statement) return undefined;
-      // A mention runs without a dialog, so it may only read. Anything else has to go through the
-      // tool, where the user is asked — the notation must not become a way around the question.
-      if (!isReadOnlySql(statement)) {
-        throw new Error(t("“#db2:” runs statements that read. Ask the agent to run anything else, so you are asked first."));
-      }
-      const rows = await requireIbmi().getContent().runSQL(statement);
-      return {
-        kind: "db2",
-        label: t("{0} rows", rows.length),
-        body: headToTokens(`${statement}\n\n${formatRows(rows)}`, deps.attachmentTokens),
-        untrusted: true,
-      };
-    }
   }
   return undefined;
-}
-
-interface IbmiConnectionLike {
-  getContent(): {
-    runSQL(statement: string): Promise<Array<Record<string, unknown>>>;
-    downloadMemberContent(library: string, sourceFile: string, member: string): Promise<string>;
-  };
-}
-
-function requireIbmi(): IbmiConnectionLike {
-  if (!ibmiConnected()) throw new Error(t("Not connected to an IBM i. Connect with Code for IBM i first."));
-  return ibmiInstance()!.getConnection() as unknown as IbmiConnectionLike;
 }
 
 /** Errors and warnings, grouped by file, in the shape a compiler prints them. */

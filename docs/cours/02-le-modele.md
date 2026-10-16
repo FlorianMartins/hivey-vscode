@@ -69,7 +69,7 @@ approximations plus courtes. Un modèle de 7 milliards de paramètres passe ains
 4 ou 5 Go, pour une perte de qualité faible. C'est la raison pour laquelle faire tourner un modèle
 chez soi est devenu possible.
 
-La différence se voit à l'usage, et le [chapitre 12](12-la-qualite-mesuree.md) la **mesure** sur ce
+La différence se voit à l'usage, et le [chapitre 11](11-la-qualite-mesuree.md) la **mesure** sur ce
 projet : un modèle de 7 milliards de paramètres a obtenu **0 sur 56** sur les tâches du banc d'essai,
 et — c'est le plus instructif — dans 51 cas sur 56 il n'a **même pas essayé** d'agir.
 

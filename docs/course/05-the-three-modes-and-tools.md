@@ -83,7 +83,7 @@ permission you cannot withdraw.
 
 One measured detail, and it is instructive: in Agent mode, knowing whether the model **actually
 acted** is information distinct from knowing whether it **succeeded**. The project's bench counts both
-([chapter 12](12-measured-quality.md)), and on a small local model the result was: 51 tasks out of 56
+([chapter 11](11-measured-quality.md)), and on a small local model the result was: 51 tasks out of 56
 where **no action was attempted**. The model was writing the change in a code block and asking "would
 you like me to proceed?".
 

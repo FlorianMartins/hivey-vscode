@@ -60,7 +60,7 @@ couvrir **parce que la forme de la donnée l'en empêchait**, et la règle gén�
 garde-fou ne couvre pas un sujet, il couvre une forme — vérifier que la donnée a la forme qu'il lit.*
 
 Troisième trouvaille, de même nature : le tableau des préréglages ne donnait que les **libellés**
-(« Hivey Smart », « Hivey Pro ») alors que le chapitre 12 publie les **identifiants** (`hivey`,
+(« Hivey Smart », « Hivey Pro ») alors que le chapitre 11 publie les **identifiants** (`hivey`,
 `hivey/smart`), qui ne leur correspondent pas — héritage de deux renommages. Un lecteur ne pouvait pas
 relier une promesse à son résultat mesuré. Les deux éditions portent maintenant la colonne des
 identifiants et disent que le décalage existe.

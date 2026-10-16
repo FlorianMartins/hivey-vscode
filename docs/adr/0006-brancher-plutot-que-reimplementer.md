@@ -1,6 +1,10 @@
 # ADR-0006 — Se brancher sur les outils existants plutôt que les réimplémenter
 
-**Date** : 2026-08-27 · **Statut** : accepté
+**Date** : 2026-08-27 · **Statut** : en partie caduque (accepté à l’origine)
+
+> **Statut : en partie caduque.** Le support IBM i a été retiré du produit : ce qui ne concerne
+> qu'IBM i ici ne s'applique plus. Le principe — se brancher plutôt que réimplémenter — tient
+> toujours, pour Git et pour MCP.
 
 ## Contexte
 

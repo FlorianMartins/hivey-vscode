@@ -26,7 +26,7 @@ export interface Token {
  * fix the same bug. What actually varies between C and Rust, at this resolution, is which words are
  * keywords — so that is the only thing the table holds.
  */
-export type Family = "clike" | "script" | "sql" | "ibmi" | "ibmi-fixed" | "json" | "markup" | "plain";
+export type Family = "clike" | "script" | "sql" | "json" | "markup" | "plain";
 
 const CLIKE = new Set(
   ("abstract as async await break case catch class const constructor continue declare default delete do else enum export extends " +
@@ -44,8 +44,6 @@ const SCRIPT = new Set(
     .split(" "),
 );
 
-// Db2 for i alongside the standard: `QSYS2`, `SYSIBM` and `FETCH FIRST` are what an IBM i developer
-// is actually reading, and a highlighter that knows ANSI SQL and not theirs is the wrong one here.
 const SQL = new Set(
   ("add all alter and any as asc begin between by call cascade case cast char coalesce column commit constraint create cross current " +
     "cursor date declare default delete desc distinct do drop else end exec execute exists fetch first for foreign from full function " +
@@ -55,28 +53,12 @@ const SQL = new Set(
     .split(" "),
 );
 
-// Free-form RPG, CL and the SQL that lives inside SQLRPGLE. Opcodes and built-ins together: to
-// someone reading a member, `%SUBST` and `DOW` are the same kind of word — the language's own.
-const IBMI = new Set(
-  ("and begsr callp chain clear const ctl-opt dcl-c dcl-ds dcl-f dcl-parm dcl-pi dcl-pr dcl-proc dcl-s dcl-subf delete dou dow else " +
-    "elseif end-ds end-if end-pi end-pr end-proc end-sr enddo endfor endif endmon endsl eval eval-corr except exsr for forward " +
-    "if in inz iter leave leavesr like likeds likerec monitor on-error open or other otherwise psds qualified read readc reade readp " +
-    "readpe recno reset return select setgt setll sndmsg sqlcode sqlstate sqltype static subst templ template unlock update when " +
-    "write xml-into xml-sax dsply pgm endpgm dclf dcl chgvar sndpgmmsg monmsg rcvf call cmd")
-    .split(" "),
-);
-
 /** Which family a fence's language tag belongs to. Unknown tags render plain, never guessed at. */
 export function familyOf(lang: string): Family {
   const id = lang.toLowerCase().replace(/^\./, "");
   if (/^(ts|tsx|js|jsx|javascript|typescript|java|c|h|cpp|cc|hpp|cs|csharp|go|golang|rust|rs|php|swift|kotlin|kt|scala|dart|groovy|proto)$/.test(id)) return "clike";
   if (/^(py|python|rb|ruby|sh|bash|zsh|shell|console|ps1|powershell|perl|pl|lua|r|yaml|yml|toml|ini|cfg|conf|makefile|make|dockerfile|env)$/.test(id)) return "script";
-  if (/^(sql|db2|db2i|plsql|tsql|mysql|postgres|postgresql|sqlite)$/.test(id)) return "sql";
-  // Fixed-format members carry meaning in their columns, which is a different lexer, not a
-  // different keyword list: an asterisk in column 7 is a comment and an asterisk anywhere else is
-  // multiplication.
-  if (/^(rpg|rpg3|rpgiii|rpgle-fixed|dds|pf|lf|dspf|prtf)$/.test(id)) return "ibmi-fixed";
-  if (/^(rpgle|sqlrpgle|free|clle|clp|cl|cmd)$/.test(id)) return "ibmi";
+  if (/^(sql|db2|plsql|tsql|mysql|postgres|postgresql|sqlite)$/.test(id)) return "sql";
   if (/^(json|jsonc|json5)$/.test(id)) return "json";
   if (/^(html|xml|svg|vue|xhtml|jsp|aspx)$/.test(id)) return "markup";
   return "plain";
@@ -88,8 +70,6 @@ interface Rules {
   lineComment: string[];
   blockComment?: [string, string];
   quotes: string[];
-  /** True where a word may hold a hyphen: `end-proc`, `dcl-ds`, `CHGVAR`. */
-  hyphenWords?: boolean;
   /** Preprocessor and directive lines, colored as meta. */
   directive?: RegExp;
   caseSensitive?: boolean;
@@ -103,8 +83,6 @@ function rulesFor(family: Family): Rules | undefined {
       return { keywords: SCRIPT, lineComment: ["#"], quotes: ['"', "'"], caseSensitive: true };
     case "sql":
       return { keywords: SQL, lineComment: ["--"], blockComment: ["/*", "*/"], quotes: ["'", '"'], caseSensitive: false };
-    case "ibmi":
-      return { keywords: IBMI, lineComment: ["//"], quotes: ["'", '"'], hyphenWords: true, directive: /^\s*(\*\*free|\/(?:free|end-free|copy|include|if|else|endif|define|exec\b))/i, caseSensitive: false };
     case "json":
       return { keywords: new Set(["true", "false", "null"]), lineComment: ["//"], blockComment: ["/*", "*/"], quotes: ['"'], caseSensitive: true };
     default:
@@ -115,7 +93,6 @@ function rulesFor(family: Family): Rules | undefined {
 /** Tokens for one block of code. An unknown language yields one plain token — never a guess. */
 export function highlight(code: string, lang: string): Token[] {
   const family = familyOf(lang);
-  if (family === "ibmi-fixed") return highlightFixed(code);
   if (family === "markup") return highlightMarkup(code);
   const rules = rulesFor(family);
   if (!rules) return code ? [{ text: code, kind: "plain" }] : [];
@@ -196,7 +173,7 @@ function scan(code: string, rules: Rules): Token[] {
       // coloring without a parser, and it is the one that makes a snippet scannable.
       else if (code[j] === "(") push(out, word, "function");
       // Type-ish by convention: `Foo`, `HTTPServer`. A convention, so it is applied only where the
-      // language has one — SQL and RPG are case-insensitive and would light up at random.
+      // language has one — SQL is case-insensitive and would light up at random.
       else if (rules.caseSensitive && /^[A-Z][A-Za-z0-9_]*$/.test(word) && /[a-z]/.test(word)) push(out, word, "type");
       else push(out, word, "plain");
       i = j;
@@ -211,7 +188,7 @@ function scan(code: string, rules: Rules): Token[] {
   return out;
 }
 
-/** From an opening quote to its match, honouring backslash escapes and doubled quotes (SQL, RPG). */
+/** From an opening quote to its match, honouring backslash escapes and doubled quotes (SQL). */
 function readString(code: string, from: number, quote: string): [string, number] {
   let i = from + 1;
   while (i < code.length) {
@@ -221,7 +198,7 @@ function readString(code: string, from: number, quote: string): [string, number]
       continue;
     }
     if (c === quote) {
-      // `'it''s'` is one string in SQL and in RPG, and closing at the middle quote would color the
+      // `'it''s'` is one string in SQL, and closing at the middle quote would color the
       // rest of the statement as if it were text.
       if (code[i + 1] === quote) {
         i += 2;
@@ -243,48 +220,7 @@ function isWordStart(c: string): boolean {
 
 function isWordChar(c: string, rules: Rules): boolean {
   if (!c) return false;
-  if (rules.hyphenWords && c === "-") return true;
   return /[A-Za-z0-9_$%@]/.test(c);
-}
-
-/**
- * Fixed-format members, where the column is the syntax.
- *
- * RPG III, RPG IV fixed and DDS all put meaning in fixed positions, and the one that matters for
- * reading a snippet is the comment: an asterisk in column 7 comments the line out. Column 6 carries
- * the specification letter (H, F, D, C, O in RPG; A in DDS), which is what tells you what kind of
- * line you are looking at — so it is colored as the structural marker it is.
- *
- * Everything to the right of that stays plain. Guessing at operands inside a fixed layout is where
- * a naive highlighter starts coloring column boundaries as operators.
- */
-function highlightFixed(code: string): Token[] {
-  const out: Token[] = [];
-  for (const line of code.split(/(?<=\n)/)) {
-    const bare = line.replace(/\r?\n$/, "");
-    const eol = line.slice(bare.length);
-    // The comment marker is column 7 (index 6), and a bare `*` in column 1 is the convention older
-    // listings use — both are comments and neither is multiplication.
-    if (bare[6] === "*" || /^\s*\*/.test(bare)) {
-      push(out, bare, "comment");
-      push(out, eol, "plain");
-      continue;
-    }
-    if (/^\s*\*\*(free|ctdata|\s|$)/i.test(bare)) {
-      push(out, bare, "meta");
-      push(out, eol, "plain");
-      continue;
-    }
-    if (bare.length > 6 && /[A-Za-z]/.test(bare[5] ?? "")) {
-      push(out, bare.slice(0, 5), "plain");
-      push(out, bare[5]!, "keyword");
-      push(out, bare.slice(6), "plain");
-      push(out, eol, "plain");
-      continue;
-    }
-    push(out, bare + eol, "plain");
-  }
-  return out;
 }
 
 /** Tags, attribute values and comments. Enough to read a snippet; not an XML parser. */

@@ -195,9 +195,8 @@ async function main(): Promise<void> {
   const cliAgents = await loadCliAgents(cwd);
 
   // ⚠️ `["general"]` was the whole story here, and the evaluation harness drives this client: every
-  // figure in `eval/QUALITY.md` was therefore measured with the RPG, DDS, CL and Db2 for i families
-  // switched OFF, on a bench where twenty-two of the sixty-two tasks are IBM i tasks. The skills were
-  // written for those tasks and never reached them. The panel detects from the files the editor has
+  // figure in `eval/QUALITY.md` was therefore measured with every language skill family switched
+  // OFF. The skills were written for those tasks and never reached them. The panel detects from the files the editor has
   // open; the terminal has no editor, so it detects from the files that are THERE — the same
   // question, asked of the only thing it can see.
   //

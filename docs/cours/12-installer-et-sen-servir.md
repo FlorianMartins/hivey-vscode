@@ -1,6 +1,6 @@
 # 13. Installer et s'en servir
 
-[← Chapitre précédent](12-la-qualite-mesuree.md) · [Sommaire](README.md) · [Glossaire →](99-glossaire.md)
+[← Chapitre précédent](11-la-qualite-mesuree.md) · [Sommaire](README.md) · [Glossaire →](99-glossaire.md)
 
 Ce chapitre suppose uniquement que vous avez un ordinateur. Il ne suppose pas que vous savez coder.
 
@@ -60,7 +60,7 @@ dire « cet ordinateur-ci ».
 
 ⚠️ **Sachez ce que vous allez obtenir.** Ce modèle-là répond bien aux questions et à la complétion.
 Pour du travail d'**agent** — modifier des fichiers tout seul — la mesure du
-[chapitre 12](12-la-qualite-mesuree.md) est sans ambiguïté : il n'y arrive pas. Si vous voulez le
+[chapitre 11](11-la-qualite-mesuree.md) est sans ambiguïté : il n'y arrive pas. Si vous voulez le
 mode agent, il faut soit un modèle local plus récent qui sache appeler des outils, soit une escalade
 vers un modèle distant.
 
@@ -159,7 +159,6 @@ Dans les réglages de VS Code, cherchez `hiveyCode`.
 | `privacy.egressPolicy` | `ask-always` pour qu'on vous demande à chaque fois |
 | `budget.dailyUsd` | Le plafond de dépense par jour |
 | `budget.perRequestTokens` | La taille au-delà de laquelle une requête est questionnée — 0 (par défaut) : jamais, la limite est la fenêtre du modèle |
-| `ibmi.writableLibraries` | Les bibliothèques qu'un agent peut modifier ([chapitre 11](11-ibm-i.md)) |
 | `language` | Pour un poste dont l'éditeur est dans une langue et l'utilisateur dans une autre |
 
 ## Et si ça ne marche pas
@@ -171,7 +170,7 @@ Dans les réglages de VS Code, cherchez `hiveyCode`.
   comptez une dizaine de mots par seconde. Un modèle plus petit sera plus rapide et moins bon.
 - **Ça ne modifie aucun fichier.** Vous êtes probablement en mode Plan, qui ne modifie rien **par
   construction** ([chapitre 5](05-les-trois-modes-et-les-outils.md)). Si vous êtes bien en mode Agent,
-  relisez la fin du [chapitre 12](12-la-qualite-mesuree.md) : certains modèles locaux n'appellent pas
+  relisez la fin du [chapitre 11](11-la-qualite-mesuree.md) : certains modèles locaux n'appellent pas
   d'outils.
 
-[← Chapitre précédent](12-la-qualite-mesuree.md) · [Sommaire](README.md) · [Glossaire →](99-glossaire.md)
+[← Chapitre précédent](11-la-qualite-mesuree.md) · [Sommaire](README.md) · [Glossaire →](99-glossaire.md)

@@ -1,6 +1,6 @@
 # 10. Le coût
 
-[← Chapitre précédent](09-la-confidentialite.md) · [Sommaire](README.md) · [Chapitre suivant →](11-ibm-i.md)
+[← Chapitre précédent](09-la-confidentialite.md) · [Sommaire](README.md) · [Chapitre suivant →](11-la-qualite-mesuree.md)
 
 ## Pourquoi un assistant de code coûte de l'argent
 
@@ -97,7 +97,7 @@ des **routages** et non des modèles :
 ⚠️ La colonne du milieu n'est pas un détail d'implémentation : le libellé et l'identifiant **ne se
 correspondent pas**. « Hivey Smart » s'appelle `hivey`, et « Hivey Pro » s'appelle `hivey/smart`.
 C'est un héritage de deux renommages, et c'est visible : le tableau de mesures du
-[chapitre 12](12-la-qualite-mesuree.md) publie les **identifiants**, donc sans cette colonne un
+[chapitre 11](11-la-qualite-mesuree.md) publie les **identifiants**, donc sans cette colonne un
 lecteur ne peut pas relier une promesse à son résultat mesuré.
 
 
@@ -205,6 +205,6 @@ ne sont pas la même chose. Un modèle local ne coûte rien à facturer, mais il
 l'électricité et du temps. Les rapports de ce projet écrivent donc « non valorisé » (*not priced*) là
 où le prix est inconnu, et **jamais 0,00 $**, parce qu'un zéro est une affirmation.
 
-C'est la même discipline que le [chapitre 12](12-la-qualite-mesuree.md) applique aux scores.
+C'est la même discipline que le [chapitre 11](11-la-qualite-mesuree.md) applique aux scores.
 
-[← Chapitre précédent](09-la-confidentialite.md) · [Sommaire](README.md) · [Chapitre suivant →](11-ibm-i.md)
+[← Chapitre précédent](09-la-confidentialite.md) · [Sommaire](README.md) · [Chapitre suivant →](11-la-qualite-mesuree.md)

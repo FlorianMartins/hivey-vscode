@@ -1,3 +1,0 @@
-dcl-pr calcVat packed(11:2);
-  net packed(11:2) const;
-end-pr;

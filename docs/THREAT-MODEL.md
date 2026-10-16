@@ -113,18 +113,6 @@ sont enracinés dans l'espace de travail et permettraient à l'agent de modifier
 auteur a ouvert, au milieu de sa propre édition. Et il n'y a **aucun outil git** : la branche reste
 locale, l'agent ne pousse jamais, et un test lit le module pour s'en assurer.
 
-**La promotion vers la production n'est pas un outil de l'agent**, et ne peut pas être configurée
-pour l'être. Sur une partition gérée par ARCAD Elias, un changement n'entre pas en production parce
-que quelqu'un a édité un membre : il est extrait, modifié, réintégré, construit, puis **promu** par
-une personne qui en répond. La dernière étape est une décision de livraison, et une décision de
-livraison n'est pas un appel d'outil. La garantie tient à la **liste blanche** d'actions `arcad.*`
-que le pont expose (`extension/integrations/arcad.ts`) et non à une consigne : un test lit cette
-liste dans le source et refuse toute entrée qui ressemble à une promotion
-(`looksLikePromotion`, `src/core/ibmi/delivery.ts`), parce que la promesse se tient par le fait que
-personne n'ajoute la mauvaise commande dans six mois. Et l'agent ne propose la réintégration qu'une
-fois le changement **compilé et testé dans le tour** : réintégrer un membre qui ne compile pas remet
-un composant cassé à la construction de tout le monde.
-
 **Le corpus d'apprentissage est du code source hors du dépôt.** Désactivé par défaut, il conserve —
 quand on l'active — la demande, les fichiers touchés tels qu'ils étaient, et les diffs des escalades
 réussies, dans le stockage global de l'extension.
@@ -141,47 +129,6 @@ source pour le refuser. La politique de l'organisation peut le désactiver.
 s'y oppose — et c'est pour cela que la fonctionnalité demande à être allumée plutôt que d'être
 allumée par défaut.
 
-**QTEMP est la seule bibliothèque qu'un outil en lecture peut écrire**, et la garde le sait
-explicitement (`SCRATCH_LIBRARY`, `src/core/ibmi/guard.ts`). La raison n'est pas une convention mais
-une propriété de la bibliothèque : elle est créée par travail, détruite avec lui, invisible des
-autres travaux, et rien de la production ne s'atteint par elle. Demander « quels programmes
-utilisent ce fichier » passe par `DSPPGMREF` vers un **fichier de sortie**, donc un outil qui ne fait
-que lire doit malgré tout écrire quelque part. L'exemption vit dans la garde et non dans chaque
-outil : un outil qui s'accorde une exemption est un outil qui peut se tromper, et le suivant recopie
-l'exemption sans recopier la raison. Elle ne vaut que pour la bibliothèque nommée QTEMP — une
-commande qui écrit dans QTEMP *et* dans CUSTMAST reste une commande qui écrit dans CUSTMAST — et
-`ibmi_impact` fait passer **sa propre commande** par la garde avant de la lancer, pour qu'un
-`OUTFILE` déplacé ailleurs échoue bruyamment au lieu de reposer sur un commentaire resté vrai.
-
-**Compiler** (`src/core/ibmi/compile.ts`) crée un objet, donc c'est une écriture et elle est bornée
-par la même liste — avec deux précisions qui lui sont propres :
-
-- la liste vide ne désactive pas la barrière, elle la rend **visible** : la compilation est toujours
-  soumise à approbation et la carte dit que rien ne la borne. Une barrière silencieusement inactive
-  sur l'opération qui crée des objets serait le pire des deux mondes ;
-- **chaque nom est refusé plutôt qu'échappé.** Bibliothèque, fichier source, membre et bibliothèque
-  cible viennent du modèle et sont interpolés dans une commande CL et dans du SQL. Un nom qui n'est
-  pas un nom IBM i valide (dix caractères, lettre ou `# $ @` en tête) est rejeté : `CUSTRPT) MONMSG
-  MSGID(CPF0000) DLTLIB LIB(PROD` est une chaîne acceptable et une commande catastrophique, et la
-  garde CL ne peut rien y faire — elle relit une commande *après* sa construction, et celle-ci
-  aurait été construite par nous pour le compte du modèle. Idem pour le nom de travail que la
-  partition renvoie avant qu'il ne reparte dans une requête.
-
-**Sur IBM i** (`src/core/ibmi/guard.ts`), `hiveyCode.ibmi.writableLibraries` ajoute une barrière
-dans le code, du même genre que l'outillage du mode Plan :
-
-- toute commande CL ou instruction SQL qui **modifie** doit nommer sa bibliothèque, et chacune doit
-  figurer dans la liste ; la lecture n'est jamais restreinte ;
-- un verbe CL que l'extension ne reconnaît pas comme lecteur **compte comme écrivain** : se tromper
-  dans ce sens coûte un refus que l'utilisateur lève, se tromper dans l'autre coûte un fichier de
-  production ;
-- une commande **non qualifiée** est refusée : elle se résoudrait sur la liste de bibliothèques du
-  travail, qui n'est pas connaissable ici ;
-- une commande qui porte ce qu'elle va faire **dans une chaîne** — `QSH`, `STRQSH`, du CL passé à
-  `QCMDEXC` ou `QCAPCMD` — est refusée d'emblée, **même lorsqu'elle semble nommer une bibliothèque
-  autorisée**. `QSH` figurait parmi les verbes de lecture : `QSH CMD('rm -r /QSYS.LIB/PROD.LIB')`
-  passait donc la barrière sans être regardé.
-
 **Résidu, assumé — et un canal de plus depuis la 0.87.0.** Certains runtimes locaux (Ollama avec
 `qwen2.5-coder`, par exemple) ne rendent **pas** les appels d'outils par le protocole : ils les
 écrivent en texte dans la réponse, avec `tool_calls: null`. Le mode agent ne faisait donc rien du tout
@@ -196,10 +143,7 @@ natif ; ce qui change est qu'une phrase bien formée peut en devenir une, et c'e
 l'origine est écrite sur la carte.
 
 **Résidu, assumé.** Un utilisateur qui approuve sans lire approuve quand même. Le nombre d'étapes
-d'un tour est plafonné (12) pour qu'une boucle ne demande pas trente fois d'affilée. Sur IBM i, la
-barrière n'empêche pas une commande autorisée de détruire quelque chose **dans** une bibliothèque
-autorisée : elle borne le périmètre, pas le geste. Et elle est **vide par défaut** — une
-installation qui ne la configure pas n'a pas de périmètre.
+d'un tour est plafonné (12) pour qu'une boucle ne demande pas trente fois d'affilée.
 
 ---
 

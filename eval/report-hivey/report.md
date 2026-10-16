@@ -8,7 +8,7 @@ Endpoint: `https://openrouter.ai/api/v1`. Models: `hivey`.
 
 | model | passed | rate | time | steps | tokens in | tokens out | cost | out of steps | truncated | escalations |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `hivey` | 48/56 | 86 % | 3725.8 s | 516 | 3448638 | 138198 | $4.3422 | 3 | 0 | 0 |
+| `hivey` | 32/34 | 94 % | 2026.1 s | 333 | 2110495 | 66879 | $2.4589 | 1 | 0 | 0 |
 
 ## `hivey`
 
@@ -16,9 +16,8 @@ Endpoint: `https://openrouter.ai/api/v1`. Models: `hivey`.
 | --- | --- | --- | --- | --- | --- |
 | bug | 24/24 | 100 % | 1357.9 s | 240 | $1.7732 |
 | feature | 3/3 | 100 % | 152.8 s | 27 | $0.2047 |
-| ibmi | 15/21 | 71 % | 1607.0 s | 170 | $1.7687 |
 | refactor | 2/4 | 50 % | 355.9 s | 37 | $0.2549 |
-| test | 4/4 | 100 % | 252.2 s | 42 | $0.3408 |
+| test | 3/3 | 100 % | 159.5 s | 29 | $0.2262 |
 
 | task | result | time | steps | tokens | cost |
 | --- | --- | --- | --- | --- | --- |
@@ -31,28 +30,6 @@ Endpoint: `https://openrouter.ai/api/v1`. Models: `hivey`.
 | `fin-market-hours` | pass | 61.2 s | 12 | 82297+2130 | $0.0868 |
 | `fin-minor-units` | pass | 57.3 s | 10 | 64285+1931 | $0.0731 |
 | `fin-settlement` | pass | 64.0 s | 10 | 65500+2438 | $0.0793 |
-| `ibmi-cl-monmsg` | pass | 49.7 s | 6 | 40912+1660 | $0.0546 |
-| `ibmi-cl-qualify` | **FAIL** | 100.9 s | 9 | 60240+4390 | $0.0986 |
-| `ibmi-cl-sbmjob` | **FAIL** | 41.3 s | 4 | 27833+1200 | $0.0388 |
-| `ibmi-db2-catalog` | pass | 55.7 s | 8 | 52567+1785 | $0.0659 |
-| `ibmi-db2-commit` | **FAIL** | 87.5 s | 10 | 81032+3740 | $0.1040 |
-| `ibmi-db2-ddl` | pass | 32.0 s | 3 | 25365+1540 | $0.0405 |
-| `ibmi-dds-field` | pass | 91.8 s | 9 | 66094+3730 | $0.0961 |
-| `ibmi-dds-logical` | pass | 59.4 s | 7 | 48526+2352 | $0.0686 |
-| `ibmi-dds-printer` | **FAIL** | 154.9 s | 10 | 89224+8085 | $0.1563 |
-| `ibmi-rpg-copy-proto` | pass | 77.3 s | 10 | 70987+3025 | $0.0921 |
-| `ibmi-rpg-doc` | pass | 89.6 s | 12 | 79189+3561 | $0.1007 |
-| `ibmi-rpg-fixed-lr` | pass | 58.4 s | 7 | 48590+2272 | $0.0676 |
-| `ibmi-rpg-freeform` | **FAIL** | 50.6 s | 4 | 29491+1764 | $0.0461 |
-| `ibmi-rpg-indicators` | pass | 76.5 s | 9 | 66043+3219 | $0.0900 |
-| `ibmi-rpg-monitor` | pass | 59.3 s | 9 | 66611+1773 | $0.0749 |
-| `ibmi-rpg-move` | pass | 120.6 s | 10 | 74438+5197 | $0.1186 |
-| `ibmi-rpg-packed` | pass | 119.9 s | 9 | 70390+5674 | $0.1202 |
-| `ibmi-rpg-procedure` | pass | 81.2 s | 12 | 83135+3665 | $0.1063 |
-| `ibmi-rpg-sql-cursor` | **FAIL** | 30.2 s | 3 | 22165+915 | $0.0308 |
-| `ibmi-rpg-srvpgm` | pass | 110.3 s | 11 | 77332+5732 | $0.1253 |
-| `ibmi-rpg-unittest` | pass | 92.7 s | 13 | 105473+3638 | $0.1146 |
-| `ibmi-sql-db2` | pass | 59.9 s | 8 | 52506+2402 | $0.0727 |
 | `java-equals-hashcode` | pass | 58.1 s | 9 | 61801+2378 | $0.0793 |
 | `java-junit` | pass | 52.6 s | 8 | 58088+2394 | $0.0751 |
 | `java-optional` | pass | 67.3 s | 15 | 81972+3101 | $0.1008 |
@@ -80,42 +57,6 @@ Endpoint: `https://openrouter.ai/api/v1`. Models: `hivey`.
 | `ts-readonly-input` | pass | 47.4 s | 8 | 53061+1932 | $0.0679 |
 
 ### What the failures said
-
-**`ibmi-cl-qualify`** — agent exit 0
-
-```
-
-```
-
-**`ibmi-cl-sbmjob`** — agent exit 0
-
-```
-
-```
-
-**`ibmi-db2-commit`** — agent exit 0
-
-```
-
-```
-
-**`ibmi-dds-printer`** — agent exit 0
-
-```
-
-```
-
-**`ibmi-rpg-freeform`** — agent exit 0
-
-```
-
-```
-
-**`ibmi-rpg-sql-cursor`** — agent exit 0
-
-```
-
-```
 
 **`ts-impossible-state`** — agent exit 0
 

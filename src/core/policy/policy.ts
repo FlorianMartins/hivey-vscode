@@ -7,7 +7,7 @@
 //
 // IT ONLY RESTRICTS. A policy can forbid a provider, raise the minimum redaction, lower a budget
 // ceiling, add a blocked glob. It cannot grant anything — there is no policy that turns redaction
-// off, allows a provider the user has not configured, or widens the writable libraries. That
+// off, or allows a provider the user has not configured. That
 // asymmetry is what makes the file safe to deploy by script: the worst a wrong policy can do is
 // make the extension less capable, never less careful.
 //
@@ -68,8 +68,6 @@ export interface ManagedPolicy {
   deniedPaths?: string[];
   /** The most auto-approval allowed. */
   autoApprove?: ApprovalCeiling;
-  /** IBM i libraries the agent may change. The user can narrow this, never widen it. */
-  writableLibraries?: string[];
   /** Ceilings. A user figure above one of these is clamped to it. */
   budget?: { perRequestUsd?: number; dailyUsd?: number; perRequestTokens?: number };
   /** MCP servers allowed, by fingerprint of their command and tool definitions. */
@@ -216,7 +214,6 @@ export interface Restrictable {
   deniedCommands: string[];
   deniedPaths: string[];
   autoApprove: ApprovalCeiling;
-  writableLibraries: string[];
   budget: { perRequestUsd: number; dailyUsd: number; perRequestTokens: number };
 }
 
@@ -281,14 +278,6 @@ export function applyPolicy(settings: Restrictable, state: PolicyState): Applied
   if (policy.deniedPaths?.length) {
     out.deniedPaths = union(out.deniedPaths, policy.deniedPaths);
     managed.push("permissions.deniedPaths");
-  }
-  if (policy.writableLibraries) {
-    // An empty user list means the IBM i gate is OFF, which is the most permissive state there is —
-    // so it cannot be read as "the user agrees with the policy". The policy's list stands.
-    out.writableLibraries = out.writableLibraries.length
-      ? intersect(out.writableLibraries, policy.writableLibraries)
-      : [...policy.writableLibraries];
-    managed.push("ibmi.writableLibraries");
   }
   // A size ceiling of 0 means "no limit", so a policy tightening it has to be able to go from 0 to a
   // number — which is a RESTRICTION even though the number is larger. Treated as unlimited rather
@@ -358,11 +347,6 @@ function rank<T extends string>(order: readonly T[], value: T): number {
 
 function union(a: string[], b: string[]): string[] {
   return [...new Set([...a, ...b])];
-}
-
-function intersect(a: string[], b: string[]): string[] {
-  const other = new Set(b.map((x) => x.toUpperCase()));
-  return a.filter((x) => other.has(x.toUpperCase()));
 }
 
 // ── Where it is read from ────────────────────────────────────────────────────────────────────────

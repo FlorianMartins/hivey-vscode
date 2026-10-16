@@ -1,6 +1,9 @@
-# Prompt — Hivey Code au-delà d'IBM Bob et de GitHub Copilot
+# Prompt — Hivey Code au-delà de GitHub Copilot
 
 Oct 1, 2026 · @Florian Martins
+
+> ⚠️ **Le support IBM i a été retiré du produit** depuis la rédaction de ce prompt. Sa phase 1
+> (dépasser IBM Bob sur IBM i) et les chantiers propres à IBM i en ont été retirés.
 
 Ce prompt pilote un agent de code dans le dépôt `hivey-vscode`, phase par phase. Il transforme la
 feuille de route en chantiers testables, chacun avec ses critères d'acceptation.
@@ -17,10 +20,9 @@ open source sous Apache-2.0, en version 0.61.0. Son principe : le modèle par d�
 poste ou sur un serveur interne. Le modèle distant est une escalade consentie, payée sur un budget,
 et tout ce qui sort est pseudonymisé de façon réversible.
 
-L'objectif est d'en faire l'assistant de code le plus solide pour un établissement financier qui
-exploite IBM i, en trois temps :
+L'objectif est d'en faire l'assistant de code le plus solide pour un établissement financier, en
+deux temps :
 
-- dépasser IBM Bob sur IBM i ;
 - égaler GitHub Copilot sur ce qu'un évaluateur d'entreprise comparera ;
 - ajouter ce qu'aucun des deux ne peut offrir sans prendre les données du client.
 
@@ -51,7 +53,7 @@ arrête-toi et explique pourquoi au lieu de contourner.
    `beforeRequest`, transforme des messages en requête. Le caractère local se décide par l'adresse
    (`isLocalEndpoint`), jamais par le nom d'un réglage.
 5. **Les garanties vivent dans le code, jamais dans un prompt.** Le jeu d'outils du mode Plan
-   (`core/session/modes.ts`) et `ibmi.writableLibraries` (`core/ibmi/guard.ts`) en sont le modèle.
+   (`core/session/modes.ts`) en est le modèle.
    Un refus l'emporte toujours sur une autorisation, et l'inconnu compte comme une écriture.
 6. **Le préfixe du prompt est un actif** (ADR 0010). Rien qui change d'un tour à l'autre n'entre
    dans `stablePrompt` ; le test d'intégration qui compare le préfixe octet par octet reste vert.
@@ -94,8 +96,8 @@ demandée ; un chantier n'est terminé que lorsque les onze étapes sont faites.
    les options rejetées et pourquoi.
 9. **Journal et état.** Mets à jour `CHANGELOG.md` (version mineure suivante, rubriques Ajouté,
    Corrigé, Précisé) et `docs/ROADMAP.md`. Classe chaque point honnêtement : **testé**, **vérifié à
-   la main** ou **non vérifié**. Ce qui exige une partition IBM i, un GPU ou un service externe que
-   tu n'as pas exécuté est « non vérifié ».
+   la main** ou **non vérifié**. Ce qui exige un GPU ou un service externe que tu n'as pas exécuté
+   est « non vérifié ».
 10. **Contrôles.** Avant chaque commit, tout est vert : `npm run typecheck`, `npm test`,
     `npm run eval:verify`, `npm run scan:secrets`, `npm audit --audit-level=high`, et
     `npm run test:integration` quand l'environnement le permet. Si un contrôle ne peut pas tourner
@@ -134,19 +136,6 @@ marqueur incomplet (au plus la longueur maximale d'un marqueur) et le libère au
 **Critères.** Tests sur toutes les positions de coupure, en fin de flux et lors d'un arrêt par
 l'utilisateur.
 
-### 0.3 Fermer `QSH` dans la garde IBM i
-
-**Constat.** `READING_VERBS` (`core/ibmi/guard.ts`) contient `QSH` et `STRSQL`. `QSH CMD('rm …')`
-est donc classé comme lecture et échappe à `ibmi.writableLibraries`.
-
-**À faire.** Retire `QSH` et `STRSQL` des lecteurs. Traite `QSH` et `STRQSH` comme des écritures
-dont la cible n'est pas analysable, donc refusées dès que la liste est renseignée. Vérifie que les
-commandes imbriquées (`SBMJOB CMD(…)`) et les appels SQL à `QSYS2.QCMDEXC` sont contrôlés.
-
-**Critères.** Avec une liste valant `["DEVCFC"]`, aucun de ces cas ne passe :
-`QSH CMD('rm -r /QSYS.LIB/PROD.LIB')`, `STRQSH`, `SBMJOB CMD(DLTF FILE(PROD/X))`,
-`CALL QSYS2.QCMDEXC('DLTF PROD/X')`.
-
 ### 0.4 Suite de tests sous Node 22
 
 **Constat.** `npm test` lance `node --test dist-tests/`, qui échoue sous Node 22. La CI tourne en
@@ -172,103 +161,13 @@ jamais tourné contre un vrai modèle.
 
 - `npm run eval -- --report <dossier>` produit un rapport JSON et Markdown : pour chaque tâche,
   réussite, durée, jetons, coût, nombre d'étapes et escalade éventuelle.
-- Porte le banc à au moins 40 tâches réalistes : TypeScript, Python, Java et SQL ; RPG fixe et
-  libre, CL, DDS, Db2 for i ; finance (arrondi, décimal). Chaque tâche garde une commande de
+- Porte le banc à au moins 40 tâches réalistes : TypeScript, Python, Java et SQL ; finance
+  (arrondi, décimal). Chaque tâche garde une commande de
   contrôle qui échoue sur la version non modifiée.
 - Le workflow nocturne publie le rapport quand `HIVEY_EVAL_URL` est configuré.
 
 **Interdit.** N'invente aucun score. Si aucun modèle n'est joignable, livre le harnais et marque les
 chiffres « non mesurés ».
-
-## Phase 1 — Dépasser IBM Bob sur IBM i
-
-IBM Bob, avec son Premium Package for i, apporte un mode dédié, une quarantaine de compétences
-IBM i, une documentation curatée et la génération de tests RPG. Hivey doit aller plus loin sur un
-point que Bob ne revendique pas : **vérifier sur la partition ce qu'il a écrit**, et s'en servir
-comme verdict.
-
-Règles propres à cette phase :
-
-- Tout passe par la connexion de Code for IBM i, comme aujourd'hui
-  (`extension/integrations/ibmi.ts`). N'ouvre aucune session propre.
-- N'invente aucune API. Lis l'API exportée par Code for IBM i avant de l'utiliser, et cite la
-  fonction employée dans le plan.
-- Rien de cette phase ne peut être exécuté ici sans partition. Écris les tests sur des sorties
-  enregistrées (fixtures) et classe le reste « non vérifié ».
-
-### 1.1 Boucle compiler, lire, corriger
-
-**À faire.** Un outil `ibmi_compile` compile un membre dans une bibliothèque cible, avec la commande
-adaptée au type du membre : `CRTBNDRPG`, `CRTSQLRPGI`, `CRTRPGMOD`, `CRTBNDCL`, `CRTPF`, `CRTLF`,
-`CRTDSPF`, `CRTPRTF`.
-
-- La bibliothèque cible doit figurer dans `ibmi.writableLibraries`. Liste vide : l'outil demande à
-  chaque fois et signale que la garde n'est pas configurée.
-- Après compilation, il lit les erreurs de la liste de compilation (spool, par exemple via
-  `SYSTOOLS.SPOOLED_FILE_DATA`) et de la joblog (`QSYS2.JOBLOG_INFO`).
-- Il renvoie au modèle une liste structurée : identifiant (RNF, SQL, CPD…), gravité, membre, ligne,
-  texte.
-- Le résultat devient un type de vérification dans `core/router/outcome.ts`. Comme pour les tests et
-  les diagnostics, c'est le dernier résultat du tour qui compte ; une compilation finale en échec
-  déclenche l'escalade, avec la liste d'erreurs.
-- En mode Plan, l'outil n'existe pas : il crée des objets.
-
-**Critères.** L'analyseur de liste est testé sur des fixtures RPG III, ILE RPG fixe et libre,
-SQLRPGLE, CL et DDS. `verifyTurn()` traite une compilation finale en échec comme un échec, et une
-compilation corrigée comme un succès.
-
-### 1.2 Tests unitaires RPG exécutés
-
-**À faire.** Détecte RPGUnit sur la partition (commande `RUCALLTST`) et expose-le comme outil de
-test ; ses résultats sont analysés et versés à `verifyTurn()`. Une compétence `/rpgtest` écrit des
-tests au format RPGUnit, les compile par 1.1 et les exécute.
-
-**Critères.** Sans RPGUnit installé, l'outil le dit et ne simule rien. Analyseur de résultats testé
-sur fixtures.
-
-### 1.3 Analyse d'impact
-
-**À faire.** Un outil en lecture, `ibmi_impact`, répond à « qui utilise ce fichier, ce programme, ce
-champ ? ».
-
-- Niveau objet : `DSPPGMREF` vers un fichier de sortie dans `QTEMP`, ou les services QSYS2
-  équivalents.
-- Niveau champ : références croisées ARCAD quand Elias est présent, sinon recherche dans les sources
-  des bibliothèques lisibles.
-- Le résultat indique sa méthode et ses limites. L'outil rejoint la liste blanche du mode Plan, et
-  une compétence `/impact` l'appelle avant toute modification d'un fichier physique.
-
-**Critères.** `QTEMP` est la seule bibliothèque qu'un outil en lecture peut écrire ; la garde le
-sait explicitement, test à l'appui.
-
-### 1.4 Performance Db2 for i
-
-**À faire.** `/sql` et `ibmi_sql` en lecture consultent l'Index Advisor (`QSYS2.SYSIXADV`) et les
-statistiques de table (`QSYS2.SYSTABLESTAT`) pour justifier une requête ou un index proposé. La
-création d'un index reste une écriture, soumise à la garde.
-
-### 1.5 Messages et documentation de la maison
-
-**À faire.** Un outil `ibmi_message` donne le texte et l'aide d'un identifiant (CPF, MCH, RNF,
-SQL…) via `QSYS2.MESSAGE_FILE_DATA`. La base de connaissance indexe les identifiants de message
-cités dans la documentation interne (`knowledge.folders`). Une erreur renvoie ainsi à la fois au
-texte IBM et à la procédure maison.
-
-### 1.6 Au moins 40 compétences IBM i, chacune mesurée
-
-**À faire.** Complète les familles `rpg`, `dds`, `db2i` et `cl`, par exemple : accès par
-enregistrement vers SQL, programme monolithique vers modules et programmes de service ILE, `/COPY`
-vers prototypes, indicateurs numérotés vers indicateurs nommés, cycle RPG, `MOVE` et `MOVEL`,
-contrôle de validation, journalisation.
-
-**Critères.** Chaque compétence est adossée à au moins une tâche de `eval/tasks`, dont la commande
-de contrôle échoue avant intervention.
-
-### 1.7 Livraison par ARCAD
-
-**À faire.** Une modification compilée et testée peut être préparée pour ARCAD Elias : check-in et
-demande de version, par les commandes `arcad.*` existantes. La promotion vers la production n'est
-jamais un outil de l'agent.
 
 ## Phase 2 — Égaler Copilot sur ce que l'entreprise compare
 
@@ -413,7 +312,7 @@ politique d'entreprise le demande.
 - messages FIX.
 
 **Critères.** Chaque compétence est adossée à au moins une tâche de `eval/tasks`, en JavaScript,
-Python, Java et RPG quand c'est pertinent.
+Python et Java quand c'est pertinent.
 
 ### 3.5 Tableau de qualité publié
 
@@ -476,9 +375,9 @@ l'utilisateur tape), et celles du dépôt utilisaient **déjà** la divulgation 
 raisonnement écrit dans `skillsPrompt`.
 
 Le vrai manque est l'inverse : **les 85 compétences intégrées étaient inatteignables par le modèle**.
-Quarante pour IBM i, huit pour la finance, chacune adossée à une tâche d'évaluation — et toutes
+Celles de la finance, chacune adossée à une tâche d'évaluation, comme les autres — toutes
 conditionnées au fait que l'utilisateur **connaisse la commande à taper**. Qui ne sait pas que
-`/packed` existe n'en bénéficie jamais.
+`/rounding` existe n'en bénéficie jamais.
 
 Fait : elles passent par le mécanisme existant (`skillsPrompt` + `use_skill`), filtrées par ce que
 l'utilisateur a activé — ce qui borne le coût — en excluant celles qui sont une action sur la
@@ -661,13 +560,13 @@ précisément pour ça.
 ### 5.3 Vérifier la bonne chose
 
 **Mesuré** : les **5 autres** échecs annoncés comme des réussites n'ont rien vu échouer — le contrôle
-lancé n'était pas celui qui décide. Et **7 des 10 cas sont des tâches IBM i**, dont le contrôle est
+lancé n'était pas celui qui décide. Et **la plupart des 10 cas sont des tâches** dont le contrôle est
 *structurel* : il n'existe souvent aucune commande que le modèle puisse lancer qui refléterait le vrai
 contrôle. C'est donc **autant une propriété du banc qu'un défaut du modèle**, et il faut le dire avant
 de corriger quoi que ce soit.
 
 À dériver avant d'engager : le modèle devine la commande de contrôle d'un dépôt. Il existe déjà
-`hiveyCode.ibmi.testCommand` et les règles de la maison ; il n'existe pas d'endroit où un dépôt
+les règles de la maison ; il n'existe pas d'endroit où un dépôt
 **déclare** « voici ce qui dit si mon code marche ». Vérifier dans le code si ce manque est réel avant
 d'ajouter un fichier de plus.
 
@@ -680,7 +579,7 @@ configurations. Le chantier 4.2 a rendu 85 compétences atteignables par le mod�
 jamais demandées. **Offrir n'est pas utiliser.**
 
 Décision à annoncer **avant** la mesure, comme pour DeepSeek : on force une compétence sur la famille
-qui lui correspond (les tâches IBM i ont chacune la leur) et on compare. Si la compétence forcée fait
+qui lui correspond (les tâches de la finance ont chacune la leur) et on compare. Si la compétence forcée fait
 gagner des tâches, le défaut est dans la **sélection** et c'est elle qu'on répare. Si elle n'en fait
 pas gagner, les 85 descriptions sortent du préfixe : on ne paie pas des jetons à chaque tour pour une
 capacité que rien n'emploie. **Le banc tranche, et le résultat est publié dans les deux cas.**
@@ -725,7 +624,7 @@ Mesurer : `never acted`, qui existe pour cette question.
 - Ajouter une dépendance npm à l'exécution, ou un appel réseau vers une adresse que personne n'a
   configurée.
 - Affaiblir une garantie, un test ou un défaut sûr pour faire passer un chantier.
-- Inventer une API (Code for IBM i, ARCAD, un fournisseur), une route REST, un score d'évaluation ou
+- Inventer une API (un fournisseur, un outil tiers), une route REST, un score d'évaluation ou
   un résultat de test.
 - Écrire une version de modèle ou un prix en dur.
 - Ajouter un index vectoriel, ou envoyer du code à une API d'embeddings.

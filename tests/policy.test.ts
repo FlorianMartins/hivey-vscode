@@ -43,7 +43,6 @@ const POLICY: ManagedPolicy = {
   blockedGlobs: ["**/clients/**"],
   deniedCommands: ["curl", "scp"],
   autoApprove: "off",
-  writableLibraries: ["TSTCFC", "DEVCFC"],
   budget: { perRequestUsd: 0.5, dailyUsd: 5, perRequestTokens: 200_000 },
   disabled: ["completion"],
 };
@@ -136,7 +135,6 @@ const permissive: Restrictable = {
   deniedCommands: [],
   deniedPaths: [],
   autoApprove: "all",
-  writableLibraries: [],
   budget: { perRequestUsd: 10, dailyUsd: 100, perRequestTokens: 200_000 },
 };
 
@@ -180,16 +178,6 @@ test("a user who is STRICTER than the policy is left alone", () => {
   assert.equal(settings.escalation, "never");
   assert.equal(managed.includes("budget.dailyUsd"), false);
   assert.equal(managed.includes("escalation.policy"), false);
-});
-
-test("an empty writable-libraries list is the most permissive state, so the policy's list stands", () => {
-  // The IBM i gate is OFF when the list is empty. Reading that as "the user agrees" would be a way
-  // past the policy with no setting to point at.
-  const { settings } = applyPolicy(permissive, verifyPolicy({ envelope: envelopeFor(POLICY), publicKey: PUBLIC }));
-  assert.deepEqual(settings.writableLibraries, ["TSTCFC", "DEVCFC"]);
-  // And a user list is narrowed to the intersection, never widened.
-  const wide = applyPolicy({ ...permissive, writableLibraries: ["TSTCFC", "PRODCFC"] }, verifyPolicy({ envelope: envelopeFor(POLICY), publicKey: PUBLIC }));
-  assert.deepEqual(wide.settings.writableLibraries, ["TSTCFC"]);
 });
 
 test("a field the policy says nothing about is left exactly as the user set it", () => {

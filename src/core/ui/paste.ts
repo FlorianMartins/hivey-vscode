@@ -77,7 +77,7 @@ export function isTextLike(mediaType: string, name = ""): boolean {
   if (/^application\/(json|xml|x-yaml|yaml|sql|javascript|typescript|x-sh|x-httpd-php)$/.test(mediaType)) return true;
   if (!mediaType || mediaType === "application/octet-stream") {
     // A source file dragged from a file manager often arrives with no type at all.
-    return /\.(txt|md|markdown|json|ya?ml|toml|ini|cfg|conf|csv|tsv|log|sql|sh|bash|zsh|ps1|py|rb|go|rs|java|kt|cs|c|h|cpp|hpp|ts|tsx|js|jsx|vue|svelte|html?|css|scss|xml|rpgle|sqlrpgle|clle|clp|dds|cbl|cob)$/i.test(
+    return /\.(txt|md|markdown|json|ya?ml|toml|ini|cfg|conf|csv|tsv|log|sql|sh|bash|zsh|ps1|py|rb|go|rs|java|kt|cs|c|h|cpp|hpp|ts|tsx|js|jsx|vue|svelte|html?|css|scss|xml|cbl|cob)$/i.test(
       name,
     );
   }

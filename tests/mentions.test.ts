@@ -37,10 +37,6 @@ test("the notations that take an argument keep it", () => {
 
   const quoted = parsePrompt('open #file:"src/my folder/a b.ts" please');
   assert.equal(quoted.mentions[0]?.argument, "src/my folder/a b.ts", "a path with spaces needs quotes to survive");
-
-  const member = parsePrompt("explain #member:QGPL/QRPGLESRC(CALCVAT)");
-  assert.equal(member.mentions[0]?.kind, "member");
-  assert.equal(member.mentions[0]?.argument, "QGPL/QRPGLESRC(CALCVAT)");
 });
 
 test("several mentions in one question are all found, in order", () => {
@@ -97,19 +93,17 @@ test("an unknown participant is not eaten", () => {
 });
 
 test("a participant and mentions coexist", () => {
-  const parsed = parsePrompt("@ibmi does #member:QGPL/QRPGLESRC(CALCVAT) round correctly?");
-  assert.equal(parsed.participant, "ibmi");
-  assert.equal(parsed.mentions[0]?.kind, "member");
+  const parsed = parsePrompt("@workspace does #file:src/billing/vat.ts round correctly?");
+  assert.equal(parsed.participant, "workspace");
+  assert.equal(parsed.mentions[0]?.kind, "file");
   assert.match(parsed.text, /^does /);
 });
 
-test("the platform participants exist and each says where to look first", () => {
+test("the participants exist and each says where to look first", () => {
   const ids = participants().map((p) => p.id);
-  for (const expected of ["workspace", "editor", "terminal", "git", "ibmi", "arcad"]) {
+  for (const expected of ["workspace", "editor", "terminal", "git"]) {
     assert.ok(ids.includes(expected as never), `${expected} is missing`);
   }
-  assert.match(participantDirective("ibmi"), /QSYS2/);
-  assert.match(participantDirective("arcad"), /change management/i);
   assert.match(participantDirective("git"), /never push/i, "the one thing the agent must not decide on its own");
 });
 

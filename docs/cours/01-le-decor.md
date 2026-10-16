@@ -53,7 +53,7 @@ des propositions pendant la frappe, et la capacité de modifier des fichiers si 
 
 Une extension se livre sous forme d'un fichier qui finit par **`.vsix`**. C'est une archive — une
 boîte, comme un `.zip` — qui contient le programme de l'extension, ses images, et sa documentation.
-L'éditeur sait l'ouvrir et l'installer. On verra au [chapitre 13](13-installer-et-sen-servir.md)
+L'éditeur sait l'ouvrir et l'installer. On verra au [chapitre 12](12-installer-et-sen-servir.md)
 comment faire.
 
 ## Le dépôt, le commit, la branche

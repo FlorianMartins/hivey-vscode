@@ -35,9 +35,8 @@ Each chapter ends with an **"In Hivey Code"** section, which says what the proje
 | 8 | [MCP](08-mcp.md) | Plugging in an external service, and the risk that creates |
 | 9 | [Privacy](09-privacy.md) | Pseudonymisation, a tamper-evident log, a signed policy |
 | 10 | [The cost](10-the-cost.md) | Why it costs money elsewhere, and how it tends to zero here |
-| 11 | [IBM i](11-ibm-i.md) | The computers nobody shows you that everything depends on |
-| 12 | [Measured quality](12-measured-quality.md) | How you prove an assistant is good — or bad |
-| 13 | [Install it and use it](13-install-and-use.md) | Getting it working on your machine, step by step |
+| 11 | [Measured quality](11-measured-quality.md) | How you prove an assistant is good — or bad |
+| 12 | [Install it and use it](12-install-and-use.md) | Getting it working on your machine, step by step |
 | — | [Glossary](99-glossary.md) | Every term, alphabetically |
 
 ## Why this course replaced the old French README
@@ -49,7 +48,7 @@ behind (it announced 284 tests when there were 700, and version `0.11.1` when th
 
 This course translates nothing. It explains. And it is kept current by a check that **refuses the
 build** when the version announced at the top of this page is no longer the project's — see
-[chapter 12](12-measured-quality.md). A document somebody promises to maintain is not maintained; a
+[chapter 11](11-measured-quality.md). A document somebody promises to maintain is not maintained; a
 document whose staleness breaks the build is.
 
 ⚠️ There are now two editions of this course, French (`docs/cours/`) and English (`docs/course/`),

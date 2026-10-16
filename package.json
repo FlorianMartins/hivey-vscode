@@ -36,12 +36,6 @@
     "privacy",
     "gdpr",
     "confidential",
-    "ibm i",
-    "as400",
-    "rpgle",
-    "sqlrpgle",
-    "db2 for i",
-    "arcad",
     "mcp"
   ],
   "icon": "media/icon.png",
@@ -215,16 +209,6 @@
         "category": "Hivey Code"
       },
       {
-        "command": "hiveyCode.setArcadCredentials",
-        "title": "%command.setArcadCredentials.title%",
-        "category": "Hivey Code"
-      },
-      {
-        "command": "hiveyCode.clearArcadCredentials",
-        "title": "%command.clearArcadCredentials.title%",
-        "category": "Hivey Code"
-      },
-      {
         "command": "hiveyCode.exportSession",
         "title": "%command.exportSession.title%",
         "category": "Hivey Code",
@@ -301,12 +285,6 @@
         "title": "%command.attachOpenEditors.title%",
         "category": "Hivey Code",
         "icon": "$(files)"
-      },
-      {
-        "command": "hiveyCode.diagnoseIbmi",
-        "title": "%command.diagnoseIbmi.title%",
-        "category": "Hivey Code",
-        "icon": "$(pulse)"
       },
       {
         "command": "hiveyCode.showKnowledge",
@@ -1855,29 +1833,6 @@
         "title": "%config.section.context%",
         "order": 6,
         "properties": {
-          "hiveyCode.ibmi.writableLibraries": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "default": [],
-            "markdownDescription": "%config.ibmi.writableLibraries%"
-          },
-          "hiveyCode.ibmi.integration": {
-            "type": "string",
-            "enum": [
-              "auto",
-              "on",
-              "off"
-            ],
-            "enumDescriptions": [
-              "%config.ibmi.integration.auto%",
-              "%config.ibmi.integration.on%",
-              "%config.ibmi.integration.off%"
-            ],
-            "default": "auto",
-            "markdownDescription": "%config.ibmi.integration%"
-          },
           "hiveyCode.context.maxTokens": {
             "type": "number",
             "default": 0,

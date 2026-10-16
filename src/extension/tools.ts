@@ -25,9 +25,7 @@ import type { Settings } from "./config.js";
 import { relative } from "./workspace.js";
 import { openFileUris } from "./models.js";
 import { buildGitTools, gitAvailable } from "./integrations/git.js";
-import { buildIbmiTools, ibmiEnabled } from "./integrations/ibmi.js";
 import { readSettings } from "./config.js";
-import { arcadInstalled, buildArcadTools, type ArcadDeps } from "./integrations/arcad.js";
 import { buildKnowledgeTools } from "./knowledge.js";
 import type { McpManager } from "./integrations/mcp.js";
 import { runCommandInTerminal } from "./terminal.js";
@@ -67,7 +65,7 @@ function root(): vscode.Uri {
  *                   folder was unreadable, and the model was told so in words that sound like the
  *                   folder is missing.
  *   NONE            a window with files open and no folder — which is ordinary when the files come
- *                   from a remote, an IBM i partition or a drag-and-drop. Every tool answered "No
+ *                   from a remote or a drag-and-drop. Every tool answered "No
  *                   folder is open", and the user, looking at their open files, reads that as the
  *                   extension having lost the workspace. The tabs ARE the workspace here, so a path
  *                   is matched against them.
@@ -155,8 +153,6 @@ export interface ToolDeps {
   hooks?: Hooks;
   /** Shows a diff and returns what the user chose. */
   confirmEdit?: (uri: vscode.Uri, next: string) => Promise<boolean>;
-  /** The Elias credentials, read from the keychain when an ARCAD call needs them. */
-  arcad?: ArcadDeps;
   /** Running MCP servers, whose tools join the set. */
   mcp?: McpManager;
   /** Where the agent's plan goes when it updates one. Absent means the plan tool is not offered. */
@@ -559,15 +555,11 @@ export function buildTools(deps: ToolDeps): Tool[] {
   };
 
   // The integrations are offered only when there is something behind them. A model given
-  // `ibmi_sql` on a machine with no partition does not conclude "no IBM i here"; it calls the tool,
+  // `git_log` on a machine with no Git does not conclude "no Git here"; it calls the tool,
   // reads the error, and calls it again — a turn spent proving something the tool list could have
   // said for free. Absence is the clearest way to say a system is not there.
   const integrations: Tool[] = [
     ...(gitAvailable() ? buildGitTools() : []),
-    // The same gate as the menu: a model that is told it can read source members on a machine with
-    // no partition will try, and spend a turn discovering what the settings already knew.
-    ...(ibmiEnabled(readSettings().ibmi.integration) ? buildIbmiTools(readSettings().ibmi.writableLibraries) : []),
-    ...(arcadInstalled() && deps.arcad ? buildArcadTools(deps.arcad) : []),
     // Same gate as the rest: a model told it can consult a knowledge base that is switched off
     // spends a call finding out. Off by default, because a base nobody asked for is a folder of
     // files appearing in somebody's repository.

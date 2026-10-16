@@ -195,8 +195,6 @@ export function stablePrompt(parts: StablePromptParts): string {
  * the position that carries the most weight in practice.
  */
 export interface TurnDirectiveParts {
-  /** Dialect rules implied by the files in play, e.g. Db2 for i rather than PostgreSQL. */
-  dialect?: string;
   /** The named participant this turn is addressed to, when the user picked one. */
   participant?: string;
   /** Which language to reply in. See `languageDirective`. */
@@ -204,7 +202,7 @@ export interface TurnDirectiveParts {
 }
 
 export function turnDirectives(parts: TurnDirectiveParts): string {
-  return [parts.dialect, parts.participant, parts.language].filter(Boolean).join("\n\n").trim();
+  return [parts.participant, parts.language].filter(Boolean).join("\n\n").trim();
 }
 
 /**

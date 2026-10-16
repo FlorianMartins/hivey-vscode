@@ -70,7 +70,7 @@ That back-and-forth is the **agent loop**, and it is the subject of
 Here is the story, because it explains better than any theory why these details matter.
 
 The project wanted to **measure** its quality with a local model (that is
-[chapter 12](12-measured-quality.md)). First task on the bench: "add an option to this small
+[chapter 11](11-measured-quality.md)). First task on the bench: "add an option to this small
 program". The model answered — and **nothing happened**. No file changed. Zero tools called.
 
 Looking at what it had actually replied, this is what we found: the tool call was **perfect**. The

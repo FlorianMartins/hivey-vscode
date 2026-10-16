@@ -1,6 +1,10 @@
 # ADR-0018 — Une compétence nomme la tâche qui l'éprouve
 
-**Date** : 2026-10-02 · **Statut** : accepté
+**Date** : 2026-10-02 · **Statut** : en partie caduque (accepté à l’origine)
+
+> **Statut : en partie caduque.** Le support IBM i a été retiré du produit : ce qui ne concerne
+> qu'IBM i ici ne s'applique plus. Le principe — une compétence nomme la tâche qui l'éprouve —
+> tient toujours, pour la famille `finance`.
 
 ## Contexte
 

@@ -18,7 +18,7 @@ eval/tasks/<id>/
 | field | meaning |
 | --- | --- |
 | `title` | one line, for the report |
-| `kind` | `bug`, `test`, `feature`, `refactor`, `ibmi` — how the score is broken down |
+| `kind` | `bug`, `test`, `feature`, `refactor`, `noverify` — how the score is broken down |
 | `prompt` | exactly what the user would type |
 | `check` | a shell command run in the working copy. Exit 0 means the task is done |
 | `timeoutMs` | optional, default 180000 |
@@ -64,9 +64,8 @@ which is worth stating as a rule of its own.
 
 ### A structural check must look at the code, not at the prose
 
-Not every task can be decided by running something. There is no IBM i partition here, no JDK and no
-TypeScript compiler, so those tasks are checked by SHAPE — "no `any` remains", "no `finally` block",
-"the library is qualified". A shape check is a grep, and a grep reads the comments too. So a correct
+Not every task can be decided by running something. There is no JDK and no TypeScript compiler
+here, so those tasks are checked by SHAPE — "no `any` remains", "no `finally` block". A shape check is a grep, and a grep reads the comments too. So a correct
 answer that EXPLAINS itself — "replaced the `finally` block with try-with-resources" — was refused
 for quoting the very thing it had removed. The first victim was the reference solution.
 
@@ -126,6 +125,5 @@ worth reading, because it is where the model's actual failure mode is.
 ## What it is not
 
 It is not a benchmark anyone should quote against another product: the tasks are small, there are
-few of them, and they are chosen to look like this project's users' work (including IBM i, which no
-public benchmark covers). It is a regression net and a way to choose between two local models
+few of them, and they are chosen to look like this project's users' work. It is a regression net and a way to choose between two local models
 honestly.

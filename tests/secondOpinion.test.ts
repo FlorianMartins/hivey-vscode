@@ -39,7 +39,6 @@ test("every guarantee this product makes elsewhere is on the guarded list", () =
   for (const key of [
     "privacy.blockedGlobs",
     "permissions.autoApprove",
-    "ibmi.writableLibraries",
     "corpus.enabled",
     "siem.rejectUnauthorized",
     "hooks",

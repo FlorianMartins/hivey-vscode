@@ -1,6 +1,6 @@
 # 13. Install it and use it
 
-[← Previous chapter](12-measured-quality.md) · [Contents](README.md) · [Glossary →](99-glossary.md)
+[← Previous chapter](11-measured-quality.md) · [Contents](README.md) · [Glossary →](99-glossary.md)
 
 This chapter assumes only that you have a computer. It does not assume you can code.
 
@@ -59,7 +59,7 @@ computer here".
 
 ⚠️ **Know what you are going to get.** That model answers questions and does completion well. For
 **agent** work — changing files by itself — the measurement in
-[chapter 12](12-measured-quality.md) is unambiguous: it cannot do it. If you want agent mode, you need
+[chapter 11](11-measured-quality.md) is unambiguous: it cannot do it. If you want agent mode, you need
 either a more recent local model that can call tools, or escalation to a remote one.
 
 ## 4. Use it
@@ -154,7 +154,6 @@ In VS Code's settings, search for `hiveyCode`.
 | `privacy.egressPolicy` | `ask-always` so you are asked every time |
 | `budget.dailyUsd` | The daily spend cap |
 | `budget.perRequestTokens` | The size beyond which a request is questioned — 0 (the default): never, the model's own window is the limit |
-| `ibmi.writableLibraries` | The libraries an agent may change ([chapter 11](11-ibm-i.md)) |
 | `language` | For a machine whose editor is in one language and whose user is in another |
 
 ## And if it doesn't work
@@ -170,6 +169,6 @@ In VS Code's settings, search for `hiveyCode`.
   faster and worse.
 - **It changes no files.** You are probably in Plan mode, which changes nothing **by construction**
   ([chapter 5](05-the-three-modes-and-tools.md)). If you really are in Agent mode, read the end of
-  [chapter 12](12-measured-quality.md): some local models do not call tools.
+  [chapter 11](11-measured-quality.md): some local models do not call tools.
 
-[← Previous chapter](12-measured-quality.md) · [Contents](README.md) · [Glossary →](99-glossary.md)
+[← Previous chapter](11-measured-quality.md) · [Contents](README.md) · [Glossary →](99-glossary.md)

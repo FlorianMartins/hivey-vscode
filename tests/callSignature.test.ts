@@ -13,7 +13,7 @@ test("a command is the command, not the tool's own reply", () => {
 test("the argument that matters is the one shown", () => {
   assert.equal(callSignature("read_file", { path: "src/app.ts" }), "src/app.ts");
   assert.equal(callSignature("search_text", { pattern: "TODO", glob: "**/*.ts" }), "TODO");
-  assert.equal(callSignature("ibmi_sql", { sql: "SELECT * FROM QSYS2.SYSSCHEMAS" }), "SELECT * FROM QSYS2.SYSSCHEMAS");
+  assert.equal(callSignature("git_commit", { message: "fix the rounding", path: "src/vat.ts" }), "fix the rounding");
 });
 
 test("an unknown tool still says something", () => {
@@ -25,7 +25,7 @@ test("an unknown tool still says something", () => {
 
 test("a tool with nothing to say says nothing", () => {
   // Rather than "(no arguments)", which is a word about the interface rather than about the work.
-  assert.equal(callSignature("ibmi_library_list", {}), "");
+  assert.equal(callSignature("git_status", {}), "");
 });
 
 test("long arguments are cut, not wrapped", () => {
@@ -36,6 +36,6 @@ test("long arguments are cut, not wrapped", () => {
 
 test("a multi-line argument becomes one line", () => {
   // A step row is one line high. A newline in it does not wrap, it breaks the row.
-  const sql = callSignature("ibmi_sql", { sql: "SELECT *\n  FROM QSYS2.SYSSCHEMAS\n  WHERE X = 1" });
+  const sql = callSignature("run_command", { command: "psql -c 'SELECT *\n  FROM customers\n  WHERE X = 1'" });
   assert.ok(!sql.includes("\n"), sql);
 });

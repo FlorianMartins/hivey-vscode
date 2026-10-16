@@ -8,7 +8,7 @@ Endpoint: `https://openrouter.ai/api/v1`. Models: `x-ai/grok-4.7`.
 
 | model | passed | rate | time | steps | tokens in | tokens out | cost | out of steps | truncated | escalations |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `x-ai/grok-4.7` | 52/56 | 93 % | 1485.1 s | 221 | 606229 | 83919 | $1.0684 | 0 | 0 | 0 |
+| `x-ai/grok-4.7` | 32/34 | 94 % | 500.6 s | 147 | 391765 | 16229 | $0.4510 | 0 | 0 | 0 |
 
 ## `x-ai/grok-4.7`
 
@@ -16,9 +16,8 @@ Endpoint: `https://openrouter.ai/api/v1`. Models: `x-ai/grok-4.7`.
 | --- | --- | --- | --- | --- | --- |
 | bug | 24/24 | 100 % | 216.9 s | 113 | $0.3341 |
 | feature | 2/3 | 67 % | 26.4 s | 12 | $0.0374 |
-| ibmi | 19/21 | 90 % | 923.2 s | 72 | $0.5778 |
 | refactor | 3/4 | 75 % | 224.9 s | 12 | $0.0445 |
-| test | 4/4 | 100 % | 93.7 s | 12 | $0.0746 |
+| test | 3/3 | 100 % | 32.4 s | 10 | $0.0350 |
 
 | task | result | time | steps | tokens | cost |
 | --- | --- | --- | --- | --- | --- |
@@ -31,28 +30,6 @@ Endpoint: `https://openrouter.ai/api/v1`. Models: `x-ai/grok-4.7`.
 | `fin-market-hours` | pass | 8.5 s | 5 | 13042+455 | $0.0154 |
 | `fin-minor-units` | pass | 10.0 s | 4 | 12386+372 | $0.0182 |
 | `fin-settlement` | pass | 9.1 s | 4 | 12725+485 | $0.0134 |
-| `ibmi-cl-monmsg` | pass | 9.8 s | 2 | 7480+496 | $0.0110 |
-| `ibmi-cl-qualify` | pass | 22.4 s | 2 | 7580+1559 | $0.0176 |
-| `ibmi-cl-sbmjob` | **FAIL** | 87.2 s | 2 | 7595+7360 | $0.0526 |
-| `ibmi-db2-catalog` | pass | 27.2 s | 1 | 4793+2064 | $0.0170 |
-| `ibmi-db2-commit` | **FAIL** | 21.8 s | 4 | 10068+1473 | $0.0188 |
-| `ibmi-db2-ddl` | pass | 9.2 s | 2 | 8102+463 | $0.0098 |
-| `ibmi-dds-field` | pass | 18.9 s | 3 | 10969+1587 | $0.0184 |
-| `ibmi-dds-logical` | pass | 33.9 s | 2 | 7327+2659 | $0.0220 |
-| `ibmi-dds-printer` | pass | 87.6 s | 3 | 11334+6187 | $0.0513 |
-| `ibmi-rpg-copy-proto` | pass | 33.4 s | 5 | 10427+2164 | $0.0254 |
-| `ibmi-rpg-doc` | pass | 24.9 s | 6 | 14285+1126 | $0.0228 |
-| `ibmi-rpg-fixed-lr` | pass | 51.6 s | 2 | 7507+3300 | $0.0277 |
-| `ibmi-rpg-freeform` | pass | 92.5 s | 4 | 14077+6124 | $0.0497 |
-| `ibmi-rpg-indicators` | pass | 21.4 s | 4 | 10451+1218 | $0.0198 |
-| `ibmi-rpg-monitor` | pass | 8.2 s | 4 | 9859+294 | $0.0098 |
-| `ibmi-rpg-move` | pass | 273.4 s | 5 | 12927+17714 | $0.1199 |
-| `ibmi-rpg-packed` | pass | 44.0 s | 4 | 10241+2799 | $0.0271 |
-| `ibmi-rpg-procedure` | pass | 22.8 s | 4 | 10885+1574 | $0.0184 |
-| `ibmi-rpg-sql-cursor` | pass | 10.5 s | 3 | 10635+678 | $0.0125 |
-| `ibmi-rpg-srvpgm` | pass | 13.6 s | 6 | 10445+782 | $0.0152 |
-| `ibmi-rpg-unittest` | pass | 61.3 s | 2 | 7796+5719 | $0.0395 |
-| `ibmi-sql-db2` | pass | 8.9 s | 4 | 9681+350 | $0.0111 |
 | `java-equals-hashcode` | pass | 5.6 s | 3 | 7509+267 | $0.0080 |
 | `java-junit` | pass | 10.0 s | 2 | 8002+605 | $0.0091 |
 | `java-optional` | pass | 17.7 s | 6 | 8128+1272 | $0.0151 |
@@ -80,18 +57,6 @@ Endpoint: `https://openrouter.ai/api/v1`. Models: `x-ai/grok-4.7`.
 | `ts-readonly-input` | pass | 5.3 s | 2 | 7224+205 | $0.0055 |
 
 ### What the failures said
-
-**`ibmi-cl-sbmjob`** — agent exit 0
-
-```
-
-```
-
-**`ibmi-db2-commit`** — agent exit 0
-
-```
-
-```
 
 **`ts-exhaustive-switch`** — agent exit 0
 

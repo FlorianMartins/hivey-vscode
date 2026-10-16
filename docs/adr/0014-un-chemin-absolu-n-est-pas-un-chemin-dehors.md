@@ -92,5 +92,5 @@ atteint et qu'un éditeur en marche n'atteint pas.
   aucun dossier ouvert. Renvoyer un nom relatif inventé déplacerait le mensonge d'un cran.
 - **Faire dire au prompt « nomme les fichiers relativement ».** Une consigne, donc une requête, et
   un modèle qui la lit mal est le cas ordinaire. C'est exactement le raisonnement déjà écrit pour le
-  mode Plan et pour le garde-fou IBM i : une garantie vit dans le code.
+  mode Plan : une garantie vit dans le code.
 - **Accepter n'importe quel chemin absolu.** Cela supprimerait la parade, pas le défaut.

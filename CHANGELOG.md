@@ -2,6 +2,17 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## Non publié
+
+### Retiré
+
+- **Tout l'axe IBM i.** Les échecs reproductibles du banc venaient tous des tâches IBM i, où le
+  modèle invente des syntaxes (CL, DDS, binder source, catalogue Db2). Sont retirés : la connexion
+  IBM i et l'intégration ARCAD, les outils `ibmi_*` et `arcad_*`, les règles RPG/CL/DDS ajoutées aux
+  consignes, les 41 skills IBM i (et `/packed`), les mentions `#member`, `#db2`, `@ibmi` et `@arcad`,
+  les réglages `hiveyCode.ibmi.*`, les commandes associées, le chapitre de cours, et les 22 tâches IBM i
+  du banc (62 → 40 tâches).
+
 ## 1.14.2 — 2026-10-11
 
 ### Ajouté

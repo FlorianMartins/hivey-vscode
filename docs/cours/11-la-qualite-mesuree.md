@@ -1,6 +1,6 @@
 # 12. La qualité mesurée
 
-[← Chapitre précédent](11-ibm-i.md) · [Sommaire](README.md) · [Chapitre suivant →](13-installer-et-sen-servir.md)
+[← Chapitre précédent](10-le-cout.md) · [Sommaire](README.md) · [Chapitre suivant →](12-installer-et-sen-servir.md)
 
 ## Le problème : tout le monde dit être le meilleur
 
@@ -14,7 +14,7 @@ mesurer mais de s'assurer que la mesure veut dire quelque chose.
 ## Ce qu'est un banc d'évaluation
 
 Un **banc d'évaluation** (*benchmark*) est un jeu de tâches avec une réponse vérifiable
-automatiquement. Celui de ce projet contient **62 tâches** : des petits dépôts cassés, une consigne,
+automatiquement. Celui de ce projet contient **40 tâches** : des petits dépôts cassés, une consigne,
 et un **contrôle** — une commande qui réussit si le travail est fait et échoue sinon.
 
 Par exemple : un petit programme qui compte des lignes, la consigne « ajoute une option `--json` », et
@@ -71,7 +71,7 @@ contrôle a échoué quand même. C'est ce chiffre qui décide si on peut laisse
 un modèle qui échoue bruyamment vous coûte un tour, un modèle qui échoue **en annonçant une
 réussite** coûte la confiance qui rend l'outil utilisable.
 
-Et deux chiffres qui donnent l'échelle, mesurés sur le jeu complet : **le préréglage gratuit réussit
+Et deux chiffres qui donnent l'échelle, mesurés sur l'ancien jeu de 62 tâches : **le préréglage gratuit réussit
 la moitié des tâches, pour rien** — il ne dit pas que le gratuit suffit, il dit où il s'arrête. Et un
 modèle payant bon marché en réussit près des trois quarts pour **quatre centimes sur 62 tâches**.
 
@@ -118,7 +118,7 @@ séries de la même configuration, sur les mêmes tâches, avec le même program
 50 réussites.** Rien n'avait changé entre elles.
 
 La raison est dans le [chapitre 2](02-le-modele.md) : un modèle de langage ne produit pas deux fois
-la même réponse. Sur 62 tâches, deux ou trois basculent d'un côté ou de l'autre.
+la même réponse. Sur quelques dizaines de tâches, deux ou trois basculent d'un côté ou de l'autre.
 
 La conséquence est sévère et vaut pour tous les chiffres que vous lirez ailleurs : **une différence
 plus petite que cet écart n'est pas un résultat.** Quand un outil annonce « 3 % de mieux », la
@@ -204,4 +204,4 @@ maintenir n'est pas maintenu ; un document dont l'obsolescence casse le build l'
 raisonnement vaut pour les chiffres cités dans les README, vérifiés par `npm run check:numbers` —
 parce qu'un nombre écrit dans une phrase n'a aucune raison de suivre la chose qu'il décrit.
 
-[← Chapitre précédent](11-ibm-i.md) · [Sommaire](README.md) · [Chapitre suivant →](13-installer-et-sen-servir.md)
+[← Chapitre précédent](10-le-cout.md) · [Sommaire](README.md) · [Chapitre suivant →](12-installer-et-sen-servir.md)

@@ -2,8 +2,8 @@
 //
 // MCP is how a vendor plugs a system into an assistant without either side knowing about the
 // other: the server declares its tools, the client offers them to the model, and the two never
-// share a type. That is exactly the shape an IBM i shop needs — ARCAD, a ticketing system, an
-// internal catalogue — so this extension speaks it.
+// share a type. That is exactly the shape a team needs — a ticketing system, an internal
+// catalogue — so this extension speaks it.
 //
 // Writing the client rather than installing @modelcontextprotocol/sdk is the same trade this
 // codebase makes everywhere else. The wire format is JSON-RPC 2.0 over a stream, the handshake is
