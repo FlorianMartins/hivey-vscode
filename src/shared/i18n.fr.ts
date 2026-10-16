@@ -247,6 +247,7 @@ export const FR: Record<string, string> = {
   "Send into the running task (⏎) — read at its next step": "Envoyer dans la tâche en cours (⏎) — lu à sa prochaine étape",
   "Correct or add something — read at the next step": "Corriger ou préciser — lu à la prochaine étape",
   "read at the next step…": "lu à la prochaine étape…",
+  "Hivey Code (commands)": "Hivey Code (commandes)",
   "noted — read at the next step": "noté — lu à la prochaine étape",
   "Stopped after {0} steps (hiveyCode.agent.maxSteps) before the task was finished.": "Arrêté après {0} étapes (hiveyCode.agent.maxSteps), avant la fin de la tâche.",
   "Stopped: the model kept repeating the same call.": "Arrêté : le modèle répétait le même appel.",

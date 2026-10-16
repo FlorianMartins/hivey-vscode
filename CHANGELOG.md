@@ -4,6 +4,24 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ## 1.14.2 — 2026-10-11
 
+### Corrigé
+
+- **Windows : l'agent lit enfin la sortie de ses commandes.** « il corrige et ensuite dit que ce
+  n'est pas bon ». Sous Windows, `run_command` passait par l'intégration du shell du terminal, qui y
+  renvoie souvent une sortie vide (« code de sortie 0 » et rien d'autre) : l'agent ne pouvait rien
+  vérifier, se mettait à écrire ses résultats dans des fichiers pour les relire, et s'égarait. Les
+  commandes y tournent maintenant comme un processus dont la sortie (et les erreurs) est lue
+  directement, affichée dans un terminal **Hivey Code (commandes)** où Ctrl+C l'arrête ; un délai
+  dépassé arrête aussi ce que la commande a lancé (un serveur). Le modèle est prévenu que c'est
+  `cmd.exe` (`&&`, `dir`, `type` — pas `ls`, `cat`, `head`). Réglage `hiveyCode.agent.commandRunner`
+  (`auto` par défaut : processus sous Windows, terminal ailleurs).
+- **Un nom de fichier mal orthographié est signalé avec le bon.** L'agent avait confondu
+  `skinator-page.js` et `skincare-page.js` pendant une douzaine d'étapes : « fichier introuvable » ne
+  lui disait jamais lequel existait. `read_file` et `edit_file` répondent maintenant « … did you mean
+  skinator-page.js ? ». Et un `edit_file` qui remplace un texte par le même texte le dit (« the same
+  text, character for character ») au lieu de « l'éditeur a accepté mais rien n'a changé », qui le
+  lançait à la recherche d'une panne de l'éditeur.
+
 ### Ajouté
 
 - **Comme Claude Code : corriger le tir pendant que l'IA travaille, sans Stop.** « si l'utilisateur
