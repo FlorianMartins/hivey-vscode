@@ -33,6 +33,7 @@ import { makeProvider } from "../core/providers/index.js";
 import { promptForMode } from "../core/session/modes.js";
 import { readSettings, endpointFor, Keys, SECTION } from "./config.js";
 import { t } from "../shared/i18n.js";
+import { IDENTICAL_EDIT } from "../core/text/findText.js";
 
 export interface BackgroundTask {
   id: string;
@@ -147,6 +148,7 @@ function backgroundTools(worktree: string, engine: Engine | undefined): Tool[] {
       const path = inside(String(args["path"] ?? ""));
       const text = await readFile(path, "utf8");
       const old = String(args["old"] ?? "");
+      if (old === String(args["new"] ?? "")) return { content: IDENTICAL_EDIT, isError: true };
       const first = text.indexOf(old);
       if (first < 0) return { content: "That snippet does not appear in the file. Read it again.", isError: true };
       if (text.indexOf(old, first + 1) >= 0) {

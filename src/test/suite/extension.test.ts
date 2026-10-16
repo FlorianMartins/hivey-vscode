@@ -429,6 +429,82 @@ suite("Hivey Code", () => {
   }
 
   /**
+   * « il corrige et ensuite dit que ce n'est pas bon » — on Windows, commands came back "exit code 0"
+   * with no output through the terminal's shell integration, and the model lost its way. Run as a
+   * process, what the command printed — both streams — and its exit code are what the model reads,
+   * and a command that never ends is really stopped at its timeout.
+   */
+  test("run_command as a process hands the model the output, the exit code, and stops a command at its timeout", async () => {
+    const ext = vscode.extensions.getExtension(ID)!;
+    await ext.activate();
+    const stub = await scriptedStub([
+      { tool: { name: "run_command", args: { command: "echo hello-out && echo hello-err 1>&2 && exit 3" } } },
+      { tool: { name: "run_command", args: { command: "sleep 30", timeoutMs: 1500 } } },
+      { text: "ok" },
+    ]);
+    const restore = await useStub(stub.port);
+    const config = vscode.workspace.getConfiguration(SECTION);
+    const before = { runner: config.get("agent.commandRunner"), approve: config.get("permissions.autoApprove") };
+    await config.update("agent.commandRunner", "process", vscode.ConfigurationTarget.Global);
+    await config.update("permissions.autoApprove", "all", vscode.ConfigurationTarget.Global);
+    try {
+      await vscode.commands.executeCommand("hiveyCode.newSession");
+      await vscode.commands.executeCommand("hiveyCode.setMode", "agent");
+      const started = Date.now();
+      await vscode.commands.executeCommand("hiveyCode.askWith", "run the checks");
+      const took = Date.now() - started;
+      const toolText = (body: string | undefined): string =>
+        JSON.stringify((JSON.parse(body ?? "{}").messages ?? []).filter((m: { role: string }) => m.role === "tool").pop() ?? {});
+      const first = toolText(stub.bodies()[1]);
+      assert.match(first, /exit code 3/, first);
+      assert.match(first, /hello-out/, "stdout was not read");
+      assert.match(first, /hello-err/, "stderr was not read");
+      const second = toolText(stub.bodies()[2]);
+      assert.match(second, /timed out and was killed/, second);
+      assert.ok(took < 15000, `the turn waited ${took} ms: the command was not stopped at its timeout`);
+    } finally {
+      await config.update("agent.commandRunner", before.runner, vscode.ConfigurationTarget.Global);
+      await config.update("permissions.autoApprove", before.approve, vscode.ConfigurationTarget.Global);
+      await restore();
+      stub.close();
+    }
+  });
+
+  test("a file the model misspelt is answered with the one it meant", async () => {
+    const ext = vscode.extensions.getExtension(ID)!;
+    await ext.activate();
+    const dir = await fs.mkdtemp(join(tmpdir(), "hivey-near-"));
+    await fs.writeFile(join(dir, "skinator-page.js"), "export {};\n");
+    // This harness opens no folder: the open tabs are the workspace, so the real file is one of them.
+    await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(join(dir, "skinator-page.js")));
+    const stub = await scriptedStub([
+      { tool: { name: "read_file", args: { path: join(dir, "skincare-page.js") } } },
+      { tool: { name: "edit_file", args: { path: join(dir, "skinator-page.js"), old: "export", new: "export" } } },
+      { text: "ok" },
+    ]);
+    const restore = await useStub(stub.port);
+    const config = vscode.workspace.getConfiguration(SECTION);
+    const approve = config.get("permissions.autoApprove");
+    await config.update("permissions.autoApprove", "all", vscode.ConfigurationTarget.Global);
+    try {
+      await vscode.commands.executeCommand("hiveyCode.newSession");
+      await vscode.commands.executeCommand("hiveyCode.setMode", "agent");
+      await vscode.commands.executeCommand("hiveyCode.askWith", "read the page script");
+      const tool = (i: number): string =>
+        JSON.stringify((JSON.parse(stub.bodies()[i] ?? "{}").messages ?? []).filter((m: { role: string }) => m.role === "tool").pop() ?? {});
+      assert.match(tool(1), /skinator-page\.js/, tool(1));
+      assert.match(tool(1), /did you mean/, tool(1));
+      assert.match(tool(2), /same text, character for character/, tool(2));
+    } finally {
+      await config.update("permissions.autoApprove", approve, vscode.ConfigurationTarget.Global);
+      await restore();
+      stub.close();
+      await vscode.commands.executeCommand("workbench.action.closeAllEditors");
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  /**
    * Stop while the send confirmation is on screen.
    *
    * This is the window every question passes through — `privacy.confirmSend` is "always" by default

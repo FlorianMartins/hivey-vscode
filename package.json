@@ -1344,6 +1344,16 @@
             "minimum": 0,
             "markdownDescription": "%config.agent.maxSteps%"
           },
+          "hiveyCode.agent.commandRunner": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "process",
+              "terminal"
+            ],
+            "default": "auto",
+            "markdownDescription": "%config.agent.commandRunner%"
+          },
           "hiveyCode.chat.suggestNext": {
             "type": "boolean",
             "default": true,

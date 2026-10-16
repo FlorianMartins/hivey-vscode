@@ -134,3 +134,15 @@ export function findUnique(text: string, needle: string): FindResult {
   const end = map[at + needleNorm.length] ?? text.length;
   return { start, end, normalized: true };
 }
+
+/**
+ * What an edit tool says when `old` and `new` are the same text — before looking for it at all.
+ *
+ * ⚠️ A real session asked to replace a word with the very same word, six times, believing it was
+ * fixing a typo, and was told "the editor accepted the edit but the file did not change" — which sent
+ * it looking for a fault in the editor. The fault was in the request.
+ */
+export const IDENTICAL_EDIT =
+  "`old` and `new` are the same text, character for character — this edit changes nothing. If you meant " +
+  "to correct something, the file may already say what `new` says: read those lines again and compare " +
+  "them letter by letter with what you expect.";
