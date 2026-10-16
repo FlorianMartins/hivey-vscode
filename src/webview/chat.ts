@@ -620,10 +620,6 @@ function renderEntry(entry: UiEntry, state: UiState, deps: ChatDeps, first = fal
       onApply: (code: string, language: string) => deps.send({ type: "applyCode", code, language }),
     };
     for (const seg of entry.segments!) {
-      if (seg.user !== undefined) {
-        wrap.append(interjectionBubble(seg.user, false));
-        continue;
-      }
       if (seg.reasoning?.trim() || seg.steps?.length) wrap.append(segmentBlock(seg, false).wrap);
       if (seg.text?.trim()) wrap.append(markdown(seg.text, actions, state.searchQuery || undefined));
     }
@@ -1047,19 +1043,6 @@ export function collapsible(
  * One stretch of an agent turn: what the model thought and the actions it took, in one block whose
  * title says what was done — then the words it wrote there follow it. See core/session/segments.ts.
  */
-/**
- * What the person typed during the turn, where it came in it. `pending` until the model has read it
- * (at its next step), so it is plain the message was received and not yet acted on.
- */
-export function interjectionBubble(text: string, pending: boolean): HTMLElement {
-  const wrap = el("div", pending ? "interjection pending" : "interjection");
-  const head = el("div", "interjection-head");
-  head.append(el("span", "entry-who", t("You")));
-  if (pending) head.append(el("span", "entry-meta", t("read at the next step…")));
-  wrap.append(head, el("div", "interjection-text", text));
-  return wrap;
-}
-
 export function segmentBlock(
   seg: { reasoning?: string; steps?: Array<{ tool: string; summary: string; ok: boolean; call?: string }> },
   open: boolean,
@@ -1325,8 +1308,6 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
         ? t("What can we plan together?")
         : t("Ask a question…");
   if (suggestion) area.classList.add("has-suggestion");
-  // During a turn the box takes a correction for it — see `submit`.
-  if (isStreaming()) area.placeholder = t("Correct or add something — read at the next step");
   area.addEventListener("input", () => {
     autoGrow(area);
     markReady(area);
@@ -1428,13 +1409,9 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
     // The same button as its neighbours, carrying a different glyph. `primary` made it a size and a
     // weight of its own at the end of a row of six identical controls, and "the send is special"
     // is a thing a toolbar says by position, not by paint.
-    // During a turn both: send what you typed into the turn, or stop it.
-    ...(isStreaming()
-      ? [
-          button({ icon: ICON.send, title: t("Send into the running task (⏎) — read at its next step"), className: "btn ghost icon-only send steer", onClick: () => submit(area, deps) }),
-          button({ icon: ICON.stop, title: t("Stop the answer"), className: "btn ghost icon-only send stop", onClick: () => deps.send({ type: "stop" }) }),
-        ]
-      : [button({ icon: ICON.send, title: t("Send (⏎)"), className: "btn ghost icon-only send", onClick: () => submit(area, deps) })]),
+    isStreaming()
+      ? button({ icon: ICON.stop, title: t("Stop the answer"), className: "btn ghost icon-only send stop", onClick: () => deps.send({ type: "stop" }) })
+      : button({ icon: ICON.send, title: t("Send (⏎)"), className: "btn ghost icon-only send", onClick: () => submit(area, deps) }),
   );
   bar.append(right);
   card.append(bar);
@@ -2386,18 +2363,7 @@ function expandSlash(text: string, state?: UiState): { text: string; attach: boo
 
 function submit(area: HTMLTextAreaElement, deps: ChatDeps): void {
   let text = area.value.trim();
-  if (!text) return;
-  // ⚠️ During a turn the message joins it — « rectifier le tir sans avoir à Stop et refaire une
-  // nouvelle requête ». It used to be ignored: the only way to correct a model heading the wrong way
-  // was to stop it and ask again, losing what it had done. Read by the model at its next step. A
-  // command or an edit of an old message has no place inside a running turn and waits for its end.
-  if (isStreaming()) {
-    if (area.dataset["editing"] || matchSlash(text, deps.state())?.action) return;
-    area.value = "";
-    autoGrow(area);
-    deps.send({ type: "steer", text });
-    return;
-  }
+  if (!text || isStreaming()) return;
   // A command that acts on the conversation clears the box and does its thing. It deliberately
   // does not go through the editing path below: `/compact` typed while editing an old message is a
   // command, not a replacement for that message.
