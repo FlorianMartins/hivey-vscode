@@ -2024,6 +2024,12 @@ suite("Hivey Code", () => {
       // Still bounded, so a save that never happens fails here rather than hanging: the loop ends and
       // the assertions below say exactly what was missing.
       for (let i = 0; i < 100 && doc.isDirty; i++) await delay(50);
+      // ⚠️ And for the tool to have FINISHED — its result on its way back to the model — before the
+      // stop. The buffer and its dirty flag change inside the tool, so stopping on them alone could
+      // land between the save starting and the file being written, and CI failed on exactly that
+      // under load. The promise under test is "on disk before the next step", and the next step is
+      // the second request.
+      for (let i = 0; i < 200 && stub.bodies().length < 2; i++) await delay(50);
       await vscode.commands.executeCommand("hiveyCode.stopAnswer");
 
       const back = (JSON.parse(stub.bodies()[1] ?? "{}").messages ?? []).filter(
