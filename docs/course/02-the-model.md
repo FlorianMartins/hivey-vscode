@@ -82,11 +82,19 @@ part — in 51 cases out of 56 it did not **even try** to act.
   It improves hard answers and it costs tokens. Hivey Code shows it **while** it is being written —
   the only moment it is interesting — then folds it away as soon as the action or answer it decided
   on starts. The level is chosen in the composer: **Direct** (no thinking), **Brief**, **Standard**,
-  **Deep** — and only the ones the model really has, when its server can say so. On your own server, a
+  **Deep** — and only the ones the model really has: its server says so when it is yours, its
+  documentation otherwise. Each level really changes the request, whichever the provider: Direct
+  **turns thinking off** wherever the model allows it; on a model that always thinks (Claude Opus 5.5,
+  Gemini 3, Grok…), Direct is not offered and the lowest level says so. Brief, Standard and Deep ask
+  for a low, medium and high effort (the highest below "max" when the model has one). One exception
+  worth knowing: at OpenAI, through Chat Completions, GPT-5.4 and later accept tools only without
+  thinking — so a level picked there is sent as Direct during an agent turn. Until you pick one, a
+  cloud model receives exactly the request it always did: it thinks at its own default, and the
+  button says so ("Model default"). On your own server, a
   level nobody chose means **Standard**: left to itself, a model like Qwen thinks at its maximum, even
   for a small task. The thinking is never sent back to the model from one question to the next; the
-  one exception is an agent turn on a self-hosted server, where each step gets the earlier steps'
-  thinking back, so it does not start over.
+  exception is within one agent turn, where each step gets the earlier steps' thinking back so it does
+  not start over — on a self-hosted server, and in the signed form Claude and DeepSeek ask for.
 
 ## In Hivey Code
 

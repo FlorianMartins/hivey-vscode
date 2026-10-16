@@ -23,6 +23,7 @@ import { keepCacheMarks } from "./cache.js";
 import { isSelfHostedProvider } from "../redaction/index.js";
 import { toolCallsFromText } from "./textToolCall.js";
 import { PROBE_EFFORT } from "../router/reasoningLevels.js";
+import { wireReasoning } from "./reasoningMap.js";
 
 export interface OpenAIProviderOptions {
   id: string;
@@ -195,7 +196,10 @@ export class OpenAICompatibleProvider implements Provider {
       messages: req.messages.map((m, index) => {
         if (m.role === "tool") return { role: "tool", tool_call_id: m.toolCallId, content: m.content };
         // The thinking behind an earlier step, back to the model that had it — see `ChatMessage.reasoning`.
-        const thought = m.role === "assistant" && m.reasoning && isSelfHostedProvider(this.id) ? { reasoning_content: m.reasoning } : {};
+        // DeepSeek too: with tools and thinking on, it REQUIRES it back on every later request (a 400
+        // otherwise — https://api-docs.deepseek.com/guides/thinking_mode).
+        const thought =
+          m.role === "assistant" && m.reasoning && (isSelfHostedProvider(this.id) || this.id === "deepseek") ? { reasoning_content: m.reasoning } : {};
         if (m.toolCalls?.length) {
           return {
             role: m.role,
@@ -242,28 +246,17 @@ export class OpenAICompatibleProvider implements Provider {
         function: { name: t.name, description: t.description, parameters: t.parameters },
       }));
     }
-    // Reasoning. OpenRouter normalizes it under `reasoning`; OpenAI's own API and several
-    // gateways take `reasoning_effort`. Sending both is safe: an unknown field is dropped, and a
-    // server that knows one of them gets the intent.
-    if (req.reasoning && req.reasoning !== "none") {
-      if (this.id === "openrouter") body["reasoning"] = { effort: req.reasoning };
-      else body["reasoning_effort"] = req.reasoning;
-    } else if (req.reasoning === "none" && this.id === "openrouter") {
-      // Explicitly off, so a model that thinks by default does not bill for it.
-      body["reasoning"] = { exclude: true };
-    } else if (req.reasoning === "none" && isSelfHostedProvider(this.id)) {
-      // ⚠️ "Direct" means no thinking, and sending nothing did not say so: the chat template's own
-      // default applied, which on Qwen3.8 is its MAXIMUM effort. llama.cpp reads "none" as
-      // enable_thinking=false.
-      body["reasoning_effort"] = "none";
-    }
-    // ⚠️ A side task on a self-hosted server: thinking OFF. "none" above sends nothing to
-    // llama.cpp, and nothing means the chat template's default effort — so an edit prediction or a
-    // commit message thought for longer than it took to write. Only for chores and only on the
-    // user's own server (llama.cpp reads `reasoning_effort: "none"` as enable_thinking=false); a
-    // turn somebody is waiting to read keeps its thinking, and clouds are left exactly as they were.
-    // A server that rejects the field gets the request again without it — see `adaptRequest`.
-    if (req.chore && isSelfHostedProvider(this.id)) body["reasoning_effort"] = "none";
+    // Reasoning: what the panel's level is for THIS provider and THIS model — the field, the word,
+    // and whether thinking can be off at all. One table, with the vendors' documentation cited
+    // beside each rule: providers/reasoningMap.ts.
+    //
+    // ⚠️ "Direct" means no thinking. Sending nothing did not say so: the model's own default applied
+    // — on Qwen3.8 its MAXIMUM effort, on OpenRouter whatever the upstream does by default — and
+    // OpenRouter's `exclude: true`, sent here before, only HID the thinking while it went on.
+    // A chore on the user's own server is sent with thinking off whatever the panel says.
+    const thinking = wireReasoning(this.id, req.model, req.reasoning, { tools: Boolean(req.tools?.length), ...(req.chore ? { chore: true } : {}) });
+    Object.assign(body, thinking.fields);
+    if (thinking.dropTemperature) delete body["temperature"];
     // How far the server has read the prompt, streamed before the first token — which is also the
     // only way to tell a request waiting in a busy server's queue from one being read. See
     // core/agent/waiting.ts. Self-hosted only; a server that does not know it ignores it, and one
@@ -595,6 +588,26 @@ export function adaptRequest(body: Record<string, unknown>, error: string): Reco
     return undefined;
   }
 
+  // A model that cannot think, asked to: Ollama answers `"<model>" does not support thinking` and
+  // names no field. The effort goes; the question is asked again without it.
+  if (/does not support thinking|thinking is not supported/.test(said)) {
+    for (const field of ["reasoning_effort", "reasoning"]) {
+      if (field in next) {
+        delete next[field];
+        changed = true;
+      }
+    }
+    if (changed) return next;
+  }
+  // DeepSeek, thinking with tools, refuses a history whose earlier steps lost their
+  // `reasoning_content` (a conversation resumed from the transcript, a step shortened to fit).
+  // Thinking off is the one request it accepts for that history — less than was asked, never more.
+  const thinkingField = next["thinking"] as { type?: string } | undefined;
+  if (said.includes("reasoning_content") && thinkingField && typeof thinkingField === "object" && thinkingField.type !== "disabled") {
+    next["thinking"] = { type: "disabled" };
+    delete next["reasoning_effort"];
+    return next;
+  }
   // OpenAI's rename. Only when the server asks for it by name: elsewhere `max_tokens` is the field
   // that works, and swapping it blindly would break every server that never renamed anything.
   if ("max_tokens" in next && said.includes("max_completion_tokens")) {

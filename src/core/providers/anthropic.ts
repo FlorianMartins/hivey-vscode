@@ -9,7 +9,8 @@ import { request } from "../util/http.js";
 import { sseData, sseLines } from "../util/sse.js";
 import type { ChatDelta, ChatRequest, ChatResult, Provider, ToolCall, Usage } from "./types.js";
 import { toolCallsFromText } from "./textToolCall.js";
-import { EMPTY_USAGE, THINKING_BUDGET } from "./types.js";
+import { EMPTY_USAGE } from "./types.js";
+import { anthropicThinking } from "./reasoningMap.js";
 import { keepCacheMarks } from "./cache.js";
 import { describeHttpError, isCompleteJson } from "./openai.js";
 
@@ -67,8 +68,10 @@ export class AnthropicProvider implements Provider {
         if (m.role === "tool") {
           return { role: "user", content: [{ type: "tool_result", tool_use_id: m.toolCallId, content: m.content }] };
         }
+        // Signed thinking blocks first, as the API returned them — see `ChatMessage.thinkingBlocks`.
+        const thought = m.role === "assistant" ? (m.thinkingBlocks ?? []) : [];
         if (m.toolCalls?.length) {
-          const blocks: unknown[] = [];
+          const blocks: unknown[] = [...thought];
           if (m.content) blocks.push({ type: "text", text: m.content });
           for (const t of m.toolCalls) {
             blocks.push({ type: "tool_use", id: t.id, name: t.name, input: safeJson(t.args) });
@@ -85,7 +88,7 @@ export class AnthropicProvider implements Provider {
           type: "image",
           source: { type: "base64", media_type: img.mediaType, data: img.data },
         }));
-        return { role: m.role === "assistant" ? "assistant" : "user", content: [block, ...images] };
+        return { role: m.role === "assistant" ? "assistant" : "user", content: [...thought, block, ...images] };
       }),
     };
     if (system.length) {
@@ -95,16 +98,21 @@ export class AnthropicProvider implements Provider {
         return b;
       });
     }
-    if (req.reasoning && req.reasoning !== "none") {
-      const budget = THINKING_BUDGET[req.reasoning];
-      body["thinking"] = { type: "enabled", budget_tokens: budget };
-      // The answer has to fit AFTER the thinking, and the API rejects max_tokens <= budget.
-      body["max_tokens"] = Math.max(Number(body["max_tokens"] ?? 4096), budget + 4096);
-      // Extended thinking and a temperature cannot both be set.
-      delete body["temperature"];
-    } else if (req.temperature != null) {
-      body["temperature"] = req.temperature;
+    // Thinking, per model family — see providers/reasoningMap.ts, where each rule cites the docs.
+    // A chore is not a level anybody picked: the model's own default, as an unpicked turn.
+    const think = anthropicThinking(req.model, req.chore ? undefined : req.reasoning);
+    if (think.thinking) body["thinking"] = think.thinking;
+    if (think.effort) body["output_config"] = { effort: think.effort };
+    if (think.headroom) {
+      // Thinking tokens count against `max_tokens`: a cap the caller set is for the ANSWER, so the
+      // thinking is added on top — the API also refuses a budget that is not below max_tokens.
+      const asked = Number(body["max_tokens"]);
+      const ceiling = learnedMaxOutput.get(req.model);
+      const wanted = req.maxTokens !== undefined ? asked + think.headroom : Math.max(asked, think.headroom + 4096);
+      body["max_tokens"] = ceiling ? Math.min(wanted, ceiling) : wanted;
     }
+    // Refused outright on the newest models, and alongside thinking on the older ones.
+    if (think.temperature && req.temperature != null) body["temperature"] = req.temperature;
     if (req.tools?.length) {
       body["tools"] = req.tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.parameters }));
     }
@@ -137,7 +145,7 @@ export class AnthropicProvider implements Provider {
     let reasoning = "";
     let stopReason: ChatResult["stopReason"] = "stop";
     const usage: Usage = { ...EMPTY_USAGE };
-    const blocks = new Map<number, { type: string; id?: string; name?: string; json: string }>();
+    const blocks = new Map<number, { type: string; id?: string; name?: string; json: string; thinking?: string; signature?: string; data?: string }>();
 
     for await (const line of sseLines(res.body, req.signal)) {
       const ev = sseData(line) as any;
@@ -154,7 +162,14 @@ export class AnthropicProvider implements Provider {
           break;
         }
         case "content_block_start":
-          blocks.set(ev.index, { type: ev.content_block?.type, id: ev.content_block?.id, name: ev.content_block?.name, json: "" });
+          blocks.set(ev.index, {
+            type: ev.content_block?.type,
+            id: ev.content_block?.id,
+            name: ev.content_block?.name,
+            json: "",
+            ...(ev.content_block?.type === "thinking" ? { thinking: ev.content_block?.thinking ?? "", signature: ev.content_block?.signature ?? "" } : {}),
+            ...(ev.content_block?.type === "redacted_thinking" ? { data: ev.content_block?.data } : {}),
+          });
           break;
         case "content_block_delta": {
           const d = ev.delta ?? {};
@@ -164,6 +179,11 @@ export class AnthropicProvider implements Provider {
           } else if (d.type === "thinking_delta" && d.thinking) {
             reasoning += d.thinking;
             onDelta?.({ reasoning: d.thinking });
+            const b = blocks.get(ev.index);
+            if (b) b.thinking = (b.thinking ?? "") + d.thinking;
+          } else if (d.type === "signature_delta" && d.signature) {
+            const b = blocks.get(ev.index);
+            if (b) b.signature = (b.signature ?? "") + d.signature;
           } else if (d.type === "input_json_delta") {
             const b = blocks.get(ev.index);
             if (b) b.json += d.partial_json ?? "";
@@ -205,7 +225,19 @@ export class AnthropicProvider implements Provider {
     const usable = cut ? toolCalls.filter((c) => isCompleteJson(c.args)) : toolCalls;
     if (usable.length && !cut) stopReason = "tool_calls";
 
-    return { text, reasoning, toolCalls: usable, usage, stopReason };
+    // The signed thinking, to go back with the calls it led to. A block without its signature cannot
+    // be verified and would be refused, so it is not kept.
+    const thinkingBlocks = [...blocks.entries()]
+      .sort((a, b) => a[0] - b[0])
+      .flatMap(([, b]): Array<Record<string, string>> =>
+        b.type === "thinking" && b.signature
+          ? [{ type: "thinking", thinking: b.thinking ?? "", signature: b.signature }]
+          : b.type === "redacted_thinking" && b.data
+            ? [{ type: "redacted_thinking", data: b.data }]
+            : [],
+      );
+
+    return { text, reasoning, toolCalls: usable, usage, stopReason, ...(thinkingBlocks.length ? { thinkingBlocks } : {}) };
   }
 
   async listModels(): Promise<string[]> {

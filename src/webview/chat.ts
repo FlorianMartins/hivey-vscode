@@ -2231,13 +2231,32 @@ function reasoningButton(state: UiState, deps: ChatDeps): HTMLElement {
   // marked in the hint; the usual four otherwise. Our own words on the button, not the vendor's:
   // « laisser le texte Bref, Standard et Approfondi […] pour un rendu plus propre ».
   const levels = state.reasoningLevels;
+  // A model that cannot stop thinking (Claude Opus 5.5, Fable) has no "Direct": its lowest level says
+  // so rather than pretend to be off.
+  const alwaysThinks = Boolean(levels && !levels.some((l) => l.id === "none"));
   const offered = levels
-    ? REASONING.filter((r) => levels.some((l) => l.id === r.id)).map((r) => {
+    ? REASONING.filter((r) => levels.some((l) => l.id === r.id)).map((r, i) => {
         const own = levels.find((l) => l.id === r.id)!;
-        return { ...r, hint: own.isDefault ? `${r.hint} ${t("The model's own default.")}` : r.hint };
+        let hint = r.hint;
+        if (alwaysThinks && i === 0) hint = `${hint} ${t("This model cannot turn its thinking off: this is the least it does.")}`;
+        // OpenAI's Chat Completions from GPT-5.4: tools only without thinking — Direct is all there is.
+        if (levels.length === 1 && r.id === "none") hint = `${hint} ${t("Through this API, this model cannot think while it uses tools.")}`;
+        if (own.isDefault) hint = `${hint} ${t("The model's own default.")}`;
+        return { ...r, hint };
       })
     : REASONING;
-  const current = offered.find((r) => r.id === state.reasoning) ?? offered[0]!;
+  // Nothing picked, on a cloud: the request carries no thinking field and the model thinks at its
+  // own default. The button says so — the default level by name when the model's catalogue knows it,
+  // "Model default" otherwise — rather than claim "Direct", which would be a different request.
+  const ownDefault = levels?.find((l) => l.isDefault)?.id;
+  const unset = state.reasoningUnset
+    ? {
+        id: undefined,
+        label: offered.find((r) => r.id === ownDefault)?.label ?? t("Model default"),
+        hint: t("The model's own default."),
+      }
+    : undefined;
+  const current = unset ?? offered.find((r) => r.id === state.reasoning) ?? offered[0]!;
   const b = button({
     // ⚠️ A leading glyph, because the closed button shows only its VALUE. "Agent · qwen2.5-coder ·
     // Direct" gives no clue that the third one is about thinking — reported as "the menus are still
@@ -2247,7 +2266,7 @@ function reasoningButton(state: UiState, deps: ChatDeps): HTMLElement {
     label: current.label,
     trailingIcon: ICON.chevron,
     title: t("Reasoning: {0}", current.hint),
-    className: `btn ghost reasoning${state.reasoning === "none" ? "" : " active"}`,
+    className: `btn ghost reasoning${state.reasoning === "none" && !unset ? "" : " active"}`,
     onClick: () =>
       menu(b, (close) => {
         const panel = el("div", "menu-list");
@@ -2258,7 +2277,7 @@ function reasoningButton(state: UiState, deps: ChatDeps): HTMLElement {
               menuItem({
                 label: r.label,
                 hint: r.hint,
-                selected: r.id === state.reasoning,
+                selected: !unset && r.id === state.reasoning,
                 onClick: () => {
                   deps.send({ type: "setReasoning", reasoning: r.id });
                   close();

@@ -131,7 +131,8 @@ import { WorkspaceContext, relative } from "./workspace.js";
 import { setActiveWindow } from "../core/context/scale.js";
 import { WaitWatch, type WaitLabel } from "../core/agent/waiting.js";
 import { isSelfHostedProvider } from "../core/redaction/index.js";
-import { choicesFor, levelsFromRefusal, type ModelReasoning } from "../core/router/reasoningLevels.js";
+import { choicesFor, levelsFromRefusal, type ModelReasoning, type ReasoningChoice } from "../core/router/reasoningLevels.js";
+import { reasoningMenu } from "../core/providers/reasoningMap.js";
 import { nextStepMessages, parseNextStep } from "../core/session/nextStep.js";
 import { stepText } from "../shared/stepText.js";
 import { SegmentBuilder } from "../core/session/segments.js";
@@ -556,6 +557,33 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private reasoningChosen = false;
 
   /**
+   * The levels the selected model really has: what its own server said when it is self-hosted (see
+   * core/router/reasoningLevels.ts), otherwise what its vendor documents (core/providers/reasoningMap.ts).
+   * `undefined` keeps the usual four. A preset routes between several models, so it keeps them too.
+   */
+  /**
+   * No level picked, on a cloud provider. ⚠️ « aucune régression de qualité pour personne »: then
+   * the request is exactly what it was before levels were translated per model — no thinking field,
+   * the vendor's own default — and only a level chosen in the menu changes it. (On the user's own
+   * server an unpicked level is Standard: see `effectiveReasoning`.)
+   */
+  private cloudDefault(s: Settings): boolean {
+    return !this.reasoningChosen && !isSelfHostedProvider(s.chat.provider);
+  }
+
+  /** The effort a turn's request carries: nothing at all for the cloud default. */
+  private requestReasoning(s: Settings, model: string): Reasoning | undefined {
+    return this.cloudDefault(s) ? undefined : effortToSend(model, this.effectiveReasoning(s));
+  }
+
+  private offeredLevels(s: Settings): ReasoningChoice[] | undefined {
+    const known = this.reasoningLevelsSeen.get(this.windowKey(s));
+    if (known) return choicesFor(known);
+    if (isHivey(s.chat.model)) return undefined;
+    return reasoningMenu(s.chat.provider, s.chat.model);
+  }
+
+  /**
    * The effort a turn actually uses.
    *
    * ⚠️ "it reasons too much even for small tasks, and sometimes does things outside the request".
@@ -568,8 +596,18 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    * default they had: an effort there is billed.
    */
   private effectiveReasoning(s: Settings): Reasoning {
+    // Nothing picked, on a cloud: what it always was. The request carries no thinking field at all
+    // (`requestReasoning`), and the panel shows the model's own default.
+    if (this.cloudDefault(s)) return this.reasoning;
     const known = this.reasoningLevelsSeen.get(this.windowKey(s));
-    const offered = known ? choicesFor(known) : undefined;
+    const offered = this.offeredLevels(s);
+    // A model that cannot be steered at all: nothing to choose, nothing sent beyond "none" (which its
+    // provider maps to no field — see reasoningMap.ts).
+    if (offered && !offered.length) return "none";
+    if (!known && this.reasoning === "none" && !offered?.some((c) => c.id === "none") && offered) {
+      // Direct on a model whose thinking cannot be turned off (Opus 5.5, Fable): the least it thinks.
+      return offered[0]!.id;
+    }
     if (!this.reasoningChosen && this.reasoning === "none" && isSelfHostedProvider(s.chat.provider)) {
       // Standard when the model has it; otherwise the model's own default rather than a level it lacks.
       if (!offered || offered.some((c) => c.id === "medium")) return "medium";
@@ -721,13 +759,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       },
       mode: this.session.mode,
       reasoning: this.effectiveReasoning(s),
+      ...(this.cloudDefault(s) ? { reasoningUnset: true } : {}),
       // A preset is not a model, so everything the panel wants to know about "the model" has to be
       // asked of the one that would answer an ordinary turn — its window, whether it thinks, what
       // it costs. The NAME stays the preset's: that is what the user chose and what they can act on.
-      reasoningAvailable: supportsReasoning(hiveyModel(s.chat.model, "everyday")),
-      ...(this.reasoningLevelsSeen.get(this.windowKey(s))
-        ? { reasoningLevels: choicesFor(this.reasoningLevelsSeen.get(this.windowKey(s))!) }
-        : {}),
+      // …and not when its vendor offers no way to steer it (gpt-4o, deepseek-chat): a menu whose
+      // levels all send the same request would be pretending.
+      reasoningAvailable: supportsReasoning(hiveyModel(s.chat.model, "everyday")) && this.offeredLevels(s)?.length !== 0,
+      ...(this.offeredLevels(s) ? { reasoningLevels: this.offeredLevels(s)! } : {}),
       model: s.chat.model,
       modelLabel: isHivey(s.chat.model)
         ? hiveyLabel(s.chat.model)
@@ -4594,7 +4633,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         // Never an effort a model cannot use. The control is hidden when `canReason` is false, but a
         // stored preference survives a model change — so switching to a plain model went on sending
         // `effort: "high"` to an endpoint with no idea what to do with it. Hidden is not unsent.
-        reasoning: effortToSend(useModel, this.effectiveReasoning(settings)),
+        ...(this.requestReasoning(settings, useModel) ? { reasoning: this.requestReasoning(settings, useModel)! } : {}),
         // Asked once, when the model stops calling tools: it changed files and ran nothing, so
         // finish it. The cheap middle between telling the user and escalating to a billed model.
         selfCheck: (trace) =>

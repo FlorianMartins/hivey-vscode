@@ -85,11 +85,21 @@ et — c'est le plus instructif — dans 51 cas sur 56 il n'a **même pas essay�
   l'affiche **pendant** qu'il s'écrit — c'est le seul moment où c'est intéressant — puis le replie
   dès que commence l'action ou la réponse qu'il a décidée. Le niveau se choisit dans la zone de
   saisie : **Direct** (aucune réflexion), **Bref**, **Standard**, **Approfondi** — et seulement ceux
-  que le modèle possède vraiment, quand son serveur sait le dire. Sur votre propre serveur, un niveau
+  que le modèle possède vraiment : son serveur le dit quand il est chez vous, sa documentation sinon.
+  Chaque niveau change vraiment la requête, d'un fournisseur à l'autre : Direct **coupe** la
+  réflexion là où le modèle le permet ; sur un modèle qui réfléchit toujours (Claude Opus 5.5, Gemini
+  3, Grok…), Direct n'est pas proposé et le niveau le plus bas le dit. Bref, Standard et Approfondi
+  demandent un effort faible, moyen et élevé (le plus élevé avant « max » quand le modèle en a un).
+  Exception à connaître : chez OpenAI, en passant par Chat Completions, GPT-5.4 et suivants
+  n'acceptent les outils que sans réflexion — un niveau choisi y part donc en Direct pendant un tour
+  d'agent. Tant que vous n'avez rien choisi, un modèle dans le cloud reçoit exactement la même requête
+  qu'avant : il réfléchit à son propre réglage par défaut, et le bouton l'indique (« Défaut du
+  modèle »). Sur votre propre serveur, un niveau
   que personne n'a choisi vaut **Standard** : laissé à lui-même, un modèle comme Qwen réfléchit à son
   maximum, même pour une petite tâche. La réflexion n'est jamais renvoyée au modèle d'une question à
-  l'autre ; seule exception, pendant un tour d'agent sur un serveur auto-hébergé, chaque étape
-  retrouve la réflexion des étapes précédentes, pour ne pas tout recommencer.
+  l'autre ; l'exception est le tour d'agent, où chaque étape retrouve la réflexion des étapes
+  précédentes pour ne pas tout recommencer — sur un serveur auto-hébergé, et sous la forme signée
+  que demandent Claude et DeepSeek.
 
 ## Dans Hivey Code
 

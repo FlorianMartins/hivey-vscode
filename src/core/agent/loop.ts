@@ -271,11 +271,14 @@ export function shrinkToolOutputs(messages: ChatMessage[], tokens: number, keptA
   let saved = 0;
   // The thinking of older steps goes first: it led to calls whose results are still here, and the
   // last two steps' thinking is what the next one builds on.
-  const thinkers = messages.filter((m) => m.role === "assistant" && m.reasoning);
+  // Oldest first and in a row: Anthropic accepts signed thinking blocks dropped from the front of the
+  // history, never from the middle.
+  const thinkers = messages.filter((m) => m.role === "assistant" && (m.reasoning || m.thinkingBlocks));
   for (const m of thinkers.slice(0, -2)) {
     if (saved >= target) break;
-    saved += m.reasoning!.length;
+    saved += (m.reasoning ?? "").length + JSON.stringify(m.thinkingBlocks ?? []).length;
     delete m.reasoning;
+    delete m.thinkingBlocks;
   }
   for (const { m, i } of tools) {
     if (saved >= target) break;
@@ -552,7 +555,13 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
 
     opts.onStep?.({ step, toolCalls: res.toolCalls });
     // With the thinking that led to these calls: the next step continues it rather than redoing it.
-    working.push({ role: "assistant", content: res.text, toolCalls: res.toolCalls, ...(res.reasoning ? { reasoning: res.reasoning } : {}) });
+    working.push({
+      role: "assistant",
+      content: res.text,
+      toolCalls: res.toolCalls,
+      ...(res.reasoning ? { reasoning: res.reasoning } : {}),
+      ...(res.thinkingBlocks?.length ? { thinkingBlocks: res.thinkingBlocks } : {}),
+    });
 
     // Every call gets a result message, including the ones that were refused or failed. A missing
     // result is a protocol error with most providers and a silent hang with the rest.

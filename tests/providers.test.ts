@@ -410,14 +410,16 @@ test("reasoning effort is translated per provider, not passed through", async ()
   await gateway.close();
 });
 
-test("asking for no reasoning tells OpenRouter to exclude it, so a thinking model stops billing for it", async () => {
+test("asking for no reasoning tells OpenRouter to turn it off, so a thinking model stops billing for it", async () => {
+  // ⚠️ `{exclude: true}` was sent here, and it only HIDES the reasoning: the model went on thinking,
+  // and billing for it. `effort: "none"` is OpenRouter's documented way to disable it.
   const s = await serve((_req, res) => sse(res, [{ choices: [{ delta: { content: "x" } }] }]));
   await new OpenAICompatibleProvider({ id: "openrouter", baseUrl: s.url, isLocal: false, apiKey: "k" }).chat({
     model: "m",
     messages: [{ role: "user", content: "hi" }],
     reasoning: "none",
   });
-  assert.deepEqual(s.requests[0]!.body.reasoning, { exclude: true });
+  assert.deepEqual(s.requests[0]!.body.reasoning, { effort: "none" });
   await s.close();
 });
 

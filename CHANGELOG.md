@@ -37,6 +37,39 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **Le niveau de réflexion change vraiment la réflexion, sur chaque fournisseur et chaque modèle.**
+  « je veux vraiment que quand on bascule le mode de réflexion qu'il change vraiment le niveau de
+  réflexion ». Une seule table (`src/core/providers/reasoningMap.ts`, chaque règle à côté de la
+  documentation du fournisseur) traduit Direct / Bref / Standard / Approfondi pour chaque fournisseur
+  et chaque famille de modèles :
+  - **Anthropic** : les Claude récents recevaient `thinking: {type: "enabled", budget_tokens}`, un
+    refus (400) depuis Opus 4.7. Ils reçoivent maintenant la réflexion adaptative avec
+    `output_config.effort` (low / medium / xhigh, high sur les 4.6), le résumé de la réflexion
+    (`display: "summarized"`) pour qu'elle s'affiche, et Direct la coupe selon ce que chaque modèle
+    accepte (`disabled`, ou `between_tools` sur Sonnet 5.5). Opus 5.5 et Fable ne peuvent pas cesser de
+    réfléchir : Direct n'y est plus proposé, et le niveau le plus bas le dit. Plus de température là où
+    elle est refusée. Les blocs de réflexion signés sont rendus avec les appels d'outil qu'ils ont
+    décidés. Claude 4.5 et plus anciens gardent le budget en jetons.
+  - **OpenRouter** : Direct envoyait `exclude: true`, qui ne fait que **cacher** la réflexion — le
+    modèle réfléchissait et facturait quand même. C'est maintenant `effort: "none"`, qui la coupe, sauf
+    sur les modèles qui ne le permettent pas. Les efforts acceptés par chaque modèle viennent du
+    catalogue d'OpenRouter, régénéré chaque jour (`reasoningEfforts.generated.ts`).
+  - **OpenAI, Gemini, DeepSeek, Mistral, xAI, Groq, Perplexity, Qwen (DashScope)** : seulement les
+    valeurs que chaque modèle accepte — `none` là où la réflexion se coupe, l'effort le plus bas
+    ailleurs, rien du tout aux modèles sans réflexion (gpt-4o…). DeepSeek se règle par
+    `thinking` + `reasoning_effort`, Qwen par `enable_thinking` + `thinking_budget`. Chez OpenAI, en
+    Chat Completions, GPT-5.4 et suivants n'acceptent les outils que sans réflexion : un tour d'agent y
+    part en Direct.
+  - **Serveur auto-hébergé et passerelle** : inchangé (Standard par défaut, Direct coupe) ; le mot
+    envoyé pour chaque niveau passe par un point unique, `selfHostedEffort`, que le banc décidera.
+  - Le menu ne propose que les niveaux qui changent vraiment quelque chose pour le modèle choisi, et
+    disparaît sur un modèle qu'on ne peut pas régler.
+  - Sur un fournisseur cloud, tant qu'aucun niveau n'a été choisi, la requête est exactement celle
+    d'avant (aucun champ de réflexion : le modèle réfléchit à son réglage par défaut), et le bouton
+    affiche « Défaut du modèle » (ou le niveau par défaut du modèle quand on le connaît) plutôt que
+    « Direct ». Les tâches annexes (message de commit, suggestion, traduction) aussi. Seul un niveau
+    choisi dans le menu change ce que le modèle reçoit.
+
 - **Windows : l'agent lit enfin la sortie de ses commandes.** « il corrige et ensuite dit que ce
   n'est pas bon ». Sous Windows, `run_command` passait par l'intégration du shell du terminal, qui y
   renvoie souvent une sortie vide (« code de sortie 0 » et rien d'autre) : l'agent ne pouvait rien

@@ -288,6 +288,11 @@ export interface UiState {
   session: UiSession;
   mode: Mode;
   reasoning: Reasoning;
+  /**
+   * No level was picked and the provider is a cloud: the request carries no thinking field, so the
+   * model thinks at its vendor's own default. The control shows that, not a level.
+   */
+  reasoningUnset?: boolean;
   /** True when the selected chat model can think — drives whether the control is offered. */
   reasoningAvailable: boolean;
   /** The thinking levels the selected model really has, when its server said — see core/router/reasoningLevels.ts. */

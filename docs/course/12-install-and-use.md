@@ -71,7 +71,8 @@ Open a folder containing code, then the **Hivey Code** panel in the right-hand b
 - **Change mode** (Chat / Plan / Agent) according to what you want to allow
   ([chapter 5](05-the-three-modes-and-tools.md)). Start with **Plan**: it reads and changes nothing.
 - **Choose how much it thinks**: Direct, Brief, Standard or Deep, next to the mode
-  ([chapter 2](02-the-model.md)). Only the levels the model knows are offered.
+  ([chapter 2](02-the-model.md)). Only the levels the model knows are offered, and each one really
+  changes how much it thinks; Direct is missing on a model that cannot stop thinking.
 - **Stop** ends the turn at once. On a shared server busy with somebody else, the turn shows "In the
   queue… 12 s" rather than a misleading "thinking…": it is waiting its turn, and there is no longer a
   time limit after which it would be dropped.
