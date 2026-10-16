@@ -7,7 +7,7 @@
 //
 // The rules live in src/core/router/curate.ts, with their tests. Read them there before doubting a row.
 
-export const HIVEY_GENERATED_AT = "2026-10-08";
+export const HIVEY_GENERATED_AT = "2026-10-16";
 
 /**
  * Roles where a dearer preset resolved to the same model as a cheaper one, on the day this ran.
@@ -22,15 +22,15 @@ export const HIVEY_OVERLAPS: string[] = [];
 /** variant → role → model id. */
 export const HIVEY_ROUTING: Record<string, Record<string, string>> = {
   "hivey/free": {
-    "chore": "nvidia/nemotron-3.5-lightning:free",
-    "everyday": "nvidia/nemotron-3.5-lightning:free",
-    "deep": "nvidia/nemotron-3.5-lightning:free",
+    "chore": "nvidia/nemotron-3.5-super-vl:free",
+    "everyday": "nvidia/nemotron-3.5-super-vl:free",
+    "deep": "nvidia/nemotron-3.5-super-vl:free",
     "completion": "cohere/north-mini-code:free"
   },
   "hivey/smart": {
     "chore": "qwen/qwen3.7-flash",
     "everyday": "x-ai/grok-4.7",
-    "deep": "openai/gpt-6.1-sol-pro",
+    "deep": "google/gemini-4-argon",
     "completion": "poolside/laguna-s-2.1"
   },
   "hivey": {

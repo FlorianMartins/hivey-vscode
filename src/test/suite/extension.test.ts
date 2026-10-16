@@ -388,6 +388,47 @@ suite("Hivey Code", () => {
   });
 
   /**
+   * "My friend pressed stop" — and the agent went on for two hours.
+   *
+   * A real turn on the shared server: an agent task going round edit → run → fail, a different call
+   * each time so the repeat detector never fired, ninety requests an hour, after the person had
+   * stopped it. Each way of leaving a running turn is exercised here against a model that never
+   * stops asking for tools, and the check is the only one that matters on a shared GPU: once the
+   * person has left the turn, NO further request reaches the server.
+   */
+  for (const leave of ["stop", "new conversation"] as const) {
+    test(`leaving a running agent turn (${leave}) sends nothing more to the model`, async () => {
+      const ext = vscode.extensions.getExtension(ID)!;
+      await ext.activate();
+      const stub = await endlessToolStub();
+      const restore = await useStub(stub.port);
+      try {
+        await vscode.commands.executeCommand("hiveyCode.newSession");
+        await vscode.commands.executeCommand("hiveyCode.setMode", "agent");
+        const turn = vscode.commands.executeCommand("hiveyCode.askWith", "keep looking");
+        for (let i = 0; i < 100 && stub.requests() < 3; i++) await delay(50);
+        assert.ok(stub.requests() >= 3, `the agent never got going (${stub.requests()} requests)`);
+
+        if (leave === "stop") await vscode.commands.executeCommand("hiveyCode.stopAnswer");
+        else await vscode.commands.executeCommand("hiveyCode.newSession");
+
+        // A request already on the wire may land; nothing after it may.
+        await delay(400);
+        const settled = stub.requests();
+        await delay(1500);
+        assert.equal(stub.requests(), settled, `the turn kept asking the model after "${leave}"`);
+        const ended = await Promise.race([turn.then(() => "ended"), delay(4000).then(() => "still running")]);
+        assert.equal(ended, "ended", `the turn never finished after "${leave}"`);
+        assert.equal(await vscode.commands.executeCommand<boolean>("hiveyCode.stopAnswer"), false, "a turn is still held");
+      } finally {
+        await vscode.commands.executeCommand("hiveyCode.stopAnswer");
+        await restore();
+        stub.close();
+      }
+    });
+  }
+
+  /**
    * Stop while the send confirmation is on screen.
    *
    * This is the window every question passes through — `privacy.confirmSend` is "always" by default
@@ -1983,6 +2024,12 @@ suite("Hivey Code", () => {
       // Still bounded, so a save that never happens fails here rather than hanging: the loop ends and
       // the assertions below say exactly what was missing.
       for (let i = 0; i < 100 && doc.isDirty; i++) await delay(50);
+      // ⚠️ And for the tool to have FINISHED — its result on its way back to the model — before the
+      // stop. The buffer and its dirty flag change inside the tool, so stopping on them alone could
+      // land between the save starting and the file being written, and CI failed on exactly that
+      // under load. The promise under test is "on disk before the next step", and the next step is
+      // the second request.
+      for (let i = 0; i < 200 && stub.bodies().length < 2; i++) await delay(50);
       await vscode.commands.executeCommand("hiveyCode.stopAnswer");
 
       const back = (JSON.parse(stub.bodies()[1] ?? "{}").messages ?? []).filter(
@@ -2618,6 +2665,36 @@ async function scriptedStub(
     bodies: () => [...bodies],
     close: () => server.close(),
   };
+}
+
+/**
+ * A model that never finishes: every request is answered with one more read-only tool call, each
+ * with a different query, so neither the step count nor the repeat detector ends the turn — only
+ * the person can.
+ */
+async function endlessToolStub(): Promise<{ port: number; requests: () => number; close: () => void }> {
+  let n = 0;
+  const server: Server = createServer((req, res) => {
+    if (req.url?.includes("/models")) {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ data: [{ id: "stub-model" }] }));
+      return;
+    }
+    req.resume();
+    req.on("end", () => {
+      n += 1;
+      const call = { index: 0, id: `call_${n}`, function: { name: "search_text", arguments: JSON.stringify({ query: `needle${n}` }) } };
+      setTimeout(() => {
+        res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });
+        res.write(`data: ${JSON.stringify({ choices: [{ delta: { tool_calls: [call] } }] })}\n\n`);
+        res.write(`data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: "tool_calls" }] })}\n\n`);
+        res.write("data: [DONE]\n\n");
+        res.end();
+      }, 60);
+    });
+  });
+  await new Promise<void>((r) => server.listen(0, "127.0.0.1", () => r()));
+  return { port: (server.address() as { port: number }).port, requests: () => n, close: () => server.close() };
 }
 
 async function streamingStub(opts: { delayAfterFirst?: number } = {}): Promise<{
