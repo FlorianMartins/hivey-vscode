@@ -23,7 +23,26 @@ export const ENV = {
   model: "HIVEY_CODE_MODEL",
   url: "HIVEY_CODE_URL",
   key: "HIVEY_CODE_KEY",
+  /**
+   * Measurement knobs for the evaluation harness: the thinking level (`none`, `low`, `medium`,
+   * `high`) and the temperature a run uses. Unset, the client behaves exactly as it always does.
+   */
+  reasoning: "HIVEY_CODE_REASONING",
+  temperature: "HIVEY_CODE_TEMPERATURE",
 } as const;
+
+/** The thinking level asked for in the environment, if it is one this client knows. */
+export function reasoningFromEnv(value: string | undefined): "none" | "low" | "medium" | "high" | undefined {
+  const v = value?.trim().toLowerCase();
+  return v === "none" || v === "low" || v === "medium" || v === "high" ? v : undefined;
+}
+
+/** The temperature asked for in the environment, if it is a number between 0 and 2. */
+export function temperatureFromEnv(value: string | undefined): number | undefined {
+  if (value === undefined || value.trim() === "") return undefined;
+  const n = Number(value);
+  return Number.isFinite(n) && n >= 0 && n <= 2 ? n : undefined;
+}
 
 export interface TerminalTarget {
   provider: string;
