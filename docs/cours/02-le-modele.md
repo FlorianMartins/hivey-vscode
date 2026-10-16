@@ -91,7 +91,10 @@ et — c'est le plus instructif — dans 51 cas sur 56 il n'a **même pas essay�
   3, Grok…), Direct n'est pas proposé et le niveau le plus bas le dit. Bref, Standard et Approfondi
   demandent un effort faible, moyen et élevé (le plus élevé avant « max » quand le modèle en a un).
   Exception à connaître : chez OpenAI, en passant par Chat Completions, GPT-5.4 et suivants
-  n'acceptent les outils que sans réflexion — un tour d'agent y est donc toujours Direct. Sur votre propre serveur, un niveau
+  n'acceptent les outils que sans réflexion — un niveau choisi y part donc en Direct pendant un tour
+  d'agent. Tant que vous n'avez rien choisi, un modèle dans le cloud reçoit exactement la même requête
+  qu'avant : il réfléchit à son propre réglage par défaut, et le bouton l'indique (« Défaut du
+  modèle »). Sur votre propre serveur, un niveau
   que personne n'a choisi vaut **Standard** : laissé à lui-même, un modèle comme Qwen réfléchit à son
   maximum, même pour une petite tâche. La réflexion n'est jamais renvoyée au modèle d'une question à
   l'autre ; l'exception est le tour d'agent, où chaque étape retrouve la réflexion des étapes

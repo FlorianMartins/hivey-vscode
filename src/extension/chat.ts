@@ -561,6 +561,21 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    * core/router/reasoningLevels.ts), otherwise what its vendor documents (core/providers/reasoningMap.ts).
    * `undefined` keeps the usual four. A preset routes between several models, so it keeps them too.
    */
+  /**
+   * No level picked, on a cloud provider. ⚠️ « aucune régression de qualité pour personne »: then
+   * the request is exactly what it was before levels were translated per model — no thinking field,
+   * the vendor's own default — and only a level chosen in the menu changes it. (On the user's own
+   * server an unpicked level is Standard: see `effectiveReasoning`.)
+   */
+  private cloudDefault(s: Settings): boolean {
+    return !this.reasoningChosen && !isSelfHostedProvider(s.chat.provider);
+  }
+
+  /** The effort a turn's request carries: nothing at all for the cloud default. */
+  private requestReasoning(s: Settings, model: string): Reasoning | undefined {
+    return this.cloudDefault(s) ? undefined : effortToSend(model, this.effectiveReasoning(s));
+  }
+
   private offeredLevels(s: Settings): ReasoningChoice[] | undefined {
     const known = this.reasoningLevelsSeen.get(this.windowKey(s));
     if (known) return choicesFor(known);
@@ -581,6 +596,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    * default they had: an effort there is billed.
    */
   private effectiveReasoning(s: Settings): Reasoning {
+    // Nothing picked, on a cloud: what it always was. The request carries no thinking field at all
+    // (`requestReasoning`), and the panel shows the model's own default.
+    if (this.cloudDefault(s)) return this.reasoning;
     const known = this.reasoningLevelsSeen.get(this.windowKey(s));
     const offered = this.offeredLevels(s);
     // A model that cannot be steered at all: nothing to choose, nothing sent beyond "none" (which its
@@ -741,6 +759,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       },
       mode: this.session.mode,
       reasoning: this.effectiveReasoning(s),
+      ...(this.cloudDefault(s) ? { reasoningUnset: true } : {}),
       // A preset is not a model, so everything the panel wants to know about "the model" has to be
       // asked of the one that would answer an ordinary turn — its window, whether it thinks, what
       // it costs. The NAME stays the preset's: that is what the user chose and what they can act on.
@@ -4560,7 +4579,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         // Never an effort a model cannot use. The control is hidden when `canReason` is false, but a
         // stored preference survives a model change — so switching to a plain model went on sending
         // `effort: "high"` to an endpoint with no idea what to do with it. Hidden is not unsent.
-        reasoning: effortToSend(useModel, this.effectiveReasoning(settings)),
+        ...(this.requestReasoning(settings, useModel) ? { reasoning: this.requestReasoning(settings, useModel)! } : {}),
         // Asked once, when the model stops calling tools: it changed files and ran nothing, so
         // finish it. The cheap middle between telling the user and escalating to a billed model.
         selfCheck: (trace) =>

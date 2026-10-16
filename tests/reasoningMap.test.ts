@@ -220,6 +220,69 @@ test("Anthropic: signed thinking blocks go back with the tool calls they led to"
   assert.equal(second.messages[1].content[1].type, "tool_use");
 });
 
+// ── Nothing picked: exactly what was sent before ────────────────────────────────────────────────
+//
+// ⚠️ « aucune régression de qualité pour personne ». On a cloud, a turn with no level picked, and a
+// chore, carry no thinking field: the model thinks at its vendor's own default. The expected bodies
+// below are origin/main's, byte for byte — checked against main's own provider code when this was
+// written — so only a level chosen in the menu changes what a model receives.
+
+const ALL_ANTHROPIC = [
+  "claude-fable-5-1", "claude-fable-5", "claude-opus-5-5", "claude-opus-5", "claude-opus-4-8", "claude-opus-4-7", "claude-opus-4-6",
+  "claude-sonnet-5-5", "claude-sonnet-5", "claude-sonnet-4-6", "claude-haiku-5-5", "claude-haiku-4-5", "claude-sonnet-4-5", "claude-opus-4-1",
+];
+
+test("unpicked, Anthropic: every family is sent main's body — no thinking, no effort", async () => {
+  for (const model of ALL_ANTHROPIC) {
+    for (const tools of [undefined, TOOLS]) {
+      const b = await bodyOf("anthropic", { model, ...(tools ? { tools } : {}) });
+      assert.deepEqual(
+        b,
+        {
+          model,
+          max_tokens: 64000,
+          stream: true,
+          messages: [{ role: "user", content: [{ type: "text", text: "hi" }] }],
+          ...(tools ? { tools: [{ name: "read_file", description: "read", input_schema: { type: "object" } }] } : {}),
+        },
+        model,
+      );
+    }
+    // A chore is not a picked level either: main sent nothing for its "none", and neither does this.
+    const chore = await bodyOf("anthropic", { model, chore: true, reasoning: "none", maxTokens: 80 });
+    assert.deepEqual([chore.thinking, chore.output_config, chore.max_tokens], [undefined, undefined, 80], `${model} chore`);
+  }
+});
+
+test("unpicked, OpenAI / OpenRouter / Gemini and the other clouds: main's body, no reasoning field", async () => {
+  const cases: Array<[string, string]> = [
+    ["openai", "gpt-5.5"], ["openai", "gpt-5"], ["openai", "o3"], ["openai", "gpt-4o"],
+    ["openrouter", "openai/gpt-5.5"], ["openrouter", "anthropic/claude-opus-5.5"], ["openrouter", "google/gemini-3.8-flash"],
+    ["google", "gemini-2.5-flash"], ["google", "gemini-2.5-pro"], ["google", "gemini-3.8-flash"],
+    ["deepseek", "deepseek-flash"], ["mistral", "mistral-medium-latest"], ["xai", "grok-4.7"], ["groq", "qwen/qwen3.8-27b"], ["qwen", "qwen3.8-flash"],
+  ];
+  for (const [provider, model] of cases) {
+    for (const tools of [undefined, TOOLS]) {
+      const b = await bodyOf(provider, { model, ...(tools ? { tools } : {}) });
+      assert.deepEqual(
+        b,
+        {
+          model,
+          stream: true,
+          messages: [{ role: "user", content: "hi" }],
+          ...(tools ? { tools: [{ type: "function", function: { name: "read_file", description: "read", parameters: { type: "object" } } }] } : {}),
+          stream_options: { include_usage: true },
+          ...(provider === "openrouter" ? { usage: { include: true } } : {}),
+        },
+        `${provider} ${model}`,
+      );
+    }
+    // A chore: main's body too — nothing, and OpenRouter's `exclude` (which hides, and changes nothing).
+    const chore = await wireBody(provider, model, "none", { chore: true });
+    assert.deepEqual(chore, provider === "openrouter" ? { reasoning: { exclude: true } } : {}, `${provider} ${model} chore`);
+  }
+});
+
 // ── The OpenAI wire format ──────────────────────────────────────────────────────────────────────
 
 /** The reasoning-related fields of an OpenAI-shaped request. */

@@ -484,6 +484,10 @@ export function wireReasoning(
     if (opts.chore) return { fields: { reasoning_effort: "none" }, dropTemperature: false };
     return level ? { fields: { reasoning_effort: selfHostedEffort(level) }, dropTemperature: false } : none;
   }
+  // A chore on a cloud (a commit message, a suggestion, a translation) is not a level anybody picked:
+  // it is sent exactly as before levels were translated per model — the vendor's own thinking, and on
+  // OpenRouter the reasoning text left out of the reply (`exclude`, which hides it without changing it).
+  if (opts.chore) return provider === "openrouter" ? { fields: { reasoning: { exclude: true } }, dropTemperature: false } : none;
   if (!level || provider === "anthropic") return none;
   const p = profileFor(provider, model);
   if (!p) return none;

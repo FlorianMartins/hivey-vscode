@@ -2222,7 +2222,18 @@ function reasoningButton(state: UiState, deps: ChatDeps): HTMLElement {
         return { ...r, hint };
       })
     : REASONING;
-  const current = offered.find((r) => r.id === state.reasoning) ?? offered[0]!;
+  // Nothing picked, on a cloud: the request carries no thinking field and the model thinks at its
+  // own default. The button says so — the default level by name when the model's catalogue knows it,
+  // "Model default" otherwise — rather than claim "Direct", which would be a different request.
+  const ownDefault = levels?.find((l) => l.isDefault)?.id;
+  const unset = state.reasoningUnset
+    ? {
+        id: undefined,
+        label: offered.find((r) => r.id === ownDefault)?.label ?? t("Model default"),
+        hint: t("The model's own default."),
+      }
+    : undefined;
+  const current = unset ?? offered.find((r) => r.id === state.reasoning) ?? offered[0]!;
   const b = button({
     // ⚠️ A leading glyph, because the closed button shows only its VALUE. "Agent · qwen2.5-coder ·
     // Direct" gives no clue that the third one is about thinking — reported as "the menus are still
@@ -2232,7 +2243,7 @@ function reasoningButton(state: UiState, deps: ChatDeps): HTMLElement {
     label: current.label,
     trailingIcon: ICON.chevron,
     title: t("Reasoning: {0}", current.hint),
-    className: `btn ghost reasoning${state.reasoning === "none" ? "" : " active"}`,
+    className: `btn ghost reasoning${state.reasoning === "none" && !unset ? "" : " active"}`,
     onClick: () =>
       menu(b, (close) => {
         const panel = el("div", "menu-list");
@@ -2243,7 +2254,7 @@ function reasoningButton(state: UiState, deps: ChatDeps): HTMLElement {
               menuItem({
                 label: r.label,
                 hint: r.hint,
-                selected: r.id === state.reasoning,
+                selected: !unset && r.id === state.reasoning,
                 onClick: () => {
                   deps.send({ type: "setReasoning", reasoning: r.id });
                   close();

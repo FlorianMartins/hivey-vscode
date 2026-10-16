@@ -41,9 +41,11 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
     envoyé pour chaque niveau passe par un point unique, `selfHostedEffort`, que le banc décidera.
   - Le menu ne propose que les niveaux qui changent vraiment quelque chose pour le modèle choisi, et
     disparaît sur un modèle qu'on ne peut pas régler.
-  - ⚠️ Sur un fournisseur cloud, Direct — le réglage par défaut du panneau — coupe désormais
-    réellement la réflexion là où elle s'arrête (auparavant, le modèle réfléchissait à son niveau par
-    défaut).
+  - Sur un fournisseur cloud, tant qu'aucun niveau n'a été choisi, la requête est exactement celle
+    d'avant (aucun champ de réflexion : le modèle réfléchit à son réglage par défaut), et le bouton
+    affiche « Défaut du modèle » (ou le niveau par défaut du modèle quand on le connaît) plutôt que
+    « Direct ». Les tâches annexes (message de commit, suggestion, traduction) aussi. Seul un niveau
+    choisi dans le menu change ce que le modèle reçoit.
 
 - **Windows : l'agent lit enfin la sortie de ses commandes.** « il corrige et ensuite dit que ce
   n'est pas bon ». Sous Windows, `run_command` passait par l'intégration du shell du terminal, qui y

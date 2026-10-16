@@ -99,7 +99,8 @@ export class AnthropicProvider implements Provider {
       });
     }
     // Thinking, per model family — see providers/reasoningMap.ts, where each rule cites the docs.
-    const think = anthropicThinking(req.model, req.reasoning);
+    // A chore is not a level anybody picked: the model's own default, as an unpicked turn.
+    const think = anthropicThinking(req.model, req.chore ? undefined : req.reasoning);
     if (think.thinking) body["thinking"] = think.thinking;
     if (think.effort) body["output_config"] = { effort: think.effort };
     if (think.headroom) {
