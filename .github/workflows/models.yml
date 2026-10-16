@@ -16,6 +16,8 @@ permissions:
   pull-requests: write
   actions: write
   checks: read
+  # Recording the verified results on the commit, where the merge can see them.
+  statuses: write
 
 jobs:
   refresh:

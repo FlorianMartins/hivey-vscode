@@ -74,6 +74,18 @@ gh workflow run security.yml --ref "$BRANCH"
 echo "checking ${sha} on ${BRANCH}"
 checks_pass "$sha"
 
+# ⚠️ Green is not enough: check runs from a DISPATCHED workflow are not linked to the pull request
+# (its status rollup stays empty), so the merge was refused with every required check passed on
+# the commit. What was just verified is recorded as a commit status under each required name —
+# statuses are judged by commit, whatever started them — and only after it was verified: a check
+# that failed stopped the script above and nothing is recorded.
+run_url="${GITHUB_SERVER_URL:-https://github.com}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID:-0}"
+for name in "${REQUIRED[@]}"; do
+  gh api --silent -X POST "repos/${GITHUB_REPOSITORY}/statuses/${sha}" \
+    -f state=success -f context="$name" -f target_url="$run_url" \
+    -f description="Passed in the run dispatched by the Model catalogue workflow"
+done
+
 # --match-head-commit: merged only if the PR still holds the commit that was checked.
 gh pr merge "$pr" --squash --delete-branch --match-head-commit "$sha"
 echo "merged ${pr}"
