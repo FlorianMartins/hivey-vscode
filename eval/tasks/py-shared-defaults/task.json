@@ -2,6 +2,6 @@
   "title": "Tenant settings that leak into each other",
   "kind": "bug",
   "prompt": "On the multi-tenant staging box, tenants started sending mail through ACME's SMTP server: once settings_for has been called for ACME, the next tenant's settings come back with ACME's smtp host. Every tenant has to get its own settings, and nothing done to one tenant's settings may reach another tenant or the defaults. Fix it.",
-  "check": "hidden py-shared-defaults && python3 -m unittest -q test_settings test_settings_hidden",
+  "check": "\"$HIVEY_EVAL_HIDDEN\" py-shared-defaults && python3 -m unittest -q test_settings test_settings_hidden",
   "timeoutMs": 300000
 }

@@ -50,11 +50,20 @@ mid-sized model gets wrong part of the time. Each is hard for a stated reason:
 **Their tests are hidden.** A check that runs the fixture's own test file can be satisfied by
 editing the test, so these twenty keep the tests that decide them in `eval/tasks/<id>/hidden/`,
 beside `files/` and `solution/`, never copied into the working copy the model sees. The check
-starts with `hidden <id>` (`eval/bin/hidden`), which copies them in over whatever is there: a
+starts with `"$HIVEY_EVAL_HIDDEN" <id>` (`eval/check/hidden`), which copies them in over whatever is there: a
 visible test the model edited is restored, and the cases the prompt implies without spelling out
 are added. They are run by name, so a test file the model adds cannot replace them; where the
 prompt asks for tests, the model's own run as well, beside the hidden ones, and must pass too. The
 TypeScript checks also restore `tsconfig.json`, so strictness cannot be traded for a green build.
+
+**And the agent cannot reach them.** `eval/bin` is on the agent's PATH as well as the check's, so
+the helper is NOT there: it lives in `eval/check/`, on nobody's PATH, and its absolute path is in
+`HIVEY_EVAL_HIDDEN`, which `scripts/eval-env.mjs` puts in the environment of the check process and
+strips from the agent's (even when the operator exported it). The harness also refuses a working
+copy that contains a `hidden/` folder or a `*.hidden.*` file before anything runs.
+`tests/evalEnv.test.ts` holds all of it: nothing on the agent's PATH knows about `hidden/`, no
+variable of the agent's environment leads to the helper, only the three check call sites receive
+it, and no fixture or solution carries hidden tests.
 
 The check is a command rather than a diff, on purpose. A diff scores the model on writing the
 solution somebody already wrote; a command scores it on the only thing the user cares about, which

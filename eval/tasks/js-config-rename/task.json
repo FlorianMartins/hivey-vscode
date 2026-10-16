@@ -2,6 +2,6 @@
   "title": "Rename a setting and change its unit, without breaking old configs",
   "kind": "refactor",
   "prompt": "Rename the `timeout` setting to `timeoutMs`, in milliseconds (a positive whole number). Config files that still say `timeout` (in seconds) must keep working for now, with one deprecation warning, the way `retry` is already handled; if both keys are there, timeoutMs wins. On the command line it becomes --timeout-ms, and --timeout keeps working the same deprecated way.",
-  "check": "hidden js-config-rename && node --test config.test.js rename.hidden.test.js",
+  "check": "\"$HIVEY_EVAL_HIDDEN\" js-config-rename && node --test config.test.js rename.hidden.test.js",
   "timeoutMs": 420000
 }

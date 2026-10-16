@@ -2,6 +2,6 @@
   "title": "A cache that answers for the wrong currency",
   "kind": "bug",
   "prompt": "Customers on the US store sometimes see EUR prices: priceFor('A1', 'EUR') followed by priceFor('A1', 'USD') returns the EUR amount both times. The lookups behind it are slow, which is why they are cached, so dropping the cache is not an option. Fix it.",
-  "check": "hidden js-memo-key-collision && node --test pricing.test.js memo.hidden.test.js pricing.hidden.test.js",
+  "check": "\"$HIVEY_EVAL_HIDDEN\" js-memo-key-collision && node --test pricing.test.js memo.hidden.test.js pricing.hidden.test.js",
   "timeoutMs": 300000
 }
