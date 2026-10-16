@@ -6,7 +6,7 @@
 // rendered incrementally is the answer being streamed, because that one has to be.
 
 import { button, closeMenu, el, icon, ICON, menuIsOpen, searchInput } from "./dom.js";
-import { chatScreen, isStreaming, planBlock, setStreaming, stepRow, segmentBlock, segmentTitle, type ChatDeps, captureDraft, restoreDraft,
+import { chatScreen, isStreaming, planBlock, setStreaming, stepRow, segmentBlock, segmentTitle, interjectionBubble, type ChatDeps, captureDraft, restoreDraft,
   NOTE_FADE_MS,
   setComposerNote,
   dictationStopped,
@@ -364,6 +364,25 @@ class LiveTurn {
       seg.root.append(this.text);
     }
     this.scheduleRender();
+  }
+
+  /**
+   * What the person typed during the turn, drawn where the turn is now. The stretch under way is
+   * closed, so whatever the model does next — after reading it — starts below it.
+   */
+  appendInterjection(text: string): void {
+    if (this.seg) this.closeSegment();
+    this.seg = undefined;
+    const bubble = interjectionBubble(text, true);
+    following(() => this.body.append(bubble));
+  }
+
+  /** The model has read what was typed: no longer waiting. */
+  interjectionsTaken(): void {
+    for (const b of Array.from(this.body.querySelectorAll<HTMLElement>(".interjection.pending"))) {
+      b.classList.remove("pending");
+      b.querySelector(".entry-meta")?.remove();
+    }
   }
 
   /** Shut the current step's block, once, when its words or its actions take over from it. */
@@ -937,6 +956,12 @@ window.addEventListener("message", (event: MessageEvent<ToPanel>) => {
       break;
     case "replaceText":
       live?.replaceText(m.from, m.to);
+      break;
+    case "interjection":
+      if (isStreaming()) ensureLive().appendInterjection(m.text);
+      break;
+    case "interjectionTaken":
+      live?.interjectionsTaken();
       break;
     case "toolStart":
       if (live) live.toolStart(m.tool, m.call, m.count);

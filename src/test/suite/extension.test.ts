@@ -429,6 +429,141 @@ suite("Hivey Code", () => {
   }
 
   /**
+   * « rectifier le tir sans avoir à Stop et refaire une nouvelle requête ».
+   *
+   * A real turn, a model that keeps acting until it is corrected, and a message typed in the middle:
+   * the same turn must carry it to the model at its next step — no stop, no second question — and
+   * the record must show it where it came.
+   */
+  test("a message typed during an agent turn reaches the model at its next step, and the turn goes on", async () => {
+    const ext = vscode.extensions.getExtension(ID)!;
+    await ext.activate();
+    const stub = await steerableStub();
+    const restore = await useStub(stub.port);
+    try {
+      await vscode.commands.executeCommand("hiveyCode.newSession");
+      await vscode.commands.executeCommand("hiveyCode.setMode", "agent");
+      const turn = vscode.commands.executeCommand("hiveyCode.askWith", "write the module");
+      for (let i = 0; i < 100 && stub.bodies().length < 2; i++) await delay(50);
+      assert.ok(stub.bodies().length >= 2, "the agent never got going");
+
+      const joined = await vscode.commands.executeCommand<boolean>("hiveyCode.steerAnswer", "Not JavaScript: TypeScript.");
+      assert.equal(joined, true, "the message did not join the running turn");
+
+      const ended = await Promise.race([turn.then(() => "ended"), delay(8000).then(() => "still running")]);
+      assert.equal(ended, "ended", "the corrected turn never finished");
+      const carried = stub.bodies().filter((b) => b.includes("Not JavaScript: TypeScript."));
+      assert.ok(carried.length >= 1, "the correction never reached the model");
+      assert.match(carried[0]!, /while you were working/);
+      assert.equal(stub.questions(), 1, "a second question was asked instead of correcting the turn");
+
+      await vscode.commands.executeCommand("hiveyCode.exportSession");
+      const exported = vscode.window.activeTextEditor?.document.getText() ?? "";
+      await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
+      assert.match(exported, /Not JavaScript: TypeScript\./, "the record lost the correction");
+      assert.ok(exported.indexOf("Not JavaScript") < exported.indexOf("Done in TypeScript."), "the correction is not where it came");
+    } finally {
+      await vscode.commands.executeCommand("hiveyCode.stopAnswer");
+      await restore();
+      stub.close();
+    }
+  });
+
+  test("with no turn running, a message typed into the box is simply a question", async () => {
+    const ext = vscode.extensions.getExtension(ID)!;
+    await ext.activate();
+    const stub = await scriptedStub([{ text: "ok" }]);
+    const restore = await useStub(stub.port);
+    try {
+      await vscode.commands.executeCommand("hiveyCode.newSession");
+      const joined = await vscode.commands.executeCommand<boolean>("hiveyCode.steerAnswer", "hello");
+      assert.equal(joined, false);
+      for (let i = 0; i < 100 && stub.bodies().length < 1; i++) await delay(50);
+      assert.equal(stub.bodies().length, 1, "it was not asked");
+    } finally {
+      await vscode.commands.executeCommand("hiveyCode.stopAnswer");
+      await restore();
+      stub.close();
+    }
+  });
+
+  /**
+   * « il corrige et ensuite dit que ce n'est pas bon » — on Windows, commands came back "exit code 0"
+   * with no output through the terminal's shell integration, and the model lost its way. Run as a
+   * process, what the command printed — both streams — and its exit code are what the model reads,
+   * and a command that never ends is really stopped at its timeout.
+   */
+  test("run_command as a process hands the model the output, the exit code, and stops a command at its timeout", async () => {
+    const ext = vscode.extensions.getExtension(ID)!;
+    await ext.activate();
+    const stub = await scriptedStub([
+      { tool: { name: "run_command", args: { command: "echo hello-out && echo hello-err 1>&2 && exit 3" } } },
+      { tool: { name: "run_command", args: { command: "sleep 30", timeoutMs: 1500 } } },
+      { text: "ok" },
+    ]);
+    const restore = await useStub(stub.port);
+    const config = vscode.workspace.getConfiguration(SECTION);
+    const before = { runner: config.get("agent.commandRunner"), approve: config.get("permissions.autoApprove") };
+    await config.update("agent.commandRunner", "process", vscode.ConfigurationTarget.Global);
+    await config.update("permissions.autoApprove", "all", vscode.ConfigurationTarget.Global);
+    try {
+      await vscode.commands.executeCommand("hiveyCode.newSession");
+      await vscode.commands.executeCommand("hiveyCode.setMode", "agent");
+      const started = Date.now();
+      await vscode.commands.executeCommand("hiveyCode.askWith", "run the checks");
+      const took = Date.now() - started;
+      const toolText = (body: string | undefined): string =>
+        JSON.stringify((JSON.parse(body ?? "{}").messages ?? []).filter((m: { role: string }) => m.role === "tool").pop() ?? {});
+      const first = toolText(stub.bodies()[1]);
+      assert.match(first, /exit code 3/, first);
+      assert.match(first, /hello-out/, "stdout was not read");
+      assert.match(first, /hello-err/, "stderr was not read");
+      const second = toolText(stub.bodies()[2]);
+      assert.match(second, /timed out and was killed/, second);
+      assert.ok(took < 15000, `the turn waited ${took} ms: the command was not stopped at its timeout`);
+    } finally {
+      await config.update("agent.commandRunner", before.runner, vscode.ConfigurationTarget.Global);
+      await config.update("permissions.autoApprove", before.approve, vscode.ConfigurationTarget.Global);
+      await restore();
+      stub.close();
+    }
+  });
+
+  test("a file the model misspelt is answered with the one it meant", async () => {
+    const ext = vscode.extensions.getExtension(ID)!;
+    await ext.activate();
+    const dir = await fs.mkdtemp(join(tmpdir(), "hivey-near-"));
+    await fs.writeFile(join(dir, "skinator-page.js"), "export {};\n");
+    // This harness opens no folder: the open tabs are the workspace, so the real file is one of them.
+    await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(join(dir, "skinator-page.js")));
+    const stub = await scriptedStub([
+      { tool: { name: "read_file", args: { path: join(dir, "skincare-page.js") } } },
+      { tool: { name: "edit_file", args: { path: join(dir, "skinator-page.js"), old: "export", new: "export" } } },
+      { text: "ok" },
+    ]);
+    const restore = await useStub(stub.port);
+    const config = vscode.workspace.getConfiguration(SECTION);
+    const approve = config.get("permissions.autoApprove");
+    await config.update("permissions.autoApprove", "all", vscode.ConfigurationTarget.Global);
+    try {
+      await vscode.commands.executeCommand("hiveyCode.newSession");
+      await vscode.commands.executeCommand("hiveyCode.setMode", "agent");
+      await vscode.commands.executeCommand("hiveyCode.askWith", "read the page script");
+      const tool = (i: number): string =>
+        JSON.stringify((JSON.parse(stub.bodies()[i] ?? "{}").messages ?? []).filter((m: { role: string }) => m.role === "tool").pop() ?? {});
+      assert.match(tool(1), /skinator-page\.js/, tool(1));
+      assert.match(tool(1), /did you mean/, tool(1));
+      assert.match(tool(2), /same text, character for character/, tool(2));
+    } finally {
+      await config.update("permissions.autoApprove", approve, vscode.ConfigurationTarget.Global);
+      await restore();
+      stub.close();
+      await vscode.commands.executeCommand("workbench.action.closeAllEditors");
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  /**
    * Stop while the send confirmation is on screen.
    *
    * This is the window every question passes through — `privacy.confirmSend` is "always" by default
@@ -2695,6 +2830,53 @@ async function endlessToolStub(): Promise<{ port: number; requests: () => number
   });
   await new Promise<void>((r) => server.listen(0, "127.0.0.1", () => r()));
   return { port: (server.address() as { port: number }).port, requests: () => n, close: () => server.close() };
+}
+
+/**
+ * A model that keeps acting — one more read-only call per request — until a correction reaches it,
+ * then answers. Counts the questions the user asked, which a correction must not add to.
+ */
+async function steerableStub(): Promise<{ port: number; bodies: () => string[]; questions: () => number; close: () => void }> {
+  const bodies: string[] = [];
+  const server: Server = createServer((req, res) => {
+    if (req.url?.includes("/models")) {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ data: [{ id: "stub-model" }] }));
+      return;
+    }
+    let body = "";
+    req.on("data", (chunk) => (body += String(chunk)));
+    req.on("end", () => {
+      bodies.push(body);
+      const corrected = body.includes("while you were working");
+      setTimeout(() => {
+        res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });
+        if (corrected) {
+          res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: "Done in TypeScript." } }] })}\n\n`);
+          res.write(`data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: "stop" }] })}\n\n`);
+        } else {
+          const n = bodies.length;
+          const call = { index: 0, id: `call_${n}`, function: { name: "search_text", arguments: JSON.stringify({ query: `needle${n}` }) } };
+          res.write(`data: ${JSON.stringify({ choices: [{ delta: { tool_calls: [call] } }] })}\n\n`);
+          res.write(`data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: "tool_calls" }] })}\n\n`);
+        }
+        res.write("data: [DONE]\n\n");
+        res.end();
+      }, 120);
+    });
+  });
+  await new Promise<void>((r) => server.listen(0, "127.0.0.1", () => r()));
+  const questions = (): number => {
+    const last = bodies[bodies.length - 1];
+    if (!last) return 0;
+    try {
+      const msgs = JSON.parse(last).messages as Array<{ role: string; content: unknown }>;
+      return msgs.filter((m) => m.role === "user" && typeof m.content === "string" && m.content.includes("write the module")).length;
+    } catch {
+      return -1;
+    }
+  };
+  return { port: (server.address() as { port: number }).port, bodies: () => [...bodies], questions, close: () => server.close() };
 }
 
 async function streamingStub(opts: { delayAfterFirst?: number } = {}): Promise<{

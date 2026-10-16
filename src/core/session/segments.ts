@@ -21,6 +21,11 @@ export interface Segment {
   reasoning?: string;
   steps?: SegmentStep[];
   text?: string;
+  /**
+   * What the person typed while the turn ran, at the step the model read it. A segment of its own:
+   * what follows is the model's work after the correction, and reads as such.
+   */
+  user?: string;
 }
 
 export class SegmentBuilder {
@@ -39,28 +44,37 @@ export class SegmentBuilder {
     return s;
   }
 
+  /** The person's correction, read by the model now: everything after it starts afresh. */
+  user(text: string): void {
+    if (!text.trim()) return;
+    this.segments.push({ user: text });
+    this.acting = false;
+  }
+
   reasoning(chunk: string): void {
     if (!chunk) return;
     const s = this.last();
-    const target = !s || s.text || s.steps?.length || this.acting ? this.open() : s;
+    const target = !s || s.user !== undefined || s.text || s.steps?.length || this.acting ? this.open() : s;
     target.reasoning = (target.reasoning ?? "") + chunk;
   }
 
   text(chunk: string): void {
     if (!chunk) return;
     const s = this.last();
-    const target = !s || s.steps?.length || this.acting ? this.open() : s;
+    const target = !s || s.user !== undefined || s.steps?.length || this.acting ? this.open() : s;
     target.text = (target.text ?? "") + chunk;
   }
 
   /** An action is starting: it belongs to the current segment. */
   acted(): void {
-    if (!this.last()) this.open();
+    const s = this.last();
+    if (!s || s.user !== undefined) this.open();
     this.acting = true;
   }
 
   step(step: SegmentStep): void {
-    const s = this.last() ?? this.open();
+    const last = this.last();
+    const s = last && last.user === undefined ? last : this.open();
     (s.steps ??= []).push(step);
   }
 
@@ -75,4 +89,21 @@ export class SegmentBuilder {
       }
     }
   }
+}
+
+/**
+ * An answer as the model re-reads it in later turns, with the person's corrections where they came.
+ *
+ * The saved answer is the model's words only; without this, a later turn would read work that
+ * changed direction half-way for no visible reason — and could take the first direction up again.
+ * Unchanged for an answer nobody interrupted.
+ */
+export function answerWithInterjections(text: string, segments?: Segment[]): string {
+  if (!segments?.some((s) => s.user !== undefined)) return text;
+  const parts: string[] = [];
+  for (const s of segments) {
+    if (s.user !== undefined) parts.push(`[The user, while you were working: ${s.user}]`);
+    else if (s.text?.trim()) parts.push(s.text.trim());
+  }
+  return parts.join("\n\n");
 }

@@ -44,6 +44,8 @@ export interface Settings {
   agent: {
     /** Model requests one agent turn may make. 0: no limit — it runs until done or stopped. */
     maxSteps: number;
+    /** How `run_command` runs: as a process (read from its pipes) or in the terminal. See `terminal.ts`. */
+    commandRunner: "auto" | "process" | "terminal";
   };
   /** Speaking instead of typing. Off until configured — see `core/dictation/dictation.ts`. */
   dictation: DictationSettings;
@@ -265,7 +267,10 @@ function readSettingsRaw(scope?: vscode.Uri): Settings {
       suggestNext: c.get<boolean>("chat.suggestNext", true),
       maxOutputTokens: Math.max(0, Math.floor(c.get<number>("chat.maxOutputTokens", 0) || 0)),
     },
-    agent: { maxSteps: Math.max(0, Math.floor(c.get<number>("agent.maxSteps", 0) || 0)) },
+    agent: {
+      maxSteps: Math.max(0, Math.floor(c.get<number>("agent.maxSteps", 0) || 0)),
+      commandRunner: c.get<"auto" | "process" | "terminal">("agent.commandRunner", "auto"),
+    },
     appearance: c.get<"editor" | "hivey">("appearance", "editor"),
     dictation: {
       command: c.get<string>("dictation.command", ""),
