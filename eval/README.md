@@ -139,3 +139,13 @@ worth reading, because it is where the model's actual failure mode is.
 It is not a benchmark anyone should quote against another product: the tasks are small, there are
 few of them, and they are chosen to look like this project's users' work. It is a regression net and a way to choose between two local models
 honestly.
+
+## Measuring a setting
+
+Two environment variables let a run use another thinking level or temperature, without changing
+anything for anyone else (unset, the client behaves exactly as usual):
+
+- `HIVEY_CODE_REASONING` — `none`, `low`, `medium` (the default on a self-hosted server) or `high`;
+- `HIVEY_CODE_TEMPERATURE` — a number between 0 and 2 (unset: the server's own).
+
+Run the same tasks with and without, in parallel so both see the same server load, and compare.
