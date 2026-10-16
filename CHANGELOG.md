@@ -37,6 +37,11 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **Ligne de commande : plus de faux « contexte plein à 100 % ».** Le message additionnait les jetons
+  de toutes les étapes du tour et les comparait à un plancher de 8 000 jetons quand le catalogue ne
+  connaît pas le modèle : il s'affichait après chaque tâche. Il compare maintenant la dernière requête à
+  la vraie fenêtre du modèle, et ne dit rien quand elle est inconnue. Les requêtes envoyées au modèle
+  sont inchangées.
 - **Le niveau de réflexion change vraiment la réflexion, sur chaque fournisseur et chaque modèle.**
   « je veux vraiment que quand on bascule le mode de réflexion qu'il change vraiment le niveau de
   réflexion ». Une seule table (`src/core/providers/reasoningMap.ts`, chaque règle à côté de la
