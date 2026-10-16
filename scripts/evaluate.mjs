@@ -27,6 +27,7 @@ import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { CHECK_ONLY_ENV, childEnv } from "./eval-env.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const TASKS_DIR = join(ROOT, "eval", "tasks");
@@ -67,7 +68,8 @@ function sh(command, cwd, timeoutMs = 120_000, env = {}) {
       // `eval/bin` on PATH, which is how a check gets `codeonly` — a structural check must look at
       // the code and not at the comments, and the helper that strips them has to live OUTSIDE the
       // working copy: a tool the agent can edit is not a check. See `eval/bin/codeonly`.
-      env: { ...process.env, PATH: `${join(ROOT, "eval", "bin")}:${process.env.PATH ?? ""}`, ...env },
+      // Built in `eval-env.mjs`, the one place that decides what the agent and the check each see.
+      env: childEnv(process.env, env),
     });
     let out = "";
     let killed = false;
@@ -111,6 +113,14 @@ async function checkout(task, { withSolution = false } = {}) {
   if (withSolution && existsSync(join(task.dir, "solution"))) {
     await cp(join(task.dir, "solution"), dir, { recursive: true });
   }
+  // The hidden tests reach a working copy through the check and nothing else. A fixture that carried
+  // them — a `hidden/` folder or a `*.hidden.*` file copied in by mistake — would show the agent the
+  // very tests it is scored by, so such a task is refused before anything runs.
+  const leaked = (await readdir(dir, { recursive: true })).filter((p) => /(^|[\\/])hidden([\\/]|$)|\.hidden\./.test(p));
+  if (leaked.length) {
+    await rm(dir, { recursive: true, force: true });
+    throw new Error(`${task.id}: the working copy contains hidden tests (${leaked.join(", ")})`);
+  }
   if (task.setup) {
     const setup = await sh(task.setup, dir, 60_000);
     if (setup.code !== 0) throw new Error(`setup failed for ${task.id}: ${setup.out}`);
@@ -143,7 +153,7 @@ async function verifyTasks(tasks) {
   for (const task of tasks) {
     const dir = await checkout(task);
     try {
-      const result = await sh(task.check, dir, CHECK_TIMEOUT_MS);
+      const result = await sh(task.check, dir, CHECK_TIMEOUT_MS, CHECK_ONLY_ENV);
       if (result.code === 0) {
         broken++;
         console.log(`✗ ${task.id}: the check PASSES on the untouched fixture, so this task measures nothing`);
@@ -184,7 +194,7 @@ async function verifySolutions(tasks) {
     }
     const dir = await checkout(task, { withSolution: true });
     try {
-      const result = await sh(task.check, dir, CHECK_TIMEOUT_MS);
+      const result = await sh(task.check, dir, CHECK_TIMEOUT_MS, CHECK_ONLY_ENV);
       if (result.code === 0) {
         console.log(`✓ ${task.id}: passes on the reference solution`);
       } else {
@@ -241,7 +251,9 @@ async function runTask(task, model, endpoint, timeoutMs) {
     // Re-run the setup before checking: a task whose check needs a database must not be scored on
     // one the model happened to leave behind.
     if (task.setup) await sh(task.setup, dir, 60_000);
-    const check = await sh(task.check, dir, 120_000);
+    // The check, and only the check, can reach the hidden tests: CHECK_ONLY_ENV carries the path of
+    // the helper that copies them in. The agent above was started without it. See eval-env.mjs.
+    const check = await sh(task.check, dir, 120_000, CHECK_ONLY_ENV);
     return {
       task: task.id,
       kind: task.kind,

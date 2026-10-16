@@ -1,0 +1,7 @@
+{
+  "title": "A flaky test whose cause is in the code",
+  "kind": "bug",
+  "prompt": "sync.test.js fails randomly on CI, maybe one run in three, and goes green when re-run. Find out why and fix it properly: no retries and no longer sleeps.",
+  "check": "\"$HIVEY_EVAL_HIDDEN\" js-flaky-sync && node --test sync.test.js sync.hidden.test.js",
+  "timeoutMs": 300000
+}

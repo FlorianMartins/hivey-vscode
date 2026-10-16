@@ -1,0 +1,9 @@
+{
+  "name": "todo",
+  "type": "module",
+  "private": true,
+  "bin": { "todo": "./todo.js" },
+  "scripts": {
+    "test": "node --test"
+  }
+}

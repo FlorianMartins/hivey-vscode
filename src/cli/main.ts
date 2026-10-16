@@ -46,7 +46,7 @@ import { buildRepoMap } from "../core/context/repomap.js";
 import { buildCliTools } from "./tools.js";
 import { promptForMode, toolsForMode, MODES, type Mode } from "../core/session/modes.js";
 import { t, language } from "../shared/i18n.js";
-import { ENV } from "./env.js";
+import { ENV, reasoningFromEnv, temperatureFromEnv } from "./env.js";
 import { isSelfHostedProvider } from "../core/redaction/index.js";
 import { detectLanguage, translationMessages } from "../core/prompts.js";
 
@@ -506,7 +506,15 @@ async function main(): Promise<void> {
         // thinking left a thinking model with nothing to answer with: the turn ended on an empty
         // reply, and the evaluation harness — which drives this client — scored it as the model
         // failing.
-        ...(isSelfHostedProvider(cfg.provider) ? { reasoning: "medium" as const } : {}),
+        ...(reasoningFromEnv(process.env[ENV.reasoning])
+          ? { reasoning: reasoningFromEnv(process.env[ENV.reasoning]) }
+          : isSelfHostedProvider(cfg.provider)
+            ? { reasoning: "medium" as const }
+            : {}),
+        // A run measuring another temperature (see `ENV.temperature`); otherwise the server's own.
+        ...(temperatureFromEnv(process.env[ENV.temperature]) !== undefined
+          ? { temperature: temperatureFromEnv(process.env[ENV.temperature]) }
+          : {}),
         steer: () => {
           const now = typed.splice(0);
           taken.push(...now);

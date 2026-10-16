@@ -4,8 +4,8 @@ Oct 1, 2026 · @Florian Martins
 
 > ⚠️ **Le support IBM i a été retiré du produit** depuis la rédaction de ce prompt. Sa phase 1
 > (dépasser IBM Bob sur IBM i) et les chantiers propres à IBM i en ont été retirés. Les mesures
-> citées plus bas (sur 56 ou 62 tâches) datent de l'ancien banc ; il compte 40 tâches depuis le
-> retrait des 22 tâches IBM i. Le document reste une trace datée : là où il diverge du code, le code
+> citées plus bas (sur 56 ou 62 tâches) datent de l'ancien banc ; il a compté 40 tâches après le
+> retrait des 22 tâches IBM i, et 60 depuis l'ajout de vingt tâches plus difficiles. Le document reste une trace datée : là où il diverge du code, le code
 > fait foi.
 
 Ce prompt pilote un agent de code dans le dépôt `hivey-vscode`, phase par phase. Il transforme la
