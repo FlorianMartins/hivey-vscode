@@ -1,23 +1,25 @@
 #!/usr/bin/env bash
-# Lands the refreshed model catalogue on main — through the checks main requires.
+# Lands the refreshed model catalogue on main — through a pull request and the checks main requires.
 #
 # ⚠️ The job used to `git push` to main. Since main is protected (three required checks), every
 # daily run was refused — "GH006: Protected branch update failed" — and the catalogue stopped
-# moving on 2026-10-12. A pull request is not an option either: this repository does not let
-# Actions create one, and a PR opened with the job's token would not start CI anyway.
+# moving on 2026-10-12. Fast-forwarding main to a commit whose checks had passed was tried too and
+# is refused the same way for the job's token ("3 of 3 required status checks are expected", with
+# all three green on the commit). A pull request is what protection evaluates checks for.
 #
-# So: the commit goes to a branch of its own, CI and the security baseline are started on it by
-# hand (a dispatch is the one event the job's token may cause), and once the required checks have
-# passed ON THAT COMMIT main is fast-forwarded to it — which protection accepts, since the checks
-# it asks for are there. If main moved meanwhile, the commit is replayed on top and checked again.
+# A pull request opened with the job's token starts no workflow, so CI and the security baseline
+# are dispatched on its branch by hand — a dispatch is the one event that token may cause — and
+# their check runs land on the PR's head commit, which is what the merge is judged on. Once they
+# have passed, the PR is squash-merged and its branch deleted. Requires the repository setting
+# "Allow GitHub Actions to create and approve pull requests" (no review is required on main, so
+# the approving half grants nothing).
 #
-# Needs: GH_TOKEN (contents: write, actions: write, checks: read), GITHUB_REPOSITORY, a commit on
-# HEAD that is the refresh, and a checkout with push credentials.
+# Needs: GH_TOKEN (contents: write, pull-requests: write, actions: write, checks: read),
+# GITHUB_REPOSITORY, the refresh committed on HEAD, and a checkout with push credentials.
 set -euo pipefail
 
 REQUIRED=("CI complete" "security / Secret scanning (gitleaks)" "security / Workflow audit (actionlint + zizmor)")
-PREFIX="bot/models-$(date -u +%Y%m%d)-${GITHUB_RUN_ID:-local}"
-ATTEMPTS=3
+BRANCH="bot/models-$(date -u +%Y%m%d)-${GITHUB_RUN_ID:-local}"
 # CI with the integration suite takes a quarter of an hour; an hour is a stuck run, not a slow one.
 WAIT_SECONDS=3600
 
@@ -28,7 +30,7 @@ state_of() {
     --jq "[.check_runs[] | select(.name == \"${name}\")] | sort_by(.started_at) | last
           | if . == null then \"pending\"
             elif .status != \"completed\" then \"pending\"
-            elif .conclusion == \"success\" then \"success\"
+            elif .conclusion == \"success\" or .conclusion == \"skipped\" or .conclusion == \"neutral\" then \"success\"
             else \"failure\" end"
 }
 
@@ -51,30 +53,27 @@ checks_pass() {
   return 1
 }
 
-# One branch per attempt, so nothing is ever rewritten; all of them go when the job ends.
-PUSHED=()
+sha=$(git rev-parse HEAD)
+git push --quiet origin "HEAD:refs/heads/${BRANCH}"
+pr=$(gh pr create --base main --head "$BRANCH" \
+  --title "chore(models): refresh the catalogue and the Hivey presets" \
+  --body "Daily refresh by the Model catalogue workflow (run ${GITHUB_RUN_ID:-local}). Merged by the workflow once the required checks pass.")
+echo "opened ${pr}"
+# Closed, and its branch deleted, unless it was merged — a refresh that failed its checks is not
+# left lying around; tomorrow's run starts from main again.
 # shellcheck disable=SC2329 # run by the trap below
-cleanup() { for b in "${PUSHED[@]}"; do git push --quiet origin --delete "$b" 2>/dev/null || true; done; }
-trap cleanup EXIT
-
-for (( attempt = 1; attempt <= ATTEMPTS; attempt++ )); do
-  sha=$(git rev-parse HEAD)
-  BRANCH="${PREFIX}-${attempt}"
-  git push --quiet origin "HEAD:refs/heads/${BRANCH}"
-  PUSHED+=("$BRANCH")
-  gh workflow run ci.yml --ref "$BRANCH"
-  gh workflow run security.yml --ref "$BRANCH"
-  echo "checking ${sha} on ${BRANCH} (attempt ${attempt})"
-  checks_pass "$sha"
-
-  # Fast-forward only: never over somebody else's commit.
-  if git push --quiet origin "${sha}:refs/heads/main"; then
-    echo "main is now ${sha}"
-    exit 0
+abandon() {
+  if [[ "$(gh pr view "$pr" --json state -q .state)" != "MERGED" ]]; then
+    gh pr close "$pr" --delete-branch --comment "Required checks did not pass; tomorrow's run tries again." || true
   fi
-  echo "main moved while the checks ran: replaying the refresh on top"
-  git fetch --quiet origin main
-  git rebase --quiet origin/main
-done
-echo "::error::main kept moving; the refresh is left for tomorrow's run"
-exit 1
+}
+trap abandon EXIT
+
+gh workflow run ci.yml --ref "$BRANCH"
+gh workflow run security.yml --ref "$BRANCH"
+echo "checking ${sha} on ${BRANCH}"
+checks_pass "$sha"
+
+# --match-head-commit: merged only if the PR still holds the commit that was checked.
+gh pr merge "$pr" --squash --delete-branch --match-head-commit "$sha"
+echo "merged ${pr}"

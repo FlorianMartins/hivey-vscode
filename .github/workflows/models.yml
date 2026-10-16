@@ -11,8 +11,9 @@ on:
 
 permissions:
   contents: write
-  # Starting CI and the security baseline on the refresh, and reading their results: main only
-  # takes a commit its required checks have passed on — see scripts/land-catalogue.sh.
+  # The refresh lands as a pull request, merged once main's required checks have passed on it;
+  # CI and the security baseline are started on it by hand — see scripts/land-catalogue.sh.
+  pull-requests: write
   actions: write
   checks: read
 
