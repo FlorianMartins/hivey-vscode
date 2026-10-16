@@ -1,0 +1,7 @@
+{
+  "title": "Renewals on the 31st",
+  "kind": "bug",
+  "prompt": "Le job de facturation de cette nuit a planté : ValueError: day is out of range for month, sur un abonnement démarré un 31 janvier. Un abonnement démarré le 29, le 30 ou le 31 doit être renouvelé le dernier jour des mois plus courts, puis revenir à son jour d'origine : un abonnement du 31 janvier se renouvelle le 28 février, le 31 mars, le 30 avril… Corrige ça.",
+  "check": "hidden py-month-end-renewal && python3 -m unittest -q test_billing test_billing_hidden",
+  "timeoutMs": 300000
+}

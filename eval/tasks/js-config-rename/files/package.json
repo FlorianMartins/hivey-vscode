@@ -1,0 +1,6 @@
+{
+  "name": "fetchy",
+  "type": "module",
+  "private": true,
+  "bin": { "fetchy": "./cli.js" }
+}

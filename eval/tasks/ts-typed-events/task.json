@@ -1,0 +1,7 @@
+{
+  "title": "Type an event bus, and fix what the types reveal",
+  "kind": "feature",
+  "prompt": "Make the event bus in src/bus.ts type-safe, driven by the Events interface in src/events.ts: on, off and emit must only accept declared events, with the payload type of that event, and an event whose payload is undefined is emitted with no second argument. No `any`. Keep `new Bus()` working the way main.ts uses it, and fix whatever the stricter types turn up.",
+  "check": "hidden ts-typed-events && rm -rf dist && tsc -p . && node --test dist/test/bus.test.js dist/test/app.hidden.test.js && ! codeonly src/*.ts | grep -qw any",
+  "timeoutMs": 420000
+}

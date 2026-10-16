@@ -1,0 +1,7 @@
+{
+  "title": "A listener leak blamed on the wrong file",
+  "kind": "bug",
+  "prompt": "After opening and closing the settings panel a few times, every settings change re-renders the panel several times and the console shows 'possible listener leak' warnings from the event bus. I think EventBus.off is broken? Please fix.",
+  "check": "hidden js-listener-leak && node --test bus.test.js leak.hidden.test.js",
+  "timeoutMs": 300000
+}

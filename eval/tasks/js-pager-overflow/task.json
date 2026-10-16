@@ -1,0 +1,7 @@
+{
+  "title": "A pagination bar that overflows and loses the current page",
+  "kind": "bug",
+  "prompt": "The pagination bar under the search results overflows on phones when there are 8 to 10 pages, and when the user filters the list while on a high page, no page is highlighted any more. pageItems in pager.js documents what the bar is supposed to do; make the footer behave the way it says.",
+  "check": "hidden js-pager-overflow && node --test pager.test.js pager.hidden.test.js",
+  "timeoutMs": 420000
+}

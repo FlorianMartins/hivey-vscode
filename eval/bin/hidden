@@ -1,0 +1,27 @@
+#!/bin/sh
+# The authoritative tests of a task, put back into the working copy before its check runs.
+#
+# Usage, in a task's `check`:   hidden <task-id> && node --test …
+#
+# A test the agent can edit is not a test. The original checks ran the fixture's own test files,
+# which a model is free to rewrite — and "make the tests pass" is satisfied just as well by deleting
+# the assertion as by fixing the code. So the tests that DECIDE a task live in
+# `eval/tasks/<id>/hidden/`, beside `files/` and `solution/` and never copied into the working copy
+# the model sees. This copies them in at check time, OVER whatever is there: a visible test file the
+# model edited is restored to its original, and the hidden cases — the ones the prompt implies but
+# does not spell out — are added.
+#
+# It lives here, on PATH for every check, for the same reason as `codeonly`: a helper inside the
+# working copy is a file the agent can edit.
+set -e
+if [ -z "$1" ]; then
+  echo "hidden: which task?" >&2
+  exit 2
+fi
+here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
+src="$here/../tasks/$1/hidden"
+if [ ! -d "$src" ]; then
+  echo "hidden: $1 has no hidden/ directory" >&2
+  exit 2
+fi
+cp -R "$src"/. .

@@ -14,7 +14,7 @@ the measurement means something.
 ## What an evaluation bench is
 
 An **evaluation bench** (*benchmark*) is a set of tasks with an automatically checkable answer. This
-project's holds **40 tasks**: small broken repositories, an instruction, and a **check** — a command
+project's holds **60 tasks**: small broken repositories, an instruction, and a **check** — a command
 that succeeds if the work is done and fails otherwise.
 
 For example: a small program that counts lines, the instruction "add a `--json` option", and a check

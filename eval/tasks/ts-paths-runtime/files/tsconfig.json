@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "es2022",
+    "lib": ["es2022"],
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "strict": true,
+    "rootDir": "src",
+    "outDir": "dist",
+    "types": [],
+    "paths": {
+      "@core/*": ["./src/core/*"]
+    }
+  },
+  "include": ["src"]
+}

@@ -11,6 +11,7 @@ eval/tasks/<id>/
   task.json     what to ask, and how to tell whether it worked
   files/        a tiny repository, broken on purpose
   solution/     one way to do it, laid over files/ — proves the check CAN pass
+  hidden/       optional: the tests that decide the task, copied in by the check (see below)
 ```
 
 `task.json`:
@@ -23,10 +24,37 @@ eval/tasks/<id>/
 | `check` | a shell command run in the working copy. Exit 0 means the task is done |
 | `timeoutMs` | optional, default 180000 |
 
-There are 40 tasks: 24 `bug`, 6 `noverify`, 4 `refactor`, 3 `feature`, 3 `test`, over TypeScript,
+There are 60 tasks: 36 `bug`, 7 `feature`, 7 `refactor`, 6 `noverify`, 4 `test`, over TypeScript,
 JavaScript, Python, Java, SQL and the `finance` family (`fin-*`). The 22 IBM i tasks that brought
 the set to 62 were removed with the IBM i support; figures measured on 56 or 62 tasks are not
-comparable with a run on this set.
+comparable with a run on this set, and neither are figures measured on the 40-task set that came
+before the harder twenty below.
+
+### The harder twenty
+
+The first forty saturated: the self-hosted 27B model solved 39 of them, and a bench everybody passes
+cannot show progress. Twenty tasks were added that look like a normal working day and that a
+mid-sized model gets wrong part of the time. Each is hard for a stated reason:
+
+| family | tasks | what makes it hard |
+| --- | --- | --- |
+| the cause is in another file | `js-memo-key-collision`, `js-listener-leak`, `java-booking-overlap`, `py-shared-defaults` | the symptom shows in one file, the defect lives in a helper; the local patch passes the reported case and fails the others |
+| the obvious fix is wrong | `js-natural-sort`, `py-search-like`, `py-month-end-renewal`, `java-remove-while-iterating`, `js-flaky-sync` | `localeCompare` without numeric order, parameters without escaping LIKE, a clamp that drifts after February, an index loop that skips, a longer sleep |
+| a contract to honour exactly | `js-pager-overflow`, `js-map-limit` | the documented rules are checked exhaustively (every page of every list up to 40 pages, every concurrency edge) |
+| refactor that keeps behaviour | `py-pricing-refactor`, `py-n-plus-one`, `js-config-rename` | thousands of inputs compared with the original implementation, a counted-queries test, a deprecated key that must keep working |
+| feature across layers | `ts-user-phone-field`, `ts-cursor-pagination`, `ts-typed-events` | model + validation + serializer + test; API + client with inserts during paging and timestamp ties; types that must reject what is wrong (`@ts-expect-error`) and the call sites they expose |
+| build and config | `ts-paths-runtime` | a green `tsc` with a `paths` alias that Node cannot resolve at run time |
+| long, several sub-steps | `js-todo-cli-long` | stable ids, a validated option, a filter with an injectable clock, an old store format, and the tests for all of it |
+| tests that catch bugs | `js-mutation-tests` | the suite the model writes must fail on each of fifteen mutants of the implementation |
+
+**Their tests are hidden.** A check that runs the fixture's own test file can be satisfied by
+editing the test, so these twenty keep the tests that decide them in `eval/tasks/<id>/hidden/`,
+beside `files/` and `solution/`, never copied into the working copy the model sees. The check
+starts with `hidden <id>` (`eval/bin/hidden`), which copies them in over whatever is there: a
+visible test the model edited is restored, and the cases the prompt implies without spelling out
+are added. They are run by name, so a test file the model adds cannot replace them; where the
+prompt asks for tests, the model's own run as well, beside the hidden ones, and must pass too. The
+TypeScript checks also restore `tsconfig.json`, so strictness cannot be traded for a green build.
 
 The check is a command rather than a diff, on purpose. A diff scores the model on writing the
 solution somebody already wrote; a command scores it on the only thing the user cares about, which
@@ -69,8 +97,12 @@ which is worth stating as a rule of its own.
 
 ### A structural check must look at the code, not at the prose
 
-Not every task can be decided by running something. There is no JDK and no TypeScript compiler
-here, so those tasks are checked by SHAPE — "no `any` remains", "no `finally` block". A shape check is a grep, and a grep reads the comments too. So a correct
+Not every task can be decided by running something. The first Java and TypeScript tasks were
+written when no JDK and no TypeScript compiler were assumed, so they are checked by SHAPE — "no
+`any` remains", "no `finally` block". (The harder twenty compile and run instead: the Java ones
+with the runner's `javac`, the TypeScript ones with `eval/bin/tsc`, which is the repository's own
+compiler from `node_modules` — so `npm ci` must have run, as it has everywhere the checks run.) A
+shape check is a grep, and a grep reads the comments too. So a correct
 answer that EXPLAINS itself — "replaced the `finally` block with try-with-resources" — was refused
 for quoting the very thing it had removed. The first victim was the reference solution.
 

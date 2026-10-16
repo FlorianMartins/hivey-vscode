@@ -1,0 +1,7 @@
+{
+  "title": "Back-to-back bookings refused by the wrong comparison",
+  "kind": "bug",
+  "prompt": "A guest can't book room 12 from July 10 to July 12, although the previous guest checks out on July 10: BookingService says the room is taken. The check-out day is free for the next guest. Fix it.",
+  "check": "hidden java-booking-overlap && rm -rf out && javac -d out *.java && java -cp out BookingServiceTest && java -cp out BookingHiddenTest",
+  "timeoutMs": 300000
+}

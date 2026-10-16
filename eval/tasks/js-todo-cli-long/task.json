@@ -1,0 +1,7 @@
+{
+  "title": "Four changes to a CLI, and the tests for them",
+  "kind": "feature",
+  "prompt": "A few things for the todo CLI:\n1. `done <id>` marks the wrong item once something has been removed. Ids must stay stable. An unknown id is an error (exit code 2, a message on stderr), not a crash.\n2. `add` takes an optional `--due YYYY-MM-DD`. A date that is not a real date is refused with exit code 2 and nothing is saved. `list` shows it after the text, as ` (due 2026-10-20)`.\n3. `list --overdue` shows only the open items due before today. TODO_TODAY=YYYY-MM-DD overrides today, for the tests.\n4. Existing todo files must keep working.\nAdd tests for all of this to todo.test.js.",
+  "check": "hidden js-todo-cli-long && node --test todo.test.js todo.orig.hidden.test.js todo.hidden.test.js && grep -q -- '--due' todo.test.js && grep -q -- '--overdue' todo.test.js",
+  "timeoutMs": 600000
+}

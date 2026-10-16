@@ -1,0 +1,7 @@
+{
+  "title": "Tests good enough to catch a broken implementation",
+  "kind": "test",
+  "prompt": "duration.js has no tests at all. Write duration.test.js (node:test) that pins down every rule documented on parseDuration, so that any of them breaking makes a test fail. Don't change duration.js.",
+  "check": "hidden js-mutation-tests && test -f duration.test.js && ! codeonly duration.test.js | grep -Eq 'node:fs|[\"'\\'']fs[\"'\\'']|readFile|createHash|child_process|require[(]' && node --test duration.test.js && sh mutants.sh",
+  "timeoutMs": 420000
+}

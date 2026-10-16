@@ -11,6 +11,15 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
   comprises —, un rappel suit chaque résultat d'outil, et une note qui sort quand même dans l'autre
   langue est remise dans la bonne par une petite requête de traduction (réflexion coupée). Dans le
   panneau comme dans la ligne de commande.
+- **Le banc d'évaluation passe de 40 à 60 tâches, vingt plus difficiles.** Le modèle 27B en
+  réussissait 39 sur 40 : le banc ne pouvait plus montrer de progrès. Les vingt nouvelles tâches
+  (TypeScript, JavaScript, Python, Java) sont du travail ordinaire où la correction évidente est
+  fausse : cause dans un autre fichier, contrat vérifié exhaustivement, refactorisation comparée à
+  l'original sur des milliers d'entrées, fonctionnalité sur plusieurs couches, tâche longue, tests
+  jugés par mutation. Leurs tests décisifs sont **cachés** (`eval/tasks/<id>/hidden/`, recopiés par
+  `eval/bin/hidden` au moment du contrôle) : modifier ou supprimer un test ne fait plus passer une
+  tâche. Les tâches TypeScript sont compilées par le `tsc` du dépôt (`eval/bin/tsc`), les tâches
+  Java par `javac`.
 
 ### Corrigé
 

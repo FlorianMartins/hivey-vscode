@@ -1,0 +1,7 @@
+{
+  "title": "A green build that crashes at start-up",
+  "kind": "bug",
+  "prompt": "`npm run build` is green but `npm start` crashes right away with ERR_MODULE_NOT_FOUND: Cannot find package '@core/invoice.js'. Make `npm run build && npm start` work again, without giving up the type checking.",
+  "check": "hidden ts-paths-runtime && rm -rf dist && npm run --silent build && tsc -p . --noEmit --strict && npm run --silent start > actual-output.txt && diff expected-output.txt actual-output.txt && test -f src/main.ts",
+  "timeoutMs": 300000
+}
