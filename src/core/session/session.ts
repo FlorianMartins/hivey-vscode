@@ -21,7 +21,7 @@ import type { Plan } from "../agent/plan.js";
 import type { Mode } from "./modes.js";
 import { estimateTokens, headToTokens } from "../util/tokens.js";
 import { IMAGE_TOKENS } from "../models/vision.js";
-import { answerWithInterjections, type Segment } from "./segments.js";
+import type { Segment } from "./segments.js";
 
 export type EntryRole = "user" | "assistant";
 
@@ -384,10 +384,7 @@ export class Session {
  * content cannot guess keeps "the user said this" and "I read this" apart by construction.
  */
 export function renderEntry(e: Entry, nonce: string, alreadyBelow?: (c: ContextItem) => boolean): string {
-  // An answer the person corrected mid-way carries the correction where it came — see
-  // `answerWithInterjections`. Identical to `e.text` for every other entry.
-  const text = e.role === "assistant" ? answerWithInterjections(e.text, e.segments) : e.text;
-  if (!e.context?.length) return text;
+  if (!e.context?.length) return e.text;
   const blocks = e.context.map((c) => {
     const head = `[${c.kind}] ${c.label}`;
     // The same file, byte for byte, attached again later in the conversation. Sent once — down
@@ -404,5 +401,5 @@ export function renderEntry(e: Entry, nonce: string, alreadyBelow?: (c: ContextI
     const body = c.body.split(`⟦${nonce}`).join("⟦removed-fence");
     return `${head}\n⟦${nonce}:begin⟧\n${body}\n⟦${nonce}:end⟧`;
   });
-  return `${text}\n\n--- attached context ---\n${blocks.join("\n\n")}`;
+  return `${e.text}\n\n--- attached context ---\n${blocks.join("\n\n")}`;
 }

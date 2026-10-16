@@ -96,7 +96,7 @@ export interface UiEntry {
   context?: UiContextItem[];
   steps?: UiStep[];
   /** The answer as it happened: thinking and actions, then the words written there, step by step. */
-  segments?: Array<{ reasoning?: string; steps?: UiStep[]; text?: string; user?: string }>;
+  segments?: Array<{ reasoning?: string; steps?: UiStep[]; text?: string }>;
 }
 
 export interface UiSession {
@@ -454,8 +454,6 @@ export interface UiState {
 export type ToExtension =
   | { type: "ready" }
   | { type: "send"; text: string }
-  /** Typed while a turn runs: read by the model at its next step, the turn is not stopped. */
-  | { type: "steer"; text: string }
   | { type: "stop" }
   | { type: "newSession" }
   | { type: "renameSession"; title: string }
@@ -621,9 +619,6 @@ export type ToPanel =
   | { type: "activity"; text: string; hint?: string }
   | { type: "turnStart" }
   | { type: "turnEnd" }
-  /** What the person typed during the turn, drawn inside it; `taken` once the model has read it. */
-  | { type: "interjection"; text: string }
-  | { type: "interjectionTaken" }
   | {
       type: "approval";
       id: string;

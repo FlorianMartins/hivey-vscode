@@ -30,13 +30,11 @@ import { readSettings } from "./config.js";
 import { arcadInstalled, buildArcadTools, type ArcadDeps } from "./integrations/arcad.js";
 import { buildKnowledgeTools } from "./knowledge.js";
 import type { McpManager } from "./integrations/mcp.js";
-import { runCommandAsProcess, runCommandInTerminal, usesProcessRunner } from "./terminal.js";
+import { runCommandInTerminal } from "./terminal.js";
 import { withHooks, type Hooks } from "./hooks.js";
 import { buildSymbolTools } from "./symbols.js";
 import { isAbsolutePath, tidyPath, underRoot } from "../core/fs/within.js";
 import { scaledChars } from "../core/context/scale.js";
-import { nearestName } from "../core/text/nearest.js";
-import { IDENTICAL_EDIT } from "../core/text/findText.js";
 
 /**
  * Whether two paths differing only in case are the same file.
@@ -111,17 +109,10 @@ function resolve(path: string, settings: Settings): vscode.Uri {
       }
       return exact;
     }
-    // A misspelt name of an open file is the likeliest reason it is not one — said, like for a file
-    // missing from a folder (see `missingFile`).
-    const near = nearestName(
-      path.split(/[\\/]/).pop() ?? "",
-      openFileUris().map((uri) => uri.path.split("/").pop() ?? ""),
-    );
-    const hint = near ? ` An open file is named ${near} — check the spelling: did you mean ${openFileUris().find((uri) => uri.path.endsWith(`/${near}`))!.fsPath}?` : "";
     throw new Error(
-      (folders.length
+      folders.length
         ? `Refused: “${path}” is outside the folder(s) open in the editor.`
-        : `Refused: “${path}” is not one of the open files, and no folder is open.`) + hint,
+        : `Refused: “${path}” is not one of the open files, and no folder is open.`,
     );
   }
 
@@ -174,40 +165,6 @@ export interface ToolDeps {
   onNotice?: (notice: Notice) => void;
 }
 
-/**
- * Why a file the model named cannot be read — with the file it probably meant. `undefined` when it
- * exists, or when it is not a file on disk (an IBM i member, a remote document) and the editor
- * must be asked instead. See `core/text/nearest.ts`.
- */
-async function missingFile(uri: vscode.Uri): Promise<string | undefined> {
-  if (uri.scheme !== "file") return undefined;
-  try {
-    await vscode.workspace.fs.stat(uri);
-    return undefined;
-  } catch {
-    // Missing — said below, with what is there instead.
-  }
-  // Open but never saved is still a file the editor can hand over.
-  if (vscode.workspace.textDocuments.some((d) => d.uri.fsPath === uri.fsPath)) return undefined;
-  const name = uri.path.split("/").pop() ?? "";
-  const dir = vscode.Uri.joinPath(uri, "..");
-  let siblings: string[] = [];
-  try {
-    siblings = (await vscode.workspace.fs.readDirectory(dir)).filter(([, type]) => type === vscode.FileType.File).map(([n]) => n);
-  } catch {
-    // The folder itself is missing; looked for elsewhere below.
-  }
-  const near = nearestName(name, siblings);
-  if (near) {
-    return `There is no file ${relative(uri)}. In that folder there is ${relative(vscode.Uri.joinPath(dir, near))} — check the spelling: did you mean that file?`;
-  }
-  const elsewhere = name ? await vscode.workspace.findFiles(`**/${name}`, "**/node_modules/**", 3) : [];
-  if (elsewhere.length) {
-    return `There is no file ${relative(uri)}. A file with that name exists at ${elsewhere.map((u) => relative(u)).join(", ")}.`;
-  }
-  return `There is no file ${relative(uri)}. Use list_files on the folder to see what it holds.`;
-}
-
 export function buildTools(deps: ToolDeps): Tool[] {
   const s = () => deps.settings();
 
@@ -232,8 +189,6 @@ export function buildTools(deps: ToolDeps): Tool[] {
     approval: () => false,
     async run(args, ctx): Promise<ToolResult> {
       const uri = resolve(String(args["path"] ?? ""), s());
-      const missing = await missingFile(uri);
-      if (missing) return { content: missing, isError: true };
       const doc = await vscode.workspace.openTextDocument(uri);
       // ⚠️ A range, and a notice that says how to get the rest. This returned the head of the file and
       // nothing else, so on anything long the model could not reach the part it needed and resorted
@@ -431,13 +386,6 @@ export function buildTools(deps: ToolDeps): Tool[] {
       const uri = resolve(String(args["path"] ?? ""), s());
       const oldText = String(args["old"] ?? "");
       const newText = String(args["new"] ?? "");
-      // ⚠️ Before anything else. A real session asked to replace a word with the very same word, six
-      // times — it believed it was fixing a typo — and was told "the editor accepted the edit but the
-      // file did not change", which sent it looking for a fault in the editor. The fault was in the
-      // request, and saying so is what ends the loop.
-      if (oldText === newText) return { content: IDENTICAL_EDIT, isError: true };
-      const missing = await missingFile(uri);
-      if (missing) return { content: missing, isError: true };
       const doc = await vscode.workspace.openTextDocument(uri);
       const text = doc.getText();
       // ⚠️ Not `indexOf`. A file holding `é` as `e` + a combining accent and a model writing it as a
@@ -571,24 +519,13 @@ export function buildTools(deps: ToolDeps): Tool[] {
     return `\nWARNING: ${relative(uri)} was changed in the editor but could NOT be saved to disk. Commands you run will still read the old file.`;
   }
 
-  const asProcess = usesProcessRunner(readSettings().agent.commandRunner);
   const runCommand: Tool = {
     schema: {
       name: "run_command",
-      description: asProcess
-        ? "Run a shell command in the workspace (tests, build, git) and return its output and exit code. " +
-          "The user approves it first and watches it run. " +
-          // ⚠️ Said, because the model cannot know it and guesses bash: `head`, `cat | grep`, `ls -la`
-          // all fail in cmd.exe, and each failure cost a step of a real Windows session.
-          (process.platform === "win32"
-            ? "It runs in cmd.exe on Windows: chain with &&, use dir, type and findstr — not ls, cat, " +
-              "head or grep (use search_text and read_file to read files). "
-            : "It runs in /bin/sh. ") +
-          "Nothing can be typed into it, and a command that never exits on its own (a server, a " +
-          "watcher) is stopped at the timeout — give those a short timeoutMs."
-        : "Run a shell command in the workspace terminal (tests, build, git) and return its output " +
-          "and exit code. The user approves it first and watches it run. On a shell without VS Code " +
-          "integration the output cannot be read, and the result says so.",
+      description:
+        "Run a shell command in the workspace terminal (tests, build, git) and return its output " +
+        "and exit code. The user approves it first and watches it run. On a shell without VS Code " +
+        "integration the output cannot be read, and the result says so.",
       parameters: {
         type: "object",
         properties: {
@@ -602,7 +539,7 @@ export function buildTools(deps: ToolDeps): Tool[] {
     approval: (args) => t("run `{0}`", String(args["command"])),
     async run(args, ctx): Promise<ToolResult> {
       const command = String(args["command"] ?? "");
-      const result = await (asProcess ? runCommandAsProcess : runCommandInTerminal)({
+      const result = await runCommandInTerminal({
         command,
         // Not `root()`, which throws when no folder is open: a terminal does not need one. Someone
         // working on a single file still gets their shell, in whatever directory it opens in.
