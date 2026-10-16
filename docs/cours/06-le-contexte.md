@@ -58,12 +58,18 @@ avec un modèle local — rien n'a eu besoin de sortir pour que la notation fonc
 Chaque élément de contexte coûte des jetons, et la fenêtre est finie. L'outil tient donc un
 **budget** et décide quoi garder.
 
-Deux choix de conception qui se voient à l'usage :
+Quatre choix de conception qui se voient à l'usage :
 
 - **Le budget suit la fenêtre du modèle réellement choisi**, et pas un nombre fixé une fois pour
-  toutes. Avec une valeur fixe de 8 000 jetons, les conversations étaient résumées au bout de trois
-  échanges et la réponse venait du résumé — alors que 8 000 jetons sont une poussière pour un modèle
-  moderne.
+  toutes : toute la fenêtre, moins une réserve pour la réponse et les étapes suivantes (un
+  vingtième de la fenêtre, au moins de quoi écrire une réponse), tant que
+  `hiveyCode.context.maxTokens` vaut 0 (le défaut) ; 8 000 jetons si la fenêtre est inconnue. Avec une valeur fixe de 8 000 jetons, les
+  conversations étaient résumées au bout de trois échanges et la réponse venait du résumé — alors que
+  8 000 jetons sont une poussière pour un modèle moderne.
+- **Un fichier se lit par pages.** Sans plage demandée, l'outil de lecture rend une page de 2 000
+  lignes et dit comment lire la suite ; sur un gros fichier, le modèle cherche d'abord la bonne ligne
+  puis lit autour. Rien n'est inaccessible, mais un fichier de 14 000 lignes lu d'un bloc encombrait
+  chaque étape suivante du tour.
 - **Une pièce jointe trop grosse arrive sous forme de plan** : tous les symboles qu'elle déclare avec
   leur ligne, suivis de son début — plutôt que ses N premières lignes et rien sur le reste. Un plan
   dit *de quoi parle* le fichier ; ses cent premières lignes disent seulement comment il commence.
@@ -74,6 +80,14 @@ Deux choix de conception qui se voient à l'usage :
 
 Quand la conversation remplit son budget, on **compacte** : le modèle écrit un résumé de l'échange,
 et c'est le résumé qui est envoyé à partir de là.
+
+Ça se fait **tout seul** (`hiveyCode.context.autoCompact`, activé par défaut) : arrivée aux trois
+quarts du budget, la conversation est résumée avant l'envoi de la question, qui part juste après le
+résumé. Si le contexte se remplit **en pleine tâche**, ce qui a déjà été fait est noté dans la
+réponse, la conversation est résumée, et la tâche reprend là où elle s'était arrêtée. Un **Stop**
+pendant le résumé annule aussi ce qui devait suivre. Réglage désactivé, on vous **propose** de résumer
+à partir de 70 %, et un contexte plein vous pose la question au lieu d'une erreur. `/compact` le fait
+à la demande.
 
 Deux choses à savoir :
 

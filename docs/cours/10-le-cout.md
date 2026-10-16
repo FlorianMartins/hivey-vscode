@@ -1,6 +1,6 @@
 # 10. Le coût
 
-[← Chapitre précédent](09-la-confidentialite.md) · [Sommaire](README.md) · [Chapitre suivant →](11-ibm-i.md)
+[← Chapitre précédent](09-la-confidentialite.md) · [Sommaire](README.md) · [Chapitre suivant →](11-la-qualite-mesuree.md)
 
 ## Pourquoi un assistant de code coûte de l'argent
 
@@ -73,14 +73,21 @@ avec un palmarès parfait après vingt questions que personne n'a contrôlées.
 
 ## Les garde-fous
 
-- **Un plafond par requête** et **un plafond par jour**, en dollars.
-- **Un plafond de taille par requête**, en jetons — et son histoire dit quelque chose. Les plafonds en
+- **Un plafond par requête** et **un plafond par jour**, en dollars (2 $ et 20 $ par défaut). Les
+  dépasser ouvre une carte dans la conversation — envoyer quand même, relever le plafond, ou ne pas
+  envoyer — au lieu de refuser en silence.
+- **Un plafond de taille par requête**, en jetons (`hiveyCode.budget.perRequestTokens`) — et son
+  histoire dit quelque chose. Les plafonds en
   dollars étaient calibrés quand le préréglage du milieu visait un modèle à 120 $/M ; en le passant
   aux modèles actuels à 10 $/M, un prompt emballé de 400 000 jetons (un journal de compilation collé,
   un outil qui a lu un fichier compressé) est tombé à 80 centimes et **passait sous le plafond de
   2 $**. Un plafond en dollars **se desserre à chaque baisse du marché**, ce qui pour un outil dont
   l'argument est que votre code ne part pas est la mauvaise direction. 400 000 jetons de votre dépôt
-  qui s'en vont méritent une question **à n'importe quel prix**.
+  qui s'en vont méritent une question **à n'importe quel prix**. Il vaut aujourd'hui **0 par défaut**
+  (ne jamais demander) : le projet a retiré tous les plafonds fixes qui coupaient le travail du modèle
+  — nombre d'étapes, longueur de réponse, contexte — et ce sont les plafonds en dollars qui posent la
+  question avant une requête facturée. Mettez-y un nombre si vous voulez qu'une requête énorme vous
+  soit soumise, même gratuite.
 - **Un rapport de coût**, lisible, qui dit ce qui a été dépensé et sur quoi.
 
 ## Les préréglages Hivey
@@ -97,7 +104,7 @@ des **routages** et non des modèles :
 ⚠️ La colonne du milieu n'est pas un détail d'implémentation : le libellé et l'identifiant **ne se
 correspondent pas**. « Hivey Smart » s'appelle `hivey`, et « Hivey Pro » s'appelle `hivey/smart`.
 C'est un héritage de deux renommages, et c'est visible : le tableau de mesures du
-[chapitre 12](12-la-qualite-mesuree.md) publie les **identifiants**, donc sans cette colonne un
+[chapitre 11](11-la-qualite-mesuree.md) publie les **identifiants**, donc sans cette colonne un
 lecteur ne peut pas relier une promesse à son résultat mesuré.
 
 
@@ -205,6 +212,6 @@ ne sont pas la même chose. Un modèle local ne coûte rien à facturer, mais il
 l'électricité et du temps. Les rapports de ce projet écrivent donc « non valorisé » (*not priced*) là
 où le prix est inconnu, et **jamais 0,00 $**, parce qu'un zéro est une affirmation.
 
-C'est la même discipline que le [chapitre 12](12-la-qualite-mesuree.md) applique aux scores.
+C'est la même discipline que le [chapitre 11](11-la-qualite-mesuree.md) applique aux scores.
 
-[← Chapitre précédent](09-la-confidentialite.md) · [Sommaire](README.md) · [Chapitre suivant →](11-ibm-i.md)
+[← Chapitre précédent](09-la-confidentialite.md) · [Sommaire](README.md) · [Chapitre suivant →](11-la-qualite-mesuree.md)

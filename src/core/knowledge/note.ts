@@ -8,7 +8,7 @@
 // about the business the only available remedy would be to wipe it.
 //
 //   .hiveycode/knowledge/finance/invoice-settlement.md   the team's, versioned, arrives with a clone
-//   ~/.hiveycode/knowledge/rpg/free-form-conversion.md   yours, across every project
+//   ~/.hiveycode/knowledge/python/typing-conventions.md   yours, across every project
 //
 // The id is the path without its extension, so directories group a domain and the id stays
 // meaningful in a prompt: `finance/invoice-settlement` says more than `note_4187`.

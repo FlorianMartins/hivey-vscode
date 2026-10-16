@@ -111,7 +111,7 @@ export function describeSandbox(request: SandboxRequest): string {
  * Is this command allowed to run at all in background mode?
  *
  * The check is about the MODE and the engine, not about the command: judging a shell string is a
- * game this project does not play (`core/ibmi/guard.ts` makes the same argument about QSH). Either
+ * game this project does not play. Either
  * there is a container, in which case the command's content does not matter, or there is not, in
  * which case nothing runs.
  */

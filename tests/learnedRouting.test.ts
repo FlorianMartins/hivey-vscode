@@ -148,7 +148,6 @@ test("a turn is classified by what it DID, not by how it was phrased", () => {
   assert.equal(classify(["read_file", "edit_file"]), "edit");
   assert.equal(classify(["read_file", "search_text"]), "ask");
   assert.equal(classify(["run_command"]), "test");
-  assert.equal(classify(["ibmi_compile", "edit_file"]), "ibmi", "the platform wins: its models behave differently");
   assert.equal(classify([]), "ask");
 });
 

@@ -59,12 +59,11 @@ people read.
 
 ## In Hivey Code
 
-MCP is also the project's answer to a frequent request, and its refusal is instructive. For
-integration with ARCAD — a change-management tool from the IBM i world
-([chapter 11](11-ibm-i.md)) — the catalogue of REST addresses is not published. The project **refuses
-to invent those addresses**: guessing paths for a model to call produces an integration that fails at a
-customer's site, in a way nobody can debug. So it carries requests to the paths **you** supply — and
-for anything beyond that, says the right shape is an MCP server.
+MCP is also the project's answer to a frequent request, and its refusal is instructive. When a
+vendor's tool does not publish the catalogue of its REST addresses, the project **refuses to invent
+those addresses**: guessing paths for a model to call produces an integration that fails at a
+customer's site, in a way nobody can debug. The right shape for such an integration is an MCP server,
+written by whoever knows the API.
 
 It is the same discipline as everywhere else in this project: **never invent an API**, and say so when
 you don't know.

@@ -82,14 +82,13 @@ test("in agent mode the same tool is whole again", () => {
 test("the integrations' read-only tools are in plan mode, their writing ones are not", () => {
   const names = [
     "git_status", "git_diff", "git_log", "git_blame", "git_show", "git_branches",
-    "ibmi_member", "ibmi_members", "ibmi_objects", "ibmi_library_list",
-    "git_commit", "git_stage", "git_branch", "ibmi_command",
+    "git_commit", "git_stage", "git_branch",
   ].map(tool);
   const planned = new Set(toolsForMode(names, "plan").map((t) => t.schema.name));
-  for (const allowed of ["git_status", "git_diff", "git_blame", "ibmi_member", "ibmi_objects"]) {
+  for (const allowed of ["git_status", "git_diff", "git_blame"]) {
     assert.ok(planned.has(allowed), `${allowed} should be readable in plan mode`);
   }
-  for (const refused of ["git_commit", "git_stage", "git_branch", "ibmi_command"]) {
+  for (const refused of ["git_commit", "git_stage", "git_branch"]) {
     assert.ok(!planned.has(refused), `${refused} must not exist in plan mode`);
   }
 });

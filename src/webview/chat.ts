@@ -1595,7 +1595,7 @@ function fileIcon(label: string): Parameters<typeof icon>[0] {
   if (/^(md|markdown|txt|rst|adoc|log|pdf|docx?)$/.test(ext)) return "doc";
   if (/^(png|jpe?g|gif|svg|webp|bmp|ico|avif)$/.test(ext)) return "image";
   if (
-    /^(ts|tsx|js|jsx|mjs|cjs|py|rb|go|rs|java|kt|c|h|cc|cpp|hpp|cs|php|swift|scala|sh|bash|zsh|ps1|lua|dart|vue|svelte|html?|css|scss|less|rpgle?|sqlrpgle|clle?|clp|dds|pf|lf|dspf|prtf|cbl|cblle|pgm|mbr)$/.test(ext)
+    /^(ts|tsx|js|jsx|mjs|cjs|py|rb|go|rs|java|kt|c|h|cc|cpp|hpp|cs|php|swift|scala|sh|bash|zsh|ps1|lua|dart|vue|svelte|html?|css|scss|less|cbl)$/.test(ext)
   ) {
     return "code";
   }
@@ -2289,8 +2289,6 @@ const MENTIONS: Suggestion[] = [
   { token: "#problems", hint: t("the errors and warnings from the language servers"), complete: "#problems " },
   { token: "#terminal", hint: t("what is selected in the terminal"), complete: "#terminal " },
   { token: "#sym:", hint: t("a symbol by name"), complete: "#sym:" },
-  { token: "#member:", hint: t("an IBM i source member — LIB/SRCFILE(MEMBER)"), complete: "#member:" },
-  { token: "#db2:", hint: t("the result of a Db2 for i query that reads"), complete: "#db2:" },
 ];
 
 const PARTICIPANTS: Suggestion[] = [
@@ -2298,8 +2296,6 @@ const PARTICIPANTS: Suggestion[] = [
   { token: "@editor", hint: t("the file on screen and the editor's state"), complete: "@editor " },
   { token: "@terminal", hint: t("the last command and what it printed"), complete: "@terminal " },
   { token: "@git", hint: t("the working tree, the history, the blame"), complete: "@git " },
-  { token: "@ibmi", hint: t("the partition: Db2 for i, members, objects"), complete: "@ibmi " },
-  { token: "@arcad", hint: t("ARCAD Elias: components, versions, cross-references"), complete: "@arcad " },
 ];
 
 /**

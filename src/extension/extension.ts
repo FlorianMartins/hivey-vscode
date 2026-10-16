@@ -39,7 +39,6 @@ import { WorkspaceContext } from "./workspace.js";
 import { McpManager } from "./integrations/mcp.js";
 import { watchInstructions } from "./instructions.js";
 import { createDefinition, definitionUri, DefinitionStore } from "./definitions.js";
-import { ibmiDiagnose, ibmiLibraryList } from "./integrations/ibmi.js";
 import { REMOTE_VENDORS, vendor, type ProviderId } from "../core/providers/vendors.js";
 import { checkCredentials, keyProblem, normalizeBaseUrl, urlProblem } from "../core/providers/credentials.js";
 import { NextEditWatcher } from "./nextEdit.js";
@@ -320,24 +319,6 @@ export function activate(context: vscode.ExtensionContext): void {
           ? t("Policy from {0} in force: {1} setting(s) are managed.", state.policy.organisation ?? policySource(), managed.keys.length)
           : t("Policy from {0} in force. Nothing you have set conflicts with it.", state.policy.organisation ?? policySource()),
       );
-    }),
-
-    // An instrument rather than another guess. Listings came back empty on a real partition, and
-    // there is none here to try anything against, so each fix was a hypothesis handed to somebody
-    // else to test. This says what every step returned on the machine that has the problem.
-    vscode.commands.registerCommand("hiveyCode.diagnoseIbmi", async () => {
-      const library = await vscode.window.showInputBox({
-        prompt: t("Which library is not listing? Its name goes into every query below."),
-        placeHolder: "MYLIB",
-        value: ibmiLibraryList()[0] ?? "",
-      });
-      if (!library?.trim()) return;
-      const report = await vscode.window.withProgress(
-        { location: vscode.ProgressLocation.Notification, title: t("Asking the partition…") },
-        () => ibmiDiagnose(library.trim()),
-      );
-      const doc = await vscode.workspace.openTextDocument({ language: "markdown", content: report });
-      await vscode.window.showTextDocument(doc);
     }),
 
     // What, literally, was just sent.
@@ -689,20 +670,6 @@ export function activate(context: vscode.ExtensionContext): void {
       await mcp.restart();
       const running = (await mcp.status()).filter((r) => r.running).length;
       void vscode.window.showInformationMessage(t("{0} MCP server(s) connected.", running));
-    }),
-
-    vscode.commands.registerCommand("hiveyCode.setArcadCredentials", async () => {
-      const user = await vscode.window.showInputBox({ prompt: t("IBM i user profile for the ARCAD Elias server") });
-      if (!user) return;
-      const password = await vscode.window.showInputBox({ prompt: t("Password"), password: true });
-      if (!password) return;
-      await keys.storeArcad(user, password);
-      void vscode.window.showInformationMessage(t("ARCAD credentials stored in the system keychain."));
-    }),
-
-    vscode.commands.registerCommand("hiveyCode.clearArcadCredentials", async () => {
-      await keys.clearArcad();
-      void vscode.window.showInformationMessage(t("ARCAD credentials cleared."));
     }),
 
     vscode.commands.registerCommand("hiveyCode.clearApiKey", async () => {

@@ -15,13 +15,23 @@ l'extension fait, pas ce qu'elle promet.
 | Fichier ou sélection que vous joignez | Discussion | Oui si distante, anonymisé, après consentement. |
 | **Texte collé ou déposé** (> 1 200 caractères ou > 12 lignes) | Joint à la discussion plutôt qu'inséré dans la zone de saisie | Oui si distante, anonymisé comme n'importe quelle pièce jointe, et clôturé comme contenu non fiable. |
 | **Image collée ou déposée** | Jointe à la discussion, réduite à 1 600 px de côté par le panneau | Oui si distante — **et c'est la seule donnée que l'anonymisation ne peut pas toucher** (voir ci-dessous). |
+| **Enregistrement de votre voix** (dictée) | Transcrit en texte dans la zone de saisie | **Non** avec une commande locale (`dictation.command`) ou le transcripteur Whisper installé sur la machine. Oui si seul `dictation.endpoint` est défini — et, comme une image, un enregistrement ne peut pas être pseudonymisé : il passe par la même carte de consentement. |
 | Fichiers lus par l'agent | Discussion en mode agent | Idem, ré-anonymisés à **chaque** étape. |
+| Résultats d'outils d'un tour (lectures, recherches, sorties de commandes) | Conservés en entier, **en mémoire**, pour les outils `recall` et `search_memory` (cinq conversations au plus, 64 Mo chacune au plus) | **Non** en eux-mêmes : seul ce que le modèle relit repart dans la discussion, ré-anonymisé comme tout résultat d'outil. Rien n'est écrit sur le disque. |
+| Votre dernière question et la réponse | Suggestion de la prochaine demande (`chat.suggestNext`), petite requête sans réflexion | Vers un serveur local ou auto-hébergé de confiance : telle quelle. Vers un fournisseur distant : anonymisée, et **seulement** si vous avez déjà consenti pour cet hôte et ce modèle (ou `egressPolicy: "trust"`) ; sinon, et si elle contient un identifiant, rien ne part. |
+| Une note de l'agent écrite dans la mauvaise langue | Traduite vers votre langue par une petite requête (filet de sécurité de la règle de langue) | Mêmes règles que la suggestion : aucune question posée, envoi uniquement là où l'envoi est déjà consenti. |
 | Diff indexé (`git diff --cached`) | Message de commit | Idem. |
 | Sélection du terminal | « Expliquer la sortie » | Idem. |
 | Clés d'API | Trousseau du système (`SecretStorage`) | Envoyées uniquement au fournisseur concerné, dans l'en-tête d'autorisation. |
 | Historique des discussions | `workspaceState` de VS Code, sur le disque local | **Non.** |
 | Journal des envois | `globalState` de VS Code, sur le disque local | **Non.** Métadonnées seulement. |
 | Statistiques d'usage | Compteur en mémoire, remis à zéro à chaque session | **Aucune télémétrie, nulle part.** |
+
+« Distante » s'entend d'un fournisseur cloud, ou d'une adresse hors du réseau quand la confiance
+dans vos propres serveurs est retirée. Par défaut (`privacy.trustSelfHosted: true`), le point d'accès
+`local` et votre passerelle `openai-compatible` sont des environnements de confiance **quelle que soit
+leur adresse** : les requêtes y partent telles quelles, sans pseudonymisation ni confirmation. Une
+politique d'organisation qui interdit les envois non pseudonymisés annule cette confiance.
 
 ## Ce qui n'est jamais journalisé
 

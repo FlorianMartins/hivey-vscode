@@ -22,22 +22,16 @@ table des matières du projet pour le modèle. → [6](06-le-contexte.md)
 **Clé d'API** — Un mot de passe long qui dit qui paye. C'est un secret.
 → [4](04-comment-on-lui-parle.md)
 
-**CL** — Le langage de commandes d'IBM i. → [11](11-ibm-i.md)
-
 **Commit** — Un instantané du projet, avec un message qui dit pourquoi. → [1](01-le-decor.md)
 
 **Compactage** — Remplacer une conversation trop longue par un résumé que le modèle écrit, sans rien
-effacer à l'écran. → [6](06-le-contexte.md)
+effacer à l'écran. Automatique par défaut, aux trois quarts du budget. → [6](06-le-contexte.md)
 
 **Complétion** — Les propositions pendant la frappe. L'usage le plus fréquent, donc celui qui décide
 de la facture. → [10](10-le-cout.md)
 
 **Contexte (fenêtre de)** — La quantité de texte qu'un modèle peut avoir sous les yeux en une fois.
 → [2](02-le-modele.md)
-
-**DDS** — Le langage qui décrit les fichiers, écrans et états imprimés d'IBM i. → [11](11-ibm-i.md)
-
-**Db2 for i** — La base de données intégrée à IBM i. → [11](11-ibm-i.md)
 
 **Dépôt** (*repository*, *repo*) — Le dossier d'un projet, plus tout son historique.
 → [1](01-le-decor.md)
@@ -72,9 +66,6 @@ un bug qu'on corrigera : c'est le mécanisme. → [2](02-le-modele.md)
 → [5](05-les-trois-modes-et-les-outils.md)
 
 **HTTP** — Le protocole du web, utilisé aussi par les API. → [4](04-comment-on-lui-parle.md)
-
-**IBM i** — Le système d'IBM (ex-AS/400) qui fait tourner des applications de gestion depuis les
-années 1980. → [11](11-ibm-i.md)
 
 **Index vectoriel** — Une collection d'embeddings qui permet de chercher par le sens. **Ce projet n'en
 a pas**, délibérément. → [7](07-rag-et-memoire.md)
@@ -113,7 +104,7 @@ promesse de confidentialité **vérifiable** au lieu de croyable. → [1](01-le-
 n'existe pas**, pas parce qu'on le lui a demandé. → [5](05-les-trois-modes-et-les-outils.md)
 
 **Préréglage Hivey** — Une **intention** plutôt qu'un modèle : un routage qui attribue un modèle à
-chaque rôle. → [10](10-le-cout.md)
+chaque rôle. ⚠️ Son libellé et son identifiant ne se correspondent pas. → [10](10-le-cout.md)
 
 **Prompt** — Le texte envoyé au modèle, consignes invisibles incluses (le *prompt système*).
 → [2](02-le-modele.md)
@@ -130,8 +121,8 @@ question. Le modèle **n'apprend rien**. → [7](07-rag-et-memoire.md)
 **Récence** — L'ancienneté d'un modèle, utilisée pour choisir le plus récent. ⚠️ Elle était
 revendiquée dans ce projet et **n'existait pas**, par une erreur d'arrondi. → [10](10-le-cout.md)
 
-**RPG** — Le langage historique d'IBM i, en plusieurs formes dont certaines où **la colonne change le
-sens**. → [11](11-ibm-i.md)
+**Réflexion (niveau de)** — Combien le modèle « réfléchit » avant de répondre : Direct, Bref,
+Standard, Approfondi. Plus de réflexion, c'est plus de jetons. → [2](02-le-modele.md)
 
 **SIEM** — Le système où une entreprise centralise ses journaux de sécurité.
 → [9](09-la-confidentialite.md)
@@ -163,7 +154,7 @@ la description de ses outils, que le modèle lit comme des ordres. → [8](08-mc
 → [1](01-le-decor.md)
 
 **`.vsix`** — Le fichier d'une extension VS Code : une archive qu'on installe.
-→ [1](01-le-decor.md), [13](13-installer-et-sen-servir.md)
+→ [1](01-le-decor.md), [12](12-installer-et-sen-servir.md)
 
 **Worktree** — Une copie de travail séparée d'un dépôt git, où une tâche de fond travaille sans
 toucher à la vôtre. → [5](05-les-trois-modes-et-les-outils.md)

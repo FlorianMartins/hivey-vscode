@@ -3,7 +3,7 @@
 // The request behind this file was "total control of the tool", and the shape that answers it is
 // not a settings page. It is a directory of Markdown files in the repository:
 //
-//   .hiveycode/skills/review-rpg.md      a named set of instructions, invoked with /review-rpg
+//   .hiveycode/skills/review-api.md      a named set of instructions, invoked with /review-api
 //   .hiveycode/agents/db-explorer.md     a sub-agent with its own prompt, tools and model
 //
 // Files rather than settings, for three reasons that are the whole design:
@@ -23,7 +23,7 @@
 
 export interface Skill {
   kind: "skill";
-  /** The invocation name: `/review-rpg`. Lowercase, no spaces. */
+  /** The invocation name: `/review-api`. Lowercase, no spaces. */
   name: string;
   /** Shown in the slash-command list, and given to the model so it knows when this applies. */
   description: string;
@@ -137,7 +137,7 @@ export const BUILTIN_AGENTS: AgentDefinition[] = [
     kind: "agent",
     name: "dba",
     description: "Answers questions about the database: schema, queries, indexes. Reads only.",
-    tools: ["ibmi_sql", "ibmi_objects", "ibmi_library_list", "read_file", "search_text"],
+    tools: ["read_file", "search_text"],
     maxSteps: 12,
     source: "built-in",
     body: [
@@ -145,7 +145,6 @@ export const BUILTIN_AGENTS: AgentDefinition[] = [
       "decide most of the answer, and guessing at them produces SQL that parses and returns the wrong rows.",
       "",
       "Run only statements that read. Give the query, say what it will scan, and name the index it depends on.",
-      "On Db2 for i, qualify objects and use FETCH FIRST rather than LIMIT.",
     ].join("\n"),
   },
 ];
@@ -156,7 +155,7 @@ export const BUILTIN_AGENTS: AgentDefinition[] = [
  * Deliberately forgiving about layout and strict about identity. Whitespace, CRLF, a missing
  * trailing newline and quoted values are all accepted, because the file is written by hand. A
  * missing or malformed `name` is not, because the name is how it is invoked — a skill called
- * `Review RPG` would be `/Review RPG`, which nobody can type.
+ * `Review API` would be `/Review API`, which nobody can type.
  */
 export function parseDefinition(kind: "skill" | "agent", source: string, text: string): ParseResult {
   const problems: string[] = [];

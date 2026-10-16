@@ -1,6 +1,6 @@
-# 12. La qualité mesurée
+# 11. La qualité mesurée
 
-[← Chapitre précédent](11-ibm-i.md) · [Sommaire](README.md) · [Chapitre suivant →](13-installer-et-sen-servir.md)
+[← Chapitre précédent](10-le-cout.md) · [Sommaire](README.md) · [Chapitre suivant →](12-installer-et-sen-servir.md)
 
 ## Le problème : tout le monde dit être le meilleur
 
@@ -14,7 +14,7 @@ mesurer mais de s'assurer que la mesure veut dire quelque chose.
 ## Ce qu'est un banc d'évaluation
 
 Un **banc d'évaluation** (*benchmark*) est un jeu de tâches avec une réponse vérifiable
-automatiquement. Celui de ce projet contient **62 tâches** : des petits dépôts cassés, une consigne,
+automatiquement. Celui de ce projet contient **40 tâches** : des petits dépôts cassés, une consigne,
 et un **contrôle** — une commande qui réussit si le travail est fait et échoue sinon.
 
 Par exemple : un petit programme qui compte des lignes, la consigne « ajoute une option `--json` », et
@@ -56,7 +56,7 @@ chiffres sont là, à jour, plutôt que recopiés ici où ils vieilliraient.
 
 Mais la **forme** du résultat vaut d'être racontée, parce qu'elle est contre-intuitive.
 
-**Le modèle local a obtenu 0 sur 56.** Et le chiffre qui explique ce zéro n'est pas le zéro : c'est
+**Le modèle local a obtenu 0 sur 56**, sur le jeu de 56 tâches de l'époque. Et le chiffre qui explique ce zéro n'est pas le zéro : c'est
 que dans **51 cas sur 56, le modèle n'a pris aucune action**. Il écrivait la modification dans un bloc
 de code et demandait « souhaitez-vous que je procède ? ». Dans les cinq cas où il a agi, il n'a
 **jamais** appelé d'outil d'édition.
@@ -71,7 +71,7 @@ contrôle a échoué quand même. C'est ce chiffre qui décide si on peut laisse
 un modèle qui échoue bruyamment vous coûte un tour, un modèle qui échoue **en annonçant une
 réussite** coûte la confiance qui rend l'outil utilisable.
 
-Et deux chiffres qui donnent l'échelle, mesurés sur le jeu complet : **le préréglage gratuit réussit
+Et deux chiffres qui donnent l'échelle, mesurés sur l'ancien jeu de 62 tâches : **le préréglage gratuit réussit
 la moitié des tâches, pour rien** — il ne dit pas que le gratuit suffit, il dit où il s'arrête. Et un
 modèle payant bon marché en réussit près des trois quarts pour **quatre centimes sur 62 tâches**.
 
@@ -115,10 +115,10 @@ rend le tableau digne de confiance : il préfère ne rien dire que dire quelque 
 
 C'est la chose la plus désagréable à admettre sur un banc d'essai, et c'est mesuré ici : **trois
 séries de la même configuration, sur les mêmes tâches, avec le même programme, ont donné 48, 47 et
-50 réussites.** Rien n'avait changé entre elles.
+50 réussites sur 56.** Rien n'avait changé entre elles.
 
 La raison est dans le [chapitre 2](02-le-modele.md) : un modèle de langage ne produit pas deux fois
-la même réponse. Sur 62 tâches, deux ou trois basculent d'un côté ou de l'autre.
+la même réponse. Sur quelques dizaines de tâches, deux ou trois basculent d'un côté ou de l'autre.
 
 La conséquence est sévère et vaut pour tous les chiffres que vous lirez ailleurs : **une différence
 plus petite que cet écart n'est pas un résultat.** Quand un outil annonce « 3 % de mieux », la
@@ -200,8 +200,14 @@ npm run check:course
 ```
 
 C'est la seule façon qu'un document comme celui-ci ne pourrisse pas. Un document qu'on *promet* de
-maintenir n'est pas maintenu ; un document dont l'obsolescence casse le build l'est. Le même
-raisonnement vaut pour les chiffres cités dans les README, vérifiés par `npm run check:numbers` —
-parce qu'un nombre écrit dans une phrase n'a aucune raison de suivre la chose qu'il décrit.
+maintenir n'est pas maintenu ; un document dont l'obsolescence casse le build l'est. Le même contrôle tient ensemble les
+deux éditions, française et anglaise, sur les mêmes chapitres et la même version — parce qu'une
+traduction est, dans un dépôt, la chose la plus sûre de prendre du retard. Et le même raisonnement
+vaut pour les chiffres cités dans les README, vérifiés par `npm run check:numbers` — parce qu'un
+nombre écrit dans une phrase n'a aucune raison de suivre la chose qu'il décrit.
 
-[← Chapitre précédent](11-ibm-i.md) · [Sommaire](README.md) · [Chapitre suivant →](13-installer-et-sen-servir.md)
+⚠️ Ce contrôle en a trouvé un dans ce cours même : l'index annonçait vingt-six décisions motivées alors
+qu'il y en avait 37. Il échappait au garde-fou pour une raison qui vaut d'être retenue : **un nombre
+écrit en toutes lettres ne peut pas être vérifié.** C'est un chiffre, maintenant.
+
+[← Chapitre précédent](10-le-cout.md) · [Sommaire](README.md) · [Chapitre suivant →](12-installer-et-sen-servir.md)

@@ -57,7 +57,6 @@ export const GUARDED_KEYS = [
   "permissions.autoApprove",
   "permissions.allowedPaths",
   "permissions.allowedCommands",
-  "ibmi.writableLibraries",
   "corpus.enabled",
   "siem.rejectUnauthorized",
   "background.image",

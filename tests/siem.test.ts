@@ -45,7 +45,7 @@ test("the exported row is built from an allow-list, so a new field does not esca
   const withContent = {
     ...ROW,
     prompt: "the customer DURAND owes 12 000 EUR",
-    answer: "here is the corrected RPG",
+    answer: "here is the corrected code",
     attachments: ["/home/fmartins/clients/durand/contrat.docx"],
     redactedValues: ["durand@example.com"],
   };

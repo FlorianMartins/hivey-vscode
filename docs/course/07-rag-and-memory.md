@@ -85,8 +85,15 @@ A distinction that comes up often and is worth keeping in mind:
 | **The context** | nowhere, rebuilt every turn | what the model sees now ([chapter 6](06-the-context.md)) |
 | **The knowledge base** | Markdown files on your machine | what the team has established, durably |
 | **The history** | your workspace | past conversations, searchable |
+| **Memory with recall** | your machine's memory, for the length of the conversation | every tool output, whole |
 
-None of these three is "the model's memory". The model has no memory ([chapter 2](02-the-model.md)):
-these are three ways of giving it back, every time, what it needs.
+The last row deserves a sentence. When an old tool output (a file read, a search, a command) has to be
+shortened to fit in the window, the model gets a label that gives it back **word for word**: the
+`recall` tool rereads a kept output, and `search_memory` finds a passage by keywords in those outputs
+and in every message of the conversation, even the ones no longer sent. Nothing is summarised on the
+way.
+
+None of these four is "the model's memory". The model has no memory ([chapter 2](02-the-model.md)):
+these are four ways of giving it back, every time, what it needs.
 
 [← Previous chapter](06-the-context.md) · [Contents](README.md) · [Next chapter →](08-mcp.md)

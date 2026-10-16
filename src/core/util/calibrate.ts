@@ -13,7 +13,7 @@
 //
 // Three properties make this safe to trust:
 //   • per model, because a factor learned from an English-heavy Claude conversation does not
-//     describe a Qwen model reading RPG fixed-format source;
+//     describe a Qwen model reading minified JavaScript;
 //   • bounded, so one absurd sample — a provider that reports usage for a cached prefix, a request
 //     that failed halfway — cannot move the estimate somewhere useless;
 //   • it decays towards new evidence rather than averaging for ever, so a user who switches from

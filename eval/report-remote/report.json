@@ -234,562 +234,6 @@
       ]
     },
     {
-      "task": "ibmi-cl-monmsg",
-      "kind": "ibmi",
-      "model": "x-ai/grok-4.7",
-      "passed": true,
-      "seconds": 9.8,
-      "agentExit": 0,
-      "runs": [
-        {
-          "model": "x-ai/grok-4.7",
-          "steps": 2,
-          "promptTokens": 7480,
-          "completionTokens": 496,
-          "usd": 0.011023999999999999,
-          "stoppedBecause": "answer",
-          "truncated": false,
-          "tools": {
-            "read_file": 1,
-            "edit_file": 1
-          },
-          "ms": 9699
-        }
-      ]
-    },
-    {
-      "task": "ibmi-cl-qualify",
-      "kind": "ibmi",
-      "model": "x-ai/grok-4.7",
-      "passed": true,
-      "seconds": 22.4,
-      "agentExit": 0,
-      "runs": [
-        {
-          "model": "x-ai/grok-4.7",
-          "steps": 2,
-          "promptTokens": 7580,
-          "completionTokens": 1559,
-          "usd": 0.017602,
-          "stoppedBecause": "answer",
-          "truncated": false,
-          "tools": {
-            "read_file": 1,
-            "write_file": 1
-          },
-          "ms": 22275
-        }
-      ]
-    },
-    {
-      "task": "ibmi-cl-sbmjob",
-      "kind": "ibmi",
-      "model": "x-ai/grok-4.7",
-      "passed": false,
-      "seconds": 87.2,
-      "agentExit": 0,
-      "runs": [
-        {
-          "model": "x-ai/grok-4.7",
-          "steps": 2,
-          "promptTokens": 7595,
-          "completionTokens": 7360,
-          "usd": 0.052629999999999996,
-          "stoppedBecause": "answer",
-          "truncated": false,
-          "tools": {
-            "read_file": 1,
-            "write_file": 1
-          },
-          "ms": 87084
-        }
-      ],
-      "why": "",
-      "agent": "list, and a failed `SBMJOB` still falls through to the success message. I’ll pin the job name, job description, and library list, and turn a submit failure into an escape.\u001b[2m  auto-approved: write NIGHTLY.clle\u001b[0m\n\u001b[1m\n  NIGHTLY.clle\u001b[0m\n\u001b[31m  - /* Submit the nightly close. */\u001b[0m\n\u001b[31m  -              SBMJOB     CMD(CALL PGM(NIGHTCLS))\u001b[0m\n\u001b[32m  +              DCL        VAR(&MSGID) TYPE(*CHAR) LEN(7)\u001b[0m\n\u001b[32m  +              DCL        VAR(&FAILTXT) TYPE(*CHAR) LEN(80)\u001b[0m\n\u001b[32m  + \u001b[0m\n\u001b[32m  + /* Submit the nightly close under a fixed job name, job      */\u001b[0m\n\u001b[32m  + /* description and library list — not the caller's.          */\u001b[0m\n\u001b[32m  +              SBMJOB     CMD(CALL PGM(NIGHTCLS)) +\u001b[0m\n\u001b[32m  +                           JOB(NIGHTCLS) +\u001b[0m\n\u001b[32m  +                           JOBD(NIGHTLIB/NIGHTLY) +\u001b[0m\n\u001b[32m  +                           INLLIBL(NIGHTLIB QGPL QTEMP)\u001b[0m\n\u001b[32m  +              MONMSG     MSGID(CPF0000) EXEC(DO)\u001b[0m\n\u001b[32m  +                RCVMSG     MSGTYPE(*EXCP) MSGID(&MSGID) RMV(*NO)\u001b[0m\n\u001b[32m  +                CHGVAR     VAR(&FAILTXT) +\u001b[0m\n\u001b[32m  +                             VALUE('Nightly submit failed: ' *CAT +\u001b[0m\n\u001b[32m  +                             &MSGID)\u001b[0m\n\u001b[32m  +                SNDPGMMSG  MSGID(CPF9898) MSGF(QCPFMSG) +\u001b[0m\n\u001b[32m  +                             MSGDTA(&FAILTXT) MSGTYPE(*ESCAPE)\u001b[0m\n\u001b[32m  +              ENDDO\u001b[0m\n\n\u001b[2m  wrote NIGHTLY.clle\u001b[0m\n`NIGHTLY.clle` no longer submits with a bare `SBMJOB`. The nightly close is now submitted as job `NIGHTCLS`, under job description `NIGHTLIB/NIGHTLY`, with an initial library list of `NIGHTLIB`, `QGPL`, and `QTEMP`, so it no longer inherits the caller’s job description, library list, or output queue.\n\nThe submission itself is monitored. Any exception (`CPF0000`) is received, and the program sends `CPF9898` as an escape — `Nightly submit failed: ` plus the failing message id — instead of falling through to `Nightly submitted`.\n\u001b[2m  7595+7360 tokens · $0.0526\u001b[0m\n"
-    },
-    {
-      "task": "ibmi-db2-catalog",
-      "kind": "ibmi",
-      "model": "x-ai/grok-4.7",
-      "passed": true,
-      "seconds": 27.2,
-      "agentExit": 0,
-      "runs": [
-        {
-          "model": "x-ai/grok-4.7",
-          "steps": 1,
-          "promptTokens": 4793,
-          "completionTokens": 2064,
-          "usd": 0.016978,
-          "stoppedBecause": "answer",
-          "truncated": false,
-          "tools": {
-            "write_file": 1
-          },
-          "ms": 27065
-        }
-      ]
-    },
-    {
-      "task": "ibmi-db2-commit",
-      "kind": "ibmi",
-      "model": "x-ai/grok-4.7",
-      "passed": false,
-      "seconds": 21.8,
-      "agentExit": 0,
-      "runs": [
-        {
-          "model": "x-ai/grok-4.7",
-          "steps": 4,
-          "promptTokens": 10068,
-          "completionTokens": 1473,
-          "usd": 0.018798000000000002,
-          "stoppedBecause": "answer",
-          "truncated": false,
-          "tools": {
-            "search_text": 1,
-            "list_files": 1,
-            "read_file": 1,
-            "edit_file": 1
-          },
-          "ms": 21743
-        }
-      ],
-      "why": "",
-      "agent": "emote, redaction strict\u001b[0m\u001b[0m\n\u001b[2m/help for the commands, Ctrl+C to quit.\n\u001b[0m\nI'll look up the transfer program and see how the two account updates are written today.\u001b[2m  0 match(es)\u001b[0m\n\u001b[2m  1 file(s)\u001b[0m\n\u001b[2m  read TRANSFER.sqlrpgle\u001b[0m\nThe two updates run independently, so a failure after the debit never credits the other account. I'll put them in one transaction and only commit when both SQLCODEs are zero.\u001b[2m  auto-approved: edit TRANSFER.sqlrpgle\u001b[0m\n\u001b[1m\n  TRANSFER.sqlrpgle\u001b[0m\n\u001b[31m  - exec sql\u001b[0m\n\u001b[31m  -   update ACCOUNT set BALANCE = BALANCE - :cents where ACCTNO = :fromAcct;\u001b[0m\n\u001b[31m  - \u001b[0m\n\u001b[31m  - exec sql\u001b[0m\n\u001b[31m  -   update ACCOUNT set BALANCE = BALANCE + :cents where ACCTNO = :toAcct;\u001b[0m\n\u001b[32m  + exec sql set option commit = *chg;\u001b[0m\n\u001b[32m  + \u001b[0m\n\u001b[32m  + exec sql\u001b[0m\n\u001b[32m  +   update ACCOUNT set BALANCE = BALANCE - :cents where ACCTNO = :fromAcct;\u001b[0m\n\u001b[32m  + \u001b[0m\n\u001b[32m  + if sqlcode <> 0;\u001b[0m\n\u001b[32m  +   inError = *on;\u001b[0m\n\u001b[32m  + else;\u001b[0m\n\u001b[32m  +   exec sql\u001b[0m\n\u001b[32m  +     update ACCOUNT set BALANCE = BALANCE + :cents where ACCTNO = :toAcct;\u001b[0m\n\u001b[32m  + \u001b[0m\n\u001b[32m  +   if sqlcode <> 0;\u001b[0m\n\u001b[32m  +     inError = *on;\u001b[0m\n\u001b[32m  +   endif;\u001b[0m\n\u001b[32m  + endif;\u001b[0m\n\u001b[32m  + \u001b[0m\n\u001b[32m  + if inError;\u001b[0m\n\u001b[32m  +   exec sql rollback;\u001b[0m\n\u001b[32m  + else;\u001b[0m\n\u001b[32m  +   exec sql commit;\u001b[0m\n\u001b[32m  +   if sqlcode <> 0;\u001b[0m\n\u001b[32m  +     inError = *on;\u001b[0m\n\u001b[32m  +     exec sql rollback;\u001b[0m\n\u001b[32m  +   endif;\u001b[0m\n\u001b[32m  + endif;\u001b[0m\n\n\u001b[2m  edited TRANSFER.sqlrpgle\u001b[0m\nBoth updates now share one commitment-control unit of work.\n\n- `SET OPTION COMMIT = *CHG` turns commitment control on for the module.\n- `SQLCODE` is checked after the debit, the credit, and the commit.\n- Both succeed and the commit returns zero: the transfer is committed and `inError` stays off.\n- Either update fails, or the commit itself fails: `inError` is set and the work is rolled back, so the debit cannot stand without the credit.\n\u001b[2m  10068+1473 tokens · $0.0188\u001b[0m\n"
-    },
-    {
-      "task": "ibmi-db2-ddl",
-      "kind": "ibmi",
-      "model": "x-ai/grok-4.7",
-      "passed": true,
-      "seconds": 9.2,
-      "agentExit": 0,
-      "runs": [
-        {
-          "model": "x-ai/grok-4.7",
-          "steps": 2,
-          "promptTokens": 8102,
-          "completionTokens": 463,
-          "usd": 0.009766,
-          "stoppedBecause": "answer",
-          "truncated": false,
-          "tools": {
-            "read_file": 1,
-            "write_file": 1
-          },
-          "ms": 9074
-        }
-      ]
-    },
-    {
-      "task": "ibmi-dds-field",
-      "kind": "ibmi",
-      "model": "x-ai/grok-4.7",
-      "passed": true,
-      "seconds": 18.9,
-      "agentExit": 0,
-      "runs": [
-        {
-          "model": "x-ai/grok-4.7",
-          "steps": 3,
-          "promptTokens": 10969,
-          "completionTokens": 1587,
-          "usd": 0.018404,
-          "stoppedBecause": "answer",
-          "truncated": false,
-          "tools": {
-            "read_file": 1,
-            "run_command": 1,
-            "edit_file": 1
-          },
-          "ms": 18754
-        }
-      ]
-    },
-    {
-      "task": "ibmi-dds-logical",
-      "kind": "ibmi",
-      "model": "x-ai/grok-4.7",
-      "passed": true,
-      "seconds": 33.9,
-      "agentExit": 0,
-      "runs": [
-        {
-          "model": "x-ai/grok-4.7",
-          "steps": 2,
-          "promptTokens": 7327,
-          "completionTokens": 2659,
-          "usd": 0.021968,
-          "stoppedBecause": "answer",
-          "truncated": false,
-          "tools": {
-            "read_file": 1,
-            "write_file": 1
-          },
-          "ms": 33802
-        }
-      ]
-    },
-    {
-      "task": "ibmi-dds-printer",
-      "kind": "ibmi",
-      "model": "x-ai/grok-4.7",
-      "passed": true,
-      "seconds": 87.6,
-      "agentExit": 0,
-      "runs": [
-        {
-          "model": "x-ai/grok-4.7",
-          "steps": 3,
-          "promptTokens": 11334,
-          "completionTokens": 6187,
-          "usd": 0.051342000000000006,
-          "stoppedBecause": "answer",
-          "truncated": false,
-          "tools": {
-            "read_file": 1,
-            "run_command": 1,
-            "write_file": 1
-          },
-          "ms": 87488
-        }
-      ]
-    },
-    {
-      "task": "ibmi-rpg-copy-proto",
-      "kind": "ibmi",
-      "model": "x-ai/grok-4.7",
-      "passed": true,
-      "seconds": 33.4,
-      "agentExit": 0,
-      "runs": [
-        {
-          "model": "x-ai/grok-4.7",
-          "steps": 5,
-          "promptTokens": 10427,
-          "completionTokens": 2164,
-          "usd": 0.02539,
-          "stoppedBecause": "answer",
-          "truncated": false,
-          "tools": {
-            "search_text": 1,
-            "list_files": 1,
-            "read_file": 1,
-            "write_file": 1,
-            "edit_file": 1
-          },
-          "ms": 33258
-        }
-      ]
-    },
-    {
-      "task": "ibmi-rpg-doc",
-      "kind": "ibmi",
-      "model": "x-ai/grok-4.7",
-      "passed": true,
-      "seconds": 24.9,
-      "agentExit": 0,
-      "runs": [
-        {
-          "model": "x-ai/grok-4.7",
-          "steps": 6,
-          "promptTokens": 14285,
-          "completionTokens": 1126,
-          "usd": 0.022845999999999998,
-          "stoppedBecause": "answer",
-          "truncated": false,
-          "tools": {
-            "read_file": 2,
-            "search_text": 1,
-            "list_files": 1,
-            "edit_file": 2
-          },
-          "ms": 24725
-        }
-      ]
-    },
-    {
-      "task": "ibmi-rpg-fixed-lr",
-      "kind": "ibmi",
-      "model": "x-ai/grok-4.7",
-      "passed": true,
-      "seconds": 51.6,
-      "agentExit": 0,
-      "runs": [
-        {
-          "model": "x-ai/grok-4.7",
-          "steps": 2,
-          "promptTokens": 7507,
-          "completionTokens": 3300,
-          "usd": 0.02771,
-          "stoppedBecause": "answer",
-          "truncated": false,
-          "tools": {
-            "read_file": 1,
-            "edit_file": 1
-          },
-          "ms": 51484
-        }
-      ]
-    },
-    {
-      "task": "ibmi-rpg-freeform",
-      "kind": "ibmi",
-      "model": "x-ai/grok-4.7",
-      "passed": true,
-      "seconds": 92.5,
-      "agentExit": 0,
-      "runs": [
-        {
-          "model": "x-ai/grok-4.7",
-          "steps": 4,
-          "promptTokens": 14077,
-          "completionTokens": 6124,
-          "usd": 0.049729999999999996,
-          "stoppedBecause": "answer",
-          "truncated": false,
-          "tools": {
-            "read_file": 1,
-            "run_command": 2,
-            "write_file": 1
-          },
-          "ms": 92387
-        }
-      ]
-    },
-    {
-      "task": "ibmi-rpg-indicators",
-      "kind": "ibmi",
-      "model": "x-ai/grok-4.7",
-      "passed": true,
-      "seconds": 21.4,
-      "agentExit": 0,
-      "runs": [
-        {
-          "model": "x-ai/grok-4.7",
-          "steps": 4,
-          "promptTokens": 10451,
-          "completionTokens": 1218,
-          "usd": 0.019762,
-          "stoppedBecause": "answer",
-          "truncated": false,
-          "tools": {
-            "list_files": 1,
-            "search_text": 1,
-            "read_file": 1,
-            "edit_file": 1
-          },
-          "ms": 21270
-        }
-      ]
-    },
-    {
-      "task": "ibmi-rpg-monitor",
-      "kind": "ibmi",
-      "model": "x-ai/grok-4.7",
-      "passed": true,
-      "seconds": 8.2,
-      "agentExit": 0,
-      "runs": [
-        {
-          "model": "x-ai/grok-4.7",
-          "steps": 4,
-          "promptTokens": 9859,
-          "completionTokens": 294,
-          "usd": 0.009770000000000001,
-          "stoppedBecause": "answer",
-          "truncated": false,
-          "tools": {
-            "search_text": 1,
-            "list_files": 1,
-            "read_file": 1,
-            "edit_file": 1
-          },
-          "ms": 8116
-        }
-      ]
-    },
-    {
-      "task": "ibmi-rpg-move",
-      "kind": "ibmi",
-      "model": "x-ai/grok-4.7",
-      "passed": true,
-      "seconds": 273.4,
-      "agentExit": 124,
-      "runs": [
-        {
-          "model": "x-ai/grok-4.7",
-          "steps": 5,
-          "promptTokens": 12927,
-          "completionTokens": 17714,
-          "usd": 0.11985000000000001,
-          "stoppedBecause": "answer",
-          "truncated": false,
-          "tools": {
-            "search_text": 2,
-            "list_files": 1,
-            "read_file": 1,
-            "edit_file": 1
-          },
-          "ms": 273300
-        }
-      ]
-    },
-    {
-      "task": "ibmi-rpg-packed",
-      "kind": "ibmi",
-      "model": "x-ai/grok-4.7",
-      "passed": true,
-      "seconds": 44,
-      "agentExit": 0,
-      "runs": [
-        {
-          "model": "x-ai/grok-4.7",
-          "steps": 4,
-          "promptTokens": 10241,
-          "completionTokens": 2799,
-          "usd": 0.0271,
-          "stoppedBecause": "answer",
-          "truncated": false,
-          "tools": {
-            "list_files": 1,
-            "search_text": 1,
-            "read_file": 1,
-            "write_file": 1
-          },
-          "ms": 43898
-        }
-      ]
-    },
-    {
-      "task": "ibmi-rpg-procedure",
-      "kind": "ibmi",
-      "model": "x-ai/grok-4.7",
-      "passed": true,
-      "seconds": 22.8,
-      "agentExit": 0,
-      "runs": [
-        {
-          "model": "x-ai/grok-4.7",
-          "steps": 4,
-          "promptTokens": 10885,
-          "completionTokens": 1574,
-          "usd": 0.01835,
-          "stoppedBecause": "answer",
-          "truncated": false,
-          "tools": {
-            "search_text": 1,
-            "list_files": 1,
-            "read_file": 1,
-            "write_file": 1
-          },
-          "ms": 22675
-        }
-      ]
-    },
-    {
-      "task": "ibmi-rpg-sql-cursor",
-      "kind": "ibmi",
-      "model": "x-ai/grok-4.7",
-      "passed": true,
-      "seconds": 10.5,
-      "agentExit": 0,
-      "runs": [
-        {
-          "model": "x-ai/grok-4.7",
-          "steps": 3,
-          "promptTokens": 10635,
-          "completionTokens": 678,
-          "usd": 0.012474,
-          "stoppedBecause": "answer",
-          "truncated": false,
-          "tools": {
-            "read_file": 1,
-            "search_text": 1,
-            "write_file": 1
-          },
-          "ms": 10392
-        }
-      ]
-    },
-    {
-      "task": "ibmi-rpg-srvpgm",
-      "kind": "ibmi",
-      "model": "x-ai/grok-4.7",
-      "passed": true,
-      "seconds": 13.6,
-      "agentExit": 0,
-      "runs": [
-        {
-          "model": "x-ai/grok-4.7",
-          "steps": 6,
-          "promptTokens": 10445,
-          "completionTokens": 782,
-          "usd": 0.015214,
-          "stoppedBecause": "answer",
-          "truncated": false,
-          "tools": {
-            "list_files": 1,
-            "search_text": 1,
-            "read_file": 1,
-            "write_file": 3
-          },
-          "ms": 13498
-        }
-      ]
-    },
-    {
-      "task": "ibmi-rpg-unittest",
-      "kind": "test",
-      "model": "x-ai/grok-4.7",
-      "passed": true,
-      "seconds": 61.3,
-      "agentExit": 0,
-      "runs": [
-        {
-          "model": "x-ai/grok-4.7",
-          "steps": 2,
-          "promptTokens": 7796,
-          "completionTokens": 5719,
-          "usd": 0.039538,
-          "stoppedBecause": "answer",
-          "truncated": false,
-          "tools": {
-            "read_file": 1,
-            "write_file": 1
-          },
-          "ms": 61165
-        }
-      ]
-    },
-    {
-      "task": "ibmi-sql-db2",
-      "kind": "ibmi",
-      "model": "x-ai/grok-4.7",
-      "passed": true,
-      "seconds": 8.9,
-      "agentExit": 0,
-      "runs": [
-        {
-          "model": "x-ai/grok-4.7",
-          "steps": 4,
-          "promptTokens": 9681,
-          "completionTokens": 350,
-          "usd": 0.011094,
-          "stoppedBecause": "answer",
-          "truncated": false,
-          "tools": {
-            "search_text": 1,
-            "list_files": 1,
-            "read_file": 1,
-            "write_file": 1
-          },
-          "ms": 8850
-        }
-      ]
-    },
-    {
       "task": "java-equals-hashcode",
       "kind": "bug",
       "model": "x-ai/grok-4.7",
@@ -1407,19 +851,24 @@
     {
       "model": "x-ai/grok-4.7",
       "totals": {
-        "tasks": 56,
-        "passed": 52,
-        "seconds": 1485.1,
+        "tasks": 34,
+        "passed": 32,
+        "seconds": 500.6,
         "unpriced": 0,
         "outOfSteps": 0,
         "truncated": 0,
         "escalations": 0,
         "neverActed": 1,
-        "passRate": 0.9285714285714286,
-        "steps": 221,
-        "promptTokens": 606229,
-        "completionTokens": 83919,
-        "usd": 1.0684
+        "claimedDone": 1,
+        "planLeft": 0,
+        "refused": 0,
+        "timedOut": 1,
+        "selfChecked": 0,
+        "passRate": 0.9411764705882353,
+        "steps": 147,
+        "promptTokens": 391765,
+        "completionTokens": 16229,
+        "usd": 0.451
       },
       "byKind": [
         {
@@ -1433,6 +882,11 @@
             "truncated": 0,
             "escalations": 0,
             "neverActed": 0,
+            "claimedDone": 0,
+            "planLeft": 0,
+            "refused": 0,
+            "timedOut": 0,
+            "selfChecked": 0,
             "passRate": 1,
             "steps": 113,
             "promptTokens": 303555,
@@ -1451,29 +905,16 @@
             "truncated": 0,
             "escalations": 0,
             "neverActed": 0,
+            "claimedDone": 1,
+            "planLeft": 0,
+            "refused": 0,
+            "timedOut": 0,
+            "selfChecked": 0,
             "passRate": 0.6666666666666666,
             "steps": 12,
             "promptTokens": 31906,
             "completionTokens": 1232,
             "usd": 0.0374
-          }
-        },
-        {
-          "kind": "ibmi",
-          "totals": {
-            "tasks": 21,
-            "passed": 19,
-            "seconds": 923.2,
-            "unpriced": 0,
-            "outOfSteps": 0,
-            "truncated": 0,
-            "escalations": 0,
-            "neverActed": 0,
-            "passRate": 0.9047619047619048,
-            "steps": 72,
-            "promptTokens": 206668,
-            "completionTokens": 61971,
-            "usd": 0.5778
           }
         },
         {
@@ -1487,6 +928,11 @@
             "truncated": 0,
             "escalations": 0,
             "neverActed": 1,
+            "claimedDone": 0,
+            "planLeft": 0,
+            "refused": 0,
+            "timedOut": 1,
+            "selfChecked": 0,
             "passRate": 0.75,
             "steps": 12,
             "promptTokens": 27174,
@@ -1497,19 +943,24 @@
         {
           "kind": "test",
           "totals": {
-            "tasks": 4,
-            "passed": 4,
-            "seconds": 93.7,
+            "tasks": 3,
+            "passed": 3,
+            "seconds": 32.4,
             "unpriced": 0,
             "outOfSteps": 0,
             "truncated": 0,
             "escalations": 0,
             "neverActed": 0,
+            "claimedDone": 0,
+            "planLeft": 0,
+            "refused": 0,
+            "timedOut": 0,
+            "selfChecked": 0,
             "passRate": 1,
-            "steps": 12,
-            "promptTokens": 36926,
-            "completionTokens": 7606,
-            "usd": 0.0746
+            "steps": 10,
+            "promptTokens": 29130,
+            "completionTokens": 1887,
+            "usd": 0.035
           }
         }
       ]

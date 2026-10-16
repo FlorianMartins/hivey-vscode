@@ -57,11 +57,17 @@ model — nothing needed to leave for the notation to work.
 Every piece of context costs tokens, and the window is finite. So the tool keeps a **budget** and
 decides what to keep.
 
-Three design choices that show in use:
+Four design choices that show in use:
 
-- **The budget follows the window of the model actually chosen**, not a number fixed once and for all.
-  With a fixed value of 8,000 tokens, conversations were being summarised after three exchanges and
-  the answer came from the summary — when 8,000 tokens are a speck for a modern model.
+- **The budget follows the window of the model actually chosen**, not a number fixed once and for all:
+  the whole window, less a reserve for the answer and the steps that follow (a twentieth of the window,
+  at least room for one answer), as long as `hiveyCode.context.maxTokens` is 0 (the default); 8,000
+  tokens when the window is unknown. With a fixed value of 8,000 tokens, conversations were being summarised after three
+  exchanges and the answer came from the summary — when 8,000 tokens are a speck for a modern model.
+- **A file is read in pages.** With no range asked for, the reading tool returns a page of 2,000 lines
+  and says how to read on; on a large file, the model searches for the right line first and reads
+  around it. Nothing is out of reach, but a 14,000-line file read in one go weighed on every later step
+  of the turn.
 - **An attachment that is too large arrives as an outline**: every symbol it declares with its line,
   followed by its beginning — rather than its first N lines and nothing about the rest. An outline says
   *what the file is about*; its first hundred lines say only how it starts.
@@ -71,6 +77,14 @@ Three design choices that show in use:
 
 When the conversation fills its budget, it is **compacted**: the model writes a summary of the
 exchange, and it is the summary that is sent from then on.
+
+It happens **by itself** (`hiveyCode.context.autoCompact`, on by default): at three quarters of the
+budget, the conversation is summarised before the question is sent, and the question goes right after
+the summary. If the context fills up **in the middle of a task**, what has already been done is noted
+in the answer, the conversation is summarised, and the task picks up where it stopped. A **Stop**
+during the summary also cancels what was going to follow. With the setting off, you are **offered** a
+summary from 70%, and a full context asks you a question instead of failing. `/compact` does it on
+demand.
 
 Two things to know:
 

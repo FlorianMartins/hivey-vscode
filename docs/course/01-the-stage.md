@@ -50,7 +50,7 @@ suggestions as you type, and the ability to change files if you ask it to.
 
 An extension is delivered as a file ending in **`.vsix`**. It is an archive — a box, like a `.zip` —
 containing the extension's program, its images and its documentation. The editor knows how to open
-and install it. [Chapter 13](13-install-and-use.md) shows how.
+and install it. [Chapter 12](12-install-and-use.md) shows how.
 
 ## The repository, the commit, the branch
 

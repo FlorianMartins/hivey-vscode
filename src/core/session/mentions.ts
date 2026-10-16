@@ -22,9 +22,7 @@ export type MentionKind =
   | "changes"
   | "problems"
   | "terminal"
-  | "symbol"
-  | "member"
-  | "sql";
+  | "symbol";
 
 export interface Mention {
   kind: MentionKind;
@@ -34,7 +32,7 @@ export interface Mention {
   raw: string;
 }
 
-export type Participant = "workspace" | "terminal" | "git" | "ibmi" | "arcad" | "editor";
+export type Participant = "workspace" | "terminal" | "git" | "editor";
 
 export interface ParsedPrompt {
   /** The question, with the participant removed and the mentions left where they were. */
@@ -59,16 +57,12 @@ const BARE: Record<string, MentionKind> = {
   terminalselection: "terminal",
 };
 
-/** The notations that take one. `#file:src/a.ts`, `#sym:parseInvoice`, `#db2:select …`. */
+/** The notations that take one. `#file:src/a.ts`, `#sym:parseInvoice`. */
 const WITH_ARGUMENT: Record<string, MentionKind> = {
   file: "file",
   path: "file",
   sym: "symbol",
   symbol: "symbol",
-  member: "member",
-  ibmi: "member",
-  db2: "sql",
-  sql: "sql",
 };
 
 const PARTICIPANTS: Record<string, Participant> = {
@@ -76,8 +70,6 @@ const PARTICIPANTS: Record<string, Participant> = {
   codebase: "workspace",
   terminal: "terminal",
   git: "git",
-  ibmi: "ibmi",
-  arcad: "arcad",
   editor: "editor",
   vscode: "editor",
 };
@@ -134,8 +126,6 @@ export function participants(): Array<{ id: Participant; label: string; hint: st
     { id: "editor", label: "@editor", hint: "the file on screen and the editor's own state" },
     { id: "terminal", label: "@terminal", hint: "the last command and what it printed" },
     { id: "git", label: "@git", hint: "the working tree, the history, the blame" },
-    { id: "ibmi", label: "@ibmi", hint: "the partition: Db2 for i, source members, objects" },
-    { id: "arcad", label: "@arcad", hint: "ARCAD Elias: components, versions, cross-references" },
   ];
 }
 
@@ -143,7 +133,7 @@ export function participants(): Array<{ id: Participant; label: string; hint: st
  * What a participant adds to the system prompt.
  *
  * Deliberately short. A participant is a hint about where to look first, not a personality: making
- * `@ibmi` answer differently from `@workspace` about the same question would be a way of hiding
+ * `@git` answer differently from `@workspace` about the same question would be a way of hiding
  * which tools ran, and this extension's whole argument is that you can see what it did.
  */
 export function participantDirective(participant: Participant): string {
@@ -156,10 +146,6 @@ export function participantDirective(participant: Participant): string {
       return "The question is about a command and its output. Explain what the output means before proposing anything.";
     case "git":
       return "The question is about version control. Look at the working tree, the history and the blame before answering, and never push.";
-    case "ibmi":
-      return "The question is about the IBM i partition. Prefer the platform's own sources — Db2 for i catalogue views in QSYS2, source members, object lists — over guessing from the file on screen.";
-    case "arcad":
-      return "The question is about ARCAD Elias: components, versions, cross-references, promotion. Use the ARCAD actions rather than editing members directly, so the change stays under change management.";
   }
 }
 
@@ -184,10 +170,6 @@ export function describeMention(mention: Mention): string {
       return "terminal";
     case "symbol":
       return mention.argument ?? "symbol";
-    case "member":
-      return mention.argument ?? "member";
-    case "sql":
-      return "SQL result";
   }
 }
 
@@ -203,8 +185,6 @@ export function mentionSuggestions(): Array<{ token: string; hint: string }> {
     { token: "#problems", hint: "the errors and warnings reported by the language server" },
     { token: "#terminal", hint: "the last terminal command and its output" },
     { token: "#sym:", hint: "a symbol by name, and where it is used" },
-    { token: "#member:", hint: "an IBM i source member — LIB/SRCFILE(MEMBER)" },
-    { token: "#db2:", hint: "the result of a Db2 for i query" },
   ];
 }
 

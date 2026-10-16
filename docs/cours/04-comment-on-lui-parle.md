@@ -73,7 +73,7 @@ Voici l'histoire, parce qu'elle explique mieux que n'importe quelle théorie pou
 comptent.
 
 Le projet voulait **mesurer** sa qualité avec un modèle local (c'est le
-[chapitre 12](12-la-qualite-mesuree.md)). Première tâche du banc d'essai : « ajoute une option à ce
+[chapitre 11](11-la-qualite-mesuree.md)). Première tâche du banc d'essai : « ajoute une option à ce
 petit programme ». Le modèle a répondu — et **rien ne s'est passé**. Aucun fichier modifié. Zéro
 outil appelé.
 

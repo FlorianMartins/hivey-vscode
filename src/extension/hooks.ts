@@ -179,7 +179,7 @@ export class Hooks {
 
 /** The path a tool call is about, when it is about one. */
 function pathOf(args: Record<string, unknown>): string | undefined {
-  for (const key of ["path", "file", "member"]) {
+  for (const key of ["path", "file"]) {
     const value = args[key];
     if (typeof value === "string" && value.trim()) return value.trim();
   }

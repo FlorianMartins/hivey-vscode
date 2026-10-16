@@ -1,6 +1,6 @@
 # 10. The cost
 
-[← Previous chapter](09-privacy.md) · [Contents](README.md) · [Next chapter →](11-ibm-i.md)
+[← Previous chapter](09-privacy.md) · [Contents](README.md) · [Next chapter →](11-measured-quality.md)
 
 ## Why a coding assistant costs money
 
@@ -68,13 +68,19 @@ checked.
 
 ## The guard rails
 
-- **A per-request cap** and **a per-day cap**, in dollars.
-- **A per-request size cap**, in tokens — and its story says something. The dollar caps were calibrated
+- **A per-request cap** and **a per-day cap**, in dollars ($2 and $20 by default). Going over one
+  opens a card in the conversation — send anyway, raise the cap, or do not send — instead of refusing
+  silently.
+- **A per-request size cap**, in tokens (`hiveyCode.budget.perRequestTokens`) — and its story says
+  something. The dollar caps were calibrated
   when the middle preset aimed at a $120/M model; moving it to today's $10/M models, a runaway prompt of
   400,000 tokens (a pasted build log, a tool that read a compressed file) dropped to 80 cents and
   **passed under the $2 cap**. A cap in dollars **loosens with every fall in the market**, which for a
   tool whose argument is that your code does not leave is the wrong direction. 400,000 tokens of your
-  repository going out deserve a question **at any price**.
+  repository going out deserve a question **at any price**. It is now **0 by default** (never ask): the
+  project removed every fixed cap that cut the model's work short — number of steps, answer length,
+  context — and it is the dollar caps that ask before a billed request. Put a number in it if you want
+  a huge request put to you, even a free one.
 - **A cost report**, readable, saying what was spent and on what.
 
 ## The Hivey presets
@@ -90,7 +96,7 @@ and not models:
 
 ⚠️ The middle column is not an implementation detail: the label and the identifier **do not match**.
 "Hivey Smart" is called `hivey`, and "Hivey Pro" is called `hivey/smart`. It is a legacy of two
-renamings, and it shows: the measurement table in [chapter 12](12-measured-quality.md) publishes the
+renamings, and it shows: the measurement table in [chapter 11](11-measured-quality.md) publishes the
 **identifiers**, so without this column a reader cannot connect a promise to its measured result.
 
 
@@ -194,6 +200,6 @@ the same thing. A local model costs nothing to bill, but it consumes electricity
 project's reports write "not priced" where the price is unknown, and **never $0.00**, because a zero is
 an assertion.
 
-It is the same discipline [chapter 12](12-measured-quality.md) applies to scores.
+It is the same discipline [chapter 11](11-measured-quality.md) applies to scores.
 
-[← Previous chapter](09-privacy.md) · [Contents](README.md) · [Next chapter →](11-ibm-i.md)
+[← Previous chapter](09-privacy.md) · [Contents](README.md) · [Next chapter →](11-measured-quality.md)

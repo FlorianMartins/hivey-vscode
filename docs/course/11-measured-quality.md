@@ -1,6 +1,6 @@
-# 12. Measured quality
+# 11. Measured quality
 
-[← Previous chapter](11-ibm-i.md) · [Contents](README.md) · [Next chapter →](13-install-and-use.md)
+[← Previous chapter](10-the-cost.md) · [Contents](README.md) · [Next chapter →](12-install-and-use.md)
 
 ## The problem: everybody says they are the best
 
@@ -14,7 +14,7 @@ the measurement means something.
 ## What an evaluation bench is
 
 An **evaluation bench** (*benchmark*) is a set of tasks with an automatically checkable answer. This
-project's holds **62 tasks**: small broken repositories, an instruction, and a **check** — a command
+project's holds **40 tasks**: small broken repositories, an instruction, and a **check** — a command
 that succeeds if the work is done and fails otherwise.
 
 For example: a small program that counts lines, the instruction "add a `--json` option", and a check
@@ -54,7 +54,7 @@ figures are there, current, rather than copied here where they would age.
 
 But the **shape** of the result is worth telling, because it is counter-intuitive.
 
-**The local model scored 0 out of 56.** And the figure that explains that zero is not the zero: it is
+**The local model scored 0 out of 56**, on the 56-task set of the time. And the figure that explains that zero is not the zero: it is
 that in **51 cases out of 56, the model took no action at all**. It wrote the change in a code block and
 asked "would you like me to proceed?". In the five cases where it did act, it **never** called an editing
 tool.
@@ -68,7 +68,7 @@ failures the model presented as a success. It finished cleanly, and the check fa
 is what decides whether you can let the tool work unattended: a model that fails loudly costs you a
 turn, a model that fails **while announcing success** costs the trust that makes the tool usable.
 
-And two figures that give the scale, measured on the full set: **the free preset passes half the tasks,
+And two figures that give the scale, measured on the earlier 62-task set: **the free preset passes half the tasks,
 for nothing** — it does not say that free is enough, it says where free stops. And a cheap paid model
 passes nearly three-quarters for **four cents across 62 tasks**.
 
@@ -108,11 +108,11 @@ saying something uncheckable.
 ## The same measurement, twice, does not give the same number
 
 This is the most unpleasant thing to admit about a bench, and it is measured here: **three runs of the
-same configuration, on the same tasks, with the same program, gave 48, 47 and 50 passes.** Nothing had
+same configuration, on the same tasks, with the same program, gave 48, 47 and 50 passes out of 56.** Nothing had
 changed between them.
 
 The reason is in [chapter 2](02-the-model.md): a language model does not produce the same answer twice.
-Across 62 tasks, two or three tip one way or the other.
+Across a few dozen tasks, two or three tip one way or the other.
 
 The consequence is severe and applies to every figure you will read elsewhere: **a difference smaller
 than that spread is not a result.** When a tool announces "3% better", the question to ask is not "3% of
@@ -196,9 +196,8 @@ reliable thing in a repository to fall behind. And the same reasoning applies to
 READMEs, verified by `npm run check:numbers` — because a number written in a sentence has no reason to
 follow the thing it describes.
 
-⚠️ That check found two of its own in this very course: the index said twenty-six decision records when
-there were 37, and this chapter's neighbour said "forty" IBM i skills when there were 41. Both were
-invisible to the guard for the same reason, and it is worth remembering: **a number written in words
-cannot be checked.** They are digits now.
+⚠️ That check found one of its own in this very course: the index said twenty-six decision records when
+there were 37. It was invisible to the guard for a reason worth remembering: **a number written in words
+cannot be checked.** It is a digit now.
 
-[← Previous chapter](11-ibm-i.md) · [Contents](README.md) · [Next chapter →](13-install-and-use.md)
+[← Previous chapter](10-the-cost.md) · [Contents](README.md) · [Next chapter →](12-install-and-use.md)

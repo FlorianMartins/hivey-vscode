@@ -37,7 +37,7 @@ export function terms(query: string): string[] {
     ...new Set(
       query
         .toLowerCase()
-        // Keeps digits attached to letters: `531`, `db2`, `qsys2` are exactly what gets looked up.
+        // Keeps digits attached to letters: `531`, `utf8`, `s3` are exactly what gets looked up.
         .split(/[^\p{L}\p{N}_]+/u)
         .map((w) => w.trim())
         .filter((w) => w.length > 1 && !STOP.has(w)),

@@ -1,8 +1,0 @@
-             PGM
-
-/* Submit the nightly close. */
-             SBMJOB     CMD(CALL PGM(NIGHTCLS))
-
-             SNDPGMMSG  MSG('Nightly submitted')
-
-             ENDPGM

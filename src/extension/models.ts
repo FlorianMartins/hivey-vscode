@@ -369,8 +369,8 @@ export function openFileUris(): vscode.Uri[] {
  * `TabInputText` is the test, not the URI's scheme. Requiring `file:` was the fourth and last thing
  * standing between "attach all open editors" and the people reporting it as broken, and it was
  * invisible from here: it works perfectly on a laptop with local files, and attaches NOTHING over
- * SSH, in WSL, in a dev container, or on an IBM i — where every member and stream file a user of
- * this extension has open arrives under a scheme Code for IBM i registered. Reading them was never
+ * SSH, in WSL, or in a dev container — where every file a user of this extension has open arrives
+ * under a scheme the remote extension registered. Reading them was never
  * the problem: `openTextDocument` resolves any scheme with a provider, which is exactly what those
  * are. The filter was refusing files the editor could have handed over.
  *
@@ -389,8 +389,8 @@ function textTabUri(tab: vscode.Tab): vscode.Uri | undefined {
  * Is this something a person would call a file they are working on?
  *
  * Named by what it is NOT, and that direction is the whole point. An allow-list of schemes answers
- * "is it on this machine", which is a question nobody asked: over SSH, in WSL, in a container, and
- * on an IBM i the files are all somewhere else and all perfectly real. What actually has to be kept
+ * "is it on this machine", which is a question nobody asked: over SSH, in WSL and in a container
+ * the files are all somewhere else and all perfectly real. What actually has to be kept
  * out is a short, known set of documents the editor synthesises — an output channel, the release
  * notes, a settings editor, a git revision — and those can be listed, because the editor is the one
  * that makes them.

@@ -49,8 +49,24 @@ Voici ce qui se passe réellement quand vous écrivez, en mode Agent : « les te
 6. **Vous voyez un diff** — les lignes retirées, les lignes ajoutées — et vous approuvez ou non.
 7. **Il relance les tests** pour vérifier. Et ainsi de suite, jusqu'à une réponse.
 
-Le nombre d'étapes d'un tour est **plafonné** (douze), pour qu'une boucle qui tourne en rond ne vous
-demande pas trente approbations d'affilée.
+Le nombre d'étapes d'un tour **n'est pas plafonné** par défaut (`hiveyCode.agent.maxSteps` vaut 0) :
+un plafond fixe arrêtait de vraies tâches à mi-chemin, en silence, et ça ressemblait à un modèle qui
+abandonne. Ce qui termine un tour, c'est la fin du travail, votre bouton **Stop**, ou un détecteur qui
+repère un modèle répétant le même appel en boucle. Un nombre dans ce réglage remet un plafond ; quand
+il est atteint, on vous le dit et vous pouvez continuer.
+
+Trois choses que vous verrez en route :
+
+- **Le tour se lit dans l'ordre.** Chaque étape est un bloc — la réflexion, puis les actions — suivi
+  du texte écrit à ce moment-là, puis l'étape suivante. Pendant le travail, à la relecture, et dans
+  l'export Markdown de la conversation.
+- **La réponse reste dans votre langue**, du début à la fin du tour, y compris les courtes notes
+  entre deux actions, que le modèle avait tendance à écrire en anglais juste après avoir lu du code.
+  La consigne est répétée à chaque étape, et une note écrite malgré tout dans une autre langue est
+  retraduite par une petite requête avant de s'afficher.
+- **Quitter une conversation arrête son tour.** Nouvelle conversation, ouvrir une autre depuis
+  l'historique, supprimer celle-ci : le tour en cours s'arrête d'abord. Avant, il continuait dans une
+  conversation que plus personne ne regardait.
 
 ## Les permissions, et pourquoi elles sont par *forme* d'action
 
@@ -85,7 +101,7 @@ retrouver est une permission qu'on ne peut pas retirer.
 
 Un détail mesuré, et il est instructif : en mode Agent, savoir si le modèle a **réellement agi** est
 une information distincte de savoir s'il a **réussi**. Le banc d'essai du projet compte les deux
-([chapitre 12](12-la-qualite-mesuree.md)), et sur un petit modèle local le résultat a été : 51 tâches
+([chapitre 11](11-la-qualite-mesuree.md)), et sur un petit modèle local le résultat a été : 51 tâches
 sur 56 où **aucune action n'a été tentée**. Le modèle écrivait la modification dans un bloc de code
 et demandait « souhaitez-vous que je procède ? ».
 

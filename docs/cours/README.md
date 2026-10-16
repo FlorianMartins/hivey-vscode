@@ -36,9 +36,8 @@ faire et *pourquoi* — parce que la plupart de ces choix sont des arbitrages, p
 | 8 | [MCP](08-mcp.md) | Brancher un service externe, et le risque que ça crée |
 | 9 | [La confidentialité](09-la-confidentialite.md) | Pseudonymisation, journal infalsifiable, politique signée |
 | 10 | [Le coût](10-le-cout.md) | Pourquoi c'est payant ailleurs, et comment ça tend vers zéro ici |
-| 11 | [IBM i](11-ibm-i.md) | Ces ordinateurs que personne ne montre et dont tout dépend |
-| 12 | [La qualité mesurée](12-la-qualite-mesuree.md) | Comment on prouve qu'un assistant est bon — ou mauvais |
-| 13 | [Installer et s'en servir](13-installer-et-sen-servir.md) | Le faire marcher chez vous, pas à pas |
+| 11 | [La qualité mesurée](11-la-qualite-mesuree.md) | Comment on prouve qu'un assistant est bon — ou mauvais |
+| 12 | [Installer et s'en servir](12-installer-et-sen-servir.md) | Le faire marcher chez vous, pas à pas |
 | — | [Glossaire](99-glossaire.md) | Tous les termes, par ordre alphabétique |
 
 ## Pourquoi ce cours remplace l'ancien README français
@@ -50,5 +49,11 @@ a annoncé 284 tests alors qu'il y en avait 700, et la version `0.11.1` alors qu
 
 Ce cours ne traduit rien. Il explique. Et il est tenu à jour par un contrôle qui **refuse la
 construction** quand la version qu'il annonce en haut de cette page n'est plus celle du projet — voir
-le [chapitre 12](12-la-qualite-mesuree.md). Un document qu'on promet de maintenir n'est pas
+le [chapitre 11](11-la-qualite-mesuree.md). Un document qu'on promet de maintenir n'est pas
 maintenu ; un document dont l'obsolescence casse le build l'est.
+
+⚠️ Ce cours existe désormais en deux éditions, française (`docs/cours/`) et anglaise
+(`docs/course/`), et le même contrôle les tient ensemble : aucune ne peut avoir un chapitre que
+l'autre n'a pas, et les deux doivent annoncer la même version. Une traduction est, dans un dépôt, la
+chose la plus sûre de prendre du retard, et le résultat est pire qu'un document périmé : deux
+éditions qui se contredisent, sans moyen pour le lecteur de savoir laquelle est à jour.

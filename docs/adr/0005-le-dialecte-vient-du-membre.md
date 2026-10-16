@@ -1,6 +1,9 @@
 # ADR-0005 — Sur IBM i, le dialecte vient du membre, pas de son nom
 
-**Date** : 2026-08-27 · **Statut** : accepté
+**Date** : 2026-08-27 · **Statut** : caduque (accepté à l’origine)
+
+> **Statut : caduque.** Le support IBM i a été retiré du produit ; cette décision ne s'applique plus.
+> Elle reste comme trace du raisonnement tenu à l'époque.
 
 ## Contexte
 

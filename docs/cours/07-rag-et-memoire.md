@@ -86,9 +86,16 @@ Une distinction qui revient souvent et qu'il vaut mieux avoir en tête :
 | **Le contexte** | nulle part, reconstruit à chaque tour | ce que le modèle voit maintenant ([chapitre 6](06-le-contexte.md)) |
 | **La base de connaissance** | des fichiers Markdown chez vous | ce que l'équipe a établi, durablement |
 | **L'historique** | votre espace de travail | les conversations passées, cherchables |
+| **La mémoire avec rappel** | la mémoire de votre machine, le temps de la conversation | chaque résultat d'outil, en entier |
 
-Aucun de ces trois n'est « la mémoire du modèle ». Le modèle, lui, n'a pas de mémoire
-([chapitre 2](02-le-modele.md)) : ce sont trois façons de lui redonner, à chaque fois, ce dont il a
+La dernière ligne mérite une phrase. Quand un ancien résultat d'outil (une lecture de fichier, une
+recherche, une commande) doit être raccourci pour tenir dans la fenêtre, le modèle reçoit une
+étiquette qui le lui rend **mot pour mot** : l'outil `recall` relit un résultat conservé, et
+`search_memory` retrouve un passage par mots-clés dans ces résultats et dans tous les messages de la
+conversation, même ceux qui ne sont plus envoyés. Rien n'est résumé en route.
+
+Aucun de ces quatre n'est « la mémoire du modèle ». Le modèle, lui, n'a pas de mémoire
+([chapitre 2](02-le-modele.md)) : ce sont quatre façons de lui redonner, à chaque fois, ce dont il a
 besoin.
 
 [← Chapitre précédent](06-le-contexte.md) · [Sommaire](README.md) · [Chapitre suivant →](08-mcp.md)

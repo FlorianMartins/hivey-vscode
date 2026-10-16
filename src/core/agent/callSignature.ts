@@ -2,8 +2,7 @@
 //
 // The step lines used to show the first line of the RESULT, which answers "what came back" and
 // never "what did it do". Reading a finished agent turn, that is the wrong half: `run_command` said
-// "The command was started in the user's terminal", six times, without ever naming a command; four
-// `ibmi_sql` steps in a row were four identical lines. Somebody reviewing what an agent did to
+// "The command was started in the user's terminal", six times, without ever naming a command. Somebody reviewing what an agent did to
 // their repository needs the call, and the call is in the arguments.
 //
 // Which argument matters is a property of the tool, so it is named here per tool rather than
@@ -23,16 +22,6 @@ const INTERESTING: Record<string, string[]> = {
   // ⚠️ `name`, not `agent`: the schema calls it `name`, so `agent` was never found, the fallback
   // took `task`, and a step line showed the task without saying WHICH agent received it.
   run_agent: ["name", "task"],
-  ibmi_sql: ["sql"],
-  ibmi_command: ["command"],
-  ibmi_member: ["member", "library"],
-  ibmi_members: ["library"],
-  ibmi_objects: ["library"],
-  ibmi_where_is: ["name"],
-  ibmi_program_context: ["program"],
-  ibmi_library_list: [],
-  arcad_rest: ["path"],
-  arcad_action: ["action"],
   git_diff: ["path"],
   git_show: ["ref"],
   git_log: ["path"],

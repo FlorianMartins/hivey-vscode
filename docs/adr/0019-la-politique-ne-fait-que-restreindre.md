@@ -32,10 +32,11 @@ Corollaire explicite : **un développeur plus strict que sa politique est laiss�
 Quelqu'un qui veut plus d'anonymisation que son organisation n'en exige n'est pas un problème à
 résoudre.
 
-Et un piège qui méritait un test : **une liste vide est parfois l'état le plus permissif.**
-`ibmi.writableLibraries` vide signifie « la garde est inactive » — le lire comme « l'utilisateur est
-d'accord avec la politique » aurait été un passage en force sans aucun réglage à montrer du doigt.
-La liste de la politique s'applique alors telle quelle.
+Et un piège qui méritait un test : **une liste vide est parfois l'état le plus permissif.** Une
+liste vide qui signifie « la garde est inactive » ne peut pas se lire comme « l'utilisateur est
+d'accord avec la politique » — ce serait un passage en force sans aucun réglage à montrer du doigt.
+(Le seul réglage de ce genre, la liste des bibliothèques IBM i modifiables, a disparu avec le
+support IBM i.)
 
 ### 2. Un échec n'est pas une absence
 

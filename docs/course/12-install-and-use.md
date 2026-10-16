@@ -1,6 +1,6 @@
-# 13. Install it and use it
+# 12. Install it and use it
 
-[← Previous chapter](12-measured-quality.md) · [Contents](README.md) · [Glossary →](99-glossary.md)
+[← Previous chapter](11-measured-quality.md) · [Contents](README.md) · [Glossary →](99-glossary.md)
 
 This chapter assumes only that you have a computer. It does not assume you can code.
 
@@ -59,7 +59,7 @@ computer here".
 
 ⚠️ **Know what you are going to get.** That model answers questions and does completion well. For
 **agent** work — changing files by itself — the measurement in
-[chapter 12](12-measured-quality.md) is unambiguous: it cannot do it. If you want agent mode, you need
+[chapter 11](11-measured-quality.md) is unambiguous: it cannot do it. If you want agent mode, you need
 either a more recent local model that can call tools, or escalation to a remote one.
 
 ## 4. Use it
@@ -70,6 +70,13 @@ Open a folder containing code, then the **Hivey Code** panel in the right-hand b
   is.
 - **Change mode** (Chat / Plan / Agent) according to what you want to allow
   ([chapter 5](05-the-three-modes-and-tools.md)). Start with **Plan**: it reads and changes nothing.
+- **Choose how much it thinks**: Direct, Brief, Standard or Deep, next to the mode
+  ([chapter 2](02-the-model.md)). Only the levels the model knows are offered.
+- **Stop** ends the turn at once. On a shared server busy with somebody else, the turn shows "In the
+  queue… 12 s" rather than a misleading "thinking…": it is waiting its turn, and there is no longer a
+  time limit after which it would be dropped.
+- **After an answer**, the likely next request appears greyed in the composer: **Tab** (or an arrow)
+  makes it your text, **Enter** sends it. Setting `hiveyCode.chat.suggestNext`.
 - **`Ctrl+I`** in the editor rewrites the selection in place.
 - **Right click → Hivey Code** on a selection: explain, find the problems, cover with a test, document,
   show the callers, simplify.
@@ -79,16 +86,17 @@ Open a folder containing code, then the **Hivey Code** panel in the right-hand b
 
 ## 4a. Speaking instead of typing
 
-A microphone button appears in the composer — but **only if two conditions hold**: your editor gives
-the panel a microphone, and you have said **where** to transcribe. A button that looked like it was
-listening and was not would cost you a whole spoken paragraph.
+A microphone button appears in the composer wherever dictation can work. VS Code does not give an
+extension's panel a microphone: the recording is made by a program on your machine (`arecord`,
+`pw-record`, `ffmpeg`…), and the text comes from a **transcriber**. On Windows and Linux, the first
+press offers to **install one on your machine** (whisper.cpp, about 150 MB with the default model,
+once) — asked **before** recording, so you are not left talking into the void.
 
-Why something has to be configured: **a recording of your voice cannot be pseudonymised**
+Why transcription stays on your machine by default: **a recording of your voice cannot be pseudonymised**
 ([chapter 9](09-privacy.md)). It is, with an image, one of the only two things the tool cannot mask
 before sending. So sending it anywhere is a decision, never a default.
 
-The recommended path is **a command on your own machine**. If you have a transcriber installed
-(whisper.cpp, faster-whisper…), set `hiveyCode.dictation.command`:
+If you already have your own transcriber (whisper.cpp, faster-whisper…), set `hiveyCode.dictation.command`:
 
 ```
 whisper-cli -f {file} --no-timestamps --output-txt -
@@ -97,9 +105,10 @@ whisper-cli -f {file} --no-timestamps --output-txt -
 `{file}` is where the recording will be written; the text the command prints lands in the composer.
 Nothing leaves your machine.
 
-If you have no local transcriber, `hiveyCode.dictation.endpoint` takes an OpenAI-compatible address —
-and there, consent is asked **every time, with no "always"**. It is the one permission in this product
-that cannot be granted once and for all.
+If you have no local transcriber, `hiveyCode.dictation.endpoint` takes an OpenAI-compatible address (an
+OpenAI or Groq key already set up as your provider is borrowed too) — and there, consent is asked
+**every time, with no "always"**. It is the one permission in this product that cannot be granted once
+and for all.
 
 ⚠️ The transcript **lands in the composer; it is never sent on its own**. A recogniser mis-hears, and
 a dictated question that sent itself would be a question nobody proof-read. Escape while recording
@@ -152,9 +161,11 @@ In VS Code's settings, search for `hiveyCode`.
 | `privacy.blockedGlobs` | The files that must **never** leave ([chapter 9](09-privacy.md)) |
 | `privacy.customTerms` | Your customer and project names, to be pseudonymised |
 | `privacy.egressPolicy` | `ask-always` so you are asked every time |
-| `budget.dailyUsd` | The daily spend cap |
+| `budget.dailyUsd` | The daily spend cap ($20 by default) |
 | `budget.perRequestTokens` | The size beyond which a request is questioned — 0 (the default): never, the model's own window is the limit |
-| `ibmi.writableLibraries` | The libraries an agent may change ([chapter 11](11-ibm-i.md)) |
+| `context.autoCompact` | The automatic summary when the conversation nears the window ([chapter 6](06-the-context.md)) — on by default |
+| `agent.maxSteps` | A cap on the steps of an agent turn — 0 (the default): none ([chapter 5](05-the-three-modes-and-tools.md)) |
+| `chat.suggestNext` | The suggested next request — on by default |
 | `language` | For a machine whose editor is in one language and whose user is in another |
 
 ## And if it doesn't work
@@ -170,6 +181,6 @@ In VS Code's settings, search for `hiveyCode`.
   faster and worse.
 - **It changes no files.** You are probably in Plan mode, which changes nothing **by construction**
   ([chapter 5](05-the-three-modes-and-tools.md)). If you really are in Agent mode, read the end of
-  [chapter 12](12-measured-quality.md): some local models do not call tools.
+  [chapter 4](04-how-we-talk-to-it.md): some local models do not call tools the way they should.
 
-[← Previous chapter](12-measured-quality.md) · [Contents](README.md) · [Glossary →](99-glossary.md)
+[← Previous chapter](11-measured-quality.md) · [Contents](README.md) · [Glossary →](99-glossary.md)

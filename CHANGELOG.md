@@ -2,6 +2,40 @@
 
 Notable changes, newest first. Dates are the day the work landed on `main`.
 
+## Non publié
+
+### Ajouté
+
+- **La langue de l'utilisateur tient pour tout le tour.** La règle de langue annoncée en 1.14.2 est
+  activée : la consigne système dit dans quelle langue écrire — notes entre deux appels d'outil
+  comprises —, un rappel suit chaque résultat d'outil, et une note qui sort quand même dans l'autre
+  langue est remise dans la bonne par une petite requête de traduction (réflexion coupée). Dans le
+  panneau comme dans la ligne de commande.
+
+### Corrigé
+
+- **⚠️ Quitter une conversation arrête le tour qui y tourne.** « Nouvelle discussion », ouvrir une
+  autre conversation depuis l'historique, supprimer la conversation en cours ou partager un message
+  vers une autre conversation remplaçaient la conversation et laissaient le tour continuer, sans
+  personne pour le voir : sur le serveur partagé, une tâche d'agent a tourné deux heures (90 requêtes
+  par heure) après que la personne la croyait finie. Chacune de ces actions arrête d'abord le tour. Et
+  un Stop pendant un résumé (avant une question, ou après un contexte plein) annule aussi ce qui
+  devait suivre.
+- **Le catalogue des modèles avance de nouveau.** La mise à jour quotidienne poussait directement sur
+  `main`, protégée depuis le 2026-10-12 par trois vérifications obligatoires : chaque exécution était
+  refusée et le catalogue ne bougeait plus. Elle ouvre désormais une pull request, y lance la CI et la
+  base de sécurité, et la fusionne une fois les trois vérifications passées
+  (`scripts/land-catalogue.sh`).
+
+### Retiré
+
+- **Tout l'axe IBM i.** Les échecs reproductibles du banc venaient tous des tâches IBM i, où le
+  modèle invente des syntaxes (CL, DDS, binder source, catalogue Db2). Sont retirés : la connexion
+  IBM i et l'intégration ARCAD, les outils `ibmi_*` et `arcad_*`, les règles RPG/CL/DDS ajoutées aux
+  consignes, les 41 skills IBM i (et `/packed`), les mentions `#member`, `#db2`, `@ibmi` et `@arcad`,
+  les réglages `hiveyCode.ibmi.*`, les commandes associées, le chapitre de cours, et les 22 tâches IBM i
+  du banc (62 → 40 tâches).
+
 ## 1.14.2 — 2026-10-11
 
 ### Ajouté

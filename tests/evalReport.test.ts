@@ -83,13 +83,13 @@ test("a report with no model reachable says it was not measured, with no table",
 test("a measured report carries the rate, the cost and the failures", () => {
   const outcomes = [
     outcome({ task: "a", passed: true }),
-    outcome({ task: "b", kind: "ibmi", passed: false, why: "check said no", agentExit: 1, runs: [run({ steps: 11, stoppedBecause: "max-steps" })] }),
+    outcome({ task: "b", kind: "feature", passed: false, why: "check said no", agentExit: 1, runs: [run({ steps: 11, stoppedBecause: "max-steps" })] }),
   ];
   const md = markdownReport(buildReport({ at: "now", endpoint: "http://x/v1", models: ["m"], outcomes }));
   assert.match(md, /50 %/);
   assert.match(md, /\*\*FAIL\*\*/);
   assert.match(md, /check said no/, "a failure must carry what the check printed");
-  assert.match(md, /\| ibmi \|/, "the breakdown by kind is what tells an IBM i buyer anything");
+  assert.match(md, /\| feature \|/, "the breakdown by kind is what tells a buyer anything");
 });
 
 test("the breakdown is per model and per kind, and each model sees only its own", () => {
@@ -100,7 +100,7 @@ test("the breakdown is per model and per kind, and each model sees only its own"
     outcomes: [
       outcome({ task: "a", model: "small", passed: false }),
       outcome({ task: "a", model: "big", passed: true }),
-      outcome({ task: "b", model: "big", kind: "ibmi", passed: true }),
+      outcome({ task: "b", model: "big", kind: "feature", passed: true }),
     ],
   });
   const small = report.byModel.find((r) => r.model === "small")!;
@@ -108,7 +108,7 @@ test("the breakdown is per model and per kind, and each model sees only its own"
   assert.equal(small.totals.tasks, 1);
   assert.equal(small.totals.passed, 0);
   assert.equal(big.totals.passed, 2);
-  assert.deepEqual(big.byKind.map((k) => k.kind), ["bug", "ibmi"]);
+  assert.deepEqual(big.byKind.map((k) => k.kind), ["bug", "feature"]);
 });
 
 // ---------------------------------------------------------------------------

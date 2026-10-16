@@ -56,8 +56,8 @@ test("toggling is idempotent and keeps the setting readable", () => {
 test("a repository skill is spelled the same everywhere it is referred to", () => {
   // The join key between the panel's toggle, the stored setting and the prompt the model receives.
   // They disagreed at first, and the symptom was a toggle that appeared to do nothing.
-  assert.equal(skillInvocation("review-rpg"), "/review-rpg");
-  assert.equal(skillInvocation("/review-rpg"), "/review-rpg");
+  assert.equal(skillInvocation("review-api"), "/review-api");
+  assert.equal(skillInvocation("/review-api"), "/review-api");
 });
 
 test("every built-in does exactly one thing, and says what", () => {
@@ -124,7 +124,7 @@ test("only the general family is in play to begin with", () => {
   const policy = { groups: DEFAULT_GROUPS, disabled: [] };
   assert.equal(isSkillEnabled("/fix", policy), true, "a general skill is on");
   assert.equal(isSkillEnabled("/pytest", policy), false, "a Python skill is not");
-  assert.equal(isSkillEnabled("/tofree", policy), false, "nor an RPG one");
+  assert.equal(isSkillEnabled("/junit", policy), false, "nor a Java one");
 });
 
 test("choosing a family brings all of its skills, without touching the others", () => {
@@ -170,8 +170,7 @@ test("compacting survives an empty policy", () => {
 test("what the editor has open suggests the families, and nothing else", () => {
   assert.deepEqual(detectGroups(["python"]), ["python"]);
   assert.deepEqual(detectGroups(["typescriptreact", "css"]).sort(), ["frontend", "javascript"]);
-  assert.ok(detectGroups(["rpgle"]).includes("rpg"));
-  assert.ok(detectGroups(["dds.dspf"]).includes("dds"));
+  assert.ok(detectGroups(["dockerfile"]).includes("devops"));
 });
 
 test("an unrecognized workspace suggests nothing, rather than guessing", () => {
@@ -182,13 +181,13 @@ test("an unrecognized workspace suggests nothing, rather than guessing", () => {
 
 test("what is open switches its families ON, not merely suggests them", () => {
   // The defect this closes: `detectGroups` was computed and then used to tick a box in a wizard, so
-  // somebody editing RPG with default settings got `general` and nothing else while forty IBM i
-  // skills sat switched off. Florian: "the automatic detection of open programs doesn't seem to do
-  // the automated enabling and disabling of skills".
-  const { groups, fromOpenFiles } = familiesInPlay(["general"], ["rpgle", "sqlrpgle"], true);
-  assert.ok(groups.includes("rpg"), "an open RPG member did not bring the RPG family in");
-  assert.ok(groups.includes("db2i"), "sqlrpgle implies embedded SQL for i");
-  assert.deepEqual(fromOpenFiles.sort(), ["db2i", "rpg"], "the panel cannot say why a family is lit");
+  // somebody editing Python with default settings got `general` and nothing else while the
+  // language's skills sat switched off. Florian: "the automatic detection of open programs doesn't
+  // seem to do the automated enabling and disabling of skills".
+  const { groups, fromOpenFiles } = familiesInPlay(["general"], ["python", "typescript"], true);
+  assert.ok(groups.includes("python"), "an open Python file did not bring the Python family in");
+  assert.ok(groups.includes("javascript"), "TypeScript implies the JavaScript family");
+  assert.deepEqual(fromOpenFiles.sort(), ["javascript", "python"], "the panel cannot say why a family is lit");
 });
 
 test("a family the user chose survives a day spent in other files", () => {
@@ -210,7 +209,7 @@ test("deactivation is what happens when the file is no longer open", () => {
 });
 
 test("switching the automation off leaves the chosen families exactly as they are", () => {
-  const { groups, fromOpenFiles } = familiesInPlay(["general"], ["rpgle", "python"], false);
+  const { groups, fromOpenFiles } = familiesInPlay(["general"], ["java", "python"], false);
   assert.deepEqual(groups, ["general"]);
   assert.deepEqual(fromOpenFiles, [], "nothing may be attributed to the files when nothing was read");
 });
@@ -219,12 +218,10 @@ test("switching the automation off leaves the chosen families exactly as they ar
 
 test("a caller with only paths reaches the same families", () => {
   // The terminal has no editor to ask, and the evaluation harness drives the terminal: without this
-  // every figure in eval/QUALITY.md was measured with `general` alone, on a bench where 22 of the 62
-  // tasks are IBM i tasks whose skill families were switched off.
-  assert.deepEqual(groupsForPaths(["CUST001.rpgle"]), ["rpg"]);
-  assert.deepEqual(groupsForPaths(["ORDERS.sqlrpgle"]).sort(), ["db2i", "rpg"]);
-  assert.ok(groupsForPaths(["CUSTDSP.dspf"]).includes("dds"));
-  assert.ok(groupsForPaths(["BLDLIB.clle"]).includes("cl"));
+  // every figure in eval/QUALITY.md was measured with `general` alone, with every language skill
+  // family switched off.
+  assert.deepEqual(groupsForPaths(["billing/vat.py"]), ["python"]);
+  assert.deepEqual(groupsForPaths(["src/Main.java", "src/lib.rs"]).sort(), ["java", "rust"]);
   assert.deepEqual(groupsForPaths(["src/app.tsx", "src/app.css"]).sort(), ["frontend", "javascript"]);
   assert.deepEqual(groupsForPaths(["Dockerfile"]), ["devops"]);
   assert.deepEqual(groupsForPaths(["notes.txt", "LICENSE"]), [], "an unknown extension may not guess");
@@ -241,8 +238,6 @@ test("every language the extension map produces is one detectGroups knows", () =
     "a.c", "a.h", "a.cpp", "a.cc", "a.cxx", "a.hpp", "a.m", "a.mm",
     "a.go", "a.rs", "a.dart", "a.sql", "a.pls",
     "a.tf", "a.yaml", "a.yml", "a.sh", "a.bash",
-    "a.rpgle", "a.rpg", "a.sqlrpgle", "a.rpgleinc",
-    "a.pf", "a.lf", "a.dspf", "a.prtf", "a.clle", "a.cl", "a.cmd",
     "Dockerfile", "Makefile",
   ];
   const orphans: string[] = [];
@@ -255,15 +250,15 @@ test("every language the extension map produces is one detectGroups knows", () =
 });
 
 test("every family keyed on an extension is reachable from a path", () => {
-  // The other direction. `detectGroups` knows eighteen families; the ones a file name can imply must
+  // The other direction. `detectGroups` knows eleven families; the ones a file name can imply must
   // actually be implied by one, or a skill family exists that nothing but a settings page can switch on.
   const reachable = new Set(
     groupsForPaths([
       "a.css", "a.ts", "a.py", "a.java", "a.cs", "a.cpp", "a.go", "a.rs", "a.dart", "a.sql",
-      "Dockerfile", "a.rpgle", "a.dspf", "a.sqlrpgle", "a.clle",
+      "Dockerfile",
     ]),
   );
-  for (const g of ["frontend", "javascript", "python", "java", "dotnet", "cpp", "go", "rust", "flutter", "data", "devops", "rpg", "dds", "db2i", "cl"]) {
+  for (const g of ["frontend", "javascript", "python", "java", "dotnet", "cpp", "go", "rust", "flutter", "data", "devops"]) {
     assert.ok(reachable.has(g as never), `the ${g} family cannot be reached from any file name`);
   }
 });
@@ -278,103 +273,50 @@ test("every family holds at least three skills", () => {
 
 test("nothing is offered by a family nobody selected", () => {
   const names = enabledSkills({ groups: ["general"], disabled: [] }).map((s) => s.name);
-  assert.ok(!names.some((n) => ["/a11y", "/junit", "/borrow", "/dspf"].includes(n)));
+  assert.ok(!names.some((n) => ["/a11y", "/junit", "/borrow", "/pytest"].includes(n)));
   assert.ok(names.length >= 8 && names.length <= 15, `general should be a handful, got ${names.length}`);
 });
 
-// ── The IBM i families, and the task behind each skill ───────────────────────────────────────────
+// ── The finance family, and the task behind each skill ───────────────────────────────────────────
 //
-// The roadmap's requirement for phase 1 is forty IBM i skills, each backed by an evaluation task
-// whose check fails before the work is done. A requirement like that survives exactly as long as
-// somebody remembers it, so it is read off the skills themselves: a new IBM i skill with no task
-// named — and no reason given for having none — fails here.
+// A skill is a few lines of text, so a family nobody can measure is a family nobody should count:
+// every finance skill must name an evaluation task whose check fails before the work is done.
 
-const IBMI_GROUPS = new Set(["rpg", "dds", "db2i", "cl"]);
-/**
- * The families whose skills must each be backed by an evaluation task.
- *
- * IBM i because the roadmap's phase 1 asked for it, and finance because phase 3 asked for the same
- * thing in the same words — and the reason is the same in both: a skill is a few lines of text, so a
- * family nobody can measure is a family nobody should count.
- */
-const BACKED_GROUPS = new Set([...IBMI_GROUPS, "finance"]);
-const ibmiSkills = BUILTIN_SKILLS.filter((s) => IBMI_GROUPS.has(s.group));
-const backedSkills = BUILTIN_SKILLS.filter((s) => BACKED_GROUPS.has(s.group));
-
-test("there are at least forty IBM i skills", () => {
-  assert.ok(ibmiSkills.length >= 40, `only ${ibmiSkills.length}: ${ibmiSkills.map((s) => s.name).join(" ")}`);
-  // And spread across the four families rather than forty variations of one.
-  for (const group of IBMI_GROUPS) {
-    const count = ibmiSkills.filter((s) => s.group === group).length;
-    assert.ok(count >= 5, `the ${group} family has only ${count}`);
-  }
-});
-
-test("every IBM i and finance skill names the evaluation task that exercises it, or says why it cannot", () => {
-  const unbacked = backedSkills.filter((s) => !s.evalTask && !s.evalGap);
-  assert.deepEqual(unbacked.map((s) => s.name), [], "these are backed by nothing and explain nothing");
-});
+const financeSkills = BUILTIN_SKILLS.filter((s) => s.group === "finance");
 
 test("every task a skill names exists on disk", () => {
   // The failure this catches is a renamed directory: the skill still points somewhere, and nothing
   // else in the repository would notice.
   const missing: string[] = [];
-  for (const skill of backedSkills) {
+  for (const skill of BUILTIN_SKILLS) {
     if (!skill.evalTask) continue;
     if (!existsSync(join("eval", "tasks", skill.evalTask, "task.json"))) missing.push(`${skill.name} → ${skill.evalTask}`);
   }
   assert.deepEqual(missing, [], "these skills point at a task that is not there");
 });
 
-test("the declared gaps are few, and each says what is missing", () => {
-  // A gap is honest; a drawer full of gaps is the requirement quietly abandoned.
-  const gaps = ibmiSkills.filter((s) => s.evalGap);
-  assert.ok(gaps.length <= 4, `${gaps.length} skills are unbacked: ${gaps.map((s) => s.name).join(" ")}`);
-  for (const skill of gaps) {
-    assert.match(skill.evalGap ?? "", /partition/, `${skill.name}'s gap does not say what is missing`);
-    assert.equal(skill.evalTask, undefined, `${skill.name} claims both a task and a gap`);
-  }
-});
-
-test("the tasks behind the IBM i skills really are IBM i tasks", () => {
-  // The cheat this prevents: backing /tofree with a JavaScript task because the mapping only
-  // checks that a directory exists.
-  const wrong: string[] = [];
-  for (const skill of ibmiSkills) {
-    if (!skill.evalTask) continue;
-    const meta = JSON.parse(readFileSync(join("eval", "tasks", skill.evalTask, "task.json"), "utf8")) as { kind: string };
-    // `ibmi` is the kind for the platform's own work; a test-writing or bug task is allowed when the
-    // fixture is IBM i source, which the directory name carries.
-    if (meta.kind !== "ibmi" && !skill.evalTask.startsWith("ibmi-")) wrong.push(`${skill.name} → ${skill.evalTask} (${meta.kind})`);
-  }
-  assert.deepEqual(wrong, [], "these skills are backed by a task about something else");
-});
-
 test("the finance family exists, is complete, and every skill in it is backed", () => {
-  const finance = BUILTIN_SKILLS.filter((s) => s.group === "finance");
-  assert.ok(finance.length >= 8, `only ${finance.length}: ${finance.map((s) => s.name).join(" ")}`);
+  const finance = financeSkills;
+  assert.ok(finance.length >= 7, `only ${finance.length}: ${finance.map((s) => s.name).join(" ")}`);
   // The subjects the roadmap names, each present.
   const names = finance.map((s) => s.name).join(" ");
-  for (const subject of ["/rounding", "/decimal", "/packed", "/settlement", "/markethours", "/identifiers", "/fixmsg"]) {
+  for (const subject of ["/rounding", "/decimal", "/settlement", "/markethours", "/identifiers", "/fixmsg"]) {
     assert.ok(names.includes(subject), `${subject} is missing from the finance family`);
   }
   // And every one of them names a task that exists — no gaps here: all of this is testable in
-  // ordinary code, unlike an IBM i partition.
+  // ordinary code.
   for (const skill of finance) {
     assert.ok(skill.evalTask, `${skill.name} is backed by nothing`);
-    assert.equal(skill.evalGap, undefined, `${skill.name} claims a gap, and finance has no excuse for one`);
     assert.ok(existsSync(join("eval", "tasks", skill.evalTask!, "task.json")), `${skill.name} → ${skill.evalTask}`);
   }
-  // The roadmap asks for JavaScript, Python, Java and RPG where relevant: the tasks behind this
-  // family span at least three languages.
+  // The roadmap asks for more than one language: the tasks behind this family span at least two.
   const kinds = new Set(
     finance.map((s) => {
       const files = readdirSync(join("eval", "tasks", s.evalTask!, "files"));
       if (files.some((f) => f.endsWith(".py"))) return "python";
-      if (files.some((f) => f.endsWith(".rpgle"))) return "rpg";
       if (files.some((f) => f.endsWith(".js"))) return "javascript";
       return "other";
     }),
   );
-  assert.ok(kinds.size >= 3, `the finance tasks span only ${[...kinds].join(", ")}`);
+  assert.ok(kinds.size >= 2, `the finance tasks span only ${[...kinds].join(", ")}`);
 });

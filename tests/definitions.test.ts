@@ -27,17 +27,17 @@ const agent = (text: string) => parseDefinition("agent", "db.md", text);
 
 test("a plain skill is read", () => {
   const { definition, problems } = skill(`---
-name: review-rpg
-description: Review an RPG member against the shop's conventions
+name: review-api
+description: Review an API handler against the shop's conventions
 ---
 
-Check the indicators first, then the file specs.
+Check the status codes first, then the validation.
 `);
   assert.deepEqual(problems, []);
   assert.equal(definition?.kind, "skill");
-  assert.equal(definition?.name, "review-rpg");
-  assert.equal((definition as Skill).description, "Review an RPG member against the shop's conventions");
-  assert.match(definition!.body, /^Check the indicators/);
+  assert.equal(definition?.name, "review-api");
+  assert.equal((definition as Skill).description, "Review an API handler against the shop's conventions");
+  assert.match(definition!.body, /^Check the status codes/);
 });
 
 test("the things a hand-written file actually contains do not break it", () => {
@@ -54,12 +54,12 @@ test("a description folded over several lines is read as one", () => {
   const { definition } = skill(`---
 name: long
 description:
-  Use this when the member is fixed-format RPG
-  and the change touches a file specification.
+  Use this when the handler is a legacy controller
+  and the change touches a route definition.
 ---
 Body.
 `);
-  assert.match((definition as Skill).description, /fixed-format RPG and the change touches/);
+  assert.match((definition as Skill).description, /legacy controller and the change touches/);
 });
 
 test("a comment in the header is a comment", () => {
@@ -84,7 +84,7 @@ test("a file with no header is refused, and says what a header looks like", () =
 });
 
 test("a name that cannot be typed after a slash is refused", () => {
-  for (const bad of ["Review RPG", "reviewRPG", "réviser", "a", "-lead", "trail-", "x".repeat(45)]) {
+  for (const bad of ["Review API", "reviewAPI", "réviser", "a", "-lead", "trail-", "x".repeat(45)]) {
     const { definition, problems } = skill(`---\nname: ${bad}\ndescription: d\n---\nbody\n`);
     assert.equal(definition, undefined, `"${bad}" should be refused`);
     assert.ok(problems.some((p) => p.includes("usable name")), `"${bad}": ${problems.join(" ")}`);
@@ -111,8 +111,8 @@ test("every problem names the file, because they are reported in a list", () => 
 test("an agent carries its tools, its model and its step budget", () => {
   const { definition, problems } = agent(`---
 name: db-explorer
-description: Explores Db2 for i schemas
-tools: ibmi_sql, ibmi_objects, read_file
+description: Explores PostgreSQL schemas
+tools: run_sql, list_files, read_file
 model: qwen2.5-coder:7b
 max-steps: 6
 ---
@@ -120,7 +120,7 @@ You explore schemas.
 `);
   assert.deepEqual(problems, []);
   const a = definition as AgentDefinition;
-  assert.deepEqual(a.tools, ["ibmi_sql", "ibmi_objects", "read_file"]);
+  assert.deepEqual(a.tools, ["run_sql", "list_files", "read_file"]);
   assert.equal(a.model, "qwen2.5-coder:7b");
   assert.equal(a.maxSteps, 6);
 });

@@ -19,21 +19,15 @@ Required` means one of the three, and raising a limit does nothing about a balan
 
 **Branch** — A parallel line of work in a repository. → [1](01-the-stage.md)
 
-**CL** — IBM i's command language. → [11](11-ibm-i.md)
-
 **Commit** — A snapshot of the project, with a message saying why. → [1](01-the-stage.md)
 
 **Compacting** — Replacing an over-long conversation with a summary the model writes, erasing nothing on
-screen. → [6](06-the-context.md)
+screen. Automatic by default, at three quarters of the budget. → [6](06-the-context.md)
 
 **Completion** — The suggestions as you type. The most frequent use, so the one that decides the bill.
 → [10](10-the-cost.md)
 
 **Context window** — The amount of text a model can have in front of it at once. → [2](02-the-model.md)
-
-**Db2 for i** — The database built into IBM i. → [11](11-ibm-i.md)
-
-**DDS** — The language describing IBM i's files, screens and printed reports. → [11](11-ibm-i.md)
 
 **Diff** — The list of differences between two versions of a file: lines added, lines removed. What the
 extension shows you **before** writing. → [1](01-the-stage.md)
@@ -69,9 +63,6 @@ fixed: it is the mechanism. → [2](02-the-model.md)
 → [5](05-the-three-modes-and-tools.md)
 
 **HTTP** — The web's protocol, used by APIs too. → [4](04-how-we-talk-to-it.md)
-
-**IBM i** — IBM's system (formerly AS/400) that has run business applications since the 1980s.
-→ [11](11-ibm-i.md)
 
 **JSON** — A structured text format, readable by a human who makes the effort.
 → [4](04-how-we-talk-to-it.md)
@@ -120,9 +111,6 @@ not exist**, through a rounding error. → [10](10-the-cost.md)
 
 **Repository** (*repo*) — A project's folder, plus its entire history. → [1](01-the-stage.md)
 
-**RPG** — IBM i's historic language, in several shapes, some of which **the column changes the meaning**
-in. → [11](11-ibm-i.md)
-
 **SIEM** — The system where a company centralises its security logs. → [9](09-privacy.md)
 
 **Signature** — Mathematical proof that a text comes from the holder of a key and has not been modified.
@@ -140,6 +128,9 @@ stop it before having paid for all of it. → [4](04-how-we-talk-to-it.md)
 
 **Terminal** — The area where you type commands, one per line. → [1](01-the-stage.md)
 
+**Thinking level** — How much the model "thinks" before answering: Direct, Brief, Standard, Deep. More
+thinking means more tokens. → [2](02-the-model.md)
+
 **Token** — The unit a model reads and produces; about 100 tokens to 75 words. It is the billing unit and
 the limit unit. → [2](02-the-model.md)
 
@@ -155,7 +146,7 @@ deliberately. → [7](07-rag-and-memory.md)
 **VS Code** — The most used code editor, the one this extension is written for. → [1](01-the-stage.md)
 
 **`.vsix`** — A VS Code extension's file: an archive you install. → [1](01-the-stage.md),
-[13](13-install-and-use.md)
+[12](12-install-and-use.md)
 
 **Worktree** — A separate working copy of a git repository, where a background task works without
 touching yours. → [5](05-the-three-modes-and-tools.md)

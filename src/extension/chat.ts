@@ -45,18 +45,6 @@ import { describeFallback, fallbackChain, isContextOverflow, isRetryable } from 
 import type { Provider } from "../core/providers/index.js";
 import { Session, renderEntry, type ContextItem, type Entry, type SessionData } from "../core/session/session.js";
 import { headToTokens } from "../core/util/tokens.js";
-import { matchesName } from "../core/ibmi/sql.js";
-import { arcadInstalled } from "./integrations/arcad.js";
-import {
-  collectMemberContext,
-  ibmiAllLibraries,
-  ibmiAllMembers,
-  ibmiEnabled,
-  ibmiInstance,
-  ibmiLibraryList,
-  readMemberText,
-  readStreamFileText,
-} from "./integrations/ibmi.js";
 import { filterHistory, searchTranscript, upsertSession } from "../core/session/history.js";
 import { compactBrief, digestEntries, sessionAsContext, shouldAutoCompact, shouldSuggestCompact } from "../core/session/digest.js";
 import {
@@ -86,7 +74,6 @@ import {
 import type { Corpus } from "./corpus.js";
 import type { LearnedRouting } from "./learned.js";
 import type { Episode } from "../core/corpus/corpus.js";
-import { detectIbmiLanguage, ibmiPrompt } from "../core/ibmi/languages.js";
 import { hiveyLabel, hiveyModel, isHivey } from "../core/router/hivey.js";
 import { parsePrompt, participantDirective, type MentionKind, type Participant } from "../core/session/mentions.js";
 import { resolveMentions } from "./mentions.js";
@@ -2167,7 +2154,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     // The turn is over for the user NOW, not when the abort finishes travelling.
     //
     // Most of what a turn is doing can be cancelled in a millisecond. Some of it cannot: a query on
-    // a partition, a REST call to a server that is thinking, a command someone else's API will
+    // a database, a REST call to a server that is thinking, a command someone else's API will
     // return from when it is ready. Waiting for those to notice is what makes a stop button feel
     // broken — the one thing this control cannot afford, because the reason people press it is that
     // something is already taking too long.
@@ -2514,348 +2501,6 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    * answering: is the thing I want open in front of me, somewhere in the repository, part of the
    * project's own rules, or something we discussed before.
    */
-  /**
-   * A source member, or several, chosen from lists.
-   *
-   * This was three menus deep — library, then source file, then member — and each step was a list
-   * that could come back empty with a field underneath it. Three chances to end up typing a name by
-   * hand, which is both the slowest way to do this and the one most likely to be wrong: the whole
-   * point of being connected is that the names are already known over there.
-   *
-   * So: pick libraries, say what the name looks like, pick members. The source file stops being a
-   * step and becomes part of what each row says, because nobody looking for a program thinks "it is
-   * in QRPGLESRC" first — they think of its name. Libraries and members are both multi-select,
-   * which is what makes two versions of the same component a single gesture.
-   */
-  private async pickMembers(withDependencies: boolean): Promise<void> {
-    try {
-      const libraries = await vscode.window.withProgress(
-        { location: vscode.ProgressLocation.Window, title: t("Reading the libraries…") },
-        () => ibmiAllLibraries(),
-      );
-      // The same filter as everywhere else, so `ARC*` finds ARCAD_ENG. The built-in one is fuzzy and
-      // takes the star literally, which means the one syntax people reach for here matches nothing.
-      const chosenLibraries = await this.pickFiltered(
-        [
-          ...libraries.map((l) => ({
-            label: l.name,
-            description: l.inList ? t("in your library list") : (l.text ?? ""),
-          })),
-          { label: "$(edit) " + t("Type library names…"), description: t("Separated by spaces or commas"), other: true },
-        ],
-        {
-          placeHolder: libraries.length
-            ? t("Which libraries? {0} on this system — {1} to filter", libraries.length, "ARC*")
-            : t("No library could be listed — type the names"),
-          many: true,
-          nameOf: (row) => row.label,
-        },
-      );
-      if (!chosenLibraries?.length) return;
-
-      const names = chosenLibraries.filter((l) => !(l as { other?: boolean }).other).map((l) => l.label);
-      if (chosenLibraries.some((l) => (l as { other?: boolean }).other)) {
-        const typed = await vscode.window.showInputBox({ prompt: t("Library names"), placeHolder: "ARCADV1 ARCADV2" });
-        for (const name of (typed ?? "").split(/[\s,;]+/).filter(Boolean)) names.push(name.toUpperCase());
-      }
-      if (!names.length) return;
-
-      const pattern =
-        (await vscode.window.showInputBox({
-          prompt: t("Member name, or part of one"),
-          placeHolder: "*531*",
-          value: "*",
-        })) ?? "";
-      if (!pattern.trim()) return;
-
-      const hits: Array<{ library: string; sourceFile: string; name: string; extension: string; text?: string }> = [];
-      await vscode.window.withProgress(
-        { location: vscode.ProgressLocation.Notification, title: t("Searching {0}…", names.join(", ")) },
-        async (progress) => {
-          for (const library of names) {
-            // What it is doing, not a count of something it has not counted yet.
-            //
-            // It reported "LIB — 0 found" once, before doing any work, and never again: with one
-            // library — which is the ordinary case — the number sat at zero from the first moment
-            // to the last while thousands of members were being read. A figure that cannot move is
-            // worse than no figure, because it reads as a search that has found nothing.
-            //
-            // Members READ, which is what is known while reading. How many of them MATCH is not
-            // known until the filtering below, and the picker says it in its own title.
-            progress.report({ message: t("{0} — reading the member list…", library) });
-            try {
-              const members = await ibmiAllMembers(library, (read, sourceFile) => {
-                progress.report({
-                  message: sourceFile
-                    ? t("{0}/{1} — {2} members read", library, sourceFile, read)
-                    : t("{0} — {1} members read", library, read),
-                });
-              });
-              for (const member of members) {
-                if (matchesName(member.name, pattern)) hits.push({ library, ...member });
-              }
-            } catch {
-              // One library that cannot be read is one fewer looked in, not a failed search.
-            }
-          }
-        },
-      );
-
-      if (!hits.length) {
-        // Said plainly, with what was searched: an empty list and a failed listing look the same on
-        // screen, and telling them apart is the difference between trying another pattern and
-        // reporting a broken feature.
-        void vscode.window.showInformationMessage(
-          t("Nothing matching “{0}” in {1}.", pattern, names.join(", ")),
-        );
-        return;
-      }
-
-      const rows = hits
-        .sort((a, b) => a.library.localeCompare(b.library) || a.name.localeCompare(b.name))
-        .map((h) => ({
-          label: `${h.name}${h.extension ? `.${h.extension}` : ""}`,
-          description: `${h.library}/${h.sourceFile}`,
-          detail: h.text ?? "",
-          hit: h,
-        }));
-
-      if (withDependencies) {
-        const one = await this.pickFiltered(rows, {
-          placeHolder: t("{0} found — which one to follow?", rows.length),
-          many: false,
-          nameOf: (row) => row.hit.name,
-        });
-        if (!one?.length) return;
-        const hit = one[0]!.hit;
-        await this.attachWithDependencies(hit.library, hit.sourceFile, hit.name);
-        return;
-      }
-
-      const picked = await this.pickFiltered(rows, {
-        placeHolder: t("{0} found — tick the ones to attach", rows.length),
-        many: true,
-        nameOf: (row) => row.hit.name,
-      });
-      if (!picked?.length) return;
-      for (const one of picked) {
-        try {
-          const text = await readMemberText(one.hit.library, one.hit.sourceFile, one.hit.name);
-          this.pushContext({
-            kind: "member",
-            label: `${one.hit.library}/${one.hit.sourceFile}(${one.hit.name})`,
-            body: headToTokens(text, picked.length > 3 ? 3000 : 6000),
-            untrusted: true,
-          });
-        } catch (error) {
-          void vscode.window.showWarningMessage(`Hivey Code: ${(error as Error).message}`);
-        }
-      }
-    } catch (error) {
-      void vscode.window.showWarningMessage(`Hivey Code: ${(error as Error).message}`);
-    }
-  }
-
-  /**
-   * One component, in every version that has it.
-   *
-   * The other flow asks "what is in this library"; this one asks "where is this member", which is
-   * the question when two versions are on the table. The order of the questions is the difference:
-   * the name first, because you already know it, then the libraries to look in.
-   *
-   * What it cannot do is tell you which library is which version. That mapping lives in the ARCAD
-   * repository and Elias publishes no way to read it, so guessing at library naming conventions
-   * would produce an integration that works at one customer and misleads at the next.
-   */
-  private async pickAcrossVersions(): Promise<void> {
-    try {
-      const pattern = await vscode.window.showInputBox({
-        prompt: t("Which component? A name, or part of one"),
-        placeHolder: "CUSTMAINT",
-      });
-      if (!pattern?.trim()) return;
-
-      const libraries = await vscode.window.withProgress(
-        { location: vscode.ProgressLocation.Window, title: t("Reading the libraries…") },
-        () => ibmiAllLibraries(),
-      );
-      const chosen = await this.pickFiltered(
-        libraries.map((l) => ({
-          label: l.name,
-          description: l.inList ? t("in your library list") : (l.text ?? ""),
-        })),
-        {
-          placeHolder: t("Which version libraries? {0} on this system", libraries.length),
-          many: true,
-          nameOf: (row) => row.label,
-        },
-      );
-      if (!chosen?.length) return;
-
-      const hits: Array<{ library: string; sourceFile: string; name: string; extension: string; text?: string }> = [];
-      await vscode.window.withProgress(
-        { location: vscode.ProgressLocation.Notification, title: t("Looking for {0}…", pattern) },
-        async (progress) => {
-          for (const library of chosen) {
-            // Same counter, same defect, same fix — see the member search above. A figure reported
-            // once before any work and never again reads as a search that has found nothing.
-            progress.report({ message: t("{0} — reading the member list…", library.label) });
-            try {
-              const members = await ibmiAllMembers(library.label, (read, sourceFile) => {
-                progress.report({
-                  message: sourceFile
-                    ? t("{0}/{1} — {2} members read", library.label, sourceFile, read)
-                    : t("{0} — {1} members read", library.label, read),
-                });
-              });
-              for (const member of members) {
-                if (matchesName(member.name, pattern)) hits.push({ library: library.label, ...member });
-              }
-            } catch {
-              // A library that cannot be read is one fewer version looked in, not a failed search.
-            }
-          }
-        },
-      );
-
-      if (!hits.length) {
-        void vscode.window.showInformationMessage(
-          t("Nothing matching “{0}” in {1}.", pattern, chosen.map((c) => c.label).join(", ")),
-        );
-        return;
-      }
-
-      // Ticked by default: having asked for one component in several versions, wanting all of them
-      // is the ordinary case, and untickng one is easier than ticking five.
-      const rows = hits.map((h) => ({
-        label: `${h.library} — ${h.name}${h.extension ? `.${h.extension}` : ""}`,
-        description: h.sourceFile,
-        detail: h.text ?? "",
-        picked: true,
-        hit: h,
-      }));
-      const picked = await this.pickFiltered(rows, {
-        placeHolder: t("{0} versions of “{1}” — untick any you do not want", rows.length, pattern),
-        many: true,
-        nameOf: (row) => row.hit.library,
-      });
-      if (!picked?.length) return;
-
-      for (const one of picked) {
-        try {
-          const text = await readMemberText(one.hit.library, one.hit.sourceFile, one.hit.name);
-          this.pushContext({
-            kind: "member",
-            label: `${one.hit.library}/${one.hit.sourceFile}(${one.hit.name})`,
-            body: headToTokens(text, picked.length > 2 ? 4000 : 6000),
-            untrusted: true,
-          });
-        } catch (error) {
-          void vscode.window.showWarningMessage(`Hivey Code: ${(error as Error).message}`);
-        }
-      }
-    } catch (error) {
-      void vscode.window.showWarningMessage(`Hivey Code: ${(error as Error).message}`);
-    }
-  }
-
-  /**
-   * A tick-list whose filter means what it says.
-   *
-   * The quick pick's own filter is fuzzy: typing `531` matches `5331`, because it accepts the
-   * characters in order with gaps between them. That is right for a command palette, where you are
-   * half-remembering a name, and wrong for a list of members, where 531 and 5331 are two different
-   * programs and picking the wrong one is a real mistake.
-   *
-   * So the items are recomputed on every keystroke with the same rule the search box uses —
-   * "contains", or the glob if there is a `*` in it. VS Code still runs its own filter over what it
-   * is given, but everything given to it already matches, so nothing extra survives and nothing
-   * that should is hidden.
-   */
-  private async pickFiltered<T extends vscode.QuickPickItem>(
-    all: T[],
-    options: { placeHolder: string; many: boolean; nameOf: (item: T) => string },
-  ): Promise<T[] | undefined> {
-    const picker = vscode.window.createQuickPick<T>();
-    picker.placeholder = options.placeHolder;
-    picker.canSelectMany = options.many;
-    picker.matchOnDescription = true;
-    picker.matchOnDetail = true;
-    picker.items = all;
-    picker.onDidChangeValue((value) => {
-      const wanted = value.trim();
-      // The escape hatch always survives the filter. A row that says "type a name" is the one row
-      // that has to be there precisely when nothing else matched what you typed.
-      picker.items = wanted
-        ? all.filter((item) => (item as { other?: boolean }).other || matchesName(options.nameOf(item), wanted))
-        : all;
-    });
-    return new Promise<T[] | undefined>((resolve) => {
-      let done = false;
-      picker.onDidAccept(() => {
-        done = true;
-        // `selectedItems` is what is ticked when many are allowed, and the highlighted row when one
-        // is: the same property means both, which is the only reason this works for both shapes.
-        resolve([...picker.selectedItems]);
-        picker.hide();
-      });
-      picker.onDidHide(() => {
-        if (!done) resolve(undefined);
-        picker.dispose();
-      });
-      picker.show();
-    });
-  }
-
-  /** One member and everything it reaches, each piece its own attachment. */
-  private async attachWithDependencies(library: string, sourceFile: string, member: string): Promise<void> {
-    const { root, found, missing } = await vscode.window.withProgress(
-      { location: vscode.ProgressLocation.Notification, title: t("Following what {0} uses…", member) },
-      () => collectMemberContext(library, sourceFile, member),
-    );
-    this.pushContext({ kind: "member", label: root.ref, body: headToTokens(root.text, this.perFileTokens()), untrusted: true });
-    for (const dep of found) {
-      this.pushContext({ kind: "member", label: dep.ref, body: headToTokens(dep.text, this.perFileTokens()), untrusted: true });
-    }
-    if (missing.length) {
-      void vscode.window.showInformationMessage(
-        t("Attached {0} of {1}. Not found: {2}", found.length + 1, found.length + 1 + missing.length, missing.join(", ")),
-      );
-    }
-  }
-
-  /** A stream file, by path. There is no list to offer: the IFS is a file system, not a catalogue. */  /** A stream file, by path. There is no list to offer: the IFS is a file system, not a catalogue. */
-  private async attachStreamFile(): Promise<void> {
-    const home = ibmiInstance()?.getConnection()?.getConfig()?.homeDirectory;
-    const path = await vscode.window.showInputBox({
-      prompt: t("Path on the IFS"),
-      placeHolder: home ? `${home}/build.sh` : "/home/you/build.sh",
-      value: home ? `${home}/` : "/",
-    });
-    if (!path?.trim()) return;
-    try {
-      const text = await vscode.window.withProgress(
-        { location: vscode.ProgressLocation.Window, title: t("Reading {0}…", path) },
-        () => readStreamFileText(path),
-      );
-      this.pushContext({ kind: "file", label: path.trim(), body: headToTokens(text, this.perFileTokens()), untrusted: true });
-    } catch (error) {
-      void vscode.window.showWarningMessage(`Hivey Code: ${(error as Error).message}`);
-    }
-  }
-
-  /** One way in for anything attached from outside the workspace, so the rules are applied once. */
-  private pushContext(item: ContextItem): void {
-    if (this.attachments.some((a) => a.label === item.label)) {
-      void vscode.window.showInformationMessage(t("{0} is already attached.", item.label));
-      return;
-    }
-    this.attachments.push(item);
-    this.screen = "chat";
-    this.sendState();
-    void vscode.window.setStatusBarMessage(t("{0} attached.", item.label), 4000);
-  }
-
   private async contextPicker(): Promise<void> {
     type Row = vscode.QuickPickItem & { run?: () => Promise<void> | void };
     const rows: Row[] = [];
@@ -2962,41 +2607,6 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         rows.push({ label: "$(history) " + path, run: () => this.onMessage({ type: "attachPath", path }) });
       }
     });
-
-    // ── IBM i ───────────────────────────────────────────────────────────────────────────────
-    //
-    // Only when there is a connection, because every row here needs one and a menu that offers what
-    // it cannot do is worse than a menu that is short. What these attach never touches the
-    // workspace: a member is fetched through Code for IBM i's connection and a stream file through
-    // the file system it registers, so nothing has to be downloaded, opened in a tab, or checked
-    // out first. That is the whole point — the source of truth for these files is the partition.
-    if (ibmiEnabled(readSettings().ibmi.integration)) {
-      group(() => {
-        rows.push(sep(t("IBM i")));
-        rows.push({
-          label: "$(server) " + t("Source members…"),
-          description: t("Search by name across the libraries you choose"),
-          run: () => this.pickMembers(false),
-        });
-        rows.push({
-          label: "$(references) " + t("Member and what it uses…"),
-          description: t("Its copybooks and the programs it calls"),
-          run: () => this.pickMembers(true),
-        });
-        rows.push({ label: "$(file-directory) " + t("Stream file (IFS)…"), run: () => this.attachStreamFile() });
-        // ARCAD keeps each version in its own set of libraries, so the versions of a component are
-        // members of the same name in different libraries. Nothing here knows which library belongs
-        // to which version — Elias exposes no API for that mapping — so the libraries are named by
-        // the person who knows them, and the search does the rest.
-        if (arcadInstalled()) {
-          rows.push({
-            label: "$(versions) " + t("The same member across versions…"),
-            description: t("ARCAD keeps each version in its own libraries"),
-            run: () => this.pickAcrossVersions(),
-          });
-        }
-      });
-    }
 
     group(() => {
       rows.push(sep(t("The repository")));
@@ -4502,7 +4112,6 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         this.plan = plan;
         this.post({ type: "plan", plan });
       },
-      arcad: { credentials: () => this.keys.arcad() },
       mcp: this.mcp,
     }).concat(
       // The memory with recall — see `core/agent/recall.ts`. Read-only, so plan mode keeps it too.
@@ -4519,15 +4128,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     // with an exception in it is not one.
       // The built-in skills, offered to the model the way the repository's own are: names and one
     // line each in the prompt, instructions on demand. They were reachable only by a user who knew
-    // the slash command to type — so forty IBM i skills and eight finance ones, every one of them
-    // backed by an evaluation task, were conditional on knowing a magic word.
+    // the slash command to type — so every skill family, the finance one included with each skill
+    // backed by an evaluation task, was conditional on knowing a magic word.
     //
     // Filtered by what the user has actually switched on, which is also what bounds the cost: the
-    // whole catalogue is eighty-five, a typical setup enables a fraction of it, and a skill that
+    // whole catalogue is seventy-five, a typical setup enables a fraction of it, and a skill that
     // is off must not be described either — the model would announce something the user cannot
     // invoke.
     // `familiesFor()` and not the raw setting: the families the open files imply are in play too, and
-    // they are the reason forty IBM i skills now reach a conversation about an RPG member without
+    // they are the reason the Python skills now reach a conversation about a Python file without
     // anybody having opened a settings page first.
     const familiesNow = this.familiesFor().groups;
     const offeredBuiltins = builtinSkillsForModel(
@@ -4564,16 +4173,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     // Split in two, and the split is worth money. The system prompt is the head of the cacheable
     // prefix: every provider's prompt cache hits up to the first byte that differs, so one line in
     // here that follows the open editor around costs the WHOLE prefix on every turn — the repository
-    // map included. What used to sit in it and should not: the dialect note, which is derived from
-    // the attached files, and the participant directive, which is per-turn by definition. Both now
-    // ride after the transcript, where they are also read last. See `stablePrompt`.
+    // map included. What used to sit in it and should not: the participant directive, which is
+    // per-turn by definition. It now rides after the transcript, where it is also read last. See `stablePrompt`.
     // The reply language, decided from the question and restated after the transcript: see
     // `detectLanguage` for why the system prompt's own rule was not enough.
     // Built-in skill instructions are taken out first: they are English on purpose, and `/explain`
     // typed in a French interface must not read as a question asked in English.
     const lastQuestion = withoutModelText([...this.session.entries].reverse().find((e) => e.role === "user")?.text ?? "");
     const directives = turnDirectives({
-      dialect: dialectNote(this.attachments),
       ...(this.participant ? { participant: participantDirective(this.participant) } : {}),
       language: languageDirective(detectLanguage(lastQuestion, language())),
     });
@@ -6149,49 +5756,6 @@ function workspaceNote(): string {
   return folder ? `\n\nWorkspace: ${folder.name}.` : "";
 }
 
-/**
- * The rules of the dialect in the active editor, when that dialect has rules a model gets wrong.
- *
- * Only IBM i qualifies today, and it qualifies badly: a model that writes free-form RPG into a
- * fixed-format member produces something that looks right, compiles into something else, and fails
- * in a spool file. The text is appended to the SYSTEM prompt rather than to the turn, which sounds
- * like it would break the prompt cache on every file switch — it does not, because the text depends
- * on the dialect and not on the file. A conversation about RPG keeps the same prefix throughout.
- */
-function dialectNote(attached: ContextItem[] = []): string {
-  // The same switch the IBM i tools are behind. Without it the platform's rules arrived by file
-  // name alone: any `.sql` file — Postgres, SQLite, a migration in a web project — was answered
-  // with the Db2 for i dialect, on machines that have never seen a partition.
-  const onIbmi = ibmiEnabled(readSettings().ibmi.integration);
-  const sources: Array<{ path: string; text: string }> = [];
-
-  const doc = vscode.window.activeTextEditor?.document;
-  if (doc) sources.push({ path: doc.uri.path, text: doc.getText().slice(0, 20_000) });
-  // What is ATTACHED counts too, and it took a question from the user to see why: the rules were
-  // read off the focused tab alone, so attaching a source member and then reading the README — or
-  // asking about three files at once, which is the normal way to ask about how they fit together —
-  // sent the model into a dialect it had been told nothing about. The file on screen is a good
-  // guess about the subject; the files deliberately put in the conversation are better than a guess.
-  for (const item of attached) {
-    if (item.kind !== "file" && item.kind !== "selection" && item.kind !== "member") continue;
-    sources.push({ path: item.label.replace(/:\d+(?:-\d+)?$/, ""), text: item.body.slice(0, 20_000) });
-  }
-
-  const seen = new Set<string>();
-  const notes: string[] = [];
-  for (const source of sources) {
-    const lang = detectIbmiLanguage(source.path, source.text, { onIbmi });
-    if (!lang || seen.has(lang.id)) continue;
-    seen.add(lang.id);
-    notes.push(ibmiPrompt(lang));
-    // Two at most. Each of these is a paragraph of rules and, for a fixed-format dialect, a column
-    // ruler — the most expensive lines in the whole prompt. A conversation holding five dialects at
-    // once is a conversation where none of them is the subject.
-    if (notes.length === 2) break;
-  }
-  return notes.length ? `\n\n${notes.join("\n\n")}` : "";
-}
-
 function safeUrl(s: Settings, id: Settings["chat"]["provider"]): string {
   try {
     return endpointFor(s, id);
@@ -6254,11 +5818,11 @@ export { commandPrefix };
 /**
  * The path a tool call is about, if it is about one.
  *
- * Tools name it differently — `path` for a file, `member` for an IBM i source member — and a policy
+ * Tools name it differently — `path`, `file` or `uri` — and a policy
  * about paths that only understood one of those spellings would be a policy with a hole in it.
  */
 function pathArgument(args: Record<string, unknown>): string | undefined {
-  for (const key of ["path", "file", "member", "uri"]) {
+  for (const key of ["path", "file", "uri"]) {
     const value = args[key];
     if (typeof value === "string" && value.trim()) return value.trim();
   }

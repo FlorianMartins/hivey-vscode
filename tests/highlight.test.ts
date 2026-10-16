@@ -19,10 +19,7 @@ const SAMPLES: Array<[string, string]> = [
   ["ts", "const x = `a ${b} c`; // note\nfunction f(y: string) { return /re[/]gex/.test(y); }"],
   ["ts", "const s = \"he said \\\"hi\\\"\"; const n = 0xFF_00;"],
   ["py", "def f(x):\n    # comment\n    return f'{x!r}' if x else None"],
-  ["sql", "SELECT * FROM QSYS2.SYSTABLES WHERE NAME = 'it''s' FETCH FIRST 5 ROWS ONLY;"],
-  ["rpgle", "**FREE\ndcl-s name char(10);\n// a note\nif name = 'x';\n  dsply 'hello';\nendif;"],
-  ["rpg", "     H DFTACTGRP(*NO)\n     C* an old comment\n     C                   EVAL      X = 1"],
-  ["dds", "     A          R CUSTREC\n     A            CUSNO          5S 0"],
+  ["sql", "SELECT * FROM customers WHERE NAME = 'it''s' FETCH FIRST 5 ROWS ONLY;"],
   ["json", '{"a": [1, 2.5, true, null], "b": "\\u00e9"}'],
   ["html", '<div class="a" id=\'b\'>text</div><!-- c -->'],
   ["", "whatever this is, it has ` and \" and /* in it"],
@@ -91,39 +88,6 @@ test("a number is a number, and a number inside a name is not", () => {
   assert.deepEqual(kinds(highlight("const utf8Name = 1;", "ts"), "number"), ["1"], "utf8Name is one identifier");
 });
 
-// ── IBM i ────────────────────────────────────────────────────────────────────────────────────
-
-test("free-form RPG knows its own words, hyphens included", () => {
-  const tokens = highlight("**FREE\ndcl-s qty packed(5:0);\nif qty > 0;\nendif;", "rpgle");
-  const keywords = kinds(tokens, "keyword");
-  assert.ok(keywords.includes("dcl-s"), "a hyphen is part of the word in RPG");
-  assert.ok(keywords.includes("if"));
-  assert.ok(keywords.includes("endif"));
-  assert.ok(kinds(tokens, "meta").includes("**FREE"));
-});
-
-test("in a fixed-format member the column decides, not the character", () => {
-  // Column 7 is the comment marker. The same asterisk anywhere else is multiplication, and a
-  // highlighter that greps for `*` comments out half a calculation spec.
-  const commented = highlight("     C* this is a comment\n", "rpg");
-  assert.deepEqual(kinds(commented, "comment"), ["     C* this is a comment"]);
-
-  const code = highlight("     C                   EVAL      X = A * B\n", "rpg");
-  assert.equal(kinds(code, "comment").length, 0, "an asterisk in column 40 is not a comment");
-});
-
-test("the specification letter is marked, and the rest of the line is left alone", () => {
-  const tokens = highlight("     A          R CUSTREC\n", "dds");
-  assert.deepEqual(kinds(tokens, "keyword"), ["A"]);
-});
-
-test("SQLRPGLE gets the free-form lexer, fixed RPG does not", () => {
-  assert.equal(familyOf("sqlrpgle"), "ibmi");
-  assert.equal(familyOf("rpgle"), "ibmi");
-  assert.equal(familyOf("rpg"), "ibmi-fixed");
-  assert.equal(familyOf("dds"), "ibmi-fixed");
-});
-
 // ── Not guessing ─────────────────────────────────────────────────────────────────────────────
 
 test("an unknown language is left entirely plain", () => {
@@ -147,7 +111,7 @@ test("the family is decided by the tag, and an unknown tag is plain", () => {
 // family rather than once.
 
 test("a double dash comments a line of SQL, and only of SQL", () => {
-  const sql = highlight("-- how the total is computed\nSELECT 1 FROM SYSIBM.SYSDUMMY1", "sql");
+  const sql = highlight("-- how the total is computed\nSELECT 1 FROM customers", "sql");
   assert.deepEqual(kinds(sql, "comment"), ["-- how the total is computed"]);
 
   // Two minus signs in a language that has no such comment must stay arithmetic.
@@ -158,7 +122,6 @@ test("a double dash comments a line of SQL, and only of SQL", () => {
 test("each family uses its own marker", () => {
   assert.deepEqual(kinds(highlight("// note\nconst a = 1;", "ts"), "comment"), ["// note"]);
   assert.deepEqual(kinds(highlight("# note\nx = 1", "py"), "comment"), ["# note"]);
-  assert.deepEqual(kinds(highlight("// note\ndcl-s a char(1);", "rpgle"), "comment"), ["// note"]);
   assert.deepEqual(kinds(highlight("-- note\nSELECT 1", "db2"), "comment"), ["-- note"]);
 });
 

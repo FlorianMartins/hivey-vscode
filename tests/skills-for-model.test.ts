@@ -1,8 +1,8 @@
 // The built-in skills were invisible to the model (chantier 4.2).
 //
-// Eighty-five of them — forty for IBM i, eight for finance, every one backed by an evaluation task
-// that fails before it is applied — were reachable ONLY by a user typing the right slash command.
-// Somebody who does not know `/packed` exists never benefits from it, which made a whole axis of
+// All of them — the finance ones each backed by an evaluation task that fails before it is
+// applied — were reachable ONLY by a user typing the right slash command.
+// Somebody who does not know `/rounding` exists never benefits from it, which made a whole axis of
 // this product's expertise conditional on knowing a magic word.
 //
 // ⚠️ And the premise of this chantier as first written was wrong: it said eighty-five skills sat in
@@ -17,13 +17,13 @@ import { BUILTIN_SKILLS, builtinSkillsForModel } from "../src/core/session/skill
 import { skillsPrompt } from "../src/core/agent/definitions.js";
 
 test("a built-in skill becomes a skill the model can be offered", () => {
-  const packed = BUILTIN_SKILLS.find((sk) => sk.name === "/packed");
-  assert.ok(packed, "the finance family should still have /packed");
-  const [offered] = builtinSkillsForModel([packed!]);
+  const rounding = BUILTIN_SKILLS.find((sk) => sk.name === "/rounding");
+  assert.ok(rounding, "the finance family should still have /rounding");
+  const [offered] = builtinSkillsForModel([rounding!]);
   assert.equal(offered?.kind, "skill");
-  assert.equal(offered?.name, "/packed");
-  assert.equal(offered?.description, packed!.hint);
-  assert.equal(offered?.body, packed!.prompt);
+  assert.equal(offered?.name, "/rounding");
+  assert.equal(offered?.description, rounding!.hint);
+  assert.equal(offered?.body, rounding!.prompt);
   assert.equal(offered?.source, "built in");
 });
 
@@ -52,8 +52,8 @@ test("the panel offers what is in play, and nothing that is off", () => {
   // cannot invoke. Read from the source, because this is a claim about a filter at a call site.
   //
   // ⚠️ The filter used to read `settings.skills.groups` — the CHOSEN families — and that was the
-  // defect: somebody editing RPG with default settings got `general` and nothing else, so forty IBM i
-  // skills were offered to nobody. It reads `familiesFor()` now, which is chosen ∪ implied by the
+  // defect: somebody editing Python with default settings got `general` and nothing else, so the
+  // language's skills were offered to nobody. It reads `familiesFor()` now, which is chosen ∪ implied by the
   // open files. Both halves are asserted, the second negatively, so a revert to the raw setting is
   // caught rather than silently losing the automation again.
   const chat = readFileSync("src/extension/chat.ts", "utf8");

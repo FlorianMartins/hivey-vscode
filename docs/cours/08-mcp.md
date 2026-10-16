@@ -63,12 +63,10 @@ Un message qui dit *quoi* est un message qu'on lit.
 ## Dans Hivey Code
 
 MCP est aussi la réponse que le projet donne à une demande fréquente, et son refus est instructif.
-Pour l'intégration avec ARCAD — un outil de gestion de changements du monde IBM i
-([chapitre 11](11-ibm-i.md)) — le catalogue des adresses REST n'est pas publié. Le projet **refuse
+Quand l'outil d'un éditeur ne publie pas le catalogue de ses adresses REST, le projet **refuse
 d'inventer ces adresses** : deviner des chemins pour qu'un modèle les appelle produit une intégration
-qui échoue chez un client, d'une façon que personne ne peut déboguer. Il transporte donc des requêtes
-vers les chemins que **vous** fournissez — et pour tout ce qui va plus loin, dit que la bonne forme
-est un serveur MCP.
+qui échoue chez un client, d'une façon que personne ne peut déboguer. La bonne forme pour une telle
+intégration est un serveur MCP, écrit par qui connaît l'API.
 
 C'est la même discipline que partout ailleurs dans ce projet : **ne jamais inventer une API**, et le
 dire quand on ne sait pas.

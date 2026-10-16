@@ -224,9 +224,8 @@ test("the background tools are their own set, rooted in the worktree", () => {
   assert.match(code, /function backgroundTools\(worktree: string/);
   assert.match(code, /underRoot\(/, "paths are not put through the containment rule");
   assert.match(code, /is outside this task's worktree, which is all it can see/);
-  // And the set is deliberately small: no diagnostics (no editor), no plan (nobody watching), no
-  // IBM i (a partition is shared, and a background agent reaching one is the opposite of isolated).
-  for (const absent of ["get_diagnostics", "update_plan", "ibmi_"]) {
+  // And the set is deliberately small: no diagnostics (no editor), no plan (nobody watching).
+  for (const absent of ["get_diagnostics", "update_plan"]) {
     assert.equal(code.includes(`name: "${absent}`), false, `${absent} is reachable from a background task`);
   }
   assert.match(code, /return \[read, list, write, edit, command\];/);

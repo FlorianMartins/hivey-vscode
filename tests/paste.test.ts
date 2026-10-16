@@ -55,7 +55,7 @@ test("what can be read as text, and what honestly cannot", () => {
   assert.equal(isTextLike("application/json"), true);
   // No type at all is what a file manager gives for source files.
   assert.equal(isTextLike("", "queries.sql"), true);
-  assert.equal(isTextLike("application/octet-stream", "CUSTRPT.rpgle"), true);
+  assert.equal(isTextLike("application/octet-stream", "invoice.py"), true);
   // The honest boundary. A .docx is a zip and a .pdf is a binary container; reading either means a
   // parser this project does not ship. Attaching one as mojibake would be worse than refusing it,
   // because the model would answer confidently about the noise.

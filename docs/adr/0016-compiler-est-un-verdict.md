@@ -1,6 +1,9 @@
 # ADR-0016 — Compiler est un verdict, pas une action de plus
 
-**Date** : 2026-10-02 · **Statut** : accepté
+**Date** : 2026-10-02 · **Statut** : caduque (accepté à l’origine)
+
+> **Statut : caduque.** Le support IBM i a été retiré du produit ; cette décision ne s'applique plus.
+> Elle reste comme trace du raisonnement tenu à l'époque.
 
 ## Contexte
 

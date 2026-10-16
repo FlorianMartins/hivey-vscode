@@ -35,7 +35,7 @@ export interface Record_ {
 export type Stats = Record_[];
 
 /** The kinds a turn is classified into. Deliberately few: a finer split never reaches a sample size. */
-export type TaskKind = "edit" | "ask" | "ibmi" | "test";
+export type TaskKind = "edit" | "ask" | "test";
 
 export interface Candidate {
   model: string;
@@ -179,9 +179,8 @@ export function choose(
  * what it did is a fact. A turn that edited files is an `edit` whatever its phrasing.
  */
 export function classify(tools: string[]): TaskKind {
-  if (tools.some((t) => t.startsWith("ibmi_"))) return "ibmi";
   if (tools.some((t) => t === "write_file" || t === "edit_file")) return "edit";
-  if (tools.some((t) => t === "run_command" || t === "ibmi_test")) return "test";
+  if (tools.some((t) => t === "run_command")) return "test";
   return "ask";
 }
 

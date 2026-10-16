@@ -39,7 +39,7 @@ test("an id cannot climb out of the folder", () => {
   for (const bad of ["../secrets", "a/../../b", "/etc/passwd", "Finance/Invoices", "a b", ""]) {
     assert.equal(validId(bad), false, bad);
   }
-  for (const good of ["finance", "finance/invoices", "ibm-i/rpg/free-form"]) {
+  for (const good of ["finance", "finance/invoices", "python/typing/conventions"]) {
     assert.equal(validId(good), true, good);
   }
 });

@@ -1,13 +1,14 @@
 # Measured quality
 
 What each configuration scores on this repository's own evaluation set
-(62 tasks). Regenerate with `node scripts/evaluate.mjs --table eval/QUALITY.md`.
+(40 tasks). The rows below predate that set: see the first caveats. Regenerate with `node scripts/evaluate.mjs --table eval/QUALITY.md`.
 
 > **Read these figures with the following in mind.**
 >
 > - Les trois premières lignes (`hivey/free`, `remote only`, `hivey`) sont mesurées sur les **62** mêmes tâches, avec les consignes corrigées et **sans aucun refus**. Ce sont les seules comparables entre elles.
 > - ⚠️ La ligne `hivey` a d'abord donné **2/62** — non pas pour une faute du modèle, mais parce que le solde du compte OpenRouter était épuisé (−0,11 $) et que chaque tâche était refusée avant de commencer. Crédit rétabli, la même série donne 55/62. Un refus n'est pas un échec : voir `core/eval/report.ts`.
 > - ⚠️ La dernière ligne (`deepseek-v4.1-flash alone`) a été mesurée sur **56** tâches, avant que trois consignes ne soient réparées, et n'est donc PAS comparable aux trois autres. Elle reste pour la décision qu'elle a servi à prendre (ADR-0034).
+> - ⚠️ Ces lignes ont été mesurées sur l'ancien jeu de 62 tâches, dont 22 tâches IBM i retirées depuis avec tout le support IBM i. Elles restent comme trace de ce qui a été mesuré ; la prochaine série, sur le jeu actuel, les remplace.
 > - Écart constaté entre séries identiques : **48, 47 et 50** réussites sur 56. Une différence plus petite que cet écart n'est pas un résultat.
 
 Taken 2026-10-03T13:14:46.752Z against `https://openrouter.ai/api/v1` with `hivey/free`, `qwen/qwen3.7-flash`, `hivey`, `deepseek/deepseek-v4.1-flash`.
@@ -31,17 +32,10 @@ The `hivey/free` preset was re-run on the full 62 tasks after the skill families
 back **27 passed and 30 tasks killed by the harness's 180-second clock** — 48 % of the set. The same
 preset scored 32/62 two days earlier with 3 timeouts.
 
-The obvious suspect was the skills change itself: an IBM i prompt now carries about forty more skill
-names, which costs tokens on every turn. Splitting the set says otherwise:
-
-| | IBM i tasks killed | other tasks killed |
-|---|---|---|
-| 2026-10-04 | 9 % | 2 % |
-| 2026-10-06 | 53 % | **55 %** |
-
-Only the IBM i tasks gain those forty skills, and the two groups moved together. **A cause that does
-not follow the shape of the change is not that change** — the free endpoint had simply become much
-slower. A set in that state measures the provider's throughput on the day and would publish it as the
+The obvious suspect was the skills change itself: a prompt now carries more skill names, which costs
+tokens on every turn. Splitting the set said otherwise: the tasks that gained skills and the tasks
+that did not were killed at the same rate. **A cause that does not follow the shape of the change is
+not that change** — the free endpoint had simply become much slower. A set in that state measures the provider's throughput on the day and would publish it as the
 model's quality.
 
 So no figure from that run is published, and the 2026-10-04 line above stands. The bench now refuses
@@ -55,10 +49,8 @@ Not a caveat about precision — a condition that was never intended and was fou
 these figures were published. The terminal, which the harness drives, offered `general` skills alone
 and nothing else: `cfg.skillGroups ?? ["general"]`, with no caller anywhere that sets `skillGroups`.
 
-**Twenty-two of these sixty-two tasks are IBM i tasks.** The RPG, DDS, CL and Db2 for i skill
-families — written for those tasks, every skill backed by one of them — were switched off while the
-bench ran. So were `frontend`, `javascript`, `python` and the rest on the tasks that would have used
-them.
+The `frontend`, `javascript`, `python` and other skill families were switched off while the bench
+ran, on the tasks that would have used them.
 
 What that means for the numbers above, stated exactly:
 
@@ -68,7 +60,7 @@ What that means for the numbers above, stated exactly:
   from the files in the tree as of this version, and the panel from the files the editor has open.
 - Whether that **raises** these scores is **not measured**, and no figure here will be adjusted to
   guess at it. A skills list is not free: it costs prefix tokens on every turn, and a model given
-  forty extra names can also be distracted by them. The direction is plausible; it is not a result.
+  extra names can also be distracted by them. The direction is plausible; it is not a result.
 
 The next run replaces these lines rather than being compared with them, and the configuration column
 will say which side of this change it was measured on.
@@ -99,7 +91,7 @@ To reproduce it, or to measure a configuration that reads *not measured*:
 ```bash
 npm run build
 node scripts/evaluate.mjs \
-  --url https://openrouter.ai/api/v1 --model hivey/free \
+  --url http://127.0.0.1:11434/v1 --model qwen2.5-coder:7b \
   --as "local only" --table eval/QUALITY.md
 ```
 
