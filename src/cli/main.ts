@@ -189,6 +189,8 @@ async function main(): Promise<void> {
   // exists for, and reaching for the lookup without the rule put the terminal back in a different
   // version of the same hole.
   const contextTokens = contextBudget(cfg.contextTokens > 0 ? cfg.contextTokens : undefined, catalogueWindow(cfg.model));
+  // The window itself, when anything says what it is: what "how full is the context" is measured against.
+  const contextWindowKnown = cfg.contextTokens > 0 ? cfg.contextTokens : catalogueWindow(cfg.model);
 
   // The sub-agents this client offers: the repository's own, then the built-in ones, by the same
   // precedence the panel uses — a team that wrote an agent with that name meant theirs.
@@ -494,9 +496,14 @@ async function main(): Promise<void> {
       console.log(C.dim(`  ↳ ${t("noted — read at the next step")}`));
     };
     if (!oneOff && stdin.isTTY) rl.on("line", onLine);
+    // The prompt of the LAST request of the turn — what the window holds now. See `contextFill` below.
+    let lastPromptTokens = 0;
     try {
       const result = await runTurn({
         provider,
+        onUsage: (u) => {
+          if (u.actual > 0) lastPromptTokens = u.actual;
+        },
         model: cfg.model,
         messages: outgoing,
         tools,
@@ -627,8 +634,11 @@ async function main(): Promise<void> {
         changed: result.trace.some((x) => MUTATING_TOOLS.has(x.call.name) && !x.result.isError),
         verified: result.trace.some((x) => VERIFIER_TOOLS.has(x.call.name) && !x.result.isError),
         planLeft: unfinished.left.map((s) => s.title),
-        ...(result.usage.promptTokens && contextTokens
-          ? { contextFill: Math.min(1, result.usage.promptTokens / contextTokens) }
+        // ⚠️ The last request against the model's real window — not the turn's SUMMED prompt tokens
+        // against an 8 000-token floor, which said "the context is 100 % full" after every task on a
+        // model the catalogue does not know. An unknown window says nothing rather than a false 100 %.
+        ...(lastPromptTokens && contextWindowKnown > 0
+          ? { contextFill: Math.min(1, lastPromptTokens / contextWindowKnown) }
           : {}),
         toolCallsFromText: result.trace.some((x) => x.call.source === "text"),
         ...(result.shortenedTo ? { shortenedTo: result.shortenedTo } : {}),
