@@ -1,0 +1,7 @@
+{
+  "title": "A concurrency limit that leaves its slots idle",
+  "kind": "bug",
+  "prompt": "The thumbnail job is far slower than it should be. renderThumbnails is allowed 4 requests at once, but most of the time only one is running: one slow image holds everything up. Fix mapLimit so it actually keeps up to `limit` calls going, without breaking its documented behaviour.",
+  "check": "\"$HIVEY_EVAL_HIDDEN\" js-map-limit && node --test limit.test.js limit.hidden.test.js",
+  "timeoutMs": 300000
+}

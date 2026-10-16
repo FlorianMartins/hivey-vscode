@@ -1,0 +1,7 @@
+{
+  "title": "Split a pricing function nobody dares touch, keeping every result",
+  "kind": "refactor",
+  "prompt": "pricing.quote has grown into one 80-line function that nobody dares to touch. Refactor it: small functions (none longer than 25 lines), the country rules as data instead of if/elif chains, no duplication. quote must return exactly what it returns today for every input — including the errors it raises.",
+  "check": "\"$HIVEY_EVAL_HIDDEN\" py-pricing-refactor && python3 check_structure.py && python3 -m unittest -q test_pricing test_pricing_hidden",
+  "timeoutMs": 420000
+}

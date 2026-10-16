@@ -1,0 +1,7 @@
+{
+  "title": "A file explorer that sorts like a machine",
+  "kind": "bug",
+  "prompt": "The file explorer sorts names weirdly: 'Écoles' comes after 'Zoo', 'img10.png' before 'img2.png', and 'readme.md' after 'Zeta.md'. And since the explorer was added, opening it reshuffles the Recent panel too. Make it sort the way people expect in Finder or Windows Explorer.",
+  "check": "\"$HIVEY_EVAL_HIDDEN\" js-natural-sort && node --test entries.test.js entries.hidden.test.js",
+  "timeoutMs": 300000
+}

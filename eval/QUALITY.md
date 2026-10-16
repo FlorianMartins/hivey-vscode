@@ -1,7 +1,7 @@
 # Measured quality
 
 What each configuration scores on this repository's own evaluation set
-(40 tasks). The rows below predate that set: see the first caveats. Regenerate with `node scripts/evaluate.mjs --table eval/QUALITY.md`.
+(60 tasks). The rows below predate that set: see the first caveats. Regenerate with `node scripts/evaluate.mjs --table eval/QUALITY.md`.
 
 > **Read these figures with the following in mind.**
 >

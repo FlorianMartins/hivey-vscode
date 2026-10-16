@@ -1,0 +1,7 @@
+{
+  "title": "Removing from a list while iterating it, twice",
+  "kind": "bug",
+  "prompt": "Cart.removeExpired throws ConcurrentModificationException in production for some carts. Fix it, and look at the rest of Cart for the same mistake.",
+  "check": "\"$HIVEY_EVAL_HIDDEN\" java-remove-while-iterating && rm -rf out && javac -d out *.java && java -cp out CartTest && java -cp out CartHiddenTest",
+  "timeoutMs": 300000
+}

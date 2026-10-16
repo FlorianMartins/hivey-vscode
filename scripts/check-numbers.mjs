@@ -61,6 +61,9 @@ const CLAIMS = [
   // `npm run check:course`, which refuses the build instead of rewriting it, because reading what
   // changed is the work and the number is only the receipt.
   { file: "docs/cours/11-la-qualite-mesuree.md", pattern: /\*\*(\d+) tâches\*\*/g, of: "tasks" },
+  // And the English edition, which said 40 after the French one had been corrected to 60: only one
+  // of the two was a claim this script knew about.
+  { file: "docs/course/11-measured-quality.md", pattern: /\*\*(\d+) tasks\*\*/g, of: "tasks" },
   // ⚠️ Both course indexes count the decision records, and this claim is here because of how it was
   // found: the French one said "vingt-six" while there were 37 — the exact rot the course spends a
   // page warning about, inside the course. It was invisible to this script for a reason worth

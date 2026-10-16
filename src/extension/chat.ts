@@ -1086,6 +1086,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         case "send":
           await this.ask(m.text);
           break;
+        case "steer":
+          this.steer(m.text);
+          break;
         case "stop":
           this.stopTurn();
           break;
@@ -1154,6 +1157,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         }
         case "compact":
           await this.compact();
+          // A summary has no step to read a message at; what was typed during it is asked now.
+          this.askLeftSteers();
           break;
         case "startWizard":
           // A fresh conversation first: the guided start is about the one being created, and
@@ -2189,6 +2194,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     if (!ctl) return false;
     ctl.abort();
     this.stops += 1;
+    // Typed for the turn and not read yet: back in the box rather than lost, or sent on its own
+    // after a stop that was meant for the turn, not for it.
+    const unread = this.steers.splice(0);
+    if (unread.length) this.post({ type: "restoreDraft", text: unread.join("\n\n") });
 
     // The turn is over for the user NOW, not when the abort finishes travelling.
     //
@@ -2216,6 +2225,38 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    * it must also cancel what was going to follow, which is what comparing this before and after says.
    */
   private stops = 0;
+
+  /**
+   * Typed while a turn runs — « rectifier le tir sans avoir à Stop et refaire une nouvelle requête ».
+   *
+   * Not a new question: the turn is not stopped, and the model reads the message at its next step,
+   * after the results of the actions under way, with everything it has done still in front of it —
+   * see `RunTurnOptions.steer`. Drawn in the turn at once, so it is plain the message was received.
+   * With no turn running it is simply a question.
+   *
+   * Returns whether it joined a running turn.
+   */
+  steer(text: string): boolean {
+    if (!text.trim()) return false;
+    if (!this.turn) {
+      void this.ask(text);
+      return false;
+    }
+    this.steers.push(text);
+    this.post({ type: "interjection", text });
+    this.log.appendLine(`[turn] a message typed during the turn waits for its next step (${text.length} characters)`);
+    return true;
+  }
+
+  /** Typed during the turn and not read by it yet. See `steer`. */
+  private steers: string[] = [];
+
+  /** What was typed for a turn that ended before reading it, asked as the next question. */
+  private askLeftSteers(): void {
+    if (this.turn || !this.steers.length) return;
+    const left = this.steers.splice(0).join("\n\n");
+    setTimeout(() => void this.ask(left), 0);
+  }
 
   /** True while a turn is running. */
   get busy(): boolean {
@@ -2422,7 +2463,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this.recentAttachments = [path, ...this.recentAttachments.filter((p) => p !== path)].slice(0, 12);
   }
 
-  /** Re-read the repository's skills, then redraw. Called on activation and after an edit. */  /** Re-read the repository's skills, then redraw. Called on activation and after an edit. */  /** Re-read the repository's skills, then redraw. Called on activation and after an edit. */  /** Re-read the repository's skills, then redraw. Called on activation and after an edit. */
+  /** Re-read the repository's skills, then redraw. Called on activation and after an edit. */
   private async refreshSkills(): Promise<void> {
     const found = await this.definitions.load();
     const next = found.skills.map((sk) => ({
@@ -2469,6 +2510,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       // the words written there — the same reading as the panel's (see core/session/segments.ts).
       if (entry.segments?.length && !entry.error) {
         for (const seg of entry.segments) {
+          // What the person typed during the turn, where it came.
+          if (seg.user !== undefined) {
+            lines.push(`> **${t("You")}** — ${seg.user.trim().replace(/\n/g, "\n> ")}`, "");
+            continue;
+          }
           for (const step of seg.steps ?? []) lines.push(`- \`${step.tool}\` — ${stepText(step.summary)}`);
           if (seg.steps?.length) lines.push("");
           if (seg.text?.trim()) lines.push(seg.text.trim(), "");
@@ -3959,7 +4005,6 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       if (this.turn === ctl) {
         this.turn = undefined;
         this.settle();
-    this.settle();
         this.post({ type: "turnEnd" });
         this.sendState();
       }
@@ -4571,6 +4616,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           if (!ctl.signal.aborted) this.post({ type: "replaceText", from, to });
         },
         recall: this.recallFor(this.session.id),
+        // What the person typed since the last step, read now — and recorded where it was read, so
+        // the saved turn and the next turns show the correction in its place. See `steer`.
+        steer: () => {
+          if (this.turn !== ctl || ctl.signal.aborted) return [];
+          const taken = this.steers.splice(0);
+          for (const text of taken) segments.user(text);
+          if (taken.length) this.post({ type: "interjectionTaken" });
+          return taken;
+        },
         // ⚠️ "remove that cap, the model has to be able to do what it is asked from A to Z". Thirty
         // requests stopped a real task half-way — silently, after reading, editing and testing — and
         // it looked like the model giving up. No count by default: stop, and the repeat detector
@@ -5065,7 +5119,6 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       if (this.turn === ctl) {
         this.turn = undefined;
         this.settle();
-    this.settle();
         this.post({ type: "turnEnd" });
         this.sendState();
       }
@@ -5073,6 +5126,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       // own) and then asks again. See `recoverFromOverflow`.
       if (overflowed && this.turn === undefined) setTimeout(() => void this.recoverFromOverflow(), 0);
       if (saturated && this.turn === undefined) setTimeout(() => void this.continueAfterCompact(), 0);
+      // Typed after the turn's last step: it never reached it, so it is the next question. (A
+      // recovery above runs a turn of its own, which reads it at its first step.)
+      if (!overflowed && !saturated && !ctl.signal.aborted) this.askLeftSteers();
     }
   }
 
