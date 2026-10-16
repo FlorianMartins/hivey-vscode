@@ -172,6 +172,7 @@ Dans les réglages de VS Code, cherchez `hiveyCode`.
 | `budget.perRequestTokens` | La taille au-delà de laquelle une requête est questionnée — 0 (par défaut) : jamais, la limite est la fenêtre du modèle |
 | `context.autoCompact` | Le résumé automatique quand la conversation approche de la fenêtre ([chapitre 6](06-le-contexte.md)) — activé par défaut |
 | `agent.maxSteps` | Un plafond d'étapes par tour d'agent — 0 (par défaut) : aucun ([chapitre 5](05-les-trois-modes-et-les-outils.md)) |
+| `agent.commandRunner` | Comment l'agent lance les commandes — `auto` (par défaut) : en processus sous Windows, dont la sortie est lue directement et affichée dans un terminal *Hivey Code (commandes)* où Ctrl+C l'arrête, et dans le terminal intégré ailleurs ; `process` ou `terminal` pour choisir |
 | `chat.suggestNext` | La suggestion de la prochaine demande — activée par défaut |
 | `language` | Pour un poste dont l'éditeur est dans une langue et l'utilisateur dans une autre |
 

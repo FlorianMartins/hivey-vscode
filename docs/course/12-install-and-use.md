@@ -165,6 +165,7 @@ In VS Code's settings, search for `hiveyCode`.
 | `budget.perRequestTokens` | The size beyond which a request is questioned — 0 (the default): never, the model's own window is the limit |
 | `context.autoCompact` | The automatic summary when the conversation nears the window ([chapter 6](06-the-context.md)) — on by default |
 | `agent.maxSteps` | A cap on the steps of an agent turn — 0 (the default): none ([chapter 5](05-the-three-modes-and-tools.md)) |
+| `agent.commandRunner` | How the agent runs commands — `auto` (the default): as a process on Windows, whose output is read directly and shown in a *Hivey Code (commands)* terminal where Ctrl+C stops it, and in the integrated terminal elsewhere; `process` or `terminal` to choose |
 | `chat.suggestNext` | The suggested next request — on by default |
 | `language` | For a machine whose editor is in one language and whose user is in another |
 
