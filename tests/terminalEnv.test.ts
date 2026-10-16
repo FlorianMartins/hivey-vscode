@@ -8,7 +8,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ENV, missingKey, terminalEnvironment } from "../src/cli/env.js";
+import { ENV, missingKey, reasoningFromEnv, temperatureFromEnv, terminalEnvironment } from "../src/cli/env.js";
 
 /**
  * Deliberately not shaped like a key.
@@ -61,4 +61,16 @@ test("a terminal that would fail is known to be failing before it opens", () => 
   assert.equal(missingKey({ ...remote, apiKey: KEY }), false);
   assert.equal(missingKey(local), false, "a local server needs no key");
   assert.equal(missingKey({ ...local, apiKey: undefined }), false);
+});
+
+test("the evaluation knobs change nothing unless they are set to something valid", () => {
+  assert.equal(reasoningFromEnv(undefined), undefined);
+  assert.equal(reasoningFromEnv("deep"), undefined, "an unknown level is ignored, not guessed");
+  assert.equal(reasoningFromEnv(" High "), "high");
+  assert.equal(temperatureFromEnv(undefined), undefined);
+  assert.equal(temperatureFromEnv(""), undefined);
+  assert.equal(temperatureFromEnv("abc"), undefined);
+  assert.equal(temperatureFromEnv("3"), undefined, "out of range");
+  assert.equal(temperatureFromEnv("0.6"), 0.6);
+  assert.equal(temperatureFromEnv("0"), 0);
 });
