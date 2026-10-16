@@ -1,0 +1,7 @@
+{
+  "title": "An optional phone number, from the model to the API",
+  "kind": "feature",
+  "prompt": "Users need an optional phone number, stored in E.164 format (e.g. +32470123456). Accept it when a user is created and when one is updated, return it everywhere a user is returned, and reject anything that is not E.164 with a 400 like the other validation errors. Add tests for it.",
+  "check": "\"$HIVEY_EVAL_HIDDEN\" ts-user-phone-field && rm -rf dist && tsc -p . && node --test dist/test/*.test.js && grep -l phone test/*.ts | grep -qv '[.]hidden[.]'",
+  "timeoutMs": 420000
+}

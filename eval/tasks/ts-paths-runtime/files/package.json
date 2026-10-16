@@ -1,0 +1,10 @@
+{
+  "name": "invoice-cli",
+  "version": "1.4.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "tsc -p .",
+    "start": "node dist/main.js"
+  }
+}

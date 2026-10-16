@@ -1,0 +1,15 @@
+#!/bin/sh
+# The repository's own TypeScript compiler, for the checks that type-check a fixture.
+#
+# The fixtures carry no node_modules (and must not: a task is a few files, and installing anything
+# would need the network the bench does not give it). The compiler is the one this repository
+# already depends on, so a TypeScript task is decided by `tsc` rather than by a grep for the shape of
+# the code. It needs `npm ci` to have run, which every place that runs the checks already does — CI
+# before `eval:verify`, and the bench, which builds the CLI first.
+here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
+compiler="$here/../../node_modules/typescript/bin/tsc"
+if [ ! -f "$compiler" ]; then
+  echo "tsc: $compiler is missing — run \`npm ci\` in the repository first" >&2
+  exit 127
+fi
+exec node "$compiler" "$@"

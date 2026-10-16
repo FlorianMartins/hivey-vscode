@@ -1,0 +1,7 @@
+{
+  "title": "A product search that a quote breaks and a percent sign fools",
+  "kind": "bug",
+  "prompt": "Searching the catalogue for O'Reilly returns a 500 (sqlite3.OperationalError), and searching for 50% returns products that have nothing to do with it, like 'Discount 5000 pack'. Fix the search properly.",
+  "check": "\"$HIVEY_EVAL_HIDDEN\" py-search-like && python3 -m unittest -q test_search test_search_hidden",
+  "timeoutMs": 300000
+}

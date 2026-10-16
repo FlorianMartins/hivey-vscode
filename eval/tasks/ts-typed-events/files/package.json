@@ -1,0 +1,9 @@
+{
+  "name": "shop-front",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "tsc -p .",
+    "test": "tsc -p . && node --test dist/test/*.test.js"
+  }
+}

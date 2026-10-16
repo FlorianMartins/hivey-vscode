@@ -1,0 +1,7 @@
+{
+  "title": "An N+1 report, batched without changing a line of its output",
+  "kind": "refactor",
+  "prompt": "monthly_report takes minutes on production data: the database log shows one query per order for the customer and one per order line for the product. Make it fast without changing its output.",
+  "check": "\"$HIVEY_EVAL_HIDDEN\" py-n-plus-one && python3 -m unittest -q test_report test_report_hidden",
+  "timeoutMs": 300000
+}

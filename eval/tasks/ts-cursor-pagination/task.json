@@ -1,0 +1,7 @@
+{
+  "title": "From offset to cursor pagination, API and client",
+  "kind": "feature",
+  "prompt": "The nightly orders export sometimes contains the same order twice and misses others: new orders keep arriving while it pages through GET /orders, and the offsets shift under it. Switch listOrders to cursor-based pagination — an opaque `cursor` query parameter in, `nextCursor` in the response (null on the last page), and a 400 for a cursor the API did not issue — and update the export client to use it. The limit keeps working as it does today.",
+  "check": "\"$HIVEY_EVAL_HIDDEN\" ts-cursor-pagination && rm -rf dist && tsc -p . && node --test dist/test/api.test.js dist/test/cursor.hidden.test.js",
+  "timeoutMs": 480000
+}

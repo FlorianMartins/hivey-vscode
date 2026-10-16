@@ -26,4 +26,12 @@ jobs:
         with:
           languages: javascript-typescript
           queries: security-and-quality
+          # The bench's task fixtures are exercises handed to the model — some are broken on purpose
+          # (an injection to fix, a slow regex to find) — not code this product runs. Their checks
+          # and helpers outside `files/`, `solution/` and `hidden/` stay analysed.
+          config: |
+            paths-ignore:
+              - eval/tasks/*/files/**
+              - eval/tasks/*/solution/**
+              - eval/tasks/*/hidden/**
       - uses: github/codeql-action/analyze@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
