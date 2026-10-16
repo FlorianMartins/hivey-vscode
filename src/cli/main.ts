@@ -214,6 +214,8 @@ async function main(): Promise<void> {
   let mode: Mode = cfg.mode;
 
   const rl: Interface = createInterface({ input: stdin, output: stdout });
+  /** A question of the turn is waiting for its answer: the line typed is that answer. */
+  let answering = false;
 
   console.log(C.bold("Hivey Code") + C.dim(t(" — sovereign coding assistant")));
   console.log(
@@ -481,6 +483,18 @@ async function main(): Promise<void> {
     // One restorer for the whole stream. A terminal cannot repaint what it has already written, so
     // a marker shown in halves stays in halves. See `streamingRestorer`.
     const live = streamingRestorer((text) => vault.restore(text));
+    // A line typed while the turn runs corrects it — read at the next step, the turn goes on (see
+    // `RunTurnOptions.steer`). Only at a terminal: a one-off run reads nothing more, which is how the
+    // evaluation harness drives this client. A line answering a question of the turn is that
+    // answer, not a correction.
+    const typed: string[] = [];
+    const taken: string[] = [];
+    const onLine = (line: string): void => {
+      if (answering || !line.trim()) return;
+      typed.push(line.trim());
+      console.log(C.dim(`  ↳ ${t("noted — read at the next step")}`));
+    };
+    if (!oneOff && stdin.isTTY) rl.on("line", onLine);
     try {
       const result = await runTurn({
         provider,
@@ -494,6 +508,11 @@ async function main(): Promise<void> {
         // reply, and the evaluation harness — which drives this client — scored it as the model
         // failing.
         ...(isSelfHostedProvider(cfg.provider) ? { reasoning: "medium" as const } : {}),
+        steer: () => {
+          const now = typed.splice(0);
+          taken.push(...now);
+          return now;
+        },
         // The user's language, held for the whole turn, with the same safety net the panel has.
         replyLanguage: detectLanguage(text, language()),
         translate: async (note, lang, signal) =>
@@ -531,8 +550,13 @@ async function main(): Promise<void> {
             console.log(C.dim(`  ${t("auto-approved")}: ${req.description}`));
             return true;
           }
-          const answer = (await rl.question(`\n${C.amber("?")} ${req.description} — ${t("allow? [y/N]")} `)).toLowerCase();
-          return answer === "y" || answer === "o" || answer === "yes" || answer === "oui";
+          answering = true;
+          try {
+            const answer = (await rl.question(`\n${C.amber("?")} ${req.description} — ${t("allow? [y/N]")} `)).toLowerCase();
+            return answer === "y" || answer === "o" || answer === "yes" || answer === "oui";
+          } finally {
+            answering = false;
+          }
         },
         afterResponse: (t) => vault.restore(t),
         restoreArgs: (t) => vault.restore(t),
@@ -546,6 +570,9 @@ async function main(): Promise<void> {
       if (printed) stdout.write("\n");
 
       const answer = session.add({ role: "assistant", text: result.text, model: cfg.model });
+      // The corrections the turn read, kept with its answer so the next turns read them too — see
+      // `answerWithInterjections`.
+      if (taken.length) answer.segments = [...taken.map((u) => ({ user: u })), { text: result.text }];
       // Computed whatever the endpoint is, and reported only when it is known. A local model is
       // not free — it is unpriced — and the two have to stay distinguishable for the evaluation
       // report, which is forbidden to print a figure it did not measure.
@@ -613,7 +640,11 @@ async function main(): Promise<void> {
       if (isProviderRefusal(message)) writeRefusal(`provider:${refusalKind(message) ?? "unknown"}`);
     } finally {
       process.off("SIGINT", onSigint);
+      rl.off("line", onLine);
     }
+    // Typed after the turn's last step: it never reached the turn, so it is the next question.
+    const left = typed.splice(0).join("\n\n");
+    if (left && !ctl.signal.aborted) await ask(left);
   }
 }
 

@@ -295,6 +295,21 @@ export function translationMessages(text: string, lang: "en" | "fr"): Array<{ ro
   ];
 }
 
+/**
+ * What the person typed while the turn was running, as the model reads it at its next step.
+ *
+ * Framed rather than bare: arriving after a tool result, a plain sentence reads as part of what the
+ * tool printed, or as a fresh question that restarts the task. It is neither — it is the person
+ * correcting course, and the work already done stands unless it says otherwise.
+ */
+export function steerMessage(texts: string[]): string {
+  return (
+    `The user sent this while you were working. Take it into account from now on — it overrides the ` +
+    `earlier request where they conflict; keep what you have already done unless it says otherwise:\n\n` +
+    texts.join("\n\n")
+  );
+}
+
 /** Restated after the transcript every turn, where a model reads it last. */
 export function languageDirective(lang: "en" | "fr"): string {
   const name = lang === "fr" ? "French" : "English";

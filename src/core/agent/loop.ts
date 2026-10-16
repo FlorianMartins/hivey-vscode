@@ -23,7 +23,7 @@ import { estimateMessageTokens } from "../util/tokens.js";
 import { restoreDeep } from "../redaction/index.js";
 import { t } from "../../shared/i18n.js";
 import type { RecallStore } from "./recall.js";
-import { isWrongLanguage, withReplyLanguage } from "../prompts.js";
+import { isWrongLanguage, steerMessage, withReplyLanguage } from "../prompts.js";
 
 export interface ToolContext {
   /** Cancels when the user stops the turn. */
@@ -145,6 +145,13 @@ export interface TurnOptions {
   translate?: (text: string, lang: "en" | "fr", signal?: AbortSignal) => Promise<string | undefined>;
   /** A note was rewritten after it streamed — the text as streamed, then as kept. */
   onTranslated?: (from: string, to: string) => void;
+  /**
+   * What the person typed while the turn was running, handed over and forgotten by the caller.
+   * Asked before every request: the messages go in after the last tool results, so the model reads
+   * them at its next step without the turn being stopped. Asked again when the model has just
+   * answered, so a correction typed during the final words reopens the turn instead of being lost.
+   */
+  steer?: () => string[];
   /**
    * Put the real values back into a tool call's arguments, before anything looks at them.
    *
@@ -377,6 +384,9 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
       opts.report?.(t("the model kept repeating the same tool call — the turn was stopped"));
       return done("repeating");
     }
+    // Typed by the person since the last request — read at this step, the turn carries on.
+    const steered = opts.steer?.() ?? [];
+    if (steered.length) working.push({ role: "user", content: steerMessage(steered) });
 
     // Fitted BEFORE it is sent, when the window is known: the estimate counts ~4 characters a
     // token and code packs tighter, so a tenth is kept in hand, plus room for the answer.
@@ -514,6 +524,14 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
     }
 
     if (!res.toolCalls.length) {
+      // A correction typed while the model was writing its answer: the answer stands as said, and
+      // the turn goes on with the correction rather than ending over it.
+      const late = opts.steer?.() ?? [];
+      if (late.length) {
+        working.push({ role: "assistant", content: res.text || "(no answer)" });
+        working.push({ role: "user", content: steerMessage(late) });
+        continue;
+      }
       // The cheap middle between telling the user and escalating to a billed model: ask the same
       // model to finish what it started. It usually can — it forgot, it did not fail.
       const correction = selfChecked ? undefined : opts.selfCheck?.(trace);
