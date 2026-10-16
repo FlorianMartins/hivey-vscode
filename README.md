@@ -52,6 +52,7 @@ that does leave is **reversibly pseudonymized** first.
 | **One language per turn** | The agent answers in the language of your question for the whole turn — the short notes between tool calls included, which is where models drift after reading English code and logs. The rule is in the system prompt and restated after each tool result; a note that still comes out in the other language is put back by a small translation request. What the panel itself prints between the model's sentences — tool results, status lines, network errors — is translated too. |
 | **Read step by step** | A long agent turn is drawn in the order it happened: each stretch is a block with its thinking and its actions, followed by what the model wrote at that point, then the next one. While it works, the actions fold into one line showing the one in progress. The Markdown export (*Hivey Code: Export the conversation as Markdown*) keeps the same order. |
 | **It says what it is waiting for** | On a shared self-hosted server with one slot, a request waits its turn behind somebody else's. The panel says so — *In the queue… 12 s*, then *Reading the conversation… 45 %* on a long one, then the thinking — instead of a spinner over a model that has not started. There is no time limit on the first answer from your own server: a queue is not a failure, a server that is down fails at once, and Stop is always there. |
+| **Correct it while it works** | Like Claude Code: while the agent works, the composer stays open (*Correct or add something — read at the next step*). **Enter** sends what you type into the running task — it shows in the answer and the model reads it at its next step, after the actions under way, with everything it has done still in front of it. No Stop, no new question. Typed during the last words it reopens the turn; typed too late it becomes the next question; after a Stop it goes back into the box. The correction stays where it came in the saved conversation, the export and what later turns read. The terminal client does the same with a line typed during a turn. |
 | **It reads what it runs** | `run_command` returns the output and the exit code, through VS Code's shell integration — so "run the tests and fix what fails" is one turn instead of a round trip through you. On a shell with no integration the result says the output could not be read, and never invents an exit code. |
 | **The next edit** | After you change something, the edit that follows from it **elsewhere in the file** — a call site still on the old name, a branch that no longer matches — offered as a hint with a quick fix. It runs on the completion model, so on your machine it costs nothing; on a paid endpoint it stays off until you ask. |
 | **It falls back instead of failing** | A rate limit or a dead network moves the request down a chain — the cheaper model of the same preset, then your own machine — never up into something more expensive, never after a word has reached the screen, and never silently. |
@@ -502,8 +503,8 @@ Those documents are currently written in French; translations are welcome.
 ## Development
 
 ```bash
-npm test                   # builds the bundles, then 1237 tests (node:test)
-npm run test:integration   # loads the extension into a real VS Code (50 tests, headless)
+npm test                   # builds the bundles, then 1241 tests (node:test)
+npm run test:integration   # loads the extension into a real VS Code (52 tests, headless)
 npm run eval:verify        # every evaluation task must fail before a model touches it
 node scripts/screenshots.mjs  # retakes the README's images from that same editor
 npm run typecheck

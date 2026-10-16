@@ -18,10 +18,9 @@ ici est « non vérifié ».
 ⚠️ **Le support IBM i a été retiré du produit** (langages RPG/CL/DDS/Db2 for i, connexion IBM i,
 ARCAD, outils `ibmi_*`, compétences et tâches `ibmi-` du banc). Les chantiers et versions qui ne
 concernaient qu'IBM i ont été retirés de ce document ; le CHANGELOG garde l'historique. Le banc
-compte désormais **60 tâches** (62 avant le retrait des 22 tâches IBM i, 40 juste après, puis vingt
-tâches plus difficiles ajoutées quand le modèle 27B en réussissait 39 sur 40) : les mesures sur 56,
-62 ou 40 tâches citées ci-dessous sont des relevés **d'époque**, sur un autre jeu, et ne se comparent
-pas à une série sur le jeu actuel.
+compte désormais **40 tâches** (62 avant le retrait des 22 tâches IBM i) : les mesures sur 56 ou
+62 tâches citées ci-dessous sont des relevés **d'époque**, sur un autre jeu, et ne se comparent pas
+à une série sur le jeu actuel.
 
 ### Phase 0 — Fondations
 
@@ -229,7 +228,7 @@ Trois niveaux, jamais mélangés :
 - **Le rapport ne peut pas inventer un chiffre** (testé) : un modèle local est *non tarifé* et
   jamais gratuit, un total incomplet est marqué comme un plancher, et une campagne sans modèle dit
   « not measured » sans aucun tableau. Un test exige qu'un rapport vide ne contienne pas `0 %`.
-- **60 tâches, honnêtes dans les deux sens** (testé) : chacune échoue sur la fixture intacte et
+- **40 tâches, honnêtes dans les deux sens** (testé) : chacune échoue sur la fixture intacte et
   passe sur sa solution de référence. La seconde porte a trouvé quatre contrôles que *rien* ne
   pouvait satisfaire, dont un vieux de plusieurs semaines.
 - **Un contrôle structurel regarde le code et pas la prose** (testé) : `eval/bin/codeonly`, sur le
@@ -302,7 +301,7 @@ Trois niveaux, jamais mélangés :
 ### Avant 0.39.0
 
 - Noyau indépendant de l'éditeur : anonymisation, fournisseurs, routeur, budget, complétion, session,
-  carte du dépôt, boucle d'agent. **1237 tests unitaires** plus **50 tests d'intégration dans un vrai
+  carte du dépôt, boucle d'agent. **1241 tests unitaires** plus **52 tests d'intégration dans un vrai
   VS Code**.
 - Barre latérale : conversation, historique, modèles, permissions, configuration ; modes
   discussion / plan / agent ; budget de raisonnement ; contexte explicite.
@@ -325,10 +324,10 @@ Trois niveaux, jamais mélangés :
 - **Publication sur le Marketplace VS Code et Open VSX.** Préparée (`docs/PUBLISHING.md`), en attente
   des jetons d'éditeur — que seul Florian peut créer. En attendant, l'installation se fait par le
   `.vsix` de la release `build`, dont l'empreinte et l'attestation sont publiées.
-- **Qualité mesurée sur le jeu actuel.** Le banc (`eval/`, 60 tâches, `npm run eval`) a tourné
+- **Qualité mesurée sur le jeu actuel.** Le banc (`eval/`, 40 tâches, `npm run eval`) a tourné
   contre de vrais modèles, mais sur les anciens jeux de 56 et 62 tâches ; depuis le retrait des
-  tâches IBM i et l'ajout de vingt tâches plus difficiles, aucune série complète n'a encore été
-  publiée sur les 60 tâches actuelles. Les lignes de `eval/QUALITY.md` le disent.
+  tâches IBM i, aucune série complète n'a encore été publiée sur les 40 tâches restantes. Les lignes
+  de `eval/QUALITY.md` le disent.
 - **Reproductibilité octet pour octet du `.vsix`.** Non promise, et c'est délibéré : un `.vsix` est
   un zip, un zip porte les dates de modification, deux builds du même commit ne donnent donc pas les
   mêmes octets. Ce qui est offert à la place est l'empreinte du fichier réellement publié et une

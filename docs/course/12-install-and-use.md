@@ -75,6 +75,11 @@ Open a folder containing code, then the **Hivey Code** panel in the right-hand b
 - **Stop** ends the turn at once. On a shared server busy with somebody else, the turn shows "In the
   queue… 12 s" rather than a misleading "thinking…": it is waiting its turn, and there is no longer a
   time limit after which it would be dropped.
+- **While it works**, the composer stays open (*Correct or add something — read at the next step*):
+  **Enter** sends what you type into the running task. It shows in the answer, and the model reads it
+  at its next step, after the actions under way — no Stop, no new question. Typed during the last words,
+  it reopens the turn; typed too late, it becomes the next question; after a Stop it goes back into the
+  box. In the terminal client (`hivey`), a line typed during a turn does the same.
 - **After an answer**, the likely next request appears greyed in the composer: **Tab** (or an arrow)
   makes it your text, **Enter** sends it. Setting `hiveyCode.chat.suggestNext`.
 - **`Ctrl+I`** in the editor rewrites the selection in place.

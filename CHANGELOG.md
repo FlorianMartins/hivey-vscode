@@ -6,6 +6,18 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Ajouté
 
+- **Comme Claude Code : corriger le tir pendant que l'IA travaille, sans Stop.** « si l'utilisateur
+  s'aperçoit que l'IA ne prend pas le bon sens, prendre en considération sa requête pour rectifier le
+  tir sans avoir à Stop et refaire une nouvelle requête ». Pendant une réponse, la zone de saisie reste
+  ouverte (« Corriger ou préciser — lu à la prochaine étape ») et **Entrée** envoie le message
+  **dans la tâche en cours** : il s'affiche dans la réponse, et le modèle le lit à sa prochaine étape,
+  après les actions en cours, avec tout ce qu'il a déjà fait sous les yeux. Le tour n'est pas relancé.
+  Envoyé pendant les derniers mots de la réponse, il rouvre le tour ; arrivé trop tard, il devient la
+  question suivante ; après un Stop, il revient dans la zone de saisie. La correction reste à sa place
+  dans la conversation enregistrée, l'export et ce que relisent les tours suivants. Aussi dans la ligne
+  de commande (`hivey`) : une ligne tapée pendant un tour est notée et lue à l'étape suivante. Sans
+  message tapé, les requêtes envoyées au modèle sont identiques à l'octet près (vérifié par un test).
+
 - **La langue de l'utilisateur tient pour tout le tour.** La règle de langue annoncée en 1.14.2 est
   activée : la consigne système dit dans quelle langue écrire — notes entre deux appels d'outil
   comprises —, un rappel suit chaque résultat d'outil, et une note qui sort quand même dans l'autre
