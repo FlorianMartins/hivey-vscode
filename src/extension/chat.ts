@@ -131,7 +131,8 @@ import { WorkspaceContext, relative } from "./workspace.js";
 import { setActiveWindow } from "../core/context/scale.js";
 import { WaitWatch, type WaitLabel } from "../core/agent/waiting.js";
 import { isSelfHostedProvider } from "../core/redaction/index.js";
-import { choicesFor, levelsFromRefusal, type ModelReasoning } from "../core/router/reasoningLevels.js";
+import { choicesFor, levelsFromRefusal, type ModelReasoning, type ReasoningChoice } from "../core/router/reasoningLevels.js";
+import { reasoningMenu } from "../core/providers/reasoningMap.js";
 import { nextStepMessages, parseNextStep } from "../core/session/nextStep.js";
 import { stepText } from "../shared/stepText.js";
 import { SegmentBuilder } from "../core/session/segments.js";
@@ -556,6 +557,18 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private reasoningChosen = false;
 
   /**
+   * The levels the selected model really has: what its own server said when it is self-hosted (see
+   * core/router/reasoningLevels.ts), otherwise what its vendor documents (core/providers/reasoningMap.ts).
+   * `undefined` keeps the usual four. A preset routes between several models, so it keeps them too.
+   */
+  private offeredLevels(s: Settings): ReasoningChoice[] | undefined {
+    const known = this.reasoningLevelsSeen.get(this.windowKey(s));
+    if (known) return choicesFor(known);
+    if (isHivey(s.chat.model)) return undefined;
+    return reasoningMenu(s.chat.provider, s.chat.model);
+  }
+
+  /**
    * The effort a turn actually uses.
    *
    * ⚠️ "it reasons too much even for small tasks, and sometimes does things outside the request".
@@ -569,7 +582,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    */
   private effectiveReasoning(s: Settings): Reasoning {
     const known = this.reasoningLevelsSeen.get(this.windowKey(s));
-    const offered = known ? choicesFor(known) : undefined;
+    const offered = this.offeredLevels(s);
+    // A model that cannot be steered at all: nothing to choose, nothing sent beyond "none" (which its
+    // provider maps to no field — see reasoningMap.ts).
+    if (offered && !offered.length) return "none";
+    if (!known && this.reasoning === "none" && !offered?.some((c) => c.id === "none") && offered) {
+      // Direct on a model whose thinking cannot be turned off (Opus 5.5, Fable): the least it thinks.
+      return offered[0]!.id;
+    }
     if (!this.reasoningChosen && this.reasoning === "none" && isSelfHostedProvider(s.chat.provider)) {
       // Standard when the model has it; otherwise the model's own default rather than a level it lacks.
       if (!offered || offered.some((c) => c.id === "medium")) return "medium";
@@ -724,10 +744,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       // A preset is not a model, so everything the panel wants to know about "the model" has to be
       // asked of the one that would answer an ordinary turn — its window, whether it thinks, what
       // it costs. The NAME stays the preset's: that is what the user chose and what they can act on.
-      reasoningAvailable: supportsReasoning(hiveyModel(s.chat.model, "everyday")),
-      ...(this.reasoningLevelsSeen.get(this.windowKey(s))
-        ? { reasoningLevels: choicesFor(this.reasoningLevelsSeen.get(this.windowKey(s))!) }
-        : {}),
+      // …and not when its vendor offers no way to steer it (gpt-4o, deepseek-chat): a menu whose
+      // levels all send the same request would be pretending.
+      reasoningAvailable: supportsReasoning(hiveyModel(s.chat.model, "everyday")) && this.offeredLevels(s)?.length !== 0,
+      ...(this.offeredLevels(s) ? { reasoningLevels: this.offeredLevels(s)! } : {}),
       model: s.chat.model,
       modelLabel: isHivey(s.chat.model)
         ? hiveyLabel(s.chat.model)

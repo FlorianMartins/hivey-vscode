@@ -74,7 +74,8 @@ Ouvrez un dossier contenant du code, puis le panneau **Hivey Code** dans la barr
   ([chapitre 5](05-les-trois-modes-et-les-outils.md)). Commencez par **Plan** : il lit et ne modifie
   rien.
 - **Choisissez combien il réfléchit** : Direct, Bref, Standard ou Approfondi, à côté du mode
-  ([chapitre 2](02-le-modele.md)). Seuls les niveaux que le modèle connaît sont proposés.
+  ([chapitre 2](02-le-modele.md)). Seuls les niveaux que le modèle connaît sont proposés, et chacun
+  change vraiment sa réflexion ; Direct manque sur un modèle qui ne peut pas cesser de réfléchir.
 - **Stop** arrête le tour tout de suite. Sur un serveur partagé occupé par quelqu'un d'autre, le tour
   affiche « En file d'attente… 12 s » plutôt qu'un « réfléchit… » trompeur : il attend son tour, et il
   n'y a plus de délai au bout duquel il serait abandonné.

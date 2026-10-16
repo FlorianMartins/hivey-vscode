@@ -59,6 +59,12 @@ export interface ChatMessage {
    * `reasoning_content`); a cloud either has its own signed form of this or refuses the field.
    */
   reasoning?: string;
+  /**
+   * Anthropic's own thinking blocks for this assistant message, signed, given back unchanged on the
+   * next step of the same turn. Opaque to everything but `anthropic.ts`: the Messages API asks for
+   * them back with the tool calls they led to. Every other provider ignores the field.
+   */
+  thinkingBlocks?: unknown[];
   /** Marks a prefix that is worth caching remotely (system prompt + repo map). */
   cacheable?: boolean;
 }
@@ -122,6 +128,8 @@ export interface ChatDelta {
 export interface ChatResult {
   text: string;
   reasoning: string;
+  /** The provider's signed thinking blocks, to be returned on the next step — see `ChatMessage.thinkingBlocks`. */
+  thinkingBlocks?: unknown[];
   toolCalls: ToolCall[];
   usage: Usage;
   stopReason: "stop" | "length" | "tool_calls" | "error";

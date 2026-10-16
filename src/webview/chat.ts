@@ -2208,10 +2208,18 @@ function reasoningButton(state: UiState, deps: ChatDeps): HTMLElement {
   // marked in the hint; the usual four otherwise. Our own words on the button, not the vendor's:
   // « laisser le texte Bref, Standard et Approfondi […] pour un rendu plus propre ».
   const levels = state.reasoningLevels;
+  // A model that cannot stop thinking (Claude Opus 5.5, Fable) has no "Direct": its lowest level says
+  // so rather than pretend to be off.
+  const alwaysThinks = Boolean(levels && !levels.some((l) => l.id === "none"));
   const offered = levels
-    ? REASONING.filter((r) => levels.some((l) => l.id === r.id)).map((r) => {
+    ? REASONING.filter((r) => levels.some((l) => l.id === r.id)).map((r, i) => {
         const own = levels.find((l) => l.id === r.id)!;
-        return { ...r, hint: own.isDefault ? `${r.hint} ${t("The model's own default.")}` : r.hint };
+        let hint = r.hint;
+        if (alwaysThinks && i === 0) hint = `${hint} ${t("This model cannot turn its thinking off: this is the least it does.")}`;
+        // OpenAI's Chat Completions from GPT-5.4: tools only without thinking — Direct is all there is.
+        if (levels.length === 1 && r.id === "none") hint = `${hint} ${t("Through this API, this model cannot think while it uses tools.")}`;
+        if (own.isDefault) hint = `${hint} ${t("The model's own default.")}`;
+        return { ...r, hint };
       })
     : REASONING;
   const current = offered.find((r) => r.id === state.reasoning) ?? offered[0]!;

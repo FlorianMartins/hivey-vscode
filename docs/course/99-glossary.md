@@ -128,8 +128,8 @@ stop it before having paid for all of it. → [4](04-how-we-talk-to-it.md)
 
 **Terminal** — The area where you type commands, one per line. → [1](01-the-stage.md)
 
-**Thinking level** — How much the model "thinks" before answering: Direct, Brief, Standard, Deep. More
-thinking means more tokens. → [2](02-the-model.md)
+**Thinking level** — How much the model "thinks" before answering: Direct (off, where the model
+allows it), Brief, Standard, Deep. More thinking means more tokens. → [2](02-the-model.md)
 
 **Token** — The unit a model reads and produces; about 100 tokens to 75 words. It is the billing unit and
 the limit unit. → [2](02-the-model.md)

@@ -121,8 +121,8 @@ question. Le modèle **n'apprend rien**. → [7](07-rag-et-memoire.md)
 **Récence** — L'ancienneté d'un modèle, utilisée pour choisir le plus récent. ⚠️ Elle était
 revendiquée dans ce projet et **n'existait pas**, par une erreur d'arrondi. → [10](10-le-cout.md)
 
-**Réflexion (niveau de)** — Combien le modèle « réfléchit » avant de répondre : Direct, Bref,
-Standard, Approfondi. Plus de réflexion, c'est plus de jetons. → [2](02-le-modele.md)
+**Réflexion (niveau de)** — Combien le modèle « réfléchit » avant de répondre : Direct (coupée, là
+où le modèle le permet), Bref, Standard, Approfondi. Plus de réflexion, c'est plus de jetons. → [2](02-le-modele.md)
 
 **SIEM** — Le système où une entreprise centralise ses journaux de sécurité.
 → [9](09-la-confidentialite.md)

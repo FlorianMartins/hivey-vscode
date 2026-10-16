@@ -33,6 +33,8 @@ const vision = [];
 // the market moved to `gpt-6`, so `openai/gpt-6.1-sol-pro`, the model BOTH paid presets route their
 // deep work to, was reported as unable to reason and the thinking control was hidden on it.
 const reasoning = [];
+/** id → { m: mandatory (1/0), e: supported efforts, d: default effort }. */
+const efforts = {};
 let kept = 0;
 for (const m of data ?? []) {
   const p = m.pricing ?? {};
@@ -57,6 +59,17 @@ for (const m of data ?? []) {
   // after it is written.
   if ((m.architecture?.input_modalities ?? []).includes("image")) vision.push(m.id);
   if ((m.supported_parameters ?? []).includes("reasoning")) reasoning.push(m.id);
+  // Which thinking efforts the model takes, and whether it can stop thinking at all — OpenRouter's
+  // `reasoning.supported_efforts` / `mandatory` / `default_effort`. What the panel's levels become on
+  // each model is decided from this (core/providers/reasoningMap.ts), not from names.
+  const r = m.reasoning;
+  if (r && typeof r === "object" && !/:batch$/.test(m.id) && (r.mandatory || Array.isArray(r.supported_efforts))) {
+    efforts[m.id] = {
+      m: r.mandatory ? 1 : 0,
+      ...(Array.isArray(r.supported_efforts) ? { e: [...r.supported_efforts] } : {}),
+      ...(r.default_effort ? { d: r.default_effort } : {}),
+    };
+  }
   kept++;
 }
 rows.sort((a, b) => a[0].localeCompare(b[0]));
@@ -193,9 +206,28 @@ export const HIVEY_OVERLAPS: string[] = ${JSON.stringify(overlaps, null, 2)};
 export const HIVEY_ROUTING: Record<string, Record<string, string>> = ${JSON.stringify(hivey, null, 2)};
 `;
 
+const EFFORTS_OUT = "src/core/router/reasoningEfforts.generated.ts";
+const sortedEfforts = Object.fromEntries(Object.entries(efforts).sort((a, b) => a[0].localeCompare(b[0])));
+const effortsBody = `// GENERATED FILE — do not edit by hand.
+// Written by \`npm run models\` (scripts/update-models.mjs) from OpenRouter's \`reasoning\` object.
+// ${Object.keys(sortedEfforts).length} models. m: thinking cannot be turned off; e: the efforts it accepts; d: its default.
+// Read by core/providers/reasoningMap.ts — https://openrouter.ai/docs/use-cases/reasoning-tokens
+
+export interface ReasoningEfforts {
+  m: 0 | 1;
+  e?: string[];
+  d?: string;
+}
+
+export const GENERATED_REASONING_EFFORTS: Record<string, ReasoningEfforts> = {
+${Object.entries(sortedEfforts).map(([id, v]) => `  ${JSON.stringify(id)}: ${JSON.stringify(v)},`).join("\n")}
+};
+`;
+
 const strip = (s) => s.replace(/export const (?:HIVEY_)?GENERATED_AT = "[^"]*";/, "");
 const files = [
   { path: OUT, body, what: `${kept} models` },
+  { path: EFFORTS_OUT, body: effortsBody, what: `${Object.keys(sortedEfforts).length} reasoning profiles` },
   { path: HIVEY_OUT, body: hiveyBody, what: `${HIVEY_VARIANT_IDS.length} Hivey presets` },
 ];
 
