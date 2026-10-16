@@ -73,14 +73,21 @@ avec un palmarès parfait après vingt questions que personne n'a contrôlées.
 
 ## Les garde-fous
 
-- **Un plafond par requête** et **un plafond par jour**, en dollars.
-- **Un plafond de taille par requête**, en jetons — et son histoire dit quelque chose. Les plafonds en
+- **Un plafond par requête** et **un plafond par jour**, en dollars (2 $ et 20 $ par défaut). Les
+  dépasser ouvre une carte dans la conversation — envoyer quand même, relever le plafond, ou ne pas
+  envoyer — au lieu de refuser en silence.
+- **Un plafond de taille par requête**, en jetons (`hiveyCode.budget.perRequestTokens`) — et son
+  histoire dit quelque chose. Les plafonds en
   dollars étaient calibrés quand le préréglage du milieu visait un modèle à 120 $/M ; en le passant
   aux modèles actuels à 10 $/M, un prompt emballé de 400 000 jetons (un journal de compilation collé,
   un outil qui a lu un fichier compressé) est tombé à 80 centimes et **passait sous le plafond de
   2 $**. Un plafond en dollars **se desserre à chaque baisse du marché**, ce qui pour un outil dont
   l'argument est que votre code ne part pas est la mauvaise direction. 400 000 jetons de votre dépôt
-  qui s'en vont méritent une question **à n'importe quel prix**.
+  qui s'en vont méritent une question **à n'importe quel prix**. Il vaut aujourd'hui **0 par défaut**
+  (ne jamais demander) : le projet a retiré tous les plafonds fixes qui coupaient le travail du modèle
+  — nombre d'étapes, longueur de réponse, contexte — et ce sont les plafonds en dollars qui posent la
+  question avant une requête facturée. Mettez-y un nombre si vous voulez qu'une requête énorme vous
+  soit soumise, même gratuite.
 - **Un rapport de coût**, lisible, qui dit ce qui a été dépensé et sur quoi.
 
 ## Les préréglages Hivey

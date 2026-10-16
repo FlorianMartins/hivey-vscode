@@ -68,13 +68,19 @@ checked.
 
 ## The guard rails
 
-- **A per-request cap** and **a per-day cap**, in dollars.
-- **A per-request size cap**, in tokens — and its story says something. The dollar caps were calibrated
+- **A per-request cap** and **a per-day cap**, in dollars ($2 and $20 by default). Going over one
+  opens a card in the conversation — send anyway, raise the cap, or do not send — instead of refusing
+  silently.
+- **A per-request size cap**, in tokens (`hiveyCode.budget.perRequestTokens`) — and its story says
+  something. The dollar caps were calibrated
   when the middle preset aimed at a $120/M model; moving it to today's $10/M models, a runaway prompt of
   400,000 tokens (a pasted build log, a tool that read a compressed file) dropped to 80 cents and
   **passed under the $2 cap**. A cap in dollars **loosens with every fall in the market**, which for a
   tool whose argument is that your code does not leave is the wrong direction. 400,000 tokens of your
-  repository going out deserve a question **at any price**.
+  repository going out deserve a question **at any price**. It is now **0 by default** (never ask): the
+  project removed every fixed cap that cut the model's work short — number of steps, answer length,
+  context — and it is the dollar caps that ask before a billed request. Put a number in it if you want
+  a huge request put to you, even a free one.
 - **A cost report**, readable, saying what was spent and on what.
 
 ## The Hivey presets

@@ -22,10 +22,13 @@ Sont particulièrement bienvenus :
 
 Ce qui relève du modèle de menace : `docs/THREAT-MODEL.md`, y compris les résidus assumés. Un poste
 déjà compromis, une passerelle « interne » qui réexpédie vers l'extérieur, ou un utilisateur qui
-règle `redaction: "off"` et `egressPolicy: "trust"` sont hors périmètre — l'outil rend ces choix
+règle `privacy.redaction: "off"` (avec `privacy.allowUnredacted`) et `privacy.egressPolicy: "trust"`
+sont hors périmètre — l'outil rend ces choix
 explicites, il ne les interdit pas.
 
 ## Versions
 
-Seule la dernière version publiée reçoit des correctifs. Le projet est en `0.x` : l'interface de
-configuration peut encore changer.
+Seule la dernière version publiée reçoit des correctifs : le `.vsix` de la release
+[`build`](https://github.com/FlorianMartins/hivey-vscode/releases/tag/build), reconstruit depuis
+`main`. Les réglages peuvent encore changer d'une version à l'autre ; le `CHANGELOG.md` le dit quand
+c'est le cas.

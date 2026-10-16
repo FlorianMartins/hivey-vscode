@@ -83,7 +83,13 @@ et — c'est le plus instructif — dans 51 cas sur 56 il n'a **même pas essay�
 - Certains modèles savent **raisonner à voix haute** avant de répondre : ils produisent d'abord un
   brouillon de réflexion. Ça améliore les réponses difficiles et ça coûte des jetons. Hivey Code
   l'affiche **pendant** qu'il s'écrit — c'est le seul moment où c'est intéressant — puis le replie
-  dès que la réponse commence, et ne le renvoie jamais au modèle.
+  dès que commence l'action ou la réponse qu'il a décidée. Le niveau se choisit dans la zone de
+  saisie : **Direct** (aucune réflexion), **Bref**, **Standard**, **Approfondi** — et seulement ceux
+  que le modèle possède vraiment, quand son serveur sait le dire. Sur votre propre serveur, un niveau
+  que personne n'a choisi vaut **Standard** : laissé à lui-même, un modèle comme Qwen réfléchit à son
+  maximum, même pour une petite tâche. La réflexion n'est jamais renvoyée au modèle d'une question à
+  l'autre ; seule exception, pendant un tour d'agent sur un serveur auto-hébergé, chaque étape
+  retrouve la réflexion des étapes précédentes, pour ne pas tout recommencer.
 
 ## Dans Hivey Code
 

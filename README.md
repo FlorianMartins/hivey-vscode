@@ -44,25 +44,32 @@ that does leave is **reversibly pseudonymized** first.
 | **Sidebar chat** | Streaming, attachments (active file, selection, chosen files), per-workspace history, model picker, context and cost meters. |
 | **Three modes** | **Chat** (no tools), **Plan** (reads the repository, changes nothing — [what a plan looks like](https://raw.githubusercontent.com/FlorianMartins/hivey-vscode/main/docs/images/plan.png)), **Agent** (reads, edits, proposes commands). The mode decides the tool set **in code**: in plan mode no writing tool exists — it is not an instruction in a prompt. Switchable from the composer, the palette (*Hivey Code: Switch mode*) or a keybinding. |
 | **Agent mode** | Reads the repository, searches it, consults the **editor's diagnostics**, edits files and proposes commands — **one approval per action**, a diff before every write, everything in the undo stack. |
-| **Permissions** | Per action and per shape of action: “allow once”, “for this conversation”, “always”. Allowing `npm test` does not allow `npm publish`. A dedicated screen separates what is permanent from what expires. |
-| **Reasoning** | An adjustable thinking budget (direct / brief / standard / deep), translated per provider — `reasoning.effort` on OpenRouter, a token budget on Anthropic. The thinking is **shown as it is written** — which is most of the reason for turning it on — and folds itself away the moment the answer starts, because by then it is reference material sitting between you and the answer. It is never sent back to the model. |
+| **Permissions** | Per action and per shape of action: “allow once”, “for this conversation”, “always”. Allowing `npm test` does not allow `npm publish`. A dedicated screen separates what is permanent from what expires. How often you are asked at all is one control under the composer (`hiveyCode.permissions.autoApprove`): every change, changes inside the open folder run without asking, or nothing asked. Paths and commands can be allowed or refused for good (`hiveyCode.permissions.allowedPaths`, `allowedCommands`, `deniedPaths`, `deniedCommands`); a refusal wins, and the block list and the egress rules apply whatever is set. |
+| **Reasoning** | An adjustable thinking level — **Direct**, **Brief**, **Standard**, **Deep** — translated per provider: `reasoning.effort` on OpenRouter, `reasoning_effort` elsewhere, a token budget on Anthropic. On a self-hosted llama.cpp server the menu offers only the levels the model's own chat template knows (it is asked, and answers in milliseconds without generating anything), with the model's default marked. A level nobody picked is **Standard** on your own server, because an unset effort there is the template's maximum; **Direct** picked on purpose turns thinking *off*. On a long agent turn each step has its own thinking block, folded as soon as the action it decided starts. The thinking is **shown as it is written** — which is most of the reason for turning it on — and folds itself away the moment the answer starts, because by then it is reference material sitting between you and the answer. It is never sent back to the model. |
+| **Works until it is done** | No step limit by default (`hiveyCode.agent.maxSteps`, `0`): an agent turn ends when the task is done, when you press stop, or when the model starts repeating the same call. Files are read by pages of 2 000 lines, with the way to the next page — nothing is out of reach, and one huge file no longer fills the turn. Every tool result is kept whole for the conversation: when an old one has to be shortened to fit, the model gets a label it can hand to `recall` to read it again word for word, and `search_memory` finds a passage in those results and in every message, including the ones that no longer fit. |
+| **Does what was asked, then suggests the next step** | In agent mode the request is done completely — including what the change needs to work — and nothing else; what the agent noticed beyond it is one line. After the answer, a small extra request (thinking off) suggests the next request, greyed in the empty composer: **Tab** (or an arrow) makes it your text, **Enter** sends it. `hiveyCode.chat.suggestNext` turns it off; on a remote model it is pseudonymized and goes only where you have already agreed to send. |
+| **One language per turn** | The agent answers in the language of your question for the whole turn — the short notes between tool calls included, which is where models drift after reading English code and logs. The rule is in the system prompt and restated after each tool result; a note that still comes out in the other language is put back by a small translation request. What the panel itself prints between the model's sentences — tool results, status lines, network errors — is translated too. |
+| **Read step by step** | A long agent turn is drawn in the order it happened: each stretch is a block with its thinking and its actions, followed by what the model wrote at that point, then the next one. While it works, the actions fold into one line showing the one in progress. The Markdown export (*Hivey Code: Export the conversation as Markdown*) keeps the same order. |
+| **It says what it is waiting for** | On a shared self-hosted server with one slot, a request waits its turn behind somebody else's. The panel says so — *In the queue… 12 s*, then *Reading the conversation… 45 %* on a long one, then the thinking — instead of a spinner over a model that has not started. There is no time limit on the first answer from your own server: a queue is not a failure, a server that is down fails at once, and Stop is always there. |
 | **It reads what it runs** | `run_command` returns the output and the exit code, through VS Code's shell integration — so "run the tests and fix what fails" is one turn instead of a round trip through you. On a shell with no integration the result says the output could not be read, and never invents an exit code. |
 | **The next edit** | After you change something, the edit that follows from it **elsewhere in the file** — a call site still on the old name, a branch that no longer matches — offered as a hint with a quick fix. It runs on the completion model, so on your machine it costs nothing; on a paid endpoint it stays off until you ask. |
 | **It falls back instead of failing** | A rate limit or a dead network moves the request down a chain — the cheaper model of the same preset, then your own machine — never up into something more expensive, never after a word has reached the screen, and never silently. |
 | **Terminal** | The `hivey-code` command (short alias `hivey`): the same core in a REPL, with command output actually captured and a diff printed before every write. Launched from a shell, not from the editor. |
-| **In the editor** | `Ctrl+I` rewrites the selection in place · right-click → **Hivey Code** (rewrite, ask, add to the conversation, or the full list of what to do with a selection: explain, find problems, cover with a test, document, show the callers, simplify, handle the failures, add the types) · the lightbulb carries the same offers · commit message written from the staged diff · “explain the terminal output”. |
+| **In the editor** | `Ctrl+I` rewrites the selection in place · `Ctrl+Alt+I` asks about it · right-click → **Hivey Code** (rewrite, ask, add to the conversation, or the full list of what to do with a selection: explain, find problems, cover with a test, document, show the callers, simplify, handle the failures, add the types) · the lightbulb carries the same offers · commit message written from the staged diff · “explain the terminal output”. |
 | **Quick fixes** | On an error reported by your language server: “Fix with Hivey Code” and “Explain this problem”. The compiler says **what** and **where**; the model only has to fix it — which is what makes a small local model enough for most everyday cases. |
 | **The open file** | Offered as context and sent by default, the way the editor's own chat does it — the selection's lines when there is one, the whole file otherwise, following whichever tab is in front. One click puts it aside; opening another file brings the offer back. The privacy block list applies: a file it excludes never attaches itself. |
 | **Paste or drop it in** | A screenshot, a stack trace, a log, a file from the explorer — pasted or dropped onto the composer and attached to the question. A short paste still goes into the box, as it does everywhere else; a wall of text becomes an attachment instead of burying the thing you are writing. Images are reduced before they travel and go only to models the catalogue says can read them — you are told when the one you have chosen cannot, instead of it answering about a picture nobody looked at. What a `.docx` or a `.pdf` cannot honestly be turned into is refused rather than attached as noise. |
-| **Context notation** | `#file:`, `#selection`, `#changes`, `#problems`, `#codebase`, `#terminal`, `#sym:` — Copilot's notation, because you should not have to learn a second one. Resolved **on your machine** before anything is sent, which is what lets `#changes` attach unreleased code to a conversation with a local model. |
+| **Context notation** | `#file:`, `#selection`, `#editor`, `#openFiles`, `#changes`, `#problems`, `#codebase`, `#terminal`, `#sym:` — Copilot's notation, because you should not have to learn a second one. Resolved **on your machine** before anything is sent, which is what lets `#changes` attach unreleased code to a conversation with a local model. |
 | **Participants** | `@workspace`, `@editor`, `@terminal`, `@git` — a hint about where to look first, not a different personality. |
 | **House rules** | `.github/copilot-instructions.md` is read as written: a team that has one should not write it twice. `.hiveycode/instructions.md` wins if both exist. |
 | **Git** | Status, diff, log, blame, show, branches, stage, commit — through the editor's own Git extension, not through a shell. It never pushes. |
 | **MCP** | Connect any Model Context Protocol server, stdio or HTTP. Its tools join the set, under the same permissions. A local server never starts until you have said so in a dialog that names the command. |
-| **Compacting** | When a conversation fills its budget, one command — `/compact`, *This conversation → Summarize it now* under the context ring, or the offer that appears at two thirds (which can be set to **Always**, and then it happens by itself) — replaces it in the prompt with a summary the model writes, **and deletes nothing**: every exchange stays on screen, muted, one click from coming back. The gain is measured and shown (`8 200 → 900 tokens`), not asserted. |
+| **Compacting** | A summary the model writes replaces the conversation in the prompt **and deletes nothing**: every exchange stays on screen, muted, one click from coming back. It happens by itself (`hiveyCode.context.autoCompact`, on by default): a conversation at three quarters of its budget is summarized before the next question is sent, and if the window fills **in the middle of a task**, what was already done is written into the answer, the conversation is summarized and the task carries on where it stopped. Turned off, an offer appears at 70 % instead, and a full context asks whether to summarize and continue. `/compact`, or *This conversation → Summarize it now* under the context ring, does it on demand; Stop during a summary also cancels what was going to follow it. The gain is measured and shown (`8 200 → 900 tokens`), not asserted. |
 | **Knowledge base** | Optional, off by default. What has been established about this system, this business and these tools, kept as Markdown files in `.hiveycode/knowledge/` (versioned with the code) or `~/.hiveycode/knowledge/` (yours, across projects) — or on a server you plug in, or in any folder you point it at with `hiveyCode.knowledge.folders`: a share of internal documentation, a checked-out wiki. Several folders may be listed, and **Markdown, plain text, Word and PDF** are all read — the `.docx` and `.pdf` extractors are written here, by hand, like the markdown renderer and the diff, so the promise of zero runtime dependencies holds. Those folders are read **exactly as they are**, with no header required, and they are **read-only** — `/remember` never writes into somebody's documentation and retiring a note never moves one out of it. A PDF that is a scan, or whose fonts cannot honestly be read as text, is left out rather than attached as noise: a model answers about mojibake with complete confidence. The agent searches it before answering, and records what it learns with `/remember`. Only the **list of titles** travels with each question, a dozen tokens a note; a note is read when it is needed. Writing a note whose subject already exists is refused, with the notes that cover it, so the base is corrected rather than piled up; retiring moves a note to the archive with a reason rather than deleting it. |
 | **Conversations as context** | Any earlier conversation can be **attached** to the current one from the history rather than opened. “What did we settle about the invoices last week” is a question about today's work. |
 | **Rendered as it streams** | Headings, tables, checklists, quotes and **syntax-colored** code appear formatted while the answer is being written, not after. Every color is one of the editor's own variables. |
+| **Checkpoints** | A question that changed files can be undone from its message: the files the turn changed are put back and the conversation is rewound to that question, which returns to the composer to be asked differently. The confirmation names what will be overwritten, and the commands that ran whose effects no checkpoint holds; the restore goes through the editor, so it is itself one Ctrl+Z away. |
+| **Leaving stops it** | A new conversation, opening another one from the history or deleting the current one stops the turn running in it first — a turn never goes on, unseen, in a conversation nobody is looking at. |
 | **Search** | Inside the open conversation (`Ctrl+F`, matches highlighted) **and** across the whole history — the search looks inside the messages and shows the fragment that matched. |
 | **History filters** | Period, mode, “paid only”, and four sort orders (recently updated, created, longest, most expensive). |
 | **Context control** | Every exchange can be **muted** (stays on screen, stops being sent), **pinned** (survives trimming), edited or deleted. It is the most direct lever there is on both quality **and** cost. |
@@ -78,8 +85,9 @@ that does leave is **reversibly pseudonymized** first.
 | **What the compiler already knows** | Three read-only tools over your language server: who calls this, the call hierarchy, and the symbol by name across the workspace. The answer comes from the same index that powers *Go to references* — so it is right for the language you are in, and it costs no tokens to be right. |
 | **Routing that learns, per repository** | Optional. The success rate `verifyTurn()` actually observed, per repository, per kind of task, per model — and then the **cheapest model whose observed rate clears a threshold**. The panel says why: “Chose qwen2.5-coder:7b: 9 out of 10 in this repository”. Never outside the models you authorised, never on too little evidence, and a measurement exists only where something was verified. Two commands: what was learned here, and forget it. |
 | **What this machine learned stays here** | Optional, off by default. When a local model fails and a remote one succeeds **with a check at green**, the episode is kept locally: the request, the files as they were, both diffs, and the command that decided. It exports as `eval/tasks` fixtures or as a JSONL conversation set for fine-tuning a local model. **Nothing leaves** — there is no network call in that code, and a test reads the source to refuse one. |
-| **Finance** | Eight skills for code where the arithmetic is the requirement: half-away-from-zero against half-to-even, money without floats, packed and zoned decimal, T+1/T+2 settlement with holidays as a **parameter**, market hours in the exchange's own timezone, ISIN/LEI/BIC check digits, FIX BodyLength and CheckSum, amortisation schedules whose parts sum to the whole. Each one is backed by an evaluation task that fails before it is applied. |
-| **Your theme** | Every color in the panel is one of the editor's own variables. Not one hex value — [the same picker under a light theme](https://raw.githubusercontent.com/FlorianMartins/hivey-vscode/main/docs/images/picker.light.png), captured by the same script. It follows a theme change immediately, high contrast included. |
+| **Finance** | Seven skills for code where the arithmetic is the requirement: half-away-from-zero against half-to-even, money without floats, T+1/T+2 settlement with holidays as a **parameter**, market hours in the exchange's own timezone, ISIN/LEI/BIC check digits, FIX BodyLength and CheckSum, amortisation schedules whose parts sum to the whole. Each one is backed by an evaluation task that fails before it is applied. |
+| **Your theme** | By default every color in the panel is one of the editor's own variables. Not one hex value — [the same picker under a light theme](https://raw.githubusercontent.com/FlorianMartins/hivey-vscode/main/docs/images/picker.light.png), captured by the same script. It follows a theme change immediately, high contrast included. `hiveyCode.appearance: "hivey"` swaps in Hivey's own surfaces and amber accent; a light theme keeps the editor's. |
+| **Dictation** | Speak instead of typing; off until configured. The transcript lands in the composer, never in a sent question. Local first — a Whisper transcriber the extension can install on this machine (`hiveyCode.dictation.localModel`), or your own command (`hiveyCode.dictation.command`) — and a remote `/audio/transcriptions` endpoint only if you set one, behind the same consent card as an image, because a voice cannot be pseudonymized. *Hivey Code: Choose a microphone* picks the input. |
 
 ## How the cost tends to zero
 
@@ -142,7 +150,9 @@ knows whether it is completing a line or running an agent, so the routing costs 
 adds no latency.
 
 Which model each preset uses is **generated**, never written by hand: a daily job picks it from
-OpenRouter's own catalogue by budget, capability, vendor family and recency, and commits the diff.
+OpenRouter's own catalogue by budget, capability, vendor family and recency, and lands the diff as a
+pull request merged once `main`'s required checks have passed on it
+([`scripts/land-catalogue.sh`](scripts/land-catalogue.sh)).
 No model version is named anywhere in this repository — a hard-coded id is correct the day it is
 written and returns 404 a few weeks later, silently.
 
@@ -176,7 +186,9 @@ the local model alone, the local model with escalation, each preset — with qua
 over the repository's own evaluation set.
 
 **One configuration has now been measured, and the result is bad.** `local only` —
-`qwen2.5-coder:7b` on Ollama, the setup this README tells you to install — scored **0 out of 56**.
+`qwen2.5-coder:7b` on Ollama, the setup this README tells you to install — scored **0 out of 56**
+(the set held 56 tasks then; it holds 40 since the IBM i tasks were removed, and the row stays as a
+record until the next series replaces it).
 The number that explains it is next to it: in **51 of those 56 tasks the model never took a single
 tool step**. It wrote the change as a code block and asked whether it should proceed. In the five
 where it did act, it never once called an editing tool. So this is not a measurement of the model's
@@ -237,8 +249,13 @@ what you were trying to keep private is not a privacy feature.
 
 The places where others get this wrong, and which are handled here:
 
-- **The endpoint decides, not the setting name.** Pointing the “local” provider at a public URL
-  triggers pseudonymization and consent like any other.
+- **Your own servers are trusted, and that is a setting you can see.** The local endpoint and your
+  own OpenAI-compatible gateway are treated as your environment whatever their address
+  (`hiveyCode.privacy.trustSelfHosted`, on by default): requests to them go as they are, without
+  pseudonymization or a consent card. Cloud providers are never covered by it. Turn it off and the
+  endpoint decides rather than the provider's name — a public URL behind “local” is then
+  pseudonymized and consented like any other — and an organisation policy that forbids unredacted
+  requests turns it off for you.
 - **Every agent step goes through the gate again.** A file the agent just read is new text: it is
   pseudonymized again before the next call.
 - **Attached content is fenced.** Files, logs and pages arrive inside a block closed by a
@@ -405,16 +422,17 @@ hivey                          # REPL in the current directory
 hivey "why is this test flaky?"   # one-shot question
 ```
 
-Configuration comes from `.hiveycode.json` (working directory, then `~`), so a project can commit its
+Configuration comes from `.hiveycode.json` (`~`, then the working directory, which wins), so a project can commit its
 team configuration without committing a key (`apiKeyEnv` names the environment variable).
 
 It is configured through `HIVEY_CODE_PROVIDER`, `HIVEY_CODE_MODEL`, `HIVEY_CODE_URL` and
 `HIVEY_CODE_KEY`, or through `.hiveycode.json`. There is no longer a command that launches it from
 the editor: it did not work reliably enough to keep, and a button that fails is worse than no button.
 
-REPL commands: `/context` lists the exchanges, `/mute 3` takes one out of the context without
-deleting it, `/forget 3` deletes it, `/mode` switches between chat, plan and agent, `/cost` shows
-the day's spend.
+REPL commands: `/new` starts an empty conversation, `/context` lists the exchanges, `/mute 3` takes
+one out of the context without deleting it (`/unmute 3` puts it back), `/forget 3` deletes it,
+`/mode` switches between chat, plan and agent, `/model` switches model, `/cost` shows the day's
+spend, `/help` lists them. Like the panel, it holds the language of your question for the whole turn.
 
 ## Enterprise deployment
 
@@ -495,7 +513,8 @@ npm audit --audit-level=high   # 0 vulnerabilities: 5 dev tools, no runtime depe
 
 CI runs types, tests, integration tests in a real VS Code, the secret self-scan, `npm audit`,
 CodeQL, the `.vsix` packaging and an SBOM. The price catalogue is regenerated daily by a scheduled
-job: **no version and no price is ever written by hand**.
+job, through a pull request held to the same required checks as any other change: **no version and
+no price is ever written by hand**.
 
 ### Translating
 

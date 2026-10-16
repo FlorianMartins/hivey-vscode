@@ -1,7 +1,7 @@
 # Measured quality
 
 What each configuration scores on this repository's own evaluation set
-(40 tasks). Regenerate with `node scripts/evaluate.mjs --table eval/QUALITY.md`.
+(40 tasks). The rows below predate that set: see the first caveats. Regenerate with `node scripts/evaluate.mjs --table eval/QUALITY.md`.
 
 > **Read these figures with the following in mind.**
 >
@@ -91,7 +91,7 @@ To reproduce it, or to measure a configuration that reads *not measured*:
 ```bash
 npm run build
 node scripts/evaluate.mjs \
-  --url https://openrouter.ai/api/v1 --model hivey/free \
+  --url http://127.0.0.1:11434/v1 --model qwen2.5-coder:7b \
   --as "local only" --table eval/QUALITY.md
 ```
 

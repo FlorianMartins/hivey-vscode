@@ -50,7 +50,8 @@ silence.
 construit de requête. C'est ce qui permet d'affirmer « visible par le modèle ⇒ anonymisé » par
 construction plutôt que par vigilance. La boucle, elle, ignore :
 
-- **ce que fait un outil** (les outils sont injectés — l'éditeur en donne sept, le terminal six) ;
+- **ce que fait un outil** (les outils sont injectés — l'éditeur en donne bien plus que le terminal :
+  Git, serveur de langage, mémoire du tour, base de connaissance, MCP) ;
 - **ce qui est permis** (l'approbation est un rappel : la boucle demande, elle ne décide pas) ;
 - **ce qui peut sortir** (l'anonymisation est un rappel).
 
@@ -138,8 +139,8 @@ Tous les caches de prompt fonctionnent sur un **préfixe** : le cache est touch�
 octet qui diffère, et manqué sur tout ce qui suit. Une seule ligne du prompt système qui suit
 l'onglet ouvert ne coûte donc pas cette ligne — elle coûte **tout le préfixe**, à chaque tour, carte
 du dépôt comprise, chez les fournisseurs qui facturent le manque. Deux choses s'y trouvaient et
-changeaient : la note de dialecte, dérivée des fichiers joints, et la carte elle-même, reclassée
-autour de l'onglet de devant.
+changeaient : une note dérivée des fichiers joints (la note de dialecte IBM i, disparue depuis avec
+ce support), et la carte elle-même, reclassée autour de l'onglet de devant.
 
 Le prompt se construit maintenant en deux moitiés par une fonction qui prend les parties stables
 comme **champs nommés** : ajouter « juste une ligne sur le fichier ouvert » redevient un changement
@@ -156,8 +157,8 @@ un test d'intégration qui compare le premier message de deux requêtes **octet 
 
 Le SSE, le glob, le diff, l'estimation de jetons, le rendu Markdown du panneau : écrits à la main.
 Un assistant censé protéger une entreprise de la fuite de son code ne peut pas lui demander de faire
-confiance à un arbre de dépendances transitives. Les quatre paquets présents (`typescript`,
-`esbuild`, `@types/*`) ne sortent jamais du poste de développement, et le `.vsix` publié ne contient
+confiance à un arbre de dépendances transitives. Les cinq paquets présents (`typescript`,
+`esbuild`, `@vscode/test-electron`, `@types/*`) ne sortent jamais du poste de développement, et le `.vsix` publié ne contient
 que du code de ce dépôt.
 
 ## Le trajet d'une requête distante
@@ -185,15 +186,15 @@ Et deux embranchements qui n'existent que quand quelque chose ne va pas :
 
 Trois niveaux, et ils ne mesurent pas la même chose.
 
-- **`node:test` sur `src/core/`** — 562 tests, en millisecondes, sans éditeur. Ils tiennent les
+- **`node:test` sur `src/core/`** — plus d'un millier de tests, en millisecondes, sans éditeur. Ils tiennent les
   règles : ce qu'un budget refuse, ce qu'une anonymisation attrape, ce qu'un verdict d'échec dit.
-- **Les tests d'intégration** — 27, dans un vrai VS Code lancé sans affichage. Ils tiennent le
+- **Les tests d'intégration** — quelques dizaines, dans un vrai VS Code lancé sans affichage. Ils tiennent le
   câblage, c'est-à-dire l'endroit où vivent les vrais défauts : la sortie d'une commande revient-elle
   vraiment, le préfixe est-il vraiment identique d'un tour à l'autre, l'escalade part-elle vraiment
   vers l'autre modèle. Chacun de ces trois-là a été vérifié en **retirant le correctif** et en
   constatant que le test tombe — un test qui passe dans les deux cas ne prouve rien.
 - **`eval/`** — ce que les deux précédents ne peuvent pas dire : est-ce que la **réponse** est bonne.
-  Quinze petits dépôts cassés, une commande par tâche qui décide si le résultat marche, et le harnais
+  Quarante petits dépôts cassés, une commande par tâche qui décide si le résultat marche, et le harnais
   pilote le vrai client terminal — une évaluation qui aurait sa propre boucle mesurerait
   l'évaluation. La règle qui donne un sens aux chiffres tourne à chaque commit : **le contrôle de
   chaque tâche doit échouer sur la version non modifiée**, sans quoi la tâche note tout le monde à

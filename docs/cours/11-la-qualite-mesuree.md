@@ -1,4 +1,4 @@
-# 12. La qualité mesurée
+# 11. La qualité mesurée
 
 [← Chapitre précédent](10-le-cout.md) · [Sommaire](README.md) · [Chapitre suivant →](12-installer-et-sen-servir.md)
 
@@ -56,7 +56,7 @@ chiffres sont là, à jour, plutôt que recopiés ici où ils vieilliraient.
 
 Mais la **forme** du résultat vaut d'être racontée, parce qu'elle est contre-intuitive.
 
-**Le modèle local a obtenu 0 sur 56.** Et le chiffre qui explique ce zéro n'est pas le zéro : c'est
+**Le modèle local a obtenu 0 sur 56**, sur le jeu de 56 tâches de l'époque. Et le chiffre qui explique ce zéro n'est pas le zéro : c'est
 que dans **51 cas sur 56, le modèle n'a pris aucune action**. Il écrivait la modification dans un bloc
 de code et demandait « souhaitez-vous que je procède ? ». Dans les cinq cas où il a agi, il n'a
 **jamais** appelé d'outil d'édition.
@@ -115,7 +115,7 @@ rend le tableau digne de confiance : il préfère ne rien dire que dire quelque 
 
 C'est la chose la plus désagréable à admettre sur un banc d'essai, et c'est mesuré ici : **trois
 séries de la même configuration, sur les mêmes tâches, avec le même programme, ont donné 48, 47 et
-50 réussites.** Rien n'avait changé entre elles.
+50 réussites sur 56.** Rien n'avait changé entre elles.
 
 La raison est dans le [chapitre 2](02-le-modele.md) : un modèle de langage ne produit pas deux fois
 la même réponse. Sur quelques dizaines de tâches, deux ou trois basculent d'un côté ou de l'autre.
@@ -200,8 +200,14 @@ npm run check:course
 ```
 
 C'est la seule façon qu'un document comme celui-ci ne pourrisse pas. Un document qu'on *promet* de
-maintenir n'est pas maintenu ; un document dont l'obsolescence casse le build l'est. Le même
-raisonnement vaut pour les chiffres cités dans les README, vérifiés par `npm run check:numbers` —
-parce qu'un nombre écrit dans une phrase n'a aucune raison de suivre la chose qu'il décrit.
+maintenir n'est pas maintenu ; un document dont l'obsolescence casse le build l'est. Le même contrôle tient ensemble les
+deux éditions, française et anglaise, sur les mêmes chapitres et la même version — parce qu'une
+traduction est, dans un dépôt, la chose la plus sûre de prendre du retard. Et le même raisonnement
+vaut pour les chiffres cités dans les README, vérifiés par `npm run check:numbers` — parce qu'un
+nombre écrit dans une phrase n'a aucune raison de suivre la chose qu'il décrit.
+
+⚠️ Ce contrôle en a trouvé un dans ce cours même : l'index annonçait vingt-six décisions motivées alors
+qu'il y en avait 37. Il échappait au garde-fou pour une raison qui vaut d'être retenue : **un nombre
+écrit en toutes lettres ne peut pas être vérifié.** C'est un chiffre, maintenant.
 
 [← Chapitre précédent](10-le-cout.md) · [Sommaire](README.md) · [Chapitre suivant →](12-installer-et-sen-servir.md)

@@ -186,7 +186,7 @@ create, and it is the whole reason this extension is not on the Marketplace:
    gallery at all. Sign in at <https://open-vsx.org> with GitHub, sign the publisher agreement, create
    a token, then `export OVSX_PAT=…`. This matters more than it sounds for this product: a shop that
    has chosen VSCodium has usually chosen it for the same reasons it would choose this extension.
-4. **The domain verification**, if the blue tick is wanted — see below.
+4. **The domain verification**, if the blue tick is wanted — see [Verified publisher](#verified-publisher) above.
 
 None of these can be done from CI or by a tool on the maintainer's behalf, and none of them should
 be: a token with publish rights, held anywhere other than in the hands of the person pressing the

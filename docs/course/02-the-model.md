@@ -80,8 +80,13 @@ part — in 51 cases out of 56 it did not **even try** to act.
   but predictable. Higher, it varies: useful for writing, risky for code.
 - Some models can **reason out loud** before answering: they first produce a draft of their thinking.
   It improves hard answers and it costs tokens. Hivey Code shows it **while** it is being written —
-  the only moment it is interesting — then folds it away as soon as the answer starts, and never
-  sends it back to the model.
+  the only moment it is interesting — then folds it away as soon as the action or answer it decided
+  on starts. The level is chosen in the composer: **Direct** (no thinking), **Brief**, **Standard**,
+  **Deep** — and only the ones the model really has, when its server can say so. On your own server, a
+  level nobody chose means **Standard**: left to itself, a model like Qwen thinks at its maximum, even
+  for a small task. The thinking is never sent back to the model from one question to the next; the
+  one exception is an agent turn on a self-hosted server, where each step gets the earlier steps'
+  thinking back, so it does not start over.
 
 ## In Hivey Code
 

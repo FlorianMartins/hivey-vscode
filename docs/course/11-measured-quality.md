@@ -1,4 +1,4 @@
-# 12. Measured quality
+# 11. Measured quality
 
 [← Previous chapter](10-the-cost.md) · [Contents](README.md) · [Next chapter →](12-install-and-use.md)
 
@@ -54,7 +54,7 @@ figures are there, current, rather than copied here where they would age.
 
 But the **shape** of the result is worth telling, because it is counter-intuitive.
 
-**The local model scored 0 out of 56.** And the figure that explains that zero is not the zero: it is
+**The local model scored 0 out of 56**, on the 56-task set of the time. And the figure that explains that zero is not the zero: it is
 that in **51 cases out of 56, the model took no action at all**. It wrote the change in a code block and
 asked "would you like me to proceed?". In the five cases where it did act, it **never** called an editing
 tool.
@@ -108,7 +108,7 @@ saying something uncheckable.
 ## The same measurement, twice, does not give the same number
 
 This is the most unpleasant thing to admit about a bench, and it is measured here: **three runs of the
-same configuration, on the same tasks, with the same program, gave 48, 47 and 50 passes.** Nothing had
+same configuration, on the same tasks, with the same program, gave 48, 47 and 50 passes out of 56.** Nothing had
 changed between them.
 
 The reason is in [chapter 2](02-the-model.md): a language model does not produce the same answer twice.

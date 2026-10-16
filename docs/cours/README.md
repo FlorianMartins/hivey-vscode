@@ -51,3 +51,9 @@ Ce cours ne traduit rien. Il explique. Et il est tenu à jour par un contrôle q
 construction** quand la version qu'il annonce en haut de cette page n'est plus celle du projet — voir
 le [chapitre 11](11-la-qualite-mesuree.md). Un document qu'on promet de maintenir n'est pas
 maintenu ; un document dont l'obsolescence casse le build l'est.
+
+⚠️ Ce cours existe désormais en deux éditions, française (`docs/cours/`) et anglaise
+(`docs/course/`), et le même contrôle les tient ensemble : aucune ne peut avoir un chapitre que
+l'autre n'a pas, et les deux doivent annoncer la même version. Une traduction est, dans un dépôt, la
+chose la plus sûre de prendre du retard, et le résultat est pire qu'un document périmé : deux
+éditions qui se contredisent, sans moyen pour le lecteur de savoir laquelle est à jour.

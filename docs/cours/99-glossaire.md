@@ -25,7 +25,7 @@ table des matières du projet pour le modèle. → [6](06-le-contexte.md)
 **Commit** — Un instantané du projet, avec un message qui dit pourquoi. → [1](01-le-decor.md)
 
 **Compactage** — Remplacer une conversation trop longue par un résumé que le modèle écrit, sans rien
-effacer à l'écran. → [6](06-le-contexte.md)
+effacer à l'écran. Automatique par défaut, aux trois quarts du budget. → [6](06-le-contexte.md)
 
 **Complétion** — Les propositions pendant la frappe. L'usage le plus fréquent, donc celui qui décide
 de la facture. → [10](10-le-cout.md)
@@ -104,7 +104,7 @@ promesse de confidentialité **vérifiable** au lieu de croyable. → [1](01-le-
 n'existe pas**, pas parce qu'on le lui a demandé. → [5](05-les-trois-modes-et-les-outils.md)
 
 **Préréglage Hivey** — Une **intention** plutôt qu'un modèle : un routage qui attribue un modèle à
-chaque rôle. → [10](10-le-cout.md)
+chaque rôle. ⚠️ Son libellé et son identifiant ne se correspondent pas. → [10](10-le-cout.md)
 
 **Prompt** — Le texte envoyé au modèle, consignes invisibles incluses (le *prompt système*).
 → [2](02-le-modele.md)
@@ -120,6 +120,9 @@ question. Le modèle **n'apprend rien**. → [7](07-rag-et-memoire.md)
 
 **Récence** — L'ancienneté d'un modèle, utilisée pour choisir le plus récent. ⚠️ Elle était
 revendiquée dans ce projet et **n'existait pas**, par une erreur d'arrondi. → [10](10-le-cout.md)
+
+**Réflexion (niveau de)** — Combien le modèle « réfléchit » avant de répondre : Direct, Bref,
+Standard, Approfondi. Plus de réflexion, c'est plus de jetons. → [2](02-le-modele.md)
 
 **SIEM** — Le système où une entreprise centralise ses journaux de sécurité.
 → [9](09-la-confidentialite.md)

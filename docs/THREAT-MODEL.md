@@ -19,9 +19,13 @@ distant emporte du contexte.
 
 **Parade (code).** `src/extension/egress.ts` + `src/core/redaction/`. Quatre étapes avant tout appel
 distant : globs interdits, anonymisation réversible, refus sur secret, consentement par destination.
-Le caractère « local » est décidé par l'URL (`isLocalEndpoint`), pas par le nom du réglage : pointer
-le fournisseur « local » vers une adresse publique déclenche tout le dispositif. La complétion
-inline refuse un fichier interdit même en mode distant, car le préfixe partirait.
+Le caractère « local » est décidé par l'URL (`isLocalEndpoint`), pas par le nom du réglage. Une
+exception, voulue et réglable : le point d'accès `local` et votre propre passerelle compatible OpenAI
+(`openai-compatible`) sont traités comme **auto-hébergés**, donc de confiance quelle que soit leur
+adresse, tant que `privacy.trustSelfHosted` vaut `true` (le défaut) et qu'aucune politique
+d'organisation n'interdit les envois non pseudonymisés (`trustsSelfHosted`, `src/extension/config.ts`).
+Les fournisseurs cloud ne sont jamais concernés. La complétion inline refuse un fichier interdit même
+en mode distant, car le préfixe partirait.
 
 **Résidu, assumé.** Un utilisateur qui règle `egressPolicy: "trust"`, choisit `redaction: "off"` et
 coche `allowUnredacted` obtient exactement ce qu'il a demandé. L'outil rend le choix explicite ; il
@@ -143,7 +147,9 @@ natif ; ce qui change est qu'une phrase bien formée peut en devenir une, et c'e
 l'origine est écrite sur la carte.
 
 **Résidu, assumé.** Un utilisateur qui approuve sans lire approuve quand même. Le nombre d'étapes
-d'un tour est plafonné (12) pour qu'une boucle ne demande pas trente fois d'affilée.
+d'un tour n'est **pas** plafonné par défaut (`agent.maxSteps` vaut `0`) : ce qui arrête un tour, c'est
+le bouton Stop, la fin de la tâche, ou le détecteur de répétition quand le modèle refait le même
+appel. Un nombre dans `agent.maxSteps` rétablit un plafond.
 
 ---
 
@@ -192,7 +198,7 @@ de fichiers, au réseau et au trousseau.
 **Impact.** Total.
 
 **Parade (code).** **Aucune dépendance à l'exécution.** Le `.vsix` ne contient que du code de ce
-dépôt. Les quatre outils de développement sont épinglés, suivis par Dependabot, et `npm audit`
+dépôt. Les cinq outils de développement sont épinglés, suivis par Dependabot, et `npm audit`
 casse la CI au niveau `high`. CodeQL tourne sur les poussées et chaque semaine. Un SBOM est publié
 à chaque build.
 
@@ -290,10 +296,15 @@ publique par erreur de copier-coller.
 
 **Parade (code).** `isLocalEndpoint()` classe par adresse : loopback, RFC 1918, lien-local, CGNAT,
 suffixes `.internal/.corp/.lan/.local`. Tout le reste est distant, avec anonymisation et
-consentement, **quel que soit le réglage choisi**. La sonde qui détecte un serveur Ollama n'est
-jamais envoyée à un point de terminaison distant : un tiers ne reçoit aucune requête que
+consentement — **sauf** pour le fournisseur `local` et la passerelle `openai-compatible` tant que
+`privacy.trustSelfHosted` est activé (le défaut) : ce sont vos serveurs, et ils sont crus sur parole
+quelle que soit leur adresse. Décocher ce réglage, ou une politique d'organisation qui interdit les
+envois non pseudonymisés, rend à l'adresse le dernier mot. La sonde qui détecte un serveur Ollama
+n'est jamais envoyée à un point de terminaison distant : un tiers ne reçoit aucune requête que
 l'utilisateur n'a pas demandée.
 
 **Résidu, assumé.** Une passerelle sur une IP privée qui réexpédie vers un fournisseur public est
 « locale » pour l'extension. C'est une décision de l'opérateur, et le journal des envois ne peut pas
-la voir.
+la voir. Et avec `trustSelfHosted` laissé à sa valeur par défaut, une erreur de copier-coller qui
+pointe `endpoints.local` vers une URL publique fait partir le texte **sans** pseudonymisation : le
+réglage est là pour qui veut que l'adresse décide.

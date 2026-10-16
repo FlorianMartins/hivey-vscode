@@ -23,6 +23,11 @@ eval/tasks/<id>/
 | `check` | a shell command run in the working copy. Exit 0 means the task is done |
 | `timeoutMs` | optional, default 180000 |
 
+There are 40 tasks: 24 `bug`, 6 `noverify`, 4 `refactor`, 3 `feature`, 3 `test`, over TypeScript,
+JavaScript, Python, Java, SQL and the `finance` family (`fin-*`). The 22 IBM i tasks that brought
+the set to 62 were removed with the IBM i support; figures measured on 56 or 62 tasks are not
+comparable with a run on this set.
+
 The check is a command rather than a diff, on purpose. A diff scores the model on writing the
 solution somebody already wrote; a command scores it on the only thing the user cares about, which
 is whether the code now works. Two models solving a task differently both pass.
@@ -87,7 +92,14 @@ node scripts/evaluate.mjs --model qwen2.5-coder:7b --url http://127.0.0.1:11434/
 node scripts/evaluate.mjs --model qwen2.5-coder:7b --only bug          # one kind
 node scripts/evaluate.mjs --model a,b,c                                # a comparison
 node scripts/evaluate.mjs --model a --report out/                      # JSON + Markdown
+node scripts/evaluate.mjs --model a --jobs 6 --timeout 600             # 6 at a time, 600 s per task
+node scripts/evaluate.mjs --model a --as "local only" --table eval/QUALITY.md   # a row of the table
+node scripts/evaluate.mjs --from eval/results/<run>.json --table eval/QUALITY.md   # rebuild, no model
 ```
+
+`--only` takes a kind or a task id. `--jobs` defaults to 3. `--timeout` (seconds, default 180)
+overrides every task's own `timeoutMs` when it is given. `--note "…"`, repeatable, prints a caveat
+above the table.
 
 ## The report
 

@@ -17,7 +17,10 @@ ici est « non vérifié ».
 
 ⚠️ **Le support IBM i a été retiré du produit** (langages RPG/CL/DDS/Db2 for i, connexion IBM i,
 ARCAD, outils `ibmi_*`, compétences et tâches `ibmi-` du banc). Les chantiers et versions qui ne
-concernaient qu'IBM i ont été retirés de ce document ; le CHANGELOG garde l'historique.
+concernaient qu'IBM i ont été retirés de ce document ; le CHANGELOG garde l'historique. Le banc
+compte désormais **40 tâches** (62 avant le retrait des 22 tâches IBM i) : les mesures sur 56 ou
+62 tâches citées ci-dessous sont des relevés **d'époque**, sur un autre jeu, et ne se comparent pas
+à une série sur le jeu actuel.
 
 ### Phase 0 — Fondations
 
@@ -78,6 +81,39 @@ Trois niveaux, jamais mélangés :
   nommés.
 
 ## Fait
+
+### Un tour d'agent sans plafond, qui garde sa langue et se lit dans l'ordre (1.14.2 et non publié)
+
+- **Aucune limite manuelle par défaut** : `agent.maxSteps`, `chat.maxOutputTokens`,
+  `context.maxTokens`, `context.attachmentTokens` et `budget.perRequestTokens` valent `0`. Ce qui
+  arrête un tour : la fin de la tâche, Stop, ou le détecteur de répétition. Les plafonds d'argent
+  (`budget.perRequestUsd`, `budget.dailyUsd`) demandent toujours avant une requête facturée.
+- **Mémoire avec rappel** (testé) : chaque résultat d'outil est gardé en entier, en mémoire, et les
+  outils `recall` et `search_memory` le rendent mot pour mot quand il a dû être raccourci.
+- **Lecture par pages** (testé) : sans plage, `read_file` rend une page de 2 000 lignes et dit comment
+  lire la suite.
+- **Compactage automatique** (`context.autoCompact`, activé par défaut ; seuil testé) : aux trois
+  quarts du budget, la conversation est résumée avant l'envoi de la question ; un contexte qui se
+  remplit en pleine tâche est résumé et la tâche reprend. Désactivé : une offre à 70 %, et une
+  question « Résumer et continuer ? » quand le contexte est plein. La reprise après saturation est
+  testée dans un vrai éditeur (étape, refus du serveur, résumé, reprise de la tâche).
+- **Quitter une conversation arrête son tour** (testé dans un vrai éditeur) : nouvelle conversation,
+  ouvrir une autre conversation ou supprimer celle-ci ; un Stop pendant un résumé annule aussi ce qui
+  devait suivre.
+- **La langue de l'utilisateur tenue pour tout le tour** (testé) : une règle dans le prompt système,
+  un rappel après chaque résultat d'outil, et une note écrite dans une autre langue traduite par une
+  petite requête — qui ne part que là où l'envoi est déjà consenti.
+- **Les niveaux de réflexion du modèle** (testé) : sur llama.cpp, le gabarit est interrogé et le menu
+  (Direct, Bref, Standard, Approfondi) n'offre que ceux qu'il connaît ; sans choix explicite, un
+  serveur auto-hébergé reçoit Standard, et « Direct » n'envoie aucune réflexion.
+- **Indicateur de file d'attente** (testé) : « En file d'attente… », puis « Lecture de la
+  conversation… 45 % » sur un serveur qui signale son avancement ; plus aucun délai de 180 s pour la
+  première réponse d'un serveur auto-hébergé.
+- **Étape par étape** (testé) : chaque segment du tour — réflexion, actions, puis le texte écrit à ce
+  moment — est affiché et exporté dans l'ordre.
+- **Suggestion de la prochaine demande** (`chat.suggestNext`, testé) : en grisé dans la zone de
+  saisie, **Tab** (ou une flèche) la reprend, **Entrée** l'envoie.
+
 
 ### Une famille `finance` adossée à des tâches (0.84.0)
 
@@ -272,7 +308,10 @@ Trois niveaux, jamais mélangés :
 - **Onze fournisseurs** : cette machine, OpenRouter, Anthropic, OpenAI, Google Gemini, DeepSeek,
   Qwen, Mistral, xAI, Groq, Perplexity, plus toute passerelle compatible OpenAI.
 - **Préréglages Hivey** (Free / Smart / Pro) : un budget plutôt qu'un modèle, le routage par rôle
-  généré chaque jour depuis le catalogue OpenRouter. Aucune version de modèle écrite à la main.
+  généré chaque jour depuis le catalogue OpenRouter. Aucune version de modèle écrite à la main. Le
+  rafraîchissement quotidien (workflow *Model catalogue*) arrive sur `main` par une pull request,
+  fusionnée une fois les vérifications exigées passées (`scripts/land-catalogue.sh`) : `main` est
+  protégée, et une poussée directe y était refusée.
 - Permissions par forme d'action, un refus l'emporte toujours.
 - Complétion inline FIM, anti-rebond, cache, préchauffage.
 - Porte de sortie : globs interdits, anonymisation, refus sur secret, consentement, journal, budget.
@@ -285,22 +324,18 @@ Trois niveaux, jamais mélangés :
 - **Publication sur le Marketplace VS Code et Open VSX.** Préparée (`docs/PUBLISHING.md`), en attente
   des jetons d'éditeur — que seul Florian peut créer. En attendant, l'installation se fait par le
   `.vsix` de la release `build`, dont l'empreinte et l'attestation sont publiées.
-- **Qualité de génération mesurée sur un vrai modèle.** Le banc existe (`eval/`, 15 tâches, 
-  `npm run eval`), la CI vérifie que **chaque tâche échoue avant que le modèle y touche**, et le
-  harnais a été prouvé de bout en bout avec un modèle factice. Il n'a jamais tourné contre un vrai
-  modèle : la machine de développement n'a pas de GPU. Les chiffres viendront d'un poste qui en a un,
-  ou du workflow nocturne une fois `HIVEY_EVAL_URL` configuré.
+- **Qualité mesurée sur le jeu actuel.** Le banc (`eval/`, 40 tâches, `npm run eval`) a tourné
+  contre de vrais modèles, mais sur les anciens jeux de 56 et 62 tâches ; depuis le retrait des
+  tâches IBM i, aucune série complète n'a encore été publiée sur les 40 tâches restantes. Les lignes
+  de `eval/QUALITY.md` le disent.
 - **Reproductibilité octet pour octet du `.vsix`.** Non promise, et c'est délibéré : un `.vsix` est
   un zip, un zip porte les dates de modification, deux builds du même commit ne donnent donc pas les
   mêmes octets. Ce qui est offert à la place est l'empreinte du fichier réellement publié et une
   attestation Sigstore qui le lie au commit et au workflow.
 - **Autres langues** : la mécanique accepte n'importe quelle langue ; il n'y a que l'anglais et le
   français.
-- **Symboles via le serveur de langage.** La carte du dépôt utilise des expressions régulières ;
-  `DocumentSymbolProvider` ferait mieux pour les fichiers déjà ouverts.
-- **Politique d'entreprise centralisée** (un fichier de règles signé que l'extension refuse de
-  contredire), au-delà des réglages d'espace de travail.
-- **Historique partagé par équipe** et mode « revue de code » sur une branche.
+- **Historique partagé par équipe.** (La politique d'entreprise signée, la revue de branche et les
+  outils du serveur de langage, longtemps listés ici, sont faits : voir les chantiers 2.1, 2.6 et 2.7.)
 
 ## Ce qui n'est pas vérifié ici
 
@@ -319,8 +354,10 @@ ses conditions réelles :
 - `qwen2.5-coder:7b` sur CPU : la première requête charge 5 Go ; le préchauffage et `keep_alive`
   atténuent, ils ne suppriment pas. Sur un poste sans GPU, viser un modèle 1,5 B pour la complétion
   et garder le 7 B pour la discussion.
-- Le `fetch` de Node abandonne une réponse dont les en-têtes tardent : la couche HTTP le traduit en
-  « le modèle est probablement en train de charger », mais un poste très lent verra des complétions
+- Une requête de discussion vers un fournisseur cloud est abandonnée si rien n'arrive en 180 s ; vers
+  un serveur auto-hébergé (`local`, `openai-compatible`), il n'y a **aucun** délai pour la première
+  réponse — une requête qui attend son tour s'affiche « En file d'attente… », un serveur éteint
+  échoue aussitôt, et Stop reste disponible. Un poste très lent verra tout de même des complétions
   vides tant que le modèle n'est pas résident.
 - **L'intégration shell dépend du shell.** Elle est active pour bash, zsh, fish et PowerShell quand
   VS Code peut injecter son script ; un shell exotique, un conteneur sans l'injection, ou un
