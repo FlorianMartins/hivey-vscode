@@ -14,12 +14,20 @@
 // is told which one it got.
 
 import * as vscode from "vscode";
+import { spawn, type ChildProcess } from "node:child_process";
 import { t } from "../shared/i18n.js";
 import { cleanTerminalOutput, describeOutcome, isStatusAnswer } from "../core/terminal/output.js";
 import { scaledChars } from "../core/context/scale.js";
 
 /** The name is the contract: one terminal, reused, so only the first command waits for the shell. */
 export const TERMINAL_NAME = "Hivey Code";
+
+/**
+ * The terminal that shows what commands run as processes print (see `runCommandAsProcess`). A name
+ * of its own: the editor restores terminals across reloads, and one restored under `TERMINAL_NAME`
+ * was taken for the shell terminal — which has integration, and that one never will.
+ */
+export const PROCESS_TERMINAL_NAME = t("Hivey Code (commands)");
 
 /**
  * How long to wait for shell integration before giving up on it.
@@ -69,7 +77,10 @@ export interface RunResult {
  * so every command would pay the three-second wait instead of the first one.
  */
 function terminalFor(cwd: string | undefined): { terminal: vscode.Terminal; fresh: boolean } {
-  const existing = vscode.window.terminals.find((term) => term.name === TERMINAL_NAME && term.exitStatus === undefined);
+  // Never the one that shows processes' output (see `runCommandAsProcess`): same name, no shell in it.
+  const existing = vscode.window.terminals.find(
+    (term) => term.name === TERMINAL_NAME && term.exitStatus === undefined && term !== processView?.terminal,
+  );
   if (existing) return { terminal: existing, fresh: false };
   return { terminal: vscode.window.createTerminal({ name: TERMINAL_NAME, cwd }), fresh: true };
 }
@@ -252,4 +263,166 @@ export async function runCommandInTerminal(opts: RunOptions): Promise<RunResult>
     exitCode,
     content: answered ? `${content}\n(exit 1 from this command means "no match" or "not found", not an error.)` : content,
   };
+}
+
+// ── Running a command as a process ─────────────────────────────────────────────────────────────
+
+/**
+ * ⚠️ « il corrige et ensuite dit que ce n'est pas bon » — on Windows, a real session's commands came
+ * back "exit code 0" with nothing in them, and the model went on to write its results into files to
+ * be able to read them, then lost its way. Shell integration on Windows PowerShell 5.1 is known to
+ * hand back an empty stream, and every agent built on it reports the same symptom. A process whose
+ * output is read from its own pipes does not depend on any of that: what it printed is what the
+ * model reads, on every platform.
+ *
+ * The user still watches it: the output is copied into a terminal named like the other one, and
+ * Ctrl+C there stops the command — the approval was to a command they would see run.
+ */
+export async function runCommandAsProcess(opts: RunOptions): Promise<RunResult> {
+  const command = opts.command;
+  const timeoutMs = Math.min(Math.max(Number(opts.timeoutMs) || DEFAULT_TIMEOUT_MS, 1000), MAX_TIMEOUT_MS);
+  const view = await processTerminal();
+  view.write(`\r\n\x1b[2m${opts.cwd ?? ""}>\x1b[0m ${command}\r\n`);
+  opts.report?.(`$ ${command}`);
+
+  const windows = process.platform === "win32";
+  let child: ChildProcess;
+  try {
+    child = spawn(command, {
+      cwd: opts.cwd,
+      // cmd.exe on Windows, /bin/sh elsewhere — the shell the tool's description names.
+      shell: true,
+      windowsHide: true,
+      // Its own process group, so a timeout stops what it started too (a server, a watcher).
+      detached: !windows,
+      // Nothing to type into: a command that asks a question gets an end of input, not a hang.
+      stdio: ["ignore", "pipe", "pipe"],
+      env: process.env,
+    });
+  } catch (err) {
+    return { captured: true, isError: true, content: `could not start the command: ${(err as Error).message}` };
+  }
+
+  let raw = "";
+  const limit = scaledChars(MAX_OUTPUT_CHARS, 0.15) * 4;
+  const take = (chunk: string): void => {
+    raw += chunk;
+    if (raw.length > limit) raw = raw.slice(-limit);
+    view.write(chunk.replace(/\r?\n/g, "\r\n"));
+  };
+  child.stdout?.setEncoding("utf8");
+  child.stderr?.setEncoding("utf8");
+  child.stdout?.on("data", take);
+  child.stderr?.on("data", take);
+
+  const race: { outcome: "ended" | "timeout" | "cancelled" | "failed"; error?: string } = { outcome: "ended" };
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let onAbort: (() => void) | undefined;
+  const exitCode = await new Promise<number | undefined>((resolve) => {
+    // `close`, not `exit`: by then both pipes are drained, so the last lines are in.
+    child.on("close", (code) => resolve(code ?? undefined));
+    child.on("error", (err) => {
+      race.outcome = "failed";
+      race.error = err.message;
+      resolve(undefined);
+    });
+    timer = setTimeout(() => {
+      race.outcome = "timeout";
+      killTree(child);
+      // A process that ignores the kill must not hold the turn: give up waiting shortly after.
+      setTimeout(() => resolve(undefined), 3000);
+    }, timeoutMs);
+    const stop = (): void => {
+      race.outcome = "cancelled";
+      killTree(child);
+      setTimeout(() => resolve(undefined), 3000);
+    };
+    view.onInterrupt = stop;
+    if (opts.signal?.aborted) stop();
+    else if (opts.signal) {
+      onAbort = stop;
+      opts.signal.addEventListener("abort", onAbort, { once: true });
+    }
+  }).finally(() => {
+    if (timer) clearTimeout(timer);
+    if (onAbort) opts.signal?.removeEventListener("abort", onAbort);
+    view.onInterrupt = undefined;
+  });
+
+  const output = cleanTerminalOutput(raw);
+  if (race.outcome === "failed") {
+    view.write(`\r\n\x1b[31m${race.error}\x1b[0m\r\n`);
+    return { captured: true, isError: true, content: `could not run the command: ${race.error}\n${output}`.trim() };
+  }
+  if (race.outcome === "cancelled") {
+    view.write(`\r\n\x1b[2m^C\x1b[0m\r\n`);
+    return { captured: true, isError: true, exitCode: undefined, content: `Cancelled by the user.\n${output}`.trim() };
+  }
+  const timedOut = race.outcome === "timeout";
+  view.write(`\r\n\x1b[2m${timedOut ? t("timed out and was killed") : `exit ${exitCode ?? "?"}`}\x1b[0m\r\n`);
+  const content = describeOutcome({ output, exitCode, timedOut }, scaledChars(MAX_OUTPUT_CHARS, 0.15));
+  const answered = isStatusAnswer(command, exitCode);
+  return {
+    captured: true,
+    isError: timedOut || (exitCode !== undefined && exitCode !== 0 && !answered),
+    exitCode,
+    content: answered ? `${content}\n(exit 1 from this command means "no match" or "not found", not an error.)` : content,
+  };
+}
+
+/** The command and everything it started — a dev server under `npm run dev` included. */
+function killTree(child: ChildProcess): void {
+  if (child.pid === undefined || child.exitCode !== null) return;
+  if (process.platform === "win32") {
+    spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"], { windowsHide: true, stdio: "ignore" }).on("error", () => child.kill());
+    return;
+  }
+  try {
+    process.kill(-child.pid, "SIGTERM");
+  } catch {
+    child.kill("SIGTERM");
+  }
+}
+
+interface ProcessView {
+  terminal: vscode.Terminal;
+  write(text: string): void;
+  /** Ctrl+C typed in the terminal, while a command runs. */
+  onInterrupt?: () => void;
+}
+
+let processView: ProcessView | undefined;
+
+/** One terminal showing what the commands print, reused for the session like the shell one. */
+async function processTerminal(): Promise<ProcessView> {
+  if (processView && processView.terminal.exitStatus === undefined && vscode.window.terminals.includes(processView.terminal)) {
+    processView.terminal.show(true);
+    return processView;
+  }
+  const emitter = new vscode.EventEmitter<string>();
+  let opened: () => void = () => undefined;
+  const ready = new Promise<void>((r) => (opened = r));
+  const view: ProcessView = { terminal: undefined as unknown as vscode.Terminal, write: (text) => emitter.fire(text) };
+  const pty: vscode.Pseudoterminal = {
+    onDidWrite: emitter.event,
+    open: () => opened(),
+    close: () => {
+      if (processView === view) processView = undefined;
+    },
+    handleInput: (data) => {
+      if (data === CTRL_C) view.onInterrupt?.();
+    },
+  };
+  view.terminal = vscode.window.createTerminal({ name: PROCESS_TERMINAL_NAME, pty });
+  view.terminal.show(true);
+  // What is written before the terminal opens is dropped; a hidden panel may never open it, so the
+  // wait is short and the command runs either way.
+  await Promise.race([ready, new Promise((r) => setTimeout(r, 1500))]);
+  processView = view;
+  return view;
+}
+
+/** Whether `run_command` runs commands as processes — see `runCommandAsProcess`. */
+export function usesProcessRunner(setting: "auto" | "process" | "terminal"): boolean {
+  return setting === "process" || (setting === "auto" && process.platform === "win32");
 }

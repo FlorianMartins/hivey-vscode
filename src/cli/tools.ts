@@ -9,7 +9,7 @@
 import { spawn } from "node:child_process";
 import { searchPattern } from "../core/agent/regex.js";
 import { describeSlice, sliceLines } from "../core/fs/slice.js";
-import { findUnique } from "../core/text/findText.js";
+import { findUnique, IDENTICAL_EDIT } from "../core/text/findText.js";
 import { cappedAt, describeCap } from "../core/agent/capped.js";
 import { readFile, readdir, stat, writeFile } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
@@ -300,6 +300,7 @@ export function buildCliTools(opts: CliToolOptions): Tool[] {
       const path = safeResolve(opts, rel);
       const oldText = String(args["old"] ?? "");
       const newText = String(args["new"] ?? "");
+      if (oldText === newText) return { content: IDENTICAL_EDIT, isError: true };
       const text = await readFile(path, "utf8");
       // The same matcher as the panel's editor: `é` written as one code point and as `e` plus a
       // combining accent are the same text on screen and different strings to `indexOf`. One

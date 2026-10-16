@@ -225,6 +225,7 @@ export const FR: Record<string, string> = {
   "Stay local": "Rester en local",
   "Stop asking for {0} until the next conversation": "Ne plus demander pour {0} jusqu'à la prochaine conversation",
   "Stop the answer": "Interrompre la réponse",
+  "Hivey Code (commands)": "Hivey Code (commandes)",
   "Stopped after {0} steps (hiveyCode.agent.maxSteps) before the task was finished.": "Arrêté après {0} étapes (hiveyCode.agent.maxSteps), avant la fin de la tâche.",
   "Stopped: the model kept repeating the same call.": "Arrêté : le modèle répétait le même appel.",
   "Continue": "Continuer",
