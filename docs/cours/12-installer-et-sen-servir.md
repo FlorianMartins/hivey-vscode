@@ -82,7 +82,7 @@ Ouvrez un dossier contenant du code, puis le panneau **Hivey Code** dans la barr
 - **Pendant qu'il travaille**, la zone de saisie reste ouverte (« Corriger ou préciser — lu à la
   prochaine étape ») : **Entrée** envoie votre message dans la tâche en cours. Il s'affiche dans la
   réponse, et le modèle le lit à sa prochaine étape, après les actions en cours — sans Stop ni nouvelle
-  question. Envoyé pendant les derniers mots, il rouvre le tour ; arrivé trop tard, il devient la
+  question —, avec les fichiers ou images joints au même moment. Envoyé pendant les derniers mots, il rouvre le tour ; arrivé trop tard, il devient la
   question suivante ; après un Stop, il revient dans la zone de saisie. Dans la ligne de commande
   (`hivey`), une ligne tapée pendant un tour fait de même.
 - **Après une réponse**, la prochaine demande probable s'affiche en grisé dans la zone de saisie :

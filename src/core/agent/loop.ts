@@ -17,13 +17,28 @@
 // unmatched tool result from a provider that is strict about it gets a 400 and the user gets a
 // mysterious failure.
 
-import type { ChatMessage, ChatResult, Provider, ReasoningEffort, ToolCall, ToolSchema, Usage } from "../providers/types.js";
+import type { ChatMessage, ChatResult, Provider, ReasoningEffort, ToolCall, ToolSchema, Usage, ImagePart } from "../providers/types.js";
 import { coerceArgs, parseToolArgs, unknownToolMessage, validateArgs } from "./toolcall.js";
 import { estimateMessageTokens } from "../util/tokens.js";
 import { restoreDeep } from "../redaction/index.js";
 import { t } from "../../shared/i18n.js";
 import type { RecallStore } from "./recall.js";
 import { isWrongLanguage, steerMessage, withReplyLanguage } from "../prompts.js";
+
+/** A message typed during the turn, with what was attached to it. See `RunTurnOptions.steer`. */
+export interface SteerInput {
+  /** The text as the model reads it — attached files already rendered into it. */
+  text: string;
+  /** Attached images, which ride beside the text as they do on a question. */
+  images?: ImagePart[];
+}
+
+/** The typed messages as one user message: texts in order, images together. */
+function steerTurn(items: Array<string | SteerInput>): ChatMessage {
+  const texts = items.map((i) => (typeof i === "string" ? i : i.text));
+  const images = items.flatMap((i) => (typeof i === "string" ? [] : (i.images ?? [])));
+  return { role: "user", content: steerMessage(texts), ...(images.length ? { images } : {}) };
+}
 
 export interface ToolContext {
   /** Cancels when the user stops the turn. */
@@ -151,7 +166,7 @@ export interface TurnOptions {
    * them at its next step without the turn being stopped. Asked again when the model has just
    * answered, so a correction typed during the final words reopens the turn instead of being lost.
    */
-  steer?: () => string[];
+  steer?: () => Array<string | SteerInput>;
   /**
    * Put the real values back into a tool call's arguments, before anything looks at them.
    *
@@ -389,7 +404,7 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
     }
     // Typed by the person since the last request — read at this step, the turn carries on.
     const steered = opts.steer?.() ?? [];
-    if (steered.length) working.push({ role: "user", content: steerMessage(steered) });
+    if (steered.length) working.push(steerTurn(steered));
 
     // Fitted BEFORE it is sent, when the window is known: the estimate counts ~4 characters a
     // token and code packs tighter, so a tenth is kept in hand, plus room for the answer.
@@ -532,7 +547,7 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
       const late = opts.steer?.() ?? [];
       if (late.length) {
         working.push({ role: "assistant", content: res.text || "(no answer)" });
-        working.push({ role: "user", content: steerMessage(late) });
+        working.push(steerTurn(late));
         continue;
       }
       // The cheap middle between telling the user and escalating to a billed model: ask the same

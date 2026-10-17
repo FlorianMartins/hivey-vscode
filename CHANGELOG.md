@@ -6,6 +6,15 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Ajouté
 
+- **Une vraie conversation : l'IA à gauche, vous à droite.** Les cadres de réflexion et d'étapes
+  prennent la largeur de ce qu'ils disent (au plus 88 % du panneau) et la réponse garde une marge à
+  droite ; vos messages sont une bulle à la taille du texte, contre le bord droit, avec « Vous » sur sa
+  première ligne plutôt que sur une ligne à part.
+- **Une pièce jointe part avec la remarque tapée en cours de réponse.** Elle restait dans la zone de
+  saisie et n'arrivait qu'avec la question suivante. Elle est maintenant lue par le modèle à la même
+  étape que la remarque, mise en forme comme pour une question (fichier encadré, image à côté du
+  texte), et la bulle de la remarque la nomme ; après un Stop, texte et pièces jointes reviennent dans
+  la zone de saisie.
 - **Comme Claude Code : corriger le tir pendant que l'IA travaille, sans Stop.** « si l'utilisateur
   s'aperçoit que l'IA ne prend pas le bon sens, prendre en considération sa requête pour rectifier le
   tir sans avoir à Stop et refaire une nouvelle requête ». Pendant une réponse, la zone de saisie reste

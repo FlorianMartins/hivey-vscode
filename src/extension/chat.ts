@@ -2197,7 +2197,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     // Typed for the turn and not read yet: back in the box rather than lost, or sent on its own
     // after a stop that was meant for the turn, not for it.
     const unread = this.steers.splice(0);
-    if (unread.length) this.post({ type: "restoreDraft", text: unread.join("\n\n") });
+    if (unread.length) {
+      // Back where they were: the text in the box, the attachments beside it.
+      this.attachments.push(...unread.flatMap((s) => s.context));
+      this.post({ type: "restoreDraft", text: unread.map((s) => s.text).join("\n\n") });
+      this.sendState();
+    }
 
     // The turn is over for the user NOW, not when the abort finishes travelling.
     //
@@ -2242,20 +2247,31 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       void this.ask(text);
       return false;
     }
-    this.steers.push(text);
-    this.post({ type: "interjection", text });
-    this.log.appendLine(`[turn] a message typed during the turn waits for its next step (${text.length} characters)`);
+    // ⚠️ With what is attached. « si on ajoute une pièce jointe elle n'est pas envoyée avec le
+    // message » — the attachment stayed in the composer and went with the NEXT question instead, a
+    // file the person meant for this correction arriving after the work it was meant to correct.
+    // Taken now, rendered at the step the message is read exactly as a question renders its own.
+    const context = this.attachments.splice(0);
+    this.steers.push({ text, context });
+    const labels = context.map((c) => c.label);
+    this.post({ type: "interjection", text: labels.length ? `${text}\n📎 ${labels.join(", ")}` : text });
+    if (context.length) this.sendState();
+    this.log.appendLine(
+      `[turn] a message typed during the turn waits for its next step (${text.length} characters, ${context.length} attachment(s))`,
+    );
     return true;
   }
 
-  /** Typed during the turn and not read by it yet. See `steer`. */
-  private steers: string[] = [];
+  /** Typed during the turn, with its attachments, and not read by it yet. See `steer`. */
+  private steers: Array<{ text: string; context: ContextItem[] }> = [];
 
   /** What was typed for a turn that ended before reading it, asked as the next question. */
   private askLeftSteers(): void {
     if (this.turn || !this.steers.length) return;
-    const left = this.steers.splice(0).join("\n\n");
-    setTimeout(() => void this.ask(left), 0);
+    const left = this.steers.splice(0);
+    // Asked as the next question — with its attachments, put back where a question takes them from.
+    this.attachments.push(...left.flatMap((s) => s.context));
+    setTimeout(() => void this.ask(left.map((s) => s.text).join("\n\n")), 0);
   }
 
   /** True while a turn is running. */
@@ -4621,9 +4637,18 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         steer: () => {
           if (this.turn !== ctl || ctl.signal.aborted) return [];
           const taken = this.steers.splice(0);
-          for (const text of taken) segments.user(text);
+          for (const s of taken) {
+            const labels = s.context.map((c) => c.label);
+            segments.user(labels.length ? `${s.text}\n📎 ${labels.join(", ")}` : s.text);
+          }
           if (taken.length) this.post({ type: "interjectionTaken" });
-          return taken;
+          // Rendered as a question renders its attachments: fenced, untrusted where they came from
+          // outside, images beside the text. See `renderEntry`.
+          return taken.map((s) => {
+            const images = s.context.flatMap((c) => (c.image ? [c.image] : []));
+            const entry = { role: "user", text: s.text, context: s.context } as unknown as Entry;
+            return { text: renderEntry(entry, nonce), ...(images.length ? { images } : {}) };
+          });
         },
         // ⚠️ "remove that cap, the model has to be able to do what it is asked from A to Z". Thirty
         // requests stopped a real task half-way — silently, after reading, editing and testing — and
