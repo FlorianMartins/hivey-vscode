@@ -15,6 +15,7 @@
 
 import * as vscode from "vscode";
 import { spawn, type ChildProcess } from "node:child_process";
+import { homedir } from "node:os";
 import { t } from "../shared/i18n.js";
 import { cleanTerminalOutput, describeOutcome, isStatusAnswer } from "../core/terminal/output.js";
 import { scaledChars } from "../core/context/scale.js";
@@ -310,7 +311,10 @@ export async function runCommandAsProcess(opts: RunOptions): Promise<RunResult> 
   let child: ChildProcess;
   try {
     child = spawn(command, {
-      cwd: opts.cwd,
+      // ⚠️ Never the extension host's own directory — with no folder open that is wherever VS Code
+      // was started, the repository in a test run: `npm test` there ran this project's suite. The
+      // home directory, like the integrated terminal opens in.
+      cwd: opts.cwd ?? homedir(),
       // cmd.exe on Windows, /bin/sh elsewhere — the shell the tool's description names.
       shell: true,
       windowsHide: true,
