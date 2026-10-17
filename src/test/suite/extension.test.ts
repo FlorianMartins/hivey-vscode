@@ -10,6 +10,7 @@ import { SECTION, managedSettings, readSettings, providerFor, restoreMisplacedGa
 import { reloadPolicy } from "../../extension/policy.js";
 import { generateKeyPairSync, sign } from "node:crypto";
 import { buildTools } from "../../extension/tools.js";
+import { processTerminalForTests } from "../../extension/terminal.js";
 import { relative } from "../../extension/workspace.js";
 import { buildKnowledgeTools, knowledgeAmbient, knowledgeStore } from "../../extension/knowledge.js";
 import { listModels, openFileUris } from "../../extension/models.js";
@@ -786,56 +787,133 @@ suite("Hivey Code", () => {
     const ext = vscode.extensions.getExtension(ID)!;
     await ext.activate();
 
-    const run = buildTools({ settings: () => readSettings() }).find((tool) => tool.schema.name === "run_command");
-    assert.ok(run, "run_command is not among the tools");
+    // The terminal runner, asked for by name: it is no longer the default anywhere (see
+    // `usesProcessRunner`), and this is the test of what it does when it IS chosen.
+    const config = vscode.workspace.getConfiguration(SECTION);
+    const runner = config.get("agent.commandRunner");
+    await config.update("agent.commandRunner", "terminal", vscode.ConfigurationTarget.Global);
+    try {
+      const run = buildTools({ settings: () => readSettings() }).find((tool) => tool.schema.name === "run_command");
+      assert.ok(run, "run_command is not among the tools");
 
-    // Whether this machine's shell CAN be read is established first, and separately, because a test
-    // that accepts either answer proves nothing: with the capture removed it would still pass, on
-    // the strength of the branch that says "I could not read it". So the question is asked once,
-    // of the editor, and the answer decides which assertion is the honest one to make.
-    const probe = vscode.window.createTerminal({ name: "hivey-probe" });
-    const integrated = await new Promise<boolean>((resolve) => {
-      if (probe.shellIntegration) return resolve(true);
-      const timer = setTimeout(() => {
-        sub.dispose();
-        resolve(false);
-      }, 5000);
-      const sub = vscode.window.onDidChangeTerminalShellIntegration((ev) => {
-        if (ev.terminal !== probe) return;
-        clearTimeout(timer);
-        sub.dispose();
-        resolve(true);
+      // Whether this machine's shell CAN be read is established first, and separately, because a test
+      // that accepts either answer proves nothing: with the capture removed it would still pass, on
+      // the strength of the branch that says "I could not read it". So the question is asked once,
+      // of the editor, and the answer decides which assertion is the honest one to make.
+      const probe = vscode.window.createTerminal({ name: "hivey-probe" });
+      const integrated = await new Promise<boolean>((resolve) => {
+        if (probe.shellIntegration) return resolve(true);
+        const timer = setTimeout(() => {
+          sub.dispose();
+          resolve(false);
+        }, 5000);
+        const sub = vscode.window.onDidChangeTerminalShellIntegration((ev) => {
+          if (ev.terminal !== probe) return;
+          clearTimeout(timer);
+          sub.dispose();
+          resolve(true);
+        });
       });
-    });
-    probe.dispose();
+      probe.dispose();
 
-    const marker = `hivey-${Date.now().toString(36)}`;
-    // A short budget on purpose: the point of the test is what comes back, and a shell that never
-    // reports the end of a command must not hold the suite for the default two minutes.
-    const result = await run!.run({ command: `echo ${marker}`, timeoutMs: 8000 }, { report: () => {} });
-    const captured = (result.display as { captured?: boolean } | undefined)?.captured;
+      const marker = `hivey-${Date.now().toString(36)}`;
+      // A short budget on purpose: the point of the test is what comes back, and a shell that never
+      // reports the end of a command must not hold the suite for the default two minutes.
+      const result = await run!.run({ command: `echo ${marker}`, timeoutMs: 8000 }, { report: () => {} });
+      const captured = (result.display as { captured?: boolean } | undefined)?.captured;
 
-    if (!integrated) {
-      // A shell with no integration script. The command still runs; what must never happen is a
-      // result that reads like success, so that is what is checked here.
-      assert.equal(captured, false, "the output was read on a shell that has no integration");
-      assert.match(result.content, /could not be read/i, result.content);
-      assert.match(result.content, /ask the user|Do not assume/i, result.content);
-      return;
+      if (!integrated) {
+        // A shell with no integration script. The command still runs; what must never happen is a
+        // result that reads like success, so that is what is checked here.
+        assert.equal(captured, false, "the output was read on a shell that has no integration");
+        assert.match(result.content, /could not be read/i, result.content);
+        assert.match(result.content, /ask the user|Do not assume/i, result.content);
+        return;
+      }
+
+      assert.equal(captured, true, `this shell reports integration, so the output must be read: ${result.content}`);
+      assert.match(result.content, new RegExp(marker), `the output was not returned: ${result.content}`);
+      assert.match(result.content, /exit code 0/, result.content);
+      assert.ok(!result.isError, "a command that succeeded was reported as an error");
+      assert.equal((result.display as { exitCode?: number }).exitCode, 0);
+
+      // And a command that fails is reported as a failure, which is the half the agent acts on.
+      // In a sub-shell: a bare `exit 3` would end the shell the terminal is running, which is a way
+      // of failing that tells us nothing about how failures are reported.
+      const failed = await run!.run({ command: "sh -c 'exit 3'", timeoutMs: 8000 }, { report: () => {} });
+      assert.equal(failed.isError, true, `a non-zero exit was not an error: ${failed.content}`);
+      assert.match(failed.content, /exit code 3/, failed.content);
+    } finally {
+      await config.update("agent.commandRunner", runner, vscode.ConfigurationTarget.Global);
     }
+  });
 
-    assert.equal(captured, true, `this shell reports integration, so the output must be read: ${result.content}`);
-    assert.match(result.content, new RegExp(marker), `the output was not returned: ${result.content}`);
-    assert.match(result.content, /exit code 0/, result.content);
-    assert.ok(!result.isError, "a command that succeeded was reported as an error");
-    assert.equal((result.display as { exitCode?: number }).exitCode, 0);
+  /**
+   * « que les commandes ne nécessitent pas d'ouvrir le terminal à chaque fois ». By default a command
+   * runs as a process on every platform, nothing brings a terminal forward, and what it printed goes
+   * to the panel — the command's row opens on it — while the model's text stays what it was.
+   */
+  test("by default a command runs without bringing a terminal forward, and hands its output to the panel", async () => {
+    const ext = vscode.extensions.getExtension(ID)!;
+    await ext.activate();
+    const config = vscode.workspace.getConfiguration(SECTION);
+    const runner = config.get("agent.commandRunner");
+    await config.update("agent.commandRunner", undefined, vscode.ConfigurationTarget.Global);
+    const forward: vscode.Terminal[] = [];
+    const sub = vscode.window.onDidChangeActiveTerminal((term) => term && forward.push(term));
+    const opened: vscode.Terminal[] = [];
+    const subOpen = vscode.window.onDidOpenTerminal((term) => opened.push(term));
+    try {
+      assert.equal(readSettings().agent.commandRunner, "auto");
+      const run = buildTools({ settings: () => readSettings() }).find((tool) => tool.schema.name === "run_command")!;
+      // What the model reads about the tool did not move with the runner.
+      if (process.platform !== "win32") {
+        assert.match(run.schema.description, /^Run a shell command in the workspace terminal \(tests, build, git\)/);
+      }
+      const marker = `hivey-${Date.now().toString(36)}`;
+      const result = await run.run({ command: `echo ${marker}`, timeoutMs: 8000 }, { report: () => {} });
+      await delay(400);
+      const display = result.display as { captured?: boolean; exitCode?: number; command?: string; output?: string };
+      assert.equal(display.captured, true, "a process is always read");
+      assert.equal(display.exitCode, 0);
+      assert.equal(display.command, `echo ${marker}`);
+      assert.match(display.output ?? "", new RegExp(marker), "the panel was not given what the command printed");
+      assert.match(result.content, /exit code 0/);
+      // No shell terminal was opened for it, and the commands' own terminal was not brought forward.
+      assert.equal(opened.filter((term) => term.name === "Hivey Code").length, 0, "the command opened the shell terminal");
+      const view = processTerminalForTests();
+      assert.ok(view, "there is no terminal to open for the raw log");
+      assert.ok(!forward.includes(view), "the commands' terminal was brought forward");
+    } finally {
+      sub.dispose();
+      subOpen.dispose();
+      await config.update("agent.commandRunner", runner, vscode.ConfigurationTarget.Global);
+    }
+  });
 
-    // And a command that fails is reported as a failure, which is the half the agent acts on.
-    // In a sub-shell: a bare `exit 3` would end the shell the terminal is running, which is a way
-    // of failing that tells us nothing about how failures are reported.
-    const failed = await run!.run({ command: "sh -c 'exit 3'", timeoutMs: 8000 }, { report: () => {} });
-    assert.equal(failed.isError, true, `a non-zero exit was not an error: ${failed.content}`);
-    assert.match(failed.content, /exit code 3/, failed.content);
+  test("a command's step keeps what it printed, in the saved conversation and its export", async () => {
+    const ext = vscode.extensions.getExtension(ID)!;
+    await ext.activate();
+    const marker = `printed-${Date.now().toString(36)}`;
+    const stub = await scriptedStub([{ tool: { name: "run_command", args: { command: `echo ${marker}` } } }, { text: "done" }]);
+    const restore = await useStub(stub.port);
+    const config = vscode.workspace.getConfiguration(SECTION);
+    const approve = config.get("permissions.autoApprove");
+    await config.update("permissions.autoApprove", "all", vscode.ConfigurationTarget.Global);
+    try {
+      await vscode.commands.executeCommand("hiveyCode.newSession");
+      await vscode.commands.executeCommand("hiveyCode.setMode", "agent");
+      await vscode.commands.executeCommand("hiveyCode.askWith", "print the marker");
+      await vscode.commands.executeCommand("hiveyCode.exportSession");
+      const exported = vscode.window.activeTextEditor?.document.getText() ?? "";
+      await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
+      assert.match(exported, new RegExp("`run_command` `echo " + marker + "`"), exported);
+      assert.match(exported, new RegExp("```text\\n\\s*" + marker), "the step lost what the command printed");
+    } finally {
+      await config.update("permissions.autoApprove", approve, vscode.ConfigurationTarget.Global);
+      await restore();
+      stub.close();
+    }
   });
 
   /**

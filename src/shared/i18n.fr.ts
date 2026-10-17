@@ -234,7 +234,6 @@ export const FR: Record<string, string> = {
   "Stopped: the model kept repeating the same call.": "Arrêté : le modèle répétait le même appel.",
   "Continue": "Continuer",
   "Continue the task where you stopped.": "Continue la tâche là où tu t'es arrêté.",
-  "Actions": "Actions",
   "Edited {0}.": "{0} modifié.",
   "Wrote {0} ({1} lines).": "{0} écrit ({1} lignes).",
   "Wrote {0}.": "{0} écrit.",
@@ -276,7 +275,6 @@ export const FR: Record<string, string> = {
   "The server is finishing another request; this one starts right after.": "Le serveur termine une autre requête ; la vôtre démarre juste après.",
   "Waiting for the server… {0} s": "En attente du serveur… {0} s",
   "Reading the conversation… {0} %": "Lecture de la conversation… {0} %",
-  "{0} failed": "{0} en échec",
   "+{0} in parallel": "+{0} en parallèle",
   "The model's own default.": "Le réglage par défaut du modèle.",
   "Model default": "Défaut du modèle",
@@ -1340,4 +1338,7 @@ export const FR: Record<string, string> = {
   "Write tests for this in the right kind: a unit test for pure logic, a widget test with pumpWidget and finders for the UI, a golden test where the look is the contract. Name each test for the behavior it pins.": "Écris les tests du bon genre : un test unitaire pour la logique pure, un test de widget avec pumpWidget et des finders pour l’interface, un test golden là où l’apparence est le contrat. Nomme chaque test d’après le comportement qu’il fige.",
   "Write tests in the framework this project already uses (xUnit, NUnit or MSTest): one behavior per test, data-driven cases where they are data, and a name that says what is asserted. Cover the exceptions.": "Écris les tests dans le cadre déjà employé par ce projet (xUnit, NUnit ou MSTest) : un comportement par test, des cas pilotés par les données quand ce sont des données, et un nom qui dit ce qui est vérifié. Couvre les exceptions.",
   "Write this migration so it can run against a live table: no long lock, backfill separated from the schema change, and a state where old and new code both work. Give the rollback, and say what makes it irreversible if it is.": "Écris cette migration pour qu’elle puisse tourner sur une table en service : pas de verrou long, le remplissage séparé du changement de schéma, et un état où l’ancien et le nouveau code fonctionnent tous deux. Donne le retour arrière, et dis ce qui la rend irréversible si elle l’est.",
+  "Thinking": "Réflexion",
+  "(no output)": "(aucune sortie)",
+  "Being answered — click to go back to it.": "En cours de réponse — cliquez pour y revenir.",
 };

@@ -85,6 +85,13 @@ Ouvrez un dossier contenant du code, puis le panneau **Hivey Code** dans la barr
   question —, avec les fichiers ou images joints au même moment. Envoyé pendant les derniers mots, il rouvre le tour ; arrivé trop tard, il devient la
   question suivante ; après un Stop, il revient dans la zone de saisie. Dans la ligne de commande
   (`hivey`), une ligne tapée pendant un tour fait de même.
+- **Un tour se lit comme une frise**, à la manière de Claude Code : chaque moment de réflexion est une
+  ligne repliée « ∴ Réflexion » (elle montre sa dernière phrase pendant qu'elle s'écrit, et un clic
+  l'ouvre en entier), chaque action une ligne compacte — `Read(src/x.ts)`, `Bash(npm test)`,
+  `Update(src/y.ts)` — dont la pastille dit si elle a réussi, et ce que le modèle écrit entre les deux,
+  en paragraphes. Une commande ne fait plus apparaître le terminal : un clic sur sa ligne montre ce
+  qu'elle a affiché. Tant que le tour tourne, **votre demande reste épinglée** en haut de la
+  conversation dès qu'elle sort de l'écran ; un clic y revient.
 - **Après une réponse**, la prochaine demande probable s'affiche en grisé dans la zone de saisie :
   **Tab** (ou une flèche) en fait votre texte, **Entrée** l'envoie. Réglage
   `hiveyCode.chat.suggestNext`.
@@ -179,7 +186,7 @@ Dans les réglages de VS Code, cherchez `hiveyCode`.
 | `budget.perRequestTokens` | La taille au-delà de laquelle une requête est questionnée — 0 (par défaut) : jamais, la limite est la fenêtre du modèle |
 | `context.autoCompact` | Le résumé automatique quand la conversation approche de la fenêtre ([chapitre 6](06-le-contexte.md)) — activé par défaut |
 | `agent.maxSteps` | Un plafond d'étapes par tour d'agent — 0 (par défaut) : aucun ([chapitre 5](05-les-trois-modes-et-les-outils.md)) |
-| `agent.commandRunner` | Comment l'agent lance les commandes — `auto` (par défaut) : en processus sous Windows, dont la sortie est lue directement et affichée dans un terminal *Hivey Code (commandes)* où Ctrl+C l'arrête, et dans le terminal intégré ailleurs ; `process` ou `terminal` pour choisir |
+| `agent.commandRunner` | Comment l'agent lance les commandes — `auto` (par défaut) et `process` : en processus, partout, dont la sortie est lue directement, sans ouvrir le terminal : la commande et ce qu'elle affiche apparaissent dans le tour, et dans un terminal *Hivey Code (commandes)* que vous pouvez ouvrir, où Ctrl+C l'arrête ; `terminal` : dans le terminal intégré |
 | `chat.suggestNext` | La suggestion de la prochaine demande — activée par défaut |
 | `language` | Pour un poste dont l'éditeur est dans une langue et l'utilisateur dans une autre |
 

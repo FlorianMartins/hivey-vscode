@@ -15,6 +15,11 @@ export interface SegmentStep {
   summary: string;
   ok: boolean;
   call?: string;
+  /**
+   * What a command printed, for the panel's row of it — cleaned and bounded by the tool. Display
+   * only: nothing here is sent back to the model.
+   */
+  output?: string;
 }
 
 export interface Segment {

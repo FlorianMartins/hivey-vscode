@@ -54,6 +54,10 @@ export interface UiStep {
   tool: string;
   summary: string;
   ok: boolean;
+  /** What it was asked to do: a path, a command — see `callSignature`. */
+  call?: string;
+  /** What a command printed, shown when its row is opened. */
+  output?: string;
 }
 
 export interface UiEntry {
@@ -617,7 +621,11 @@ export type ToPanel =
   | { type: "state"; state: UiState }
   | { type: "delta"; text: string }
   | { type: "reasoning"; text: string }
-  | { type: "status"; text: string; tool?: string; ok?: boolean; call?: string }
+  /**
+   * A line of the turn. `result`: what an action came back with, which takes the place of the row
+   * `toolStart` drew; without it, a remark — progress, an approval decided by a rule, "Stopped.".
+   */
+  | { type: "status"; text: string; tool?: string; ok?: boolean; call?: string; output?: string; result?: boolean }
   /** A tool is starting: what the folded step list shows as "in progress". `count` > 1 for a parallel batch. */
   | { type: "toolStart"; tool: string; call?: string; count?: number }
   /** A note was rewritten after it streamed (put back in the user's language). */

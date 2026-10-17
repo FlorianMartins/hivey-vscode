@@ -82,6 +82,12 @@ Open a folder containing code, then the **Hivey Code** panel in the right-hand b
   attached at the same moment. Typed during the last words,
   it reopens the turn; typed too late, it becomes the next question; after a Stop it goes back into the
   box. In the terminal client (`hivey`), a line typed during a turn does the same.
+- **A turn reads as a timeline**, the way Claude Code draws one: each stretch of thinking is a folded
+  "∴ Thinking" line (it shows its latest sentence while it is written, and a click opens all of it),
+  each action a compact row — `Read(src/x.ts)`, `Bash(npm test)`, `Update(src/y.ts)` — whose dot says
+  whether it worked, and what the model writes in between as paragraphs. A command no longer brings
+  the terminal up: a click on its row shows what it printed. While the turn runs, **your request stays
+  pinned** at the top of the conversation once it has scrolled out of sight; a click goes back to it.
 - **After an answer**, the likely next request appears greyed in the composer: **Tab** (or an arrow)
   makes it your text, **Enter** sends it. Setting `hiveyCode.chat.suggestNext`.
 - **`Ctrl+I`** in the editor rewrites the selection in place.
@@ -172,7 +178,7 @@ In VS Code's settings, search for `hiveyCode`.
 | `budget.perRequestTokens` | The size beyond which a request is questioned — 0 (the default): never, the model's own window is the limit |
 | `context.autoCompact` | The automatic summary when the conversation nears the window ([chapter 6](06-the-context.md)) — on by default |
 | `agent.maxSteps` | A cap on the steps of an agent turn — 0 (the default): none ([chapter 5](05-the-three-modes-and-tools.md)) |
-| `agent.commandRunner` | How the agent runs commands — `auto` (the default): as a process on Windows, whose output is read directly and shown in a *Hivey Code (commands)* terminal where Ctrl+C stops it, and in the integrated terminal elsewhere; `process` or `terminal` to choose |
+| `agent.commandRunner` | How the agent runs commands — `auto` (the default) and `process`: as a process, everywhere, whose output is read directly, without opening the terminal: the command and what it printed show in the turn, and in a *Hivey Code (commands)* terminal you can open, where Ctrl+C stops it; `terminal`: in the integrated terminal |
 | `chat.suggestNext` | The suggested next request — on by default |
 | `language` | For a machine whose editor is in one language and whose user is in another |
 

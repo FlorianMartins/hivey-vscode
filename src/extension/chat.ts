@@ -2531,7 +2531,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             lines.push(`> **${t("You")}** — ${seg.user.trim().replace(/\n/g, "\n> ")}`, "");
             continue;
           }
-          for (const step of seg.steps ?? []) lines.push(`- \`${step.tool}\` — ${stepText(step.summary)}`);
+          for (const step of seg.steps ?? []) exportStep(lines, step);
           if (seg.steps?.length) lines.push("");
           if (seg.text?.trim()) lines.push(seg.text.trim(), "");
         }
@@ -2541,7 +2541,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       // A failure is part of the record. An export that quietly drops it is a record that lies by
       // omission — and it is the document somebody attaches when they report that nothing works.
       if (entry.error) lines.push(`> ${t("Failed")}: ${entry.error}`, "");
-      for (const step of entry.steps ?? []) lines.push(`- \`${step.tool}\` — ${stepText(step.summary)}`);
+      for (const step of entry.steps ?? []) exportStep(lines, step);
       if (entry.steps?.length) lines.push("");
     }
     const doc = await vscode.workspace.openTextDocument({ language: "markdown", content: lines.join("\n") });
@@ -4384,7 +4384,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const vault = new Vault();
     // Shared with the hook runner above: `hookSteps` is the same array, so the order the turn
     // actually happened in is preserved and "the last one wins" means what it says.
-    const steps: Array<{ tool: string; summary: string; ok: boolean; call?: string }> = hookSteps;
+    const steps: Array<{ tool: string; summary: string; ok: boolean; call?: string; output?: string }> = hookSteps;
     const verifierOutput = new Map<string, string>();
     // Asides the model recorded this turn. Cleared with the turn, because an aside about the file
     // you were editing an hour ago is not something you should know now.
@@ -4736,16 +4736,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           } catch {
             signature = "";
           }
-          steps.push({ tool: call.name, summary, ok: !result.isError, ...(signature ? { call: signature } : {}) });
-          segments.step({ tool: call.name, summary, ok: !result.isError, ...(signature ? { call: signature } : {}) });
+          // What a command printed, for its row in the turn — opened by a click, saved with the step
+          // so a reloaded conversation has it too. Already cleaned and bounded by the tool (see
+          // `displayOutput`); never what the model reads, which is `result.content`.
+          const output = displayedOutput(result.display);
+          const step = { tool: call.name, summary, ok: !result.isError, ...(signature ? { call: signature } : {}), ...(output !== undefined ? { output } : {}) };
+          steps.push(step);
+          segments.step({ ...step });
           if (ctl.signal.aborted) return;
-          this.post({
-            type: "status",
-            text: summary,
-            tool: call.name,
-            ok: !result.isError,
-            ...(signature ? { call: signature } : {}),
-          });
+          this.post({ type: "status", text: summary, ...step, result: true });
         },
         report: (msg) => {
           if (ctl.signal.aborted) return;
@@ -6001,5 +6000,23 @@ function waitText(label: WaitLabel): string {
       return t("Reading the conversation… {0} %", label.percent);
     default:
       return "";
+  }
+}
+
+/** What a tool handed the panel to show on its row — a command's output — when it handed any. */
+function displayedOutput(display: unknown): string | undefined {
+  const output = (display as { output?: unknown } | undefined)?.output;
+  return typeof output === "string" ? output : undefined;
+}
+
+/**
+ * One action in the Markdown export, the way the panel draws it: the tool and what it was asked to
+ * do, what came back — and what a command printed, fenced, so the export reads like the turn did.
+ */
+function exportStep(lines: string[], step: { tool: string; summary: string; call?: string; output?: string }): void {
+  lines.push(`- \`${step.tool}\`${step.call ? ` \`${step.call.replace(/`/g, "'")}\`` : ""} — ${stepText(step.summary)}`);
+  if (step.output?.trim()) {
+    const fence = step.output.includes("```") ? "````" : "```";
+    lines.push("", `  ${fence}text`, ...step.output.split("\n").map((l) => `  ${l}`), `  ${fence}`, "");
   }
 }

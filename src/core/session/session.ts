@@ -83,7 +83,7 @@ export interface Entry {
    * came back. Both, because a step showing only the result is unreadable a day later: six
    * `run_command` lines saying "started in the terminal" name no command between them.
    */
-  steps?: Array<{ tool: string; summary: string; ok: boolean; call?: string }>;
+  steps?: Array<{ tool: string; summary: string; ok: boolean; call?: string; output?: string }>;
   /** The same answer as it happened, step by step — see core/session/segments.ts. */
   segments?: Segment[];
   /** Set on an assistant entry that failed, so it is never replayed as if it were an answer. */
