@@ -21,7 +21,7 @@ import type { Plan } from "../agent/plan.js";
 import type { Mode } from "./modes.js";
 import { estimateTokens, headToTokens } from "../util/tokens.js";
 import { IMAGE_TOKENS } from "../models/vision.js";
-import { answerWithInterjections, type Segment } from "./segments.js";
+import { actionsRecord, answerWithInterjections, type Segment } from "./segments.js";
 
 export type EntryRole = "user" | "assistant";
 
@@ -386,7 +386,9 @@ export class Session {
 export function renderEntry(e: Entry, nonce: string, alreadyBelow?: (c: ContextItem) => boolean): string {
   // An answer the person corrected mid-way carries the correction where it came — see
   // `answerWithInterjections`. Identical to `e.text` for every other entry.
-  const text = e.role === "assistant" ? answerWithInterjections(e.text, e.segments) : e.text;
+  const said = e.role === "assistant" ? answerWithInterjections(e.text, e.segments) : e.text;
+  const did = e.role === "assistant" ? actionsRecord(e.steps, e.segments) : "";
+  const text = did ? (said.trim() ? `${did}\n\n${said}` : did) : said;
   if (!e.context?.length) return text;
   const blocks = e.context.map((c) => {
     const head = `[${c.kind}] ${c.label}`;
