@@ -36,6 +36,7 @@ import { buildSymbolTools } from "./symbols.js";
 import { isAbsolutePath, tidyPath, underRoot } from "../core/fs/within.js";
 import { scaledChars } from "../core/context/scale.js";
 import { nearestName } from "../core/text/nearest.js";
+import { commandHint } from "../core/terminal/hints.js";
 import { IDENTICAL_EDIT } from "../core/text/findText.js";
 
 /**
@@ -644,8 +645,12 @@ export function buildTools(deps: ToolDeps): Tool[] {
         signal: ctx.signal,
         report: (m) => ctx.report(m),
       });
+      // What this failure most likely is, beside its output — see `core/terminal/hints.ts`.
+      const hint = result.isError
+        ? commandHint({ command, output: result.content, ...(result.exitCode !== undefined ? { exitCode: result.exitCode } : {}), platform: process.platform })
+        : undefined;
       return {
-        content: result.content,
+        content: hint ? `${result.content}\n${hint}` : result.content,
         isError: result.isError,
         // The panel shows the exit code as a badge on the step. `captured: false` is what it reads
         // to say "started, not read" rather than claiming a result nobody has.

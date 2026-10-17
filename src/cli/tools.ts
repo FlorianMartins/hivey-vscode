@@ -10,6 +10,7 @@ import { spawn } from "node:child_process";
 import { searchPattern } from "../core/agent/regex.js";
 import { describeSlice, sliceLines } from "../core/fs/slice.js";
 import { findUnique, IDENTICAL_EDIT } from "../core/text/findText.js";
+import { commandHint } from "../core/terminal/hints.js";
 import { cappedAt, describeCap } from "../core/agent/capped.js";
 import { readFile, readdir, stat, writeFile } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
@@ -359,8 +360,11 @@ export function buildCliTools(opts: CliToolOptions): Tool[] {
           clearTimeout(timer);
           ctx.signal?.removeEventListener("abort", onAbort);
           const tail = out.length > maxOut ? `…(start truncated)\n${out.slice(-maxOut)}` : out;
+          // What this failure most likely is, beside its output — see `core/terminal/hints.ts`.
+          const hint =
+            code !== 0 ? commandHint({ command, output: out, ...(code !== null ? { exitCode: code } : {}), platform: process.platform }) : undefined;
           resolveResult({
-            content: `exit code ${killed ? "killed (timeout)" : code}\n${tail || "(no output)"}`,
+            content: `exit code ${killed ? "killed (timeout)" : code}\n${tail || "(no output)"}${hint ? `\n${hint}` : ""}`,
             isError: code !== 0,
           });
         });
