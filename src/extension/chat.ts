@@ -5122,6 +5122,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       // Before anything else, and unconditionally: this is what the panel reads to decide whether
       // an answer is somebody else's to draw. Left set by a turn that threw, it would be an answer
       // nothing ever draws — a silent, permanent blank.
+      // The answer is added, empty, when the turn starts, so its time was the question's time. Its
+      // time is when it ended — finished, failed or stopped.
+      const ended = this.session.entries.find((e) => e.id === this.streamingEntryId);
+      if (ended) ended.at = Date.now();
       this.streamingEntryId = undefined;
       this.checkpointFor = undefined;
       // Old checkpoints give up their file contents here rather than at write time: the cap is
