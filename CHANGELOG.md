@@ -65,6 +65,24 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **Le modèle n'oublie plus ce qu'il vient de faire.** D'un message à l'autre, il ne relisait que le
+  texte de ses réponses : ni les fichiers lus ou modifiés, ni les commandes lancées et leur résultat —
+  et après un tour arrêté, presque rien. Il relisait tout et croyait le code changé sous lui. Ses
+  actions lui sont maintenant renvoyées, une ligne par action, dans le panneau comme dans la ligne de
+  commande. Essais réels : 2 réponses exactes sur 2 à « qu'as-tu lu, modifié, lancé ? », contre 1 sur 2.
+- **Quand le contexte se remplit, les anciennes versions d'un fichier partent en premier.** Une lecture
+  d'un fichier relu ou modifié ensuite est retirée avant toute autre sortie, au lieu de garder côte à
+  côte le début de l'ancienne version et la nouvelle. Et une modification ne remet plus à zéro que le
+  compteur de répétitions de ce fichier : relire en boucle les autres fichiers entre deux modifications
+  est de nouveau repéré.
+- **`search_text` cherche dans le code.** Dans le panneau, la recherche lisait les 800 premiers fichiers
+  venus, `node_modules` et sauvegardes compris, et répondait « aucun résultat » sur du code présent.
+  Elle exclut maintenant les mêmes dossiers que la ligne de commande, le `.gitignore` et
+  `search.exclude`, saute les fichiers de plus de 400 Ko, et prévient quand la limite est atteinte.
+- **Windows : une commande de plusieurs lignes n'est plus perdue.** cmd.exe n'exécute que la première
+  ligne, sans rien dire ; la commande est refusée d'emblée avec la marche à suivre (une ligne avec
+  `&&`, ou un fichier).
+- **L'heure d'une réponse est celle de sa fin**, plus celle de la question.
 - **Ligne de commande : plus de faux « contexte plein à 100 % ».** Le message additionnait les jetons
   de toutes les étapes du tour et les comparait à un plancher de 8 000 jetons quand le catalogue ne
   connaît pas le modèle : il s'affichait après chaque tâche. Il compare maintenant la dernière requête à
