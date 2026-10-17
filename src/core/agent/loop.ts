@@ -295,9 +295,20 @@ export function shrinkToolOutputs(messages: ChatMessage[], tokens: number, keptA
     delete m.reasoning;
     delete m.thinkingBlocks;
   }
+  // Then what is out of date: a file's content from before it was read again or changed. Kept, it
+  // is a second version of the same file in the same window, and an excerpt of the old one next to
+  // the new one is how a model comes to believe a file it just edited lost its change. Said in one
+  // line, which also frees the most.
+  const stale = staleFileOutputs(messages);
   for (const { m, i } of tools) {
     if (saved >= target) break;
-    if (i === lastTool) continue;
+    if (i === lastTool || !m.toolCallId || !stale.has(m.toolCallId)) continue;
+    saved += m.content.length;
+    m.content = OUTDATED_OUTPUT;
+  }
+  for (const { m, i } of tools) {
+    if (saved >= target) break;
+    if (i === lastTool || m.content === OUTDATED_OUTPUT) continue;
     const cut = m.content.length - KEPT_HEAD_CHARS;
     // Kept whole in the memory when there is one: the model is told exactly how to have it back.
     const id = m.toolCallId ? keptAs?.(m.toolCallId) : undefined;
@@ -309,6 +320,37 @@ export function shrinkToolOutputs(messages: ChatMessage[], tokens: number, keptA
   }
   return saved > 0;
 }
+const OUTDATED_OUTPUT =
+  "[Outdated, removed to fit the context window: this file was read again or changed later in this turn, and that later result is the current one.]";
+
+const FILE_TOOLS = new Set(["read_file", "edit_file", "write_file"]);
+
+/** The file a call is about, for the tools that read or change one file. */
+function fileOf(name: string, args: string | undefined): string | undefined {
+  if (!FILE_TOOLS.has(name)) return undefined;
+  try {
+    const path = (JSON.parse(args || "{}") as Record<string, unknown>)["path"];
+    return typeof path === "string" && path.trim() ? path.trim().replace(/^\.\//, "") : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** The read_file results whose file was read again or changed by a later call of the same turn. */
+export function staleFileOutputs(messages: ChatMessage[]): Set<string> {
+  const calls = messages.flatMap((m) => (m.role === "assistant" ? (m.toolCalls ?? []) : []));
+  const stale = new Set<string>();
+  const later = new Set<string>();
+  for (let i = calls.length - 1; i >= 0; i--) {
+    const call = calls[i]!;
+    const file = fileOf(call.name, call.args);
+    if (!file) continue;
+    if (call.name === "read_file" && later.has(file)) stale.add(call.id);
+    later.add(file);
+  }
+  return stale;
+}
+
 const CONTINUE_AFTER_CUT =
   "Your previous reply was cut off by the output token limit before you finished, and any tool call you were writing was lost. " +
   "Continue from where you stopped without repeating what you already wrote. " +
@@ -665,7 +707,15 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
           continue;
         }
       } else {
-        callCounts.clear();
+        // An edit changes one file: only what reads it, or a search, can now say something new —
+        // re-reading any other file is still a repeat. Anything else (a command) can change anything.
+        const file = fileOf(call.name, JSON.stringify(args));
+        if (file) {
+          for (const key of [...callCounts.keys()]) {
+            const [name, json] = key.split("\u0000") as [string, string];
+            if (name !== "read_file" || fileOf(name, json) === file) callCounts.delete(key);
+          }
+        } else callCounts.clear();
       }
       planned.push({ call, tool, args, parallel });
     }

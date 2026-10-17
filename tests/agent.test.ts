@@ -552,6 +552,28 @@ test("⚠️ the test run repeated after each fix is never blocked", async () =>
   assert.equal(r.text, "Green.");
 });
 
+test("⚠️ an edit lets its own file be read again, not every other file", async () => {
+  // « il tourne en rond » — read, edit, re-read every file, edit again: an edit reset the whole
+  // count, so the loop never saw the re-reads of the files the edit had not touched.
+  const read = tool("read_file", { parallel: () => true });
+  const edit = tool("edit_file");
+  const reads = (id: string) => [
+    { id: `${id}a`, name: "read_file", args: '{"path":"a.ts"}' },
+    { id: `${id}b`, name: "read_file", args: '{"path":"b.ts"}' },
+  ];
+  const provider = scriptedProvider([
+    { toolCalls: reads("1") },
+    { toolCalls: [{ id: "2", name: "edit_file", args: '{"path":"a.ts"}' }] },
+    { toolCalls: reads("3") },
+    { toolCalls: [{ id: "4", name: "edit_file", args: '{"path":"a.ts"}' }] },
+    { toolCalls: reads("5") },
+    { text: "Done." },
+  ]);
+  await runTurn({ ...base, provider, tools: [read, edit] });
+  assert.equal(read.calls.filter((c) => c["path"] === "a.ts").length, 3, "the edited file, read after each edit");
+  assert.equal(read.calls.filter((c) => c["path"] === "b.ts").length, 2, "the untouched one, refused the third time");
+});
+
 test("the same tool with different arguments is never mistaken for a loop", async () => {
   const read = tool("read_file", { parallel: () => true });
   const provider = scriptedProvider([
