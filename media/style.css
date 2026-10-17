@@ -5190,50 +5190,28 @@ pre.code code {
   max-width: 92%;
 }
 
-/* « Vous » on the first line of your message, beside it, instead of a line of its own above it. */
+/* Your message: « Vous » and the time ABOVE the bubble, outside it, on your side — the way it was;
+ * the bubble itself the size of what you wrote, against the right edge. */
 .entry.user {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  column-gap: var(--sp-2);
-  align-items: start;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
 }
 .entry.user > * {
-  grid-column: 1;
-}
-.entry.user > .entry-head {
-  grid-column: 2;
-  grid-row: 1;
-  margin-bottom: 0;
-  /* Level with the first line of text inside the bubble: its border, then its padding. */
-  padding-top: calc(var(--sp-2) + 1px);
-  min-height: 0;
-}
-.entry.user > .md {
-  grid-row: 1;
-  justify-self: end;
-  width: fit-content;
   max-width: 100%;
 }
-.entry.user > .chips {
-  justify-self: end;
+.entry.user > .entry-head {
+  align-self: stretch;
+}
+.entry.user > .md {
+  width: fit-content;
 }
 
-/* The same for what you type while it works: the label on the first line, inside the bubble. */
+/* The same for what you type while it works: the label above the text, the bubble on your side. */
 .interjection {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  column-gap: var(--sp-2);
   width: fit-content;
   max-width: 85%;
   margin-left: auto;
-}
-.interjection-head {
-  grid-column: 2;
-  grid-row: 1;
-}
-.interjection-text {
-  grid-column: 1;
-  grid-row: 1;
 }
 
 /* When a message was written. Beside « Vous », always visible but quiet; in the answer's receipt it
