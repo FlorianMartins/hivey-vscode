@@ -6,7 +6,7 @@
 // assistant is ALLOWED to do rather than how clever it is, the model button carries its price, and
 // every exchange can be muted out of the context without being deleted from the story.
 
-import { button, closeMenu, el, formatTokens, icon, ICON, menu, menuItem, menuTitle, separator, vendorIcon } from "./dom.js";
+import { button, closeMenu, el, formatTokens, icon, ICON, menu, menuItem, menuTitle, messageTime, messageTimeFull, separator, vendorIcon } from "./dom.js";
 import { markdown } from "./markdown.js";
 import { t } from "../shared/i18n.js";
 import { vendorSlug } from "../core/router/vendorIcon.js";
@@ -488,6 +488,13 @@ function renderEntry(entry: UiEntry, state: UiState, deps: ChatDeps, first = fal
   // block you have landed in is your question or its reply.
   head.append(el("span", `entry-mark ${entry.role}`, entry.role === "user" ? "\u25CF" : "\u25C6"));
   head.append(el("span", "entry-who", entry.role === "user" ? t("You") : "Hivey Code"));
+  // When you wrote it, beside your name — always there, quietly: « horodater les messages […] au côté
+  // de "Vous" ». The answer's time is with its receipt, on hover (below).
+  if (entry.role === "user" && entry.at) {
+    const when = el("span", "entry-time", messageTime(entry.at));
+    when.title = messageTimeFull(entry.at);
+    head.append(when);
+  }
   // The model and the cost are a receipt, and a receipt belongs at the bottom. In the header they
   // sat between the name and the tags, competing for a row that is already tight at a docked width,
   // and they were read on every turn by nobody. They now appear with the buttons, on hover, at the
@@ -655,6 +662,12 @@ function renderEntry(entry: UiEntry, state: UiState, deps: ChatDeps, first = fal
   }
   const receipt = el("div", "entry-receipt");
   if (entry.model && entry.role === "assistant") receipt.append(el("span", "entry-meta", entry.model));
+  // The answer's time, at the end of its receipt — revealed on hover with the model and the cost.
+  if (entry.role === "assistant" && entry.at) {
+    const when = el("span", "entry-meta entry-time", messageTime(entry.at));
+    when.title = messageTimeFull(entry.at);
+    receipt.append(when);
+  }
   if (entry.usdCost) {
     const cost = el("span", "entry-meta cost", formatCost(entry.usdCost));
     // The breakdown, not just the total. A price on its own is unarguable and undiagnosable: a user

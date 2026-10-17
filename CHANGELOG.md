@@ -10,6 +10,9 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
   prennent la largeur de ce qu'ils disent (au plus 88 % du panneau) et la réponse garde une marge à
   droite ; vos messages sont une bulle à la taille du texte, contre le bord droit, avec « Vous » sur sa
   première ligne plutôt que sur une ligne à part.
+- **Messages horodatés.** L'heure s'affiche à côté de « Vous » sur chacun de vos messages, et à la fin
+  de la réponse au survol, avec le modèle ; la date s'ajoute quand le message n'est pas du jour, et
+  l'infobulle donne la date complète.
 - **Une pièce jointe part avec la remarque tapée en cours de réponse.** Elle restait dans la zone de
   saisie et n'arrivait qu'avec la question suivante. Elle est maintenant lue par le modèle à la même
   étape que la remarque, mise en forme comme pour une question (fichier encadré, image à côté du
