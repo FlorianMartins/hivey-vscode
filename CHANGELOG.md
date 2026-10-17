@@ -6,6 +6,19 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Ajouté
 
+- **Une commande qui échoue dit pourquoi.** « il a toujours des erreurs des commandes node ». Le cas
+  le plus fréquent relevé : `npx tsc` sans TypeScript dans le projet télécharge un paquet sans rapport
+  nommé `tsc`, et le modèle réessayait dix variantes. Pour ce piège et quelques autres (sous Windows,
+  `node -e '…'` et les outils Unix absents de `cmd.exe` ; module ESM/CommonJS ; module introuvable), une
+  indication suit la sortie de la commande : la cause et la commande qui marche. Panneau et ligne de
+  commande.
+- **La réflexion suit la langue de votre message.** « il bascule des fois en français et d'autres fois
+  en anglais dans le raisonnement ». La règle de langue ne visait que ce que le modèle vous écrit : il
+  réfléchissait en anglais, puis en français, puis de nouveau en anglais. Il réfléchit maintenant dans la
+  langue de votre message (celle de VS Code seulement quand le message ne permet pas de trancher), et
+  une langue demandée dans le message l'emporte, pour la réponse comme pour la réflexion.
+- **La réflexion est mise en forme.** Listes, `code` et gras s'affichent comme dans la réponse au lieu
+  du texte brut ; affichage seulement.
 - **Les commandes ne font plus apparaître le terminal.** Par défaut, partout, l'agent lance ses
   commandes en processus (lus directement) : la commande s'affiche dans le tour comme une ligne
   `Bash(npm test)`, et un clic dessus montre ce qu'elle a affiché — la fin, gardée avec la conversation
