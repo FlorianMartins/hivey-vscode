@@ -96,3 +96,21 @@ test("several messages typed between two steps arrive together, in order", () =>
   const m = steerMessage(["d'abord ceci", "et aussi cela"]);
   assert.ok(m.indexOf("d'abord ceci") < m.indexOf("et aussi cela"));
 });
+
+test("an image attached to a message typed during the turn rides beside it, as on a question", async () => {
+  const queue: Array<{ text: string; images: Array<{ mediaType: string; data: string }> }> = [];
+  const { provider, seen } = scripted([call("a"), answer("ok")], (n) => {
+    if (n === 1) queue.push({ text: "Make it look like this.", images: [{ mediaType: "image/png", data: "iVBORw0KGgo=" }] });
+  });
+  await runTurn({
+    provider,
+    model: "m",
+    messages: [{ role: "system", content: "sys" }, { role: "user", content: "Style the page." }],
+    tools: [read],
+    steer: () => queue.splice(0),
+  });
+  const last = seen[1]!.messages[seen[1]!.messages.length - 1]!;
+  assert.match(last.content, /Make it look like this\./);
+  assert.equal(last.images?.length, 1);
+  assert.equal(last.images?.[0]?.mediaType, "image/png");
+});

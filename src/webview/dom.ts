@@ -376,6 +376,23 @@ export function relativeDate(at: number, now = Date.now()): string {
   return new Date(at).toLocaleDateString(locale(), { day: "numeric", month: "short" });
 }
 
+/**
+ * When a message was written: `14:32` today, `16 oct. 14:32` before — the time is what a person
+ * scanning a conversation looks for, the date only once it is no longer today's.
+ */
+export function messageTime(at: number, now = Date.now()): string {
+  const d = new Date(at);
+  const today = new Date(now).toDateString() === d.toDateString();
+  return today
+    ? d.toLocaleTimeString(locale(), { hour: "2-digit", minute: "2-digit" })
+    : d.toLocaleString(locale(), { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+}
+
+/** The full date and time, for the tooltip. */
+export function messageTimeFull(at: number): string {
+  return new Date(at).toLocaleString(locale(), { dateStyle: "full", timeStyle: "short" });
+}
+
 /** The editor's locale, for anything Intl formats: dates, numbers, prices. */
 export function locale(): string {
   return language() === "fr" ? "fr-FR" : "en-GB";

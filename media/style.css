@@ -5079,3 +5079,78 @@ pre.code code {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+
+/* ── A conversation: the assistant on the left, you on the right ───────────────────────────────
+ *
+ * « que les box de raisonnement IA ne prennent pas toute la largeur de la page pour que ça fasse
+ * vraiment une conversation (gauche IA, droite utilisateur) ». Every block spanned the panel, so the
+ * two speakers were told apart by a label alone. The assistant's thinking and steps now take the
+ * width of what they say (never more than most of the panel) and its words keep a margin on the
+ * right; your messages are a bubble the size of what you wrote, against the right edge. */
+.entry.assistant .collapsible {
+  width: fit-content;
+  min-width: min(14rem, 88%);
+  max-width: 88%;
+}
+.entry.assistant .collapsible.open {
+  width: 88%;
+}
+.entry.assistant .md,
+.entry.assistant .live-text {
+  max-width: 92%;
+}
+
+/* « Vous » on the first line of your message, beside it, instead of a line of its own above it. */
+.entry.user {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: var(--sp-2);
+  align-items: start;
+}
+.entry.user > * {
+  grid-column: 1;
+}
+.entry.user > .entry-head {
+  grid-column: 2;
+  grid-row: 1;
+  margin-bottom: 0;
+  /* Level with the first line of text inside the bubble: its border, then its padding. */
+  padding-top: calc(var(--sp-2) + 1px);
+  min-height: 0;
+}
+.entry.user > .md {
+  grid-row: 1;
+  justify-self: end;
+  width: fit-content;
+  max-width: 100%;
+}
+.entry.user > .chips {
+  justify-self: end;
+}
+
+/* The same for what you type while it works: the label on the first line, inside the bubble. */
+.interjection {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: var(--sp-2);
+  width: fit-content;
+  max-width: 85%;
+  margin-left: auto;
+}
+.interjection-head {
+  grid-column: 2;
+  grid-row: 1;
+}
+.interjection-text {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+/* When a message was written. Beside « Vous », always visible but quiet; in the answer's receipt it
+ * follows the receipt's own hover rule. */
+.entry-time {
+  font-size: var(--fs-meta);
+  color: var(--muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}

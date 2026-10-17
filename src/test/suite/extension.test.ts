@@ -545,6 +545,44 @@ suite("Hivey Code", () => {
     }
   });
 
+  /**
+   * « quand on envoie un message en cours de réponse de l'IA, si on ajoute une pièce jointe elle n'est
+   * pas envoyée avec le message ». The file attached while the turn runs must reach the model WITH the
+   * message typed then — not wait in the composer for the next question.
+   */
+  test("a file attached while the agent works goes with the message typed then", async () => {
+    const ext = vscode.extensions.getExtension(ID)!;
+    await ext.activate();
+    const dir = await fs.mkdtemp(join(tmpdir(), "hivey-steer-attach-"));
+    const file = join(dir, "spec.md");
+    await fs.writeFile(file, "ATTACHED-SPEC-7f3a: prices are in cents\n");
+    await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(file));
+    const stub = await steerableStub();
+    const restore = await useStub(stub.port);
+    try {
+      await vscode.commands.executeCommand("hiveyCode.newSession");
+      await vscode.commands.executeCommand("hiveyCode.setMode", "agent");
+      const turn = vscode.commands.executeCommand("hiveyCode.askWith", "write the module");
+      for (let i = 0; i < 100 && stub.bodies().length < 2; i++) await delay(50);
+      await vscode.commands.executeCommand("hiveyCode.attachOpenEditors");
+      const joined = await vscode.commands.executeCommand<boolean>("hiveyCode.steerAnswer", "Follow the attached spec.");
+      assert.equal(joined, true);
+      const ended = await Promise.race([turn.then(() => "ended"), delay(8000).then(() => "still running")]);
+      assert.equal(ended, "ended");
+      const carried = stub.bodies().find((b) => b.includes("Follow the attached spec."));
+      assert.ok(carried, "the message never reached the model");
+      const last = (JSON.parse(carried!).messages as Array<{ role: string; content: string }>).filter((m) => m.role === "user").pop()!;
+      assert.match(last.content, /Follow the attached spec\./);
+      assert.match(last.content, /ATTACHED-SPEC-7f3a/, "the attached file did not go with the message");
+    } finally {
+      await vscode.commands.executeCommand("hiveyCode.stopAnswer");
+      await vscode.commands.executeCommand("workbench.action.closeAllEditors");
+      await restore();
+      stub.close();
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  });
+
   test("with no turn running, a message typed into the box is simply a question", async () => {
     const ext = vscode.extensions.getExtension(ID)!;
     await ext.activate();
