@@ -78,6 +78,12 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **Plus de texte en anglais qui bascule en français à la fin.** Une note écrite dans une autre langue
+  que la vôtre était retraduite une fois écrite : on la voyait défiler en anglais, puis changer. Le
+  traducteur est retiré ; la consigne de langue est aussi donnée en français quand vous écrivez en
+  français. Mesuré sur 10 tâches en français, 2 passages : 20/20 (contre 19/20). Une courte note
+  avant un outil peut encore sortir en anglais, juste après une réflexion en anglais : le modèle
+  enchaîne dans la langue où il vient de réfléchir.
 - **Le modèle n'oublie plus ce qu'il vient de faire.** D'un message à l'autre, il ne relisait que le
   texte de ses réponses : ni les fichiers lus ou modifiés, ni les commandes lancées et leur résultat —
   et après un tour arrêté, presque rien. Il relisait tout et croyait le code changé sous lui. Ses
