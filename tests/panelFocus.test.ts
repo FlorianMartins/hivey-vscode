@@ -12,15 +12,16 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-test("a model's thinking shows its latest sentence while it is written, and goes back to one line after", () => {
-  // ⚠️ « une pile de boîtes de raisonnement »: each stretch of thought is now one "∴ Thinking" line
-  // of the turn's timeline, folded — no box opens and grows in the middle of the turn. What the
-  // model is thinking about is still visible while it thinks: the line carries the thought's latest
-  // sentence, and the line is put on the page through the scroll-follow (asserted below).
+test("a model's thinking is one \"∴ Thinking\" line while it is written, and stays one line after", () => {
+  // ⚠️ « une pile de boîtes de raisonnement »: each stretch of thought is one "∴ Thinking" line of
+  // the turn's timeline, folded — no box opens and grows in the middle of the turn. And « ça ne fait
+  // pas propre le texte qui s'écrit sur une seule ligne »: nothing streams into that line either. It
+  // pulses while the model thinks; the thought is a click away.
   const source = readFileSync("src/webview/main.ts", "utf8");
   const append = source.slice(source.indexOf("appendReasoning("), source.indexOf("replaceText("));
   assert.match(append, /thinkingLine\("",\s*\{\s*live:\s*true/, "a stretch of thinking is not drawn as a live line");
-  assert.match(append, /preview\.textContent = lastSentence\(/, "the line does not show what is being thought");
+  assert.doesNotMatch(append, /preview|lastSentence/, "the thought is written into its folded line again");
+  assert.doesNotMatch(readFileSync("src/webview/chat.ts", "utf8"), /tl-preview/, "the line still has a place for the thought");
 
   const answer = source.slice(source.indexOf("appendText(chunk: string)"), source.indexOf("appendInterjection("));
   assert.match(answer, /this\.endThinking\(\)/, "the thinking line is not closed when the answer takes over");

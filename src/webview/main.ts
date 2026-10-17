@@ -6,7 +6,7 @@
 // rendered incrementally is the answer being streamed, because that one has to be.
 
 import { button, closeMenu, el, icon, ICON, menuIsOpen, searchInput } from "./dom.js";
-import { chatScreen, isStreaming, planBlock, setStreaming, timeline, toolRow, thinkingLine, textItem, noteItem, lastSentence, interjectionBubble, type ChatDeps, captureDraft, restoreDraft,
+import { chatScreen, isStreaming, planBlock, setStreaming, timeline, toolRow, thinkingLine, textItem, noteItem, interjectionBubble, type ChatDeps, captureDraft, restoreDraft,
   NOTE_FADE_MS,
   setComposerNote,
   dictationStopped,
@@ -455,7 +455,7 @@ class LiveTurn {
   }
 
   /** The stretch of thinking being written, while the last thing on the line is one. */
-  private thinking?: { item: HTMLElement; preview: HTMLElement; render(text: string): void; text: string };
+  private thinking?: { item: HTMLElement; render(text: string): void; text: string };
 
   /** The action under way: its row pulses until its result takes its place. */
   private running?: HTMLElement;
@@ -466,7 +466,6 @@ class LiveTurn {
     if (!thinking) return;
     this.thinking = undefined;
     thinking.item.classList.remove("live");
-    thinking.preview.textContent = "";
   }
 
   /** The words being written are over: drawn whole, and the next words type their own. */
@@ -499,7 +498,6 @@ class LiveTurn {
       }
       const thinking = this.thinking;
       thinking.text += chunk;
-      thinking.preview.textContent = lastSentence(thinking.text);
       thinking.render(thinking.text);
     });
   }
