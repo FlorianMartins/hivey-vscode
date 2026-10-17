@@ -477,6 +477,8 @@ function renderEntry(entry: UiEntry, state: UiState, deps: ChatDeps, first = fal
   // belongs to the message the way a scrollbar belongs to a list, so they sit outside the article
   // and inside a wrapper that carries the hover.
   const block = el("div", `entry-block ${entry.role}${entry.pinned ? " pinned" : ""}`);
+  // Found again by the request pinned above a running turn, which scrolls back to it — see `refreshPin`.
+  block.dataset["entry"] = entry.id;
   const wrap = el(
     "article",
     `entry ${entry.role}${entry.included ? "" : " muted"}${entry.error ? " failed" : ""}${entry.pinned ? " pinned" : ""}`,
@@ -616,8 +618,9 @@ function renderEntry(entry: UiEntry, state: UiState, deps: ChatDeps, first = fal
   if (entry.plan) wrap.append(planBlock(entry.plan, false));
   if (entry.notices?.length) wrap.append(noticesBlock(entry.notices));
   // ⚠️ Step by step when the turn was recorded that way: « on a du mal à comprendre quelle réponse va
-  // avec quelle action et quel raisonnement sur les longues tâches ». Each stretch of the turn is its
-  // block — thinking and actions — then the words written there, in the order they happened.
+  // avec quelle action et quel raisonnement sur les longues tâches ». One line down the turn, and on
+  // it, in the order they happened: each stretch's thinking (one folded line), its actions (one row
+  // each) and the words written there — see `timeline`.
   const bySegment = entry.role === "assistant" && !entry.error && (entry.segments?.length ?? 0) > 0;
   if (bySegment) {
     const actions = {
@@ -626,17 +629,23 @@ function renderEntry(entry: UiEntry, state: UiState, deps: ChatDeps, first = fal
       onInsertAtCursor: (code: string) => deps.send({ type: "insertCode", code, atCursor: true }),
       onApply: (code: string, language: string) => deps.send({ type: "applyCode", code, language }),
     };
+    const line = timeline();
     for (const seg of entry.segments!) {
       if (seg.user !== undefined) {
-        wrap.append(interjectionBubble(seg.user, false));
+        line.append(interjectionBubble(seg.user, false));
         continue;
       }
-      if (seg.reasoning?.trim() || seg.steps?.length) wrap.append(segmentBlock(seg, false).wrap);
-      if (seg.text?.trim()) wrap.append(markdown(seg.text, actions, state.searchQuery || undefined));
+      if (seg.reasoning?.trim()) line.append(thinkingLine(seg.reasoning).item);
+      for (const s of seg.steps ?? []) line.append(toolRow(s));
+      if (seg.text?.trim()) line.append(textItem(markdown(seg.text, actions, state.searchQuery || undefined)));
     }
-  } else {
-    if (entry.reasoning) wrap.append(reasoningBlock(entry.reasoning));
-    if (entry.steps?.length) wrap.append(stepList(entry.steps));
+    wrap.append(line);
+  } else if (entry.reasoning || entry.steps?.length) {
+    // A turn saved before segments existed: the same line, its thinking first, then its actions.
+    const line = timeline();
+    if (entry.reasoning) line.append(thinkingLine(entry.reasoning).item);
+    for (const s of entry.steps ?? []) line.append(toolRow(s));
+    wrap.append(line);
   }
 
   if (bySegment) {
@@ -952,38 +961,19 @@ export function setComposerNote(text: string, fadeMs?: number): void {
 export const NOTE_FADE_MS = 8000;
 
 /**
- * What the agent did, folded once the turn is over.
+ * ⚠️ ONE TIMELINE PER TURN. « une pile de boîtes de raisonnement » — each stretch of an agent turn
+ * was its own bordered, folding box ("Reasoning · 1 step · 1 read", then another "Reasoning", then
+ * another), so a turn of six steps read as six boxes stacked under each other and nothing in them
+ * said what had actually been done until each was opened.
  *
- * ⚠️ A long turn is twelve rows of tool steps sitting above its answer, permanently. While the turn
- * is running they are the only thing happening and they belong on screen; once it has finished, the
- * answer is what the reader came for and the steps are evidence to go back to. Captured frames of
- * the real panel made this plain: a finished agent turn is mostly a list of things that already
- * worked.
- *
- * Folded rather than removed, and the summary says what is inside — a header reading "7 steps" tells
- * you nothing about whether to open it. "7 steps · 2 commands · 1 edit" does, and ANY FAILED STEP
- * keeps the list open: a turn with a failure in it is one where the detail is the point, and folding
- * that away would hide the one thing worth noticing.
- *
- * Six is the threshold. Below it the list is shorter than its own summary would be.
+ * It now reads the way Claude Code reads in the editor: one vertical line down the turn, and on it,
+ * in the order they happened, a one-line "∴ Thinking" for each stretch of thought (folded, opened by
+ * a click), one compact row per action — `Read(src/x.ts)`, `Bash(npm test)`, `Update(src/y.ts)` —
+ * whose dot says how it went and which opens on what a command printed, and the model's words in
+ * between as ordinary paragraphs. The data is unchanged (core/session/segments.ts); only the drawing is.
  */
-const FOLD_STEPS_ABOVE = 6;
 
-export function stepList(steps: Array<{ tool: string; summary: string; ok: boolean; call?: string }>): HTMLElement {
-  const failed = steps.some((s) => !s.ok);
-  if (steps.length <= FOLD_STEPS_ABOVE || failed) {
-    const list = el("div", "steps");
-    for (const s of steps) list.append(stepRow(s));
-    return list;
-  }
-  const inner = el("div", "steps");
-  for (const s of steps) inner.append(stepRow(s));
-  const block = collapsible(stepSummary(steps), inner, { open: false });
-  block.classList.add("steps-folded");
-  return block;
-}
-
-/** "9 steps · 3 commands · 1 edit" — what is inside, so the fold can be left shut. */
+/** "9 steps · 3 commands · 1 edit" — what a run of actions amounts to. */
 export function stepSummary(steps: Array<{ tool: string; ok: boolean }>): string {
   const count = (names: string[]): number => steps.filter((s) => names.includes(s.tool)).length;
   // One of each reads as one: "1 étapes · 1 commandes" was the plural printed on every short step.
@@ -1002,23 +992,166 @@ export function stepSummary(steps: Array<{ tool: string; ok: boolean }>): string
 }
 
 /**
- * One line of what the agent did: the tool, what it was asked to do, and how it went.
- *
- * The call is set in the monospace of the rest of the product, because it is a command, a path or a
- * query — data, not prose — and it is the half somebody re-reading the turn is looking for. The
- * result summary follows it when it adds something: for most tools it repeats what the call already
- * said, and a line that says the same thing twice is a line nobody finishes reading.
+ * The short name an action goes by on its row — Claude Code's names, because they are the ones a
+ * developer already reads at a glance. Not translated, like a command name. A tool not listed here
+ * (an MCP tool, a git tool) keeps its own name, which is already what it does.
  */
-export function stepRow(s: { tool: string; summary: string; ok: boolean; call?: string }): HTMLElement {
-  const row = el("div", `step${s.ok ? "" : " failed"}`);
-  row.append(icon(s.ok ? "check" : "cross", "step-ico"));
-  row.append(el("span", "step-tool", s.tool));
-  if (s.call) row.append(el("code", "step-call", s.call));
-  const summary = s.call && s.summary.startsWith(s.call) ? "" : stepText(s.summary);
-  if (summary) row.append(el("span", "step-summary", summary));
+const TOOL_NAMES: Record<string, string> = {
+  read_file: "Read",
+  write_file: "Write",
+  edit_file: "Update",
+  run_command: "Bash",
+  list_files: "List",
+  search_text: "Search",
+  get_diagnostics: "Diagnostics",
+  run_agent: "Agent",
+  use_skill: "Skill",
+  update_plan: "Plan",
+};
+
+/** Tools whose result's first line is the data itself (a file's first line), not a verdict. */
+const SUMMARY_IS_DATA = new Set(["read_file"]);
+
+export function toolName(tool: string): string {
+  return TOOL_NAMES[tool] ?? tool;
+}
+
+export interface TimelineStep {
+  tool: string;
+  summary: string;
+  ok: boolean;
+  call?: string;
+  output?: string;
+}
+
+/** The turn's spine: what the rows, the thinking and the words are drawn on. */
+export function timeline(): HTMLElement {
+  return el("div", "timeline");
+}
+
+/**
+ * Something on the line that opens: a thinking stretch, or an action that has output. The whole line
+ * is the control — a chevron at the end says so — and the keyboard reaches it like a button.
+ */
+function foldable(item: HTMLElement, line: HTMLElement, body: HTMLElement, onOpen?: () => void): void {
+  item.classList.add("tl-foldable");
+  line.append(icon("chevron", "tl-chevron"));
+  line.setAttribute("role", "button");
+  line.tabIndex = 0;
+  line.setAttribute("aria-expanded", "false");
+  body.hidden = true;
+  const toggle = (): void => {
+    body.hidden = !body.hidden;
+    item.classList.toggle("open", !body.hidden);
+    line.setAttribute("aria-expanded", String(!body.hidden));
+    if (!body.hidden) onOpen?.();
+  };
+  line.addEventListener("click", (ev) => {
+    // Selecting the text of a row is not asking to open it.
+    if (window.getSelection()?.toString()) return;
+    ev.preventDefault();
+    toggle();
+  });
+  line.addEventListener("keydown", (ev) => {
+    if (ev.key === "Enter" || ev.key === " ") {
+      ev.preventDefault();
+      toggle();
+    }
+  });
+}
+
+/**
+ * One action, on one line: a dot that says how it went, the action's short name and what it was
+ * asked to do — `Bash(npm test)` — then what came back, quietly. A command's row opens on what it
+ * printed: in the panel, so running one no longer means looking at the terminal.
+ *
+ * `running` is the row of an action under way: its dot pulses, and the result replaces the row.
+ */
+export function toolRow(s: TimelineStep, opts: { running?: boolean; note?: string } = {}): HTMLElement {
+  const item = el("div", `tl-item tl-tool${s.ok ? "" : " failed"}${opts.running ? " running" : ""}`);
+  item.append(el("span", "tl-mark"));
+  const line = el("div", "tl-line");
+  const name = el("span", "tl-name", toolName(s.tool));
+  line.append(name);
+  if (s.call) {
+    // The parentheses are text, not decoration, so a copied row reads as the call it was.
+    const arg = el("span", "tl-arg");
+    arg.append(el("span", "tl-paren", "("), el("code", "tl-call", s.call), el("span", "tl-paren", ")"));
+    line.append(arg);
+  }
+  // Not for a file that was read: the first line of what came back is the first line of the FILE,
+  // which says nothing about the action.
+  const summary = opts.note ?? (SUMMARY_IS_DATA.has(s.tool) || (s.call && s.summary.startsWith(s.call)) ? "" : stepText(s.summary));
+  if (summary) line.append(el("span", "tl-summary", summary));
   // The whole of both, for a line the panel had to cut.
-  row.title = [s.call, s.summary].filter(Boolean).join("\n");
-  return row;
+  line.title = [`${toolName(s.tool)}${s.call ? `(${s.call})` : ""}`, stepText(s.summary)].filter(Boolean).join("\n");
+  item.append(line);
+  if (s.output !== undefined) {
+    const out = el("pre", "tl-output", s.output.trim() ? s.output : t("(no output)"));
+    if (!s.output.trim()) out.classList.add("empty");
+    foldable(item, line, out, () => {
+      // A log is read from its end: that is where a failure is.
+      out.scrollTop = out.scrollHeight;
+    });
+    item.append(out);
+  }
+  return item;
+}
+
+/**
+ * A stretch of thinking, as one line: "∴ Thinking", folded. Opened, it is the thought in full,
+ * rendered like the answer is. While it is being written the line carries its latest sentence, so
+ * the panel shows that the model is thinking and roughly about what, without a box growing in the
+ * middle of the turn — see `LiveTurn.appendReasoning`.
+ */
+export function thinkingLine(text: string, opts: { live?: boolean } = {}): {
+  item: HTMLElement;
+  body: HTMLElement;
+  preview: HTMLElement;
+  render(text: string): void;
+} {
+  const item = el("div", `tl-item tl-think${opts.live ? " live" : ""}`);
+  item.append(el("span", "tl-mark"));
+  const line = el("div", "tl-line");
+  line.append(el("span", "tl-glyph", "∴"), el("span", "tl-name", t("Thinking")));
+  const preview = el("span", "tl-preview");
+  line.append(preview);
+  const body = el("div", "tl-thought");
+  let latest = text;
+  const render = (value: string): void => {
+    latest = value;
+    if (body.hidden) return;
+    body.replaceChildren(...Array.from(markdown(value).childNodes));
+  };
+  foldable(item, line, body, () => render(latest));
+  item.append(line, body);
+  if (opts.live) preview.textContent = lastSentence(text);
+  return { item, body, preview, render };
+}
+
+/** The latest line of a thought, plain, for the line that stands for it while it is written. */
+export function lastSentence(text: string): string {
+  const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
+  const last = lines[lines.length - 1] ?? "";
+  return last.replace(/^([-*+]|\d+[.)]|#+)\s+/, "").replace(/[*_`]/g, "").slice(-200);
+}
+
+/** The model's words between two actions: ordinary paragraphs on the line. */
+export function textItem(content: HTMLElement): HTMLElement {
+  const item = el("div", "tl-item tl-text");
+  item.append(el("span", "tl-mark"), content);
+  return item;
+}
+
+/** A passing remark during the turn — "Stopped.", "Asking another model…" — not an action. */
+export function noteItem(text: string, ok?: boolean): HTMLElement {
+  const item = el("div", `tl-item tl-note${ok === false ? " failed" : ""}`);
+  item.append(el("span", "tl-mark"));
+  const line = el("div", "tl-line");
+  line.append(el("span", "tl-summary", text));
+  line.title = text;
+  item.append(line);
+  return item;
 }
 
 export function collapsible(
@@ -1046,21 +1179,6 @@ export function collapsible(
 }
 
 /**
- * A model's reasoning.
- *
- * Open while it is being written, shut once it is a record. Thinking is worth watching as it
- * happens — it is most of the reason for turning reasoning on, and a shut block does not grow, so
- * the panel had nothing to follow and sat on the previous answer for the whole of it. A finished
- * one is reference material: it belongs behind a heading, not between the question and the answer.
- *
- * Which makes the state a property of the TURN rather than a preference of the reader, and that is
- * why there is no setting for it: the right answer changes halfway through, by itself.
- */
-/**
- * One stretch of an agent turn: what the model thought and the actions it took, in one block whose
- * title says what was done — then the words it wrote there follow it. See core/session/segments.ts.
- */
-/**
  * What the person typed during the turn, where it came in it. `pending` until the model has read it
  * (at its next step), so it is plain the message was received and not yet acted on.
  */
@@ -1070,39 +1188,6 @@ export function interjectionBubble(text: string, pending: boolean): HTMLElement 
   head.append(el("span", "entry-who", t("You")));
   if (pending) head.append(el("span", "entry-meta", t("read at the next step…")));
   wrap.append(head, el("div", "interjection-text", text));
-  return wrap;
-}
-
-export function segmentBlock(
-  seg: { reasoning?: string; steps?: Array<{ tool: string; summary: string; ok: boolean; call?: string }> },
-  open: boolean,
-): { wrap: HTMLElement; thought: HTMLElement; steps: HTMLElement; title: HTMLElement } {
-  const wrap = reasoningBlock("", { open });
-  wrap.classList.add("segment-block");
-  const body = wrap.querySelector<HTMLElement>(".collapsible-body")!;
-  const thought = el("div", "segment-thought", seg.reasoning ?? "");
-  thought.hidden = !seg.reasoning;
-  const steps = el("div", "steps");
-  for (const s of seg.steps ?? []) steps.append(stepRow(s));
-  body.replaceChildren(thought, steps);
-  const title = wrap.querySelector<HTMLElement>(".collapsible-head > span")!;
-  title.textContent = segmentTitle(Boolean(seg.reasoning), seg.steps ?? []);
-  return { wrap, thought, steps, title };
-}
-
-/** "Reasoning · 3 steps · 1 edit", or "Actions · …" for a step that did not think aloud. */
-export function segmentTitle(thought: boolean, steps: Array<{ tool: string; ok: boolean }>): string {
-  const head = thought ? t("Reasoning") : t("Actions");
-  if (!steps.length) return head;
-  const failed = steps.filter((s) => !s.ok).length;
-  return `${head} · ${stepSummary(steps)}${failed ? ` · ${t("{0} failed", failed)}` : ""}`;
-}
-
-export function reasoningBlock(body: string, opts: { open?: boolean } = {}): HTMLElement {
-  const wrap = collapsible(t("Reasoning"), body, opts);
-  // Its own class, so the frame can carry a colour of its own: a plain grey box among grey boxes
-  // read as one more folded step list, and the thinking is not that.
-  wrap.classList.add("reasoning");
   return wrap;
 }
 

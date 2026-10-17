@@ -12,22 +12,20 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-test("a model's reasoning is open while it is written and shut once the answer starts", () => {
-  // Both halves of "when the model thinks, the chat does not go to the last message": a shut block
-  // does not GROW, so while the model was thinking there was nothing for the panel to follow. And
-  // once the answer starts, the same block is in the way of it.
-  //
-  // Which makes this a property of the TURN rather than a preference of the reader — the right
-  // answer changes halfway through, by itself — so there is no setting, and the assertion is on the
-  // one line that does it.
+test("a model's thinking shows its latest sentence while it is written, and goes back to one line after", () => {
+  // ⚠️ « une pile de boîtes de raisonnement »: each stretch of thought is now one "∴ Thinking" line
+  // of the turn's timeline, folded — no box opens and grows in the middle of the turn. What the
+  // model is thinking about is still visible while it thinks: the line carries the thought's latest
+  // sentence, and the line is put on the page through the scroll-follow (asserted below).
   const source = readFileSync("src/webview/main.ts", "utf8");
-  const append = source.slice(source.indexOf("appendReasoning("), source.indexOf("setPlan("));
-  assert.match(append, /reasoningBlock\("",\s*\{\s*open:\s*true/, "thinking is not shown while it is written");
+  const append = source.slice(source.indexOf("appendReasoning("), source.indexOf("replaceText("));
+  assert.match(append, /thinkingLine\("",\s*\{\s*live:\s*true/, "a stretch of thinking is not drawn as a live line");
+  assert.match(append, /preview\.textContent = lastSentence\(/, "the line does not show what is being thought");
 
-  const answer = source.slice(source.indexOf("appendText(chunk: string)"), source.indexOf("How much of what has arrived"));
-  assert.match(answer, /this\.foldThinking\(\)/, "the reasoning is not folded when the answer takes over");
-  const fold = source.slice(source.indexOf("private foldThinking()"), source.indexOf("private foldThinking()") + 400);
-  assert.match(fold, /folded/, "it folds on every token instead of once, so it cannot be reopened");
+  const answer = source.slice(source.indexOf("appendText(chunk: string)"), source.indexOf("appendInterjection("));
+  assert.match(answer, /this\.endThinking\(\)/, "the thinking line is not closed when the answer takes over");
+  const end = source.slice(source.indexOf("private endThinking()"), source.indexOf("private endThinking()") + 400);
+  assert.match(end, /classList\.remove\("live"\)/, "a finished stretch still claims to be thinking");
 });
 
 /**
@@ -52,7 +50,7 @@ test("the composer carries its focus across a rebuild", () => {
 
 test("reasoning arrives through the scroll-follow, like the answer does", () => {
   const source = readFileSync("src/webview/main.ts", "utf8");
-  const method = source.slice(source.indexOf("appendReasoning("), source.indexOf("setPlan("));
+  const method = source.slice(source.indexOf("appendReasoning("), source.indexOf("replaceText("));
   assert.match(method, /following\(/, "thinking is appended outside the follow, so the panel stays on the previous answer");
 });
 

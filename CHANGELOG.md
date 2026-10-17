@@ -6,6 +6,22 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Ajouté
 
+- **Les commandes ne font plus apparaître le terminal.** Par défaut, partout, l'agent lance ses
+  commandes en processus (lus directement) : la commande s'affiche dans le tour comme une ligne
+  `Bash(npm test)`, et un clic dessus montre ce qu'elle a affiché — la fin, gardée avec la conversation
+  et reprise dans l'export Markdown. La sortie est aussi copiée dans un terminal *Hivey Code
+  (commandes)* créé sans être affiché, que vous pouvez ouvrir (Ctrl+C y arrête la commande).
+  `hiveyCode.agent.commandRunner` : `terminal` garde l'ancien fonctionnement. La description de l'outil
+  lue par le modèle ne change pas.
+- **Un tour se lit comme une frise, à la manière de Claude Code.** Plus de pile de cadres
+  « Raisonnement · 1 étape » : chaque moment de réflexion est une ligne repliée « ∴ Réflexion » (sa
+  dernière phrase s'affiche pendant qu'elle s'écrit ; un clic l'ouvre, rendue en Markdown), chaque
+  action une ligne compacte — `Read(src/prix.js)`, `Bash(node --test)`, `Update(src/y.ts)` — avec une
+  pastille verte ou rouge, et le texte du modèle entre les deux en paragraphes. Même affichage pour une
+  conversation rouverte.
+- **La demande en cours reste épinglée.** Pendant un tour, dès que votre demande sort de l'écran, elle
+  s'affiche en haut de la conversation (une ou deux lignes, le texte entier au survol, un clic y
+  revient) ; elle disparaît à la fin du tour.
 - **Une vraie conversation : l'IA à gauche, vous à droite.** Les cadres de réflexion et d'étapes
   prennent la largeur de ce qu'ils disent (au plus 88 % du panneau) et la réponse garde une marge à
   droite ; vos messages sont une bulle à la taille du texte, contre le bord droit, avec « Vous » sur sa

@@ -67,6 +67,23 @@ export interface RunResult {
   /** False when shell integration was not available and the output could not be read. */
   captured: boolean;
   exitCode?: number;
+  /**
+   * What the command printed, cleaned, for the PANEL — the command's step row opens on it (see
+   * `toolRow` in the webview). Not what the model reads: that is `content`.
+   */
+  output?: string;
+}
+
+/**
+ * How much of a command's output the panel keeps on its step: the END of it, where a failure is.
+ * Saved with the conversation, so it is bounded — a turn can run fifty commands.
+ */
+export const DISPLAY_OUTPUT_CHARS = 4000;
+
+/** The end of what a command printed, short enough to be saved with the step that ran it. */
+export function displayOutput(output: string): string {
+  const text = output.replace(/\s+$/, "");
+  return text.length > DISPLAY_OUTPUT_CHARS ? `…\n${text.slice(-DISPLAY_OUTPUT_CHARS)}` : text;
 }
 
 /**
@@ -248,7 +265,7 @@ export async function runCommandInTerminal(opts: RunOptions): Promise<RunResult>
 
   const output = cleanTerminalOutput(raw, { command });
   if (cancelled) {
-    return { captured: true, isError: true, exitCode: undefined, content: `Cancelled by the user.\n${output}`.trim() };
+    return { captured: true, isError: true, exitCode: undefined, content: `Cancelled by the user.\n${output}`.trim(), output: displayOutput(output) };
   }
   const content = describeOutcome({ output, exitCode, timedOut }, scaledChars(MAX_OUTPUT_CHARS, 0.15));
   // `grep` exiting 1 found nothing, which is an answer. See `isStatusAnswer`: the step is not drawn
@@ -262,6 +279,7 @@ export async function runCommandInTerminal(opts: RunOptions): Promise<RunResult>
     isError: timedOut || (exitCode !== undefined && exitCode !== 0 && !answered),
     exitCode,
     content: answered ? `${content}\n(exit 1 from this command means "no match" or "not found", not an error.)` : content,
+    output: displayOutput(output),
   };
 }
 
@@ -275,13 +293,16 @@ export async function runCommandInTerminal(opts: RunOptions): Promise<RunResult>
  * output is read from its own pipes does not depend on any of that: what it printed is what the
  * model reads, on every platform.
  *
- * The user still watches it: the output is copied into a terminal named like the other one, and
- * Ctrl+C there stops the command — the approval was to a command they would see run.
+ * The user still watches it — in the PANEL: « que les commandes ne nécessitent pas d'ouvrir le
+ * terminal à chaque fois ». The command and what it printed are on its step row in the turn (see
+ * `RunResult.output`), like the agent's other actions, and no terminal is brought forward. The
+ * output is also copied into a terminal of its own, created without being shown: whoever opens it
+ * sees the session's commands, and Ctrl+C there still stops the one running.
  */
 export async function runCommandAsProcess(opts: RunOptions): Promise<RunResult> {
   const command = opts.command;
   const timeoutMs = Math.min(Math.max(Number(opts.timeoutMs) || DEFAULT_TIMEOUT_MS, 1000), MAX_TIMEOUT_MS);
-  const view = await processTerminal();
+  const view = processTerminal();
   view.write(`\r\n\x1b[2m${opts.cwd ?? ""}>\x1b[0m ${command}\r\n`);
   opts.report?.(`$ ${command}`);
 
@@ -352,11 +373,11 @@ export async function runCommandAsProcess(opts: RunOptions): Promise<RunResult> 
   const output = cleanTerminalOutput(raw);
   if (race.outcome === "failed") {
     view.write(`\r\n\x1b[31m${race.error}\x1b[0m\r\n`);
-    return { captured: true, isError: true, content: `could not run the command: ${race.error}\n${output}`.trim() };
+    return { captured: true, isError: true, content: `could not run the command: ${race.error}\n${output}`.trim(), output: displayOutput(output) };
   }
   if (race.outcome === "cancelled") {
     view.write(`\r\n\x1b[2m^C\x1b[0m\r\n`);
-    return { captured: true, isError: true, exitCode: undefined, content: `Cancelled by the user.\n${output}`.trim() };
+    return { captured: true, isError: true, exitCode: undefined, content: `Cancelled by the user.\n${output}`.trim(), output: displayOutput(output) };
   }
   const timedOut = race.outcome === "timeout";
   view.write(`\r\n\x1b[2m${timedOut ? t("timed out and was killed") : `exit ${exitCode ?? "?"}`}\x1b[0m\r\n`);
@@ -367,6 +388,7 @@ export async function runCommandAsProcess(opts: RunOptions): Promise<RunResult> 
     isError: timedOut || (exitCode !== undefined && exitCode !== 0 && !answered),
     exitCode,
     content: answered ? `${content}\n(exit 1 from this command means "no match" or "not found", not an error.)` : content,
+    output: displayOutput(output),
   };
 }
 
@@ -393,19 +415,43 @@ interface ProcessView {
 
 let processView: ProcessView | undefined;
 
-/** One terminal showing what the commands print, reused for the session like the shell one. */
-async function processTerminal(): Promise<ProcessView> {
+/** What is kept for a terminal nobody has opened yet, so that opening it later shows the session. */
+const BACKLOG_CHARS = 200_000;
+
+/**
+ * One terminal holding what the commands print, reused for the session like the shell one.
+ *
+ * ⚠️ Created, never SHOWN. It called `show()` on every command, so each command pulled the terminal
+ * panel up over the editor — what the owner asked to stop. The command's step row in the turn is
+ * where it is watched now; this terminal is for whoever wants the raw log and opens it. What is
+ * written before it opens is kept (bounded) and replayed when it does, and nothing waits for it to
+ * open: a terminal nobody looks at must not delay a command.
+ */
+function processTerminal(): ProcessView {
   if (processView && processView.terminal.exitStatus === undefined && vscode.window.terminals.includes(processView.terminal)) {
-    processView.terminal.show(true);
     return processView;
   }
   const emitter = new vscode.EventEmitter<string>();
-  let opened: () => void = () => undefined;
-  const ready = new Promise<void>((r) => (opened = r));
-  const view: ProcessView = { terminal: undefined as unknown as vscode.Terminal, write: (text) => emitter.fire(text) };
+  let opened = false;
+  let backlog = "";
+  const view: ProcessView = {
+    terminal: undefined as unknown as vscode.Terminal,
+    write: (text) => {
+      if (opened) {
+        emitter.fire(text);
+        return;
+      }
+      backlog += text;
+      if (backlog.length > BACKLOG_CHARS) backlog = backlog.slice(-BACKLOG_CHARS);
+    },
+  };
   const pty: vscode.Pseudoterminal = {
     onDidWrite: emitter.event,
-    open: () => opened(),
+    open: () => {
+      opened = true;
+      if (backlog) emitter.fire(backlog);
+      backlog = "";
+    },
     close: () => {
       if (processView === view) processView = undefined;
     },
@@ -414,15 +460,35 @@ async function processTerminal(): Promise<ProcessView> {
     },
   };
   view.terminal = vscode.window.createTerminal({ name: PROCESS_TERMINAL_NAME, pty });
-  view.terminal.show(true);
-  // What is written before the terminal opens is dropped; a hidden panel may never open it, so the
-  // wait is short and the command runs either way.
-  await Promise.race([ready, new Promise((r) => setTimeout(r, 1500))]);
   processView = view;
   return view;
 }
 
-/** Whether `run_command` runs commands as processes — see `runCommandAsProcess`. */
+/** The terminal that holds what process runs printed, once one has run. For the tests. */
+export function processTerminalForTests(): vscode.Terminal | undefined {
+  return processView?.terminal;
+}
+
+/**
+ * Whether `run_command` runs commands as processes — see `runCommandAsProcess`.
+ *
+ * Everywhere, unless the terminal is asked for by name: « que les commandes ne nécessitent pas
+ * d'ouvrir le terminal à chaque fois ». `auto` used to mean "the terminal, except on Windows", and
+ * the terminal runner has to bring the terminal forward — the shell runs in it.
+ */
 export function usesProcessRunner(setting: "auto" | "process" | "terminal"): boolean {
+  return setting !== "terminal";
+}
+
+/**
+ * Which description of `run_command` the MODEL reads — deliberately the one it read before
+ * `usesProcessRunner` changed its default.
+ *
+ * Text the model reads changes only with a measurement behind it (the task bench), and this change is
+ * about the display. So `auto` outside Windows keeps the terminal runner's description: a command
+ * whose output and exit code come back, which stays true; its one caveat — a shell without
+ * integration — simply never happens to a process.
+ */
+export function describesProcessRunner(setting: "auto" | "process" | "terminal"): boolean {
   return setting === "process" || (setting === "auto" && process.platform === "win32");
 }

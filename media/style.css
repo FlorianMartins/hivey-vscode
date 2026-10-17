@@ -754,66 +754,237 @@ pre.code {
   tab-size: 2;
 }
 
-/* ── Tool steps and reasoning ────────────────────────────────────────────────────────────── */
-
-.steps {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
+/* ── The turn, as one timeline ──────────────────────────────────────────────────────────────
+ *
+ * « une pile de boîtes de raisonnement » — each stretch of a turn was a bordered box of its own.
+ * Now one thin line runs down the turn, the way Claude Code draws it in the editor, and on it, in
+ * order: a folded "∴ Thinking" line per stretch of thought, a compact row per action — its dot says
+ * how it went — and the model's words between them as ordinary paragraphs. Nothing on it is boxed
+ * except what a click opens: a thought, or what a command printed. */
+.timeline {
+  --tl-gutter: 16px;
+  position: relative;
+  padding-left: var(--tl-gutter);
+  margin: var(--sp-1) 0;
+  min-width: 0;
+}
+/* The spine, through the middle of the dots, from the first to the last. */
+.timeline::before {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 10px;
+  bottom: 10px;
+  border-left: 1px solid color-mix(in srgb, var(--vscode-foreground) 16%, transparent);
+}
+.tl-item {
+  position: relative;
+  min-width: 0;
+}
+.tl-item + .tl-item {
+  margin-top: 2px;
+}
+/* The words get air above and below; the rows between two paragraphs stay a tight list. */
+.tl-text {
   margin: var(--sp-2) 0;
 }
-.step {
+.tl-text > .md,
+.tl-text > .live-text {
+  max-width: 92%;
+}
+.tl-text > .md > :first-child,
+.tl-text > .live-text > :first-child {
+  margin-top: 0;
+}
+.tl-text > .md > :last-child,
+.tl-text > .live-text > :last-child {
+  margin-bottom: 0;
+}
+/* The mark on the spine. Its colour is the item's state: done, failed, running, thought, words. */
+.tl-mark {
+  position: absolute;
+  left: calc(var(--tl-gutter) * -1);
+  top: 6px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--vscode-charts-green, #89d185);
+  box-sizing: border-box;
+}
+.tl-tool.failed > .tl-mark,
+.tl-note.failed > .tl-mark {
+  background: var(--vscode-errorForeground);
+}
+.tl-tool.running > .tl-mark {
+  background: var(--vscode-focusBorder);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+.tl-note > .tl-mark {
+  background: var(--muted);
+  transform: scale(0.6);
+}
+.tl-text > .tl-mark {
+  background: var(--vscode-foreground);
+  opacity: 0.55;
+  top: 7px;
+  transform: scale(0.75);
+}
+.tl-think > .tl-mark {
+  /* Hollow, but the spine must not show through it: the panel's own background. */
+  background: var(--vscode-sideBar-background, var(--vscode-editor-background));
+  border: 1.5px solid color-mix(in srgb, var(--reasoning) 80%, transparent);
+}
+.tl-think.live > .tl-mark {
+  background: color-mix(in srgb, var(--reasoning) 60%, transparent);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tl-tool.running > .tl-mark,
+  .tl-think.live > .tl-mark {
+    animation: none;
+  }
+}
+
+/* One line, never wrapped: name, argument, result — the argument is what gets cut, with an ellipsis,
+   and the full text is on hover. */
+.tl-line {
   display: flex;
   align-items: baseline;
   gap: var(--sp-2);
-  font-size: var(--fs-meta);
-  color: var(--muted);
-  padding: 1px 0;
   min-width: 0;
+  font-size: var(--fs-meta);
+  line-height: 20px;
+  color: var(--muted);
+  white-space: nowrap;
+  border-radius: var(--radius);
 }
-.step-ico {
-  color: var(--vscode-charts-green, #89d185);
+.tl-foldable > .tl-line {
+  cursor: pointer;
+  padding-right: var(--sp-1);
+}
+.tl-foldable > .tl-line:hover {
+  background: var(--hover);
+}
+.tl-foldable > .tl-line:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+.tl-name {
+  flex: 0 0 auto;
+  font-weight: 600;
+  color: var(--vscode-foreground);
+}
+.tl-arg {
+  display: flex;
+  min-width: 0;
+  /* What the action was given is cut last: the result beside it gives way first. */
+  flex: 0 1 auto;
+  margin-left: calc(var(--sp-2) * -1);
+  font-family: var(--vscode-editor-font-family);
+  color: var(--vscode-foreground);
+  opacity: 0.85;
+}
+.tl-paren {
+  flex: 0 0 auto;
+}
+.tl-call {
+  font-family: inherit;
+  font-size: inherit;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: none;
+  padding: 0;
+}
+.tl-tool.failed .tl-name,
+.tl-tool.failed .tl-arg {
+  color: var(--vscode-errorForeground);
+}
+.tl-summary {
+  flex: 0 1000 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0.85;
+}
+.tl-chevron {
   flex: 0 0 auto;
   width: 12px;
   height: 12px;
+  margin-left: auto;
   align-self: center;
+  opacity: 0.6;
+  transform: rotate(-90deg);
+  transition: transform 120ms ease;
 }
-.step-ico.dot {
-  color: var(--muted);
-  text-align: center;
+.tl-foldable.open > .tl-line > .tl-chevron {
+  transform: none;
 }
-.step.failed .step-ico {
-  color: var(--vscode-errorForeground);
+
+/* Thinking: the editor's reasoning colour, in italics, and its latest sentence while it is written. */
+.tl-think > .tl-line > .tl-name {
+  font-weight: normal;
+  font-style: italic;
+  color: color-mix(in srgb, var(--reasoning) 75%, var(--vscode-foreground));
 }
-.step-tool {
-  font-family: var(--vscode-editor-font-family);
-  color: var(--vscode-foreground);
+.tl-glyph {
   flex: 0 0 auto;
+  color: var(--reasoning);
+  margin-right: -2px;
 }
-/* What the call was: a command, a path, a query. In the font data is written in throughout this
-   product, and allowed to take the room the summary does not need — it is the half worth reading. */
-.step-call {
-  font-family: var(--vscode-editor-font-family);
-  font-size: var(--fs-meta);
-  color: var(--vscode-foreground);
-  background: color-mix(in srgb, var(--vscode-foreground) 7%, transparent);
-  border-radius: var(--radius);
-  padding: 0 4px;
+.tl-preview {
+  flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.step.failed .step-call {
-  color: var(--vscode-errorForeground);
-}
-.step-summary {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  /* Second in line for the space: when both are long the call is cut last. */
-  flex: 0 1 auto;
+  font-style: italic;
   opacity: 0.85;
+}
+.tl-preview:empty {
+  display: none;
+}
+.tl-thought {
+  margin: 2px 0 var(--sp-2);
+  padding: var(--sp-1) var(--sp-3);
+  border-left: 2px solid color-mix(in srgb, var(--reasoning) 45%, transparent);
+  font-size: var(--fs-control);
+  color: var(--muted);
+  max-width: 92%;
+}
+.tl-thought > :first-child {
+  margin-top: 0;
+}
+.tl-thought > :last-child {
+  margin-bottom: 0;
+}
+
+/* What a command printed: monospace, its own scroller, a capped height — a log, read from its end. */
+.tl-output {
+  margin: 2px 0 var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  max-height: 220px;
+  overflow: auto;
+  font-family: var(--vscode-editor-font-family);
+  font-size: 11.5px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--vscode-foreground);
+  background: color-mix(in srgb, var(--vscode-foreground) 5%, transparent);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.tl-output.empty {
+  color: var(--muted);
+  font-style: italic;
+}
+.tl-tool.failed > .tl-output {
+  border-color: color-mix(in srgb, var(--vscode-errorForeground) 40%, transparent);
+}
+/* What you typed during the turn sits on the line too, against the right edge as it always has. */
+.timeline > .interjection {
+  margin-top: var(--sp-2);
+  margin-bottom: var(--sp-2);
 }
 
 .collapsible {
@@ -860,56 +1031,15 @@ pre.code {
 
 /* The model's reasoning, in a colour of its own.
  *
- * It wore the same grey frame as a folded list of steps, so the one block that is the model talking
- * to itself looked like bookkeeping. A tinted frame and a leading edge — the language the approval
- * cards already speak — says "this is thought, not answer" without a legend. The editor's chart
- * purple: not the focus colour (that is the composer's), not a warning, not a success, so it claims
- * no meaning it does not have. */
+ * The "∴ Thinking" lines of the timeline wear it, so the model talking to itself never reads as one
+ * more action. The editor's chart purple: not the focus colour (that is the composer's), not a
+ * warning, not a success, so it claims no meaning it does not have. */
 :root {
   --reasoning: var(--vscode-charts-purple, #b180d7);
 }
 :root[data-appearance="hivey"] {
   /* Cyan against Hivey's amber: the second accent the palette already has. */
   --reasoning: #5fd0f5;
-}
-.collapsible.reasoning {
-  border-color: color-mix(in srgb, var(--reasoning) 40%, transparent);
-  border-left: 2px solid var(--reasoning);
-  background: color-mix(in srgb, var(--reasoning) 5%, transparent);
-}
-.collapsible.reasoning > .collapsible-head {
-  color: color-mix(in srgb, var(--reasoning) 75%, var(--vscode-foreground));
-}
-.collapsible.reasoning > .collapsible-body {
-  border-top-color: color-mix(in srgb, var(--reasoning) 25%, transparent);
-}
-/* While it is being written the frame breathes, at the composer ring's unhurried pace: alive, not
-   urgent. It stops the moment the answer takes over. */
-.collapsible.reasoning.thinking {
-  animation: hc-reasoning 2.8s ease-in-out infinite;
-}
-@keyframes hc-reasoning {
-  0%,
-  100% {
-    border-top-color: color-mix(in srgb, var(--reasoning) 35%, transparent);
-    border-right-color: color-mix(in srgb, var(--reasoning) 35%, transparent);
-    border-bottom-color: color-mix(in srgb, var(--reasoning) 35%, transparent);
-    box-shadow: 0 0 0 0 transparent;
-  }
-  50% {
-    border-top-color: color-mix(in srgb, var(--reasoning) 85%, transparent);
-    border-right-color: color-mix(in srgb, var(--reasoning) 85%, transparent);
-    border-bottom-color: color-mix(in srgb, var(--reasoning) 85%, transparent);
-    box-shadow: 0 0 10px -2px color-mix(in srgb, var(--reasoning) 45%, transparent);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .collapsible.reasoning.thinking {
-    animation: none;
-    border-top-color: color-mix(in srgb, var(--reasoning) 70%, transparent);
-    border-right-color: color-mix(in srgb, var(--reasoning) 70%, transparent);
-    border-bottom-color: color-mix(in srgb, var(--reasoning) 70%, transparent);
-  }
 }
 
 /* ── Approval ────────────────────────────────────────────────────────────────────────────── */
@@ -3522,6 +3652,58 @@ pre.code code {
   min-height: 0;
 }
 
+/* ── The request being answered, pinned while its turn runs ─────────────────────────────────
+ * Over the top of the transcript, not in it: nothing below moves when it comes and goes. One or two
+ * lines, cut; the whole request is in its tooltip, and a click goes back to it. */
+.request-pin {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 4;
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: var(--sp-1) var(--sp-4) var(--sp-1) var(--sp-3);
+  border: none;
+  border-bottom: 1px solid var(--border);
+  border-left: 2px solid color-mix(in srgb, var(--vscode-textLink-foreground, var(--vscode-focusBorder)) 55%, transparent);
+  background: var(--vscode-sideBar-background, var(--vscode-editor-background));
+  box-shadow: 0 3px 6px -4px rgba(0, 0, 0, 0.45);
+  font: inherit;
+  font-size: var(--fs-control);
+  line-height: 1.4;
+  text-align: left;
+  color: var(--vscode-foreground);
+  cursor: pointer;
+}
+.request-pin:hover {
+  background: color-mix(in srgb, var(--vscode-foreground) 4%, var(--vscode-sideBar-background, var(--vscode-editor-background)));
+}
+.request-pin:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+.request-pin-who {
+  flex: 0 0 auto;
+  font-size: var(--fs-meta);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.request-pin-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
 /* ── The boundary between two exchanges, and the restore point on it ──────────────────────────
  *
  * A rule across the transcript above each question but the first — that is where one exchange ends
@@ -4744,98 +4926,6 @@ pre.code code {
 }
 .turn-rule.opening {
   margin-top: var(--sp-1);
-}
-
-/* The thinking of earlier steps, one folded list: inside it, each step's block is a single line. */
-.reasoning-earlier > .collapsible-body {
-  max-height: none;
-  overflow: visible;
-  padding: var(--sp-1) 0 0;
-}
-.thoughts-earlier > .collapsible {
-  margin: 0 0 var(--sp-1);
-}
-.thoughts > .collapsible + .collapsible {
-  margin-top: var(--sp-1);
-}
-
-/* ── The turn, stretch by stretch ─────────────────────────────────────────────────────────────
- * Each stretch: one block (the thinking, then the actions) and the words written there. The block's
- * body holds a list, so it is not pre-wrapped as a whole — only the thinking inside it is. */
-.segment + .segment {
-  margin-top: var(--sp-2);
-}
-.collapsible.segment-block > .collapsible-body {
-  white-space: normal;
-}
-.segment-thought {
-  white-space: pre-wrap;
-}
-.segment-thought + .steps:not(:empty) {
-  margin-top: var(--sp-2);
-  padding-top: var(--sp-2);
-  border-top: 1px solid var(--border);
-}
-.collapsible.segment-block > .collapsible-head {
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-}
-
-/* A folded step list is a list, not prose: it does not get the reasoning block's own scroller or its
-   pre-wrap, and its rows keep the step grid they already have. */
-.collapsible.steps-folded > .collapsible-body {
-  white-space: normal;
-  max-height: none;
-  overflow: visible;
-  padding: var(--sp-1) 0 0;
-  border-top: none;
-}
-.collapsible.steps-folded > .collapsible-head {
-  color: var(--muted);
-}
-/* While the turn runs: one line — what is inside, then what is happening now. The summary keeps its
-   width, the current action takes the rest and is cut with an ellipsis, never wrapped. */
-.collapsible.steps-live > .collapsible-head {
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-}
-.collapsible.steps-live > .collapsible-head > span:not(.steps-now) {
-  flex: none;
-  order: 2;
-  margin-left: auto;
-}
-.collapsible.steps-live > .collapsible-head > span.failed {
-  color: var(--vscode-errorForeground);
-}
-.steps-now {
-  order: 1;
-  flex: 1 1 auto;
-  display: flex;
-  align-items: center;
-  gap: var(--sp-1);
-  min-width: 0;
-  overflow: hidden;
-  color: var(--vscode-foreground);
-}
-.steps-now .step-call {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  min-width: 0;
-}
-.steps-now-dot {
-  color: var(--vscode-focusBorder);
-  font-size: 0.7em;
-}
-.steps-now-dot.pulse {
-  animation: pulse 1.4s ease-in-out infinite;
-}
-@media (prefers-reduced-motion: reduce) {
-  .steps-now-dot.pulse {
-    animation: none;
-  }
 }
 
 /* A field's problem, under the field.

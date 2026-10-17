@@ -28,7 +28,7 @@ import { buildGitTools, gitAvailable } from "./integrations/git.js";
 import { readSettings } from "./config.js";
 import { buildKnowledgeTools } from "./knowledge.js";
 import type { McpManager } from "./integrations/mcp.js";
-import { runCommandAsProcess, runCommandInTerminal, usesProcessRunner } from "./terminal.js";
+import { describesProcessRunner, runCommandAsProcess, runCommandInTerminal, usesProcessRunner } from "./terminal.js";
 import { withHooks, type Hooks } from "./hooks.js";
 import { buildSymbolTools } from "./symbols.js";
 import { isAbsolutePath, tidyPath, underRoot } from "../core/fs/within.js";
@@ -567,11 +567,14 @@ export function buildTools(deps: ToolDeps): Tool[] {
     return `\nWARNING: ${relative(uri)} was changed in the editor but could NOT be saved to disk. Commands you run will still read the old file.`;
   }
 
-  const asProcess = usesProcessRunner(readSettings().agent.commandRunner);
+  const runner = readSettings().agent.commandRunner;
+  const asProcess = usesProcessRunner(runner);
   const runCommand: Tool = {
     schema: {
       name: "run_command",
-      description: asProcess
+      // Not `asProcess`: what the model reads is unchanged by the switch to processes — see
+      // `describesProcessRunner`.
+      description: describesProcessRunner(runner)
         ? "Run a shell command in the workspace (tests, build, git) and return its output and exit code. " +
           "The user approves it first and watches it run. " +
           // ⚠️ Said, because the model cannot know it and guesses bash: `head`, `cat | grep`, `ls -la`
@@ -612,7 +615,13 @@ export function buildTools(deps: ToolDeps): Tool[] {
         isError: result.isError,
         // The panel shows the exit code as a badge on the step. `captured: false` is what it reads
         // to say "started, not read" rather than claiming a result nobody has.
-        display: { captured: result.captured, exitCode: result.exitCode },
+        // `command` and `output` are for the step row, which opens on what the command printed.
+        display: {
+          captured: result.captured,
+          exitCode: result.exitCode,
+          command,
+          ...(result.output !== undefined ? { output: result.output } : {}),
+        },
       };
     },
   };
