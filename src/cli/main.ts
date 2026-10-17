@@ -587,6 +587,15 @@ async function main(): Promise<void> {
       // The corrections the turn read, kept with its answer so the next turns read them too — see
       // `answerWithInterjections`.
       if (taken.length) answer.segments = [...taken.map((u) => ({ user: u })), { text: result.text }];
+      // What it did, for the next turns to read — see `actionsRecord`.
+      if (result.trace.length) {
+        answer.steps = result.trace.map((x) => ({
+          tool: x.call.name,
+          ok: !x.result.isError,
+          summary: x.result.content.split("\n")[0]?.slice(0, 120) ?? "",
+          call: callSignature(x.call.name, safeArgs(x.call.args)),
+        }));
+      }
       // Computed whatever the endpoint is, and reported only when it is known. A local model is
       // not free — it is unpriced — and the two have to stay distinguishable for the evaluation
       // report, which is forbidden to print a figure it did not measure.

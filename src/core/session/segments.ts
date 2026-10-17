@@ -112,3 +112,19 @@ export function answerWithInterjections(text: string, segments?: Segment[]): str
   }
   return parts.join("\n\n");
 }
+
+/**
+ * What the model did during an earlier answer, one line per action, for the model to re-read.
+ *
+ * ⚠️ « il ne garde pas en mémoire les actions qu'il vient de faire ». A later turn read the words of
+ * an earlier answer and nothing of its work: which files it had read and edited, which commands it
+ * had run and what they gave. So it re-read everything, and a turn the person had stopped — whose
+ * words were a sentence or two — left it believing the code had changed under it. The steps were
+ * already saved for the panel; this hands the same record back to the model. Empty when nothing ran.
+ */
+export function actionsRecord(steps: SegmentStep[] | undefined, segments?: Segment[]): string {
+  const all = segments?.some((s) => s.steps?.length) ? segments.flatMap((s) => s.steps ?? []) : (steps ?? []);
+  if (!all.length) return "";
+  const lines = all.map((s) => `- ${s.tool}${s.call ? ` ${s.call}` : ""} → ${s.ok ? "" : "FAILED: "}${s.summary}`);
+  return `[Your actions during this answer, in order. They are done: do not redo them, and re-read a file only for content you no longer have:\n${lines.join("\n")}]`;
+}
