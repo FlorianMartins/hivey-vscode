@@ -1100,22 +1100,21 @@ export function toolRow(s: TimelineStep, opts: { running?: boolean; note?: strin
 
 /**
  * A stretch of thinking, as one line: "∴ Thinking", folded. Opened, it is the thought in full,
- * rendered like the answer is. While it is being written the line carries its latest sentence, so
- * the panel shows that the model is thinking and roughly about what, without a box growing in the
- * middle of the turn — see `LiveTurn.appendReasoning`.
+ * rendered like the answer is. While it is being written the line says so and nothing more.
+ *
+ * ⚠️ « ça ne fait pas propre le texte qui s'écrit sur une seule ligne » — the line used to carry the
+ * thought's latest sentence as it streamed, a single italic line rewriting itself many times a
+ * second. The live line now pulses (`.live`), and the thought itself is one click away.
  */
 export function thinkingLine(text: string, opts: { live?: boolean } = {}): {
   item: HTMLElement;
   body: HTMLElement;
-  preview: HTMLElement;
   render(text: string): void;
 } {
   const item = el("div", `tl-item tl-think${opts.live ? " live" : ""}`);
   item.append(el("span", "tl-mark"));
   const line = el("div", "tl-line");
   line.append(el("span", "tl-glyph", "∴"), el("span", "tl-name", t("Thinking")));
-  const preview = el("span", "tl-preview");
-  line.append(preview);
   const body = el("div", "tl-thought");
   let latest = text;
   const render = (value: string): void => {
@@ -1125,15 +1124,7 @@ export function thinkingLine(text: string, opts: { live?: boolean } = {}): {
   };
   foldable(item, line, body, () => render(latest));
   item.append(line, body);
-  if (opts.live) preview.textContent = lastSentence(text);
-  return { item, body, preview, render };
-}
-
-/** The latest line of a thought, plain, for the line that stands for it while it is written. */
-export function lastSentence(text: string): string {
-  const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
-  const last = lines[lines.length - 1] ?? "";
-  return last.replace(/^([-*+]|\d+[.)]|#+)\s+/, "").replace(/[*_`]/g, "").slice(-200);
+  return { item, body, render };
 }
 
 /** The model's words between two actions: ordinary paragraphs on the line. */

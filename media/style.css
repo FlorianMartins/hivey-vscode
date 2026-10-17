@@ -932,17 +932,6 @@ pre.code {
   color: var(--reasoning);
   margin-right: -2px;
 }
-.tl-preview {
-  flex: 0 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-style: italic;
-  opacity: 0.85;
-}
-.tl-preview:empty {
-  display: none;
-}
 .tl-thought {
   margin: 2px 0 var(--sp-2);
   padding: var(--sp-1) var(--sp-3);
