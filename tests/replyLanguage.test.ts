@@ -1,10 +1,12 @@
 // The user's language, held for the whole of an agent turn.
 //
-// « dans les réponses il continue de basculer entre les langues ».
+// « dans les réponses il continue de basculer entre les langues ». And then « je ne veux pas de
+// translator, je veux la réponse dans la langue de l'utilisateur »: the rule does the work, in the
+// user's own words too; nothing is translated after the fact.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { isWrongLanguage, withReplyLanguage } from "../src/core/prompts.js";
+import { withReplyLanguage } from "../src/core/prompts.js";
 import { runTurn, type Tool } from "../src/core/agent/loop.js";
 import type { ChatRequest, ChatResult, Provider } from "../src/core/providers/types.js";
 
@@ -22,14 +24,20 @@ test("the rule goes on the system prompt and the reminder on the newest tool out
   assert.equal(sent.length, 3, "no message is added");
 });
 
-test("only a passage long enough, and surely in the other language, is the wrong language", () => {
-  assert.equal(isWrongLanguage("The live data mechanism is already working, it's just the banner for code changes that is in the way. I'll delete it.", "fr"), true);
-  assert.equal(isWrongLanguage("Le mécanisme de données en direct fonctionne déjà, c'est seulement le bandeau qui gêne. Je le supprime.", "fr"), false);
-  assert.equal(isWrongLanguage("OK, done.", "fr"), false, "too short to tell");
-  assert.equal(isWrongLanguage("`relireBientot(Object.keys(RECHARGER_VUE))` `location.reload()` `surveillerVersion`", "fr"), false, "code is not prose");
+test("in French the rule is also said in French; in English the request is exactly what it was", () => {
+  const msgs = [{ role: "system", content: "sys" }, { role: "user", content: "x" }, { role: "tool", content: "out" }];
+  const fr = withReplyLanguage(msgs, "fr");
+  assert.match(fr[0]!.content, /Réponds en français/);
+  assert.match(fr[2]!.content, /Reply language: French\.[^\]]*Réponds en français[^\]]*\]$/);
+  const en = withReplyLanguage(msgs, "en");
+  assert.equal(
+    en[0]!.content,
+    "sys\nLanguage: the user writes in English. Every sentence you write for them is in English — short notes between tool calls included, even right after reading code, logs or your own reasoning in another language. Code, identifiers and file names stay as they are.\n",
+  );
+  assert.equal(en[2]!.content, "out\n\n[Reply language: English. Every sentence you write for the user — notes between tool calls included — is in English.]");
 });
 
-test("a note in the wrong language is translated before it is kept — the model reads the same text next", async () => {
+test("nothing is translated after the fact: a note is kept as the model wrote it, and no extra request is made", async () => {
   const replies: ChatResult[] = [
     {
       text: "The live data mechanism is already working, it is just the banner for code changes that is in the way, so I will delete it.",
@@ -58,22 +66,14 @@ test("a note in the wrong language is translated before it is kept — the model
     approval: () => false,
     run: async () => ({ content: "file" }),
   } as Tool;
-  const asked: string[] = [];
   const r = await runTurn({
     provider,
     model: "m",
     messages: [{ role: "system", content: "sys" }, { role: "user", content: "Retire le bandeau." }],
     tools: [read],
     replyLanguage: "fr",
-    translate: async (text) => {
-      asked.push(text);
-      return "Le mécanisme de données en direct fonctionne déjà ; seul le bandeau gêne, je le supprime.";
-    },
   });
-  assert.equal(asked.length, 1, "only the English note is sent for translation, not the French answer");
-  assert.match(r.text, /Le mécanisme de données en direct/);
-  assert.doesNotMatch(r.text, /The live data mechanism/);
-  const next = seen[1]!.messages.find((m) => m.role === "assistant" && m.toolCalls?.length)!;
-  assert.match(next.content, /Le mécanisme de données/, "the model reads the translated note on the next step");
-  assert.match(seen[0]!.messages[0]!.content, /Language: the user writes in French/);
+  assert.equal(seen.length, 2, "two steps, and no translation request between them");
+  assert.match(r.text, /C'est fait\./);
+  assert.match(seen[0]!.messages[0]!.content, /Language: the user writes in French[\s\S]*Réponds en français/);
 });

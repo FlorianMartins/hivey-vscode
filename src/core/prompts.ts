@@ -251,13 +251,17 @@ const ENGLISH_WORDS = new Set([
  */
 export function withReplyLanguage<M extends { role: string; content: string }>(messages: M[], lang: "en" | "fr"): M[] {
   const name = lang === "fr" ? "French" : "English";
+  // ⚠️ « je veux la réponse dans la langue de l'utilisateur » — an order about French, written in
+  // English, is the weakest form of it: measured on the thinking, it moved nothing, and the same order
+  // in French moved most of it. Said in the user's own words as well. English is unchanged.
+  const own = lang === "fr" ? " Réponds en français : chaque phrase que tu écris pour l'utilisateur, notes entre les outils comprises." : "";
   const rule =
     `\nLanguage: the user writes in ${name}. Every sentence you write for them is in ${name} — short notes ` +
     `between tool calls included, even right after reading code, logs or your own reasoning in another ` +
-    `language. Code, identifiers and file names stay as they are.\n`;
+    `language. Code, identifiers and file names stay as they are.${own}\n`;
   const reminder =
     `\n\n[Reply language: ${name}. Every sentence you write for the user — notes between tool calls ` +
-    `included — is in ${name}.]`;
+    `included — is in ${name}.${own}]`;
   const firstSystem = messages.findIndex((m) => m.role === "system");
   const lastIndex = messages.length - 1;
   return messages.map((m, i) => {
@@ -266,31 +270,6 @@ export function withReplyLanguage<M extends { role: string; content: string }>(m
     if (i === lastIndex && m.role === "tool") content += reminder;
     return content === m.content ? m : { ...m, content };
   });
-}
-
-/**
- * Is this text, which the model wrote for the user, in the wrong language? Only a passage long
- * enough to tell — a dozen words — and only when the detector is sure: anything it cannot decide
- * falls back to the expected language, so a code-heavy note is never "translated".
- */
-export function isWrongLanguage(text: string, lang: "en" | "fr"): boolean {
-  const prose = text.replace(/```[\s\S]*?```/g, " ").replace(/`[^`]*`/g, " ");
-  if ((prose.match(/[a-zàâçéèêëîïôûùüÿœ']+/gi) ?? []).length < 12) return false;
-  return detectLanguage(prose, lang) !== lang;
-}
-
-/** The request that puts a note back in the user's language — the safety net behind the rule above. */
-export function translationMessages(text: string, lang: "en" | "fr"): Array<{ role: "system" | "user"; content: string }> {
-  const name = lang === "fr" ? "French" : "English";
-  return [
-    {
-      role: "system",
-      content:
-        `Translate the user's message into ${name}. Keep code, identifiers, file names, paths, commands and ` +
-        `Markdown exactly as they are. Reply with the translation only — no preamble, no quotes.`,
-    },
-    { role: "user", content: text },
-  ];
 }
 
 /**

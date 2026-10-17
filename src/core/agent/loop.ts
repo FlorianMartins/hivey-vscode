@@ -23,7 +23,7 @@ import { estimateMessageTokens } from "../util/tokens.js";
 import { restoreDeep } from "../redaction/index.js";
 import { t } from "../../shared/i18n.js";
 import type { RecallStore } from "./recall.js";
-import { isWrongLanguage, steerMessage, withReplyLanguage } from "../prompts.js";
+import { steerMessage, withReplyLanguage } from "../prompts.js";
 
 /** A message typed during the turn, with what was attached to it. See `RunTurnOptions.steer`. */
 export interface SteerInput {
@@ -153,13 +153,11 @@ export interface TurnOptions {
   afterResponse?: (text: string) => string;
   /**
    * The user's language, held for the whole turn: the rule and the reminder go on every request (see
-   * `withReplyLanguage`), and a note written in another language goes through `translate`.
+   * `withReplyLanguage`). Nothing is translated afterwards — « je ne veux pas de translator, je veux
+   * la réponse dans la langue de l'utilisateur »: a note that streamed in English and turned French
+   * once it was done read as a glitch, and the answer is the model's to write in the right language.
    */
   replyLanguage?: "en" | "fr";
-  /** Puts a note back in the user's language — a small request, thinking off. Undefined: left as is. */
-  translate?: (text: string, lang: "en" | "fr", signal?: AbortSignal) => Promise<string | undefined>;
-  /** A note was rewritten after it streamed — the text as streamed, then as kept. */
-  onTranslated?: (from: string, to: string) => void;
   /**
    * What the person typed while the turn was running, handed over and forgotten by the caller.
    * Asked before every request: the messages go in after the last tool results, so the model reads
@@ -529,21 +527,6 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
       opts.report?.(t("the model's context window filled up mid-reply — older tool outputs were shortened and the step asked again"));
       step--;
       continue;
-    }
-
-    // The safety net behind the language rule: a note the model wrote in another language is put back
-    // in the user's — before it is kept, so what the user reads and what the model reads next agree.
-    if (opts.replyLanguage && opts.translate && res.text.trim() && isWrongLanguage(res.text, opts.replyLanguage)) {
-      try {
-        const fixed = await opts.translate(res.text, opts.replyLanguage, opts.signal);
-        if (fixed?.trim()) {
-          const restore = (s: string): string => (opts.afterResponse ? opts.afterResponse(s) : s);
-          opts.onTranslated?.(restore(res.text), restore(fixed.trim()));
-          res = { ...res, text: fixed.trim() };
-        }
-      } catch {
-        /* left as written: a note in the wrong language beats a turn that fails over it */
-      }
     }
 
     truncated = res.stopReason === "length";

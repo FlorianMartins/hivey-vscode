@@ -31,12 +31,3 @@ test("streamed pieces of one thought or one paragraph stay together", () => {
   b.text("lis.");
   assert.deepEqual(b.segments, [{ reasoning: "Read first.", text: "Je lis." }]);
 });
-
-test("a note put back in the user's language replaces what streamed", () => {
-  const b = new SegmentBuilder();
-  b.text("I will delete it.");
-  b.acted();
-  b.step({ tool: "edit_file", summary: "Edited a.js.", ok: true });
-  b.replace("I will delete it.", "Je le supprime.");
-  assert.equal(b.segments[0]!.text, "Je le supprime.");
-});

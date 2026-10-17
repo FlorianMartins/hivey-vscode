@@ -48,7 +48,7 @@ import { promptForMode, toolsForMode, MODES, type Mode } from "../core/session/m
 import { t, language } from "../shared/i18n.js";
 import { ENV, reasoningFromEnv, temperatureFromEnv } from "./env.js";
 import { isSelfHostedProvider } from "../core/redaction/index.js";
-import { detectLanguage, translationMessages } from "../core/prompts.js";
+import { detectLanguage } from "../core/prompts.js";
 
 interface CliConfig {
   provider: ProviderId;
@@ -527,18 +527,8 @@ async function main(): Promise<void> {
           taken.push(...now);
           return now;
         },
-        // The user's language, held for the whole turn, with the same safety net the panel has.
+        // The user's language, held for the whole turn, as in the panel.
         replyLanguage: detectLanguage(text, language()),
-        translate: async (note, lang, signal) =>
-          (
-            await provider.chat({
-              model: cfg.model,
-              messages: translationMessages(note, lang),
-              chore: true,
-              reasoning: "none",
-              ...(signal ? { signal } : {}),
-            })
-          ).text,
         // The same one self-check the panel does, by the same rule: it changed files and ran
         // nothing, so finish it before saying it is done.
         selfCheck: (trace) =>
