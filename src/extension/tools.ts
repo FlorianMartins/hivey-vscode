@@ -11,6 +11,7 @@
 
 import * as vscode from "vscode";
 import { describeSlice, sliceLines } from "../core/fs/slice.js";
+import { cmdMultiLineProblem } from "../core/terminal/cmdLines.js";
 import { findUnique } from "../core/text/findText.js";
 import { cappedAt, describeCap } from "../core/agent/capped.js";
 import { searchPattern } from "../core/agent/regex.js";
@@ -581,7 +582,8 @@ export function buildTools(deps: ToolDeps): Tool[] {
           // all fail in cmd.exe, and each failure cost a step of a real Windows session.
           (process.platform === "win32"
             ? "It runs in cmd.exe on Windows: chain with &&, use dir, type and findstr — not ls, cat, " +
-              "head or grep (use search_text and read_file to read files). "
+              "head, tail, sed, rm or grep (use search_text and read_file to read files). One line only: " +
+              "cmd.exe drops every line after the first, so write a longer script to a file and run the file. "
             : "It runs in /bin/sh. ") +
           "Nothing can be typed into it, and a command that never exits on its own (a server, a " +
           "watcher) is stopped at the timeout — give those a short timeoutMs."
@@ -601,6 +603,9 @@ export function buildTools(deps: ToolDeps): Tool[] {
     approval: (args) => t("run `{0}`", String(args["command"])),
     async run(args, ctx): Promise<ToolResult> {
       const command = String(args["command"] ?? "");
+      // Only where cmd.exe is the shell: the integrated terminal may be PowerShell, which takes them.
+      const multiLine = asProcess ? cmdMultiLineProblem(command, process.platform) : undefined;
+      if (multiLine) return { content: multiLine, isError: true };
       const result = await (asProcess ? runCommandAsProcess : runCommandInTerminal)({
         command,
         // Not `root()`, which throws when no folder is open: a terminal does not need one. Someone
