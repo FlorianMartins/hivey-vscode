@@ -15,6 +15,7 @@ import { cmdMultiLineProblem } from "../core/terminal/cmdLines.js";
 import { findUnique } from "../core/text/findText.js";
 import { cappedAt, describeCap } from "../core/agent/capped.js";
 import { searchPattern } from "../core/agent/regex.js";
+import { searchExclude } from "../core/agent/searchScope.js";
 import { t } from "../shared/i18n.js";
 import { parsePlan, planSummary, PLAN_TOOL_DESCRIPTION, type Plan } from "../core/agent/plan.js";
 import { NOTE_ASIDE_TOOL, type Notice } from "../core/session/notices.js";
@@ -49,6 +50,20 @@ const FOLD_CASE = process.platform === "win32";
 /** Characters, not tokens: a line budget has to be cut at a line boundary, which is a character count. */
 const MAX_READ_CHARS = 24_000;
 const MAX_MATCHES = 60;
+/** The terminal client's numbers: the files a search reads, and the size past which it skips one. */
+const MAX_SEARCHED_FILES = 4000;
+const MAX_SEARCHED_BYTES = 400_000;
+
+/** The workspace's root `.gitignore`, or nothing. */
+async function rootGitignore(): Promise<string> {
+  const root = vscode.workspace.workspaceFolders?.[0]?.uri;
+  if (!root) return "";
+  try {
+    return new TextDecoder().decode(await vscode.workspace.fs.readFile(vscode.Uri.joinPath(root, ".gitignore")));
+  } catch {
+    return "";
+  }
+}
 
 function root(): vscode.Uri {
   const folder = vscode.workspace.workspaceFolders?.[0];
@@ -300,11 +315,20 @@ export function buildTools(deps: ToolDeps): Tool[] {
       } catch (err) {
         return { content: `Invalid regular expression: ${(err as Error).message}`, isError: true };
       }
-      const uris = await vscode.workspace.findFiles(glob, undefined, 800);
+      // Without dependencies, build output and what the project does not track — see
+      // `core/agent/searchScope.ts`.
+      const exclude = searchExclude(await rootGitignore(), {
+        ...(vscode.workspace.getConfiguration("files").get<Record<string, unknown>>("exclude") ?? {}),
+        ...(vscode.workspace.getConfiguration("search").get<Record<string, unknown>>("exclude") ?? {}),
+      });
+      const uris = await vscode.workspace.findFiles(glob, exclude, MAX_SEARCHED_FILES);
       const out: string[] = [];
       for (const uri of uris) {
         if (out.length >= MAX_MATCHES) break;
         try {
+          // A database, a dump or a bundle is not where a line of code is, and reading it is what
+          // made one search take a minute.
+          if ((await vscode.workspace.fs.stat(uri)).size > MAX_SEARCHED_BYTES) continue;
           const text = new TextDecoder().decode(await vscode.workspace.fs.readFile(uri));
           const lines = text.split("\n");
           for (let i = 0; i < lines.length && out.length < MAX_MATCHES; i++) {
@@ -323,7 +347,12 @@ export function buildTools(deps: ToolDeps): Tool[] {
       // And said when the list was cut: sixty matches reported as sixty, out of two hundred, is a
       // complete picture the model does not have.
       const cut = describeCap(cappedAt(out.length, MAX_MATCHES), "matches", "Narrow the pattern, or pass a `glob` to search fewer files.");
-      return { content: note + (out.join("\n") || "(no match)") + cut };
+      // And when the FILES were cut: "(no match)" over part of the project is not "it is not there".
+      const partial =
+        out.length < MAX_MATCHES && uris.length >= MAX_SEARCHED_FILES
+          ? `\n(only the first ${MAX_SEARCHED_FILES} files were searched: pass a \`glob\` such as \`src/**\` to search where the code is.)`
+          : "";
+      return { content: note + (out.join("\n") || "(no match)") + cut + partial };
     },
   };
 
