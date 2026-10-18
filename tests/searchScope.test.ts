@@ -20,4 +20,8 @@ test("one glob: dependencies, build output, .gitignore and the settings the user
   assert.ok(g.startsWith("{") && g.endsWith("}"));
   for (const part of ["**/node_modules/**", "**/dist/**", "**/tmp/**", "**/*.min.js"]) assert.ok(g.includes(part), part);
   assert.ok(!g.includes("**/docs"));
+  // Images, fonts, media and databases never hold a line of code: a project of thousands of icons
+  // filled the files a search reads with them.
+  for (const part of ["**/*.webp", "**/*.png", "**/*.woff2", "**/*.db-wal", "**/*.mp4"]) assert.ok(g.includes(part), part);
+  assert.ok(!g.includes("**/*.js,") && !g.includes("**/*.css,"), "code is searched");
 });

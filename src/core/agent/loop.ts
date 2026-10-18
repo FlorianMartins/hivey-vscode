@@ -329,6 +329,8 @@ const OUTDATED_OUTPUT =
   "[Outdated, removed to fit the context window: this file was read again or changed later in this turn, and that later result is the current one.]";
 
 const FILE_TOOLS = new Set(["read_file", "edit_file", "write_file"]);
+/** Tools that touch only the turn itself — what they do cannot make a repeated read say something new. */
+const TURN_ONLY_TOOLS = new Set(["update_plan", "note_aside", "recall", "search_memory"]);
 
 /** The file a call is about, for the tools that read or change one file. */
 function fileOf(name: string, args: string | undefined): string | undefined {
@@ -715,9 +717,15 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
         }
       } else {
         // An edit changes one file: only what reads it, or a search, can now say something new —
-        // re-reading any other file is still a repeat. Anything else (a command) can change anything.
+        // re-reading any other file is still a repeat. Anything else (a command) can change anything,
+        // except what only touches the turn itself: the plan, a note, the memory.
+        //
+        // ⚠️ « il y a toujours un souci avec les boucles » — `update_plan` reset the count, so a turn
+        // that read the same two files four times, a plan update between each pair, was never stopped.
         const file = fileOf(call.name, JSON.stringify(args));
-        if (file) {
+        if (TURN_ONLY_TOOLS.has(call.name)) {
+          // Nothing in the project changed.
+        } else if (file) {
           for (const key of [...callCounts.keys()]) {
             const [name, json] = key.split("\u0000") as [string, string];
             if (name !== "read_file" || fileOf(name, json) === file) callCounts.delete(key);

@@ -322,9 +322,15 @@ export function buildTools(deps: ToolDeps): Tool[] {
         ...(vscode.workspace.getConfiguration("files").get<Record<string, unknown>>("exclude") ?? {}),
         ...(vscode.workspace.getConfiguration("search").get<Record<string, unknown>>("exclude") ?? {}),
       });
-      const uris = await vscode.workspace.findFiles(glob, exclude, MAX_SEARCHED_FILES);
+      // ⚠️ The same files every time. Asked for at most N, `findFiles` returns AN N of them, not the
+      // same N twice: in a project bigger than the limit, one search said "(no match)" and the same
+      // search a step later found `src/artisanFlow.js:22`, and the model could trust neither. All of
+      // them, in path order, then the first N.
+      const uris = (await vscode.workspace.findFiles(glob, exclude))
+        .sort((a, b) => (a.fsPath < b.fsPath ? -1 : a.fsPath > b.fsPath ? 1 : 0))
+        .slice(0, MAX_SEARCHED_FILES + 1);
       const out: string[] = [];
-      for (const uri of uris) {
+      for (const uri of uris.slice(0, MAX_SEARCHED_FILES)) {
         if (out.length >= MAX_MATCHES) break;
         try {
           // A database, a dump or a bundle is not where a line of code is, and reading it is what
@@ -350,7 +356,7 @@ export function buildTools(deps: ToolDeps): Tool[] {
       const cut = describeCap(cappedAt(out.length, MAX_MATCHES), "matches", "Narrow the pattern, or pass a `glob` to search fewer files.");
       // And when the FILES were cut: "(no match)" over part of the project is not "it is not there".
       const partial =
-        out.length < MAX_MATCHES && uris.length >= MAX_SEARCHED_FILES
+        out.length < MAX_MATCHES && uris.length > MAX_SEARCHED_FILES
           ? `\n(only the first ${MAX_SEARCHED_FILES} files were searched: pass a \`glob\` such as \`src/**\` to search where the code is.)`
           : "";
       return { content: note + (out.join("\n") || "(no match)") + cut + partial };

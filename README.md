@@ -503,7 +503,7 @@ Those documents are currently written in French; translations are welcome.
 ## Development
 
 ```bash
-npm test                   # builds the bundles, then 1292 tests (node:test)
+npm test                   # builds the bundles, then 1295 tests (node:test)
 npm run test:integration   # loads the extension into a real VS Code (55 tests, headless)
 npm run eval:verify        # every evaluation task must fail before a model touches it
 node scripts/screenshots.mjs  # retakes the README's images from that same editor

@@ -574,6 +574,27 @@ test("⚠️ an edit lets its own file be read again, not every other file", asy
   assert.equal(read.calls.filter((c) => c["path"] === "b.ts").length, 2, "the untouched one, refused the third time");
 });
 
+test("⚠️ a plan update between two reads does not make the same read new again", async () => {
+  // « il y a toujours un souci avec les boucles »: ui.js and menu.js read four times, an
+  // update_plan between each pair, and the count started over every time.
+  const read = tool("read_file", { parallel: () => true });
+  const plan = tool("update_plan");
+  const pair = (id: string) => [
+    { id: `${id}a`, name: "read_file", args: '{"path":"src/ui.js"}' },
+    { id: `${id}b`, name: "read_file", args: '{"path":"src/menu.js"}' },
+  ];
+  const provider = scriptedProvider([
+    { toolCalls: pair("1") },
+    { toolCalls: [{ id: "2", name: "update_plan", args: "{}" }] },
+    { toolCalls: pair("3") },
+    { toolCalls: [{ id: "4", name: "update_plan", args: "{}" }] },
+    { toolCalls: pair("5") },
+    { text: "Done." },
+  ]);
+  await runTurn({ ...base, provider, tools: [read, plan] });
+  assert.equal(read.calls.filter((c) => c["path"] === "src/ui.js").length, 2, "read twice, refused the third time");
+});
+
 test("the same tool with different arguments is never mistaken for a loop", async () => {
   const read = tool("read_file", { parallel: () => true });
   const provider = scriptedProvider([

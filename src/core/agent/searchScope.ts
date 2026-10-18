@@ -27,9 +27,23 @@ export function gitignoreGlobs(text: string): string[] {
   return out;
 }
 
-/** One exclude glob for `findFiles`, from the skipped folders, `.gitignore` and the user's settings. */
+/**
+ * Files that never hold a line of code — images, fonts, media, archives, databases. A project with
+ * thousands of icons filled the files a search reads with them.
+ */
+export const BINARY_EXTENSIONS = [
+  "png", "jpg", "jpeg", "gif", "webp", "avif", "ico", "bmp", "tiff", "psd",
+  "woff", "woff2", "ttf", "otf", "eot",
+  "mp3", "mp4", "webm", "ogg", "wav", "mov", "avi", "mkv",
+  "zip", "gz", "tgz", "7z", "rar", "jar", "pdf",
+  "db", "sqlite", "sqlite3", "db-wal", "db-shm", "wal",
+  "exe", "dll", "so", "dylib", "bin", "wasm", "node", "map",
+];
+
+/** One exclude glob for `findFiles`, from the skipped folders, binaries, `.gitignore` and the user's settings. */
 export function searchExclude(gitignore: string, settingExcludes: Record<string, unknown>): string {
   const globs = new Set<string>(SKIPPED_DIRS.map((d) => `**/${d}/**`));
+  for (const ext of BINARY_EXTENSIONS) globs.add(`**/*.${ext}`);
   for (const g of gitignoreGlobs(gitignore)) globs.add(g);
   for (const [g, on] of Object.entries(settingExcludes)) if (on === true && !/[{},]/.test(g)) globs.add(g);
   return `{${[...globs].join(",")}}`;
