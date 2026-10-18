@@ -1,0 +1,9 @@
+# Findings the secret scanner may skip, one fingerprint each — never a rule or a path.
+#
+# Fake credentials in a test that checks they are still detected. They were moved to
+# tests/redaction.test.ts, which .gitleaks.toml exempts as a whole, in the commit after this one;
+# the history keeps them, and history is not rewritten.
+ebac57367eabcc02e94b5f9620a746c2be26ff45:tests/redactionFalsePositives.test.ts:generic-api-key:43
+ebac57367eabcc02e94b5f9620a746c2be26ff45:tests/redactionFalsePositives.test.ts:generic-api-key:44
+ebac57367eabcc02e94b5f9620a746c2be26ff45:tests/redactionFalsePositives.test.ts:generic-api-key:45
+ebac57367eabcc02e94b5f9620a746c2be26ff45:tests/redactionFalsePositives.test.ts:generic-api-key:47
