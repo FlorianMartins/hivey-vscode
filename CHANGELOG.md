@@ -78,6 +78,16 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **La fenêtre des données sensibles ne s'ouvre plus pour du code, et dit où sont les données.**
+  Sur un millier de fichiers de code ordinaire, un sur vingt était pris pour un identifiant, et les
+  tracés d'icônes SVG pour des numéros de téléphone : la fenêtre s'ouvrait presque à chaque requête
+  vers un modèle distant. Le code reste lisible ; seules les vraies valeurs sont remplacées par des
+  marqueurs. Elle couvre désormais aussi les données d'une entreprise (IBAN, carte bancaire,
+  SIREN/SIRET, TVA, nom de société, montants, vérifiés par leur clé de contrôle quand elle existe)
+  et les e-mails et téléphones trouvés dans les fichiers, et liste chaque élément avec **son
+  fichier et sa ligne** pour pouvoir le corriger. Une valeur acceptée n'est plus redemandée dans la
+  conversation ; « Toujours envoyer (cette conversation) » ne redemande plus rien. Un seul bouton
+  « Annuler ».
 - **Plus de texte en anglais qui bascule en français à la fin.** Une note écrite dans une autre langue
   que la vôtre était retraduite une fois écrite : on la voyait défiler en anglais, puis changer. Le
   traducteur est retiré ; la consigne de langue est aussi donnée en français quand vous écrivez en

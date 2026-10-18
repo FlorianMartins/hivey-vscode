@@ -67,9 +67,9 @@ export function redactMessages<T extends { content: string }>(
 ): { messages: T[]; findings: Finding[]; hasSecret: boolean } {
   const findings: Finding[] = [];
   let hasSecret = false;
-  const out = messages.map((m) => {
+  const out = messages.map((m, i) => {
     const r = redact(m.content, vault, policy);
-    findings.push(...r.findings);
+    findings.push(...r.findings.map((f) => ({ ...f, message: i })));
     hasSecret ||= r.hasSecret;
     return { ...m, content: r.text };
   });

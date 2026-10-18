@@ -5,7 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { redact, redactMessages, isLocalEndpoint, Vault, entropy, DEFAULT_POLICY, restoreDeep, streamingRestorer } from "../src/core/redaction/index.js";
-import { scanShapes } from "../src/core/redaction/detectors.js";
+import { madeOfWords, scanShapes } from "../src/core/redaction/detectors.js";
 
 const strict = { ...DEFAULT_POLICY };
 const balanced = { ...DEFAULT_POLICY, level: "balanced" as const };
@@ -322,4 +322,21 @@ test("every stream that restores does so through the streaming restorer", () => 
     assert.deepEqual(perChunk, [], `${file}: a delta is still restored on its own, so a split marker shows raw`);
     assert.match(source, /streamingRestorer\(/, `${file}: nothing holds a marker across a packet boundary`);
   }
+});
+
+test("with ordinary code no longer flagged, real credentials still are", () => {
+  // The other half of redactionFalsePositives.test.ts — here, because this is the file the secret
+  // scanner is told to leave alone.
+  for (const line of [
+    "token: Zx9Kq2Lm4Np7Rt5Vw8Yb1Dg3Hj6Kl0Qs",
+    'password = "hT7-x92Kd0qLm4"',
+    "API_TOKEN=9f8d7a6b5c4e3f2a1b0c9d8e",
+    "DATABASE_URL=postgres://app:h7Fk29QeL@10.0.0.4:5432/prod",
+    'const key = "AIzaSyA1234567890abcdefghijklmnopqrstuvw";',
+  ]) {
+    const secrets = redact(line, new Vault(), strict).findings.filter((f) => f.kind === "secret");
+    assert.notDeepEqual(secrets, [], line);
+  }
+  // A key cut into its pieces is short pieces — not words, unlike `CipherChaCha20Poly1305Types`.
+  assert.equal(madeOfWords("Zx9Kq2Lm4Np7Rt5Vw8Yb1Dg3Hj6Kl0Qs"), false);
 });

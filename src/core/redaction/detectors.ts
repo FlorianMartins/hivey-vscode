@@ -57,13 +57,14 @@ const RULES: Rule[] = [
   { name: "anthropic-key", kind: "secret", re: /\bsk-ant-[A-Za-z0-9_-]{20,}\b/g },
   { name: "openai-key", kind: "secret", re: /\bsk-(?:proj-)?[A-Za-z0-9_-]{20,}\b/g },
   { name: "openrouter-key", kind: "secret", re: /\bsk-or-v1-[A-Za-z0-9]{32,}\b/g },
-  { name: "google-api-key", kind: "secret", re: /\bAIza[0-9A-Za-z_-]{35}\b/g },
+  { name: "google-api-key", kind: "secret", re: /\bAIza[0-9A-Za-z_-]{35,}\b/g },
   { name: "npm-token", kind: "secret", re: /\bnpm_[A-Za-z0-9]{36}\b/g },
   { name: "hugging-face-token", kind: "secret", re: /\bhf_[A-Za-z0-9]{30,}\b/g },
   { name: "private-key-block", kind: "secret", re: /-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY(?: BLOCK)?-----[\s\S]*?-----END [^-]*-----/g },
   { name: "jwt", kind: "secret", re: /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{4,}\b/g },
   // Credentials carried inside a URL: `postgres://user:p4ssw0rd@db.internal:5432/app`.
-  { name: "url-credentials", kind: "secret", re: /\b[a-z][a-z0-9+.-]*:\/\/[^\s/:@]+:([^\s/@]{3,})@/gi, group: 1 },
+  // Not the documentation's examples — `https://abc:xyz@example.com` is in every URL reference.
+  { name: "url-credentials", kind: "secret", re: /\b[a-z][a-z0-9+.-]*:\/\/[^\s/:@]+:([^\s/@]{3,})@(?!(?:example\.(?:com|org|net)|localhost)\b)/gi, group: 1 },
   // `PASSWORD = "…"`, `api_key: '…'`, `SECRET=…` — the assignment is what makes it a secret.
   //
   // The hard part is not finding these; it is not finding them in ordinary code. `apiKey: cfg.apiKey`,
@@ -90,22 +91,54 @@ const RULES: Rule[] = [
       // both match the label. No API key ever issued starts with # @ / or \, or ends with a colon
       // — they are base64, hex or alphanumeric — so refusing those shapes costs nothing real.
       if (/^[#@/\\]/.test(v) || v.endsWith(":")) return false;
-      if (quoted) return !/^(?:process\.|os\.|env[.[])/i.test(v);
+      // ⚠️ « il se déclenche alors qu'il n'y a pas de données sensibles (juste le projet avec du
+      // code) ». Measured over a thousand files of ordinary code, one in twenty was flagged. A sentence
+      // in quotes is a message or a doc example (`password = 'Password used to generate key'`), and no
+      // issued credential contains a space.
+      if (quoted) return !/^(?:process\.|os\.|env[.[])/i.test(v) && !/\s/.test(v);
       // Unquoted: reject anything with the shape of an expression, a type or a constant name.
       if (/[.(\[<]|::|->/.test(v)) return false;
       if (/^(?:string|number|boolean|any|unknown|null|true|false|undefined|none|nil|str|int)$/i.test(v)) return false;
       if (/^[A-Z_][A-Z0-9_]*$/.test(v)) return false; // SECRET = ANOTHER_CONSTANT
+      // A name without a digit is a variable or a type — `password: BinaryLike`, `token: discordToken`,
+      // `auth: requireAuth`. An unquoted credential in a .env file has digits; a name has words.
+      if (/^[A-Za-z_$][A-Za-z_$]*$/.test(v)) return false;
       // What is left must actually look random: a real value in a .env file does.
       return entropy(v) > 2.6 || v.length >= 16;
     },
   },
 
   // ── People ─────────────────────────────────────────────────────────────────────────────────
-  { name: "email", kind: "identity", re: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g },
-  { name: "phone", kind: "identity", re: /(?:\+\d{1,3}[\s.-]?)?(?:\(\d{1,4}\)[\s.-]?)?\d{2,4}(?:[\s.-]\d{2,4}){2,4}\b/g,
-    // Version numbers, dates and matrices all look like phone numbers. Require enough digits and
-    // at least one real separator or an international prefix.
-    verify: (v) => (v.replace(/\D/g, "").length >= 9 && /[\s.-]/.test(v)) || v.startsWith("+") },
+  // Not the documentation's examples: `pki@example.com` is in every reference page.
+  { name: "email", kind: "identity", re: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g,
+    verify: (v) => !/@(?:[a-z0-9-]+\.)*(?:example\.(?:com|org|net)|localhost)$/i.test(v) },
+  // Version numbers, dates, matrices and SVG paths all look like phone numbers. A phone number is
+  // groups of digits with ONE separator throughout (`06 12 34 56 78`, `06.12.34.56.78`), standing
+  // alone — not in the middle of `1.974 1.142c.167.095.238`, where an icon's path data was taken for
+  // a dozen numbers per file and pseudonymized, code and all.
+  { name: "phone", kind: "identity", re: /(?<![\w.,-])(?<![\d.] )(?:\+\d{1,3}[ .-]?)?(?:\(\d{1,4}\)[ .-]?)?\d{1,4}([ .-])\d{2,4}(?:\1\d{2,4}){1,3}(?![\w,-]|\.\d| \d)/g,
+    // And not `00 00 00 00 00` or `61 61 61 61 61` — bytes in an example, not anyone's number.
+    verify: (v) => {
+      const d = v.replace(/\D/g, "");
+      return d.length >= 9 && d.length <= 15 && new Set(d).size >= 3;
+    } },
+
+  // ── A company's data ─────────────────────────────────────────────────────────────────────────
+  // « il faut aussi les données d'entreprises (email, chiffres, nom de compagnies, etc) mais pas le
+  // code ». Each shape is checked the way the number itself is checked where a checksum exists —
+  // an IBAN's mod 97, a card's or a SIREN's Luhn — because ordinary code is full of long numbers
+  // and none of them should be taken for a bank account.
+  { name: "iban", kind: "business", re: /\b[A-Z]{2}\d{2}(?: ?[A-Z0-9]{4}){2,7}(?: ?[A-Z0-9]{1,3})?\b/g, verify: (v) => ibanValid(v) },
+  { name: "payment-card", kind: "business", re: /\b[3-6]\d{3}(?:[ -]?\d{4}){2}[ -]?\d{1,7}\b/g,
+    verify: (v) => { const d = v.replace(/\D/g, ""); return d.length >= 13 && d.length <= 19 && luhn(d); } },
+  // Nine or fourteen digits are everywhere in code; named SIREN/SIRET they are a company.
+  { name: "company-number", kind: "business", re: /\b(?:SIREN|SIRET|siren|siret|RCS)\b[^\d\n]{0,20}(\d{3} ?\d{3} ?\d{3}(?: ?\d{5})?)\b/g, group: 1,
+    verify: (v) => luhn(v.replace(/\D/g, "")) },
+  { name: "vat-number", kind: "business", re: /\b(?:FR[0-9A-HJ-NP-Z]{2} ?\d{9}|DE\d{9}|BE0?\d{9}|ES[A-Z0-9]\d{7}[A-Z0-9]|IT\d{11}|NL\d{9}B\d{2}|LU\d{8}|CHE-?\d{3}\.?\d{3}\.?\d{3})\b/g },
+  // A name followed by its legal form. Not `SA` alone or `AG`: two capitals are everywhere in code.
+  { name: "company-name", kind: "business", re: /\b[A-Z][A-Za-zÀ-ÿ&'-]{2,}(?: [A-Z][A-Za-zÀ-ÿ&'-]{1,}){0,2} (?:SAS|SASU|SARL|EURL|SNC|SCI|GmbH|Ltd|LLC|Inc|S\.A\.S\.?|S\.A\.R\.L\.?|Sàrl|S\.p\.A\.|B\.V\.)(?![A-Za-z])\.?/g },
+  // An amount of at least a thousand, with its currency: a figure from the books, not a constant.
+  { name: "amount", kind: "business", re: /(?:[€$£] ?\d{1,3}(?:[ \u00a0\u202f,.]\d{3})+(?:[.,]\d{1,2})?|\b\d{1,3}(?:[ \u00a0\u202f.,]\d{3})+(?:[.,]\d{1,2})?[ \u00a0\u202f]?(?:€|EUR|USD|CHF|GBP|£|\$|k€|M€))/g },
 
   // ── Machines ───────────────────────────────────────────────────────────────────────────────
   { name: "ipv4", kind: "infra", re: /\b(?:(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\b/g,
@@ -122,6 +155,33 @@ const RULES: Rule[] = [
     verify: (v) => !["root", "runner", "ubuntu", "user", "node"].includes(v.toLowerCase()) },
   { name: "windows-home", kind: "path", re: /(?:[A-Za-z]:\\Users\\)([A-Za-z0-9._ -]+)/g, group: 1 },
 ];
+
+/** The Luhn check — cards, SIREN and SIRET numbers. */
+export function luhn(digits: string): boolean {
+  let sum = 0;
+  for (let i = 0; i < digits.length; i++) {
+    let d = Number(digits[digits.length - 1 - i]);
+    if (i % 2 === 1) {
+      d *= 2;
+      if (d > 9) d -= 9;
+    }
+    sum += d;
+  }
+  return digits.length > 0 && sum % 10 === 0;
+}
+
+/** An IBAN's own check: the country and check digits moved to the end, read as a number, mod 97 is 1. */
+export function ibanValid(value: string): boolean {
+  const v = value.replace(/ /g, "").toUpperCase();
+  if (v.length < 15 || v.length > 34) return false;
+  const moved = v.slice(4) + v.slice(0, 4);
+  let rest = 0;
+  for (const c of moved) {
+    const n = c >= "A" && c <= "Z" ? String(c.charCodeAt(0) - 55) : c;
+    for (const digit of n) rest = (rest * 10 + Number(digit)) % 97;
+  }
+  return rest === 1;
+}
 
 /** Run every shape rule. Returns spans in text order; overlaps are resolved by the caller. */
 export function scanShapes(text: string): RawSpan[] {
@@ -142,6 +202,17 @@ export function scanShapes(text: string): RawSpan[] {
   return out;
 }
 
+/**
+ * Is this long string made of words — a camelCase name, a path, a URL — rather than random characters?
+ * Cut into its words (`Cipher`, `Cha`, `20`, `Poly`, `1305`, `Types`), a name averages four characters
+ * a piece or more; a key, cut the same way, averages under two: `Zx`, `9`, `Kq`, `2`, `Lm`…
+ */
+export function madeOfWords(v: string): boolean {
+  const pieces = v.split(/[/_.\-+=:]+/).filter(Boolean).flatMap((part) => part.match(/[A-Z]?[a-z]+|[A-Z]+(?![a-z])|\d+/g) ?? []);
+  if (!pieces.length) return false;
+  return pieces.reduce((n, w) => n + w.length, 0) / pieces.length >= 3;
+}
+
 /** Long, disordered strings that no vendor rule claimed. The safety net. */
 export function scanEntropy(text: string): RawSpan[] {
   const out: RawSpan[] = [];
@@ -153,6 +224,10 @@ export function scanEntropy(text: string): RawSpan[] {
     // subresource-integrity attribute. Redacting them adds noise and hides nothing.
     if (/(?:sha1|sha256|sha384|sha512|md5)-$/i.test(text.slice(Math.max(0, m.index - 8), m.index))) continue;
     if (/integrity["'\s:=]+$/i.test(text.slice(Math.max(0, m.index - 14), m.index))) continue;
+    // An image or a font inlined as base64 is content, not a credential.
+    if (/;base64,$/i.test(text.slice(Math.max(0, m.index - 8), m.index))) continue;
+    // A URL, a path, a long type or function name: words, not a key — see `madeOfWords`.
+    if (madeOfWords(v)) continue;
     if (v.length < HIGH_ENTROPY_MIN_LEN) continue;
     // A long identifier is words joined by _ or -, and reads with low entropy; a key does not.
     if (entropy(v) < HIGH_ENTROPY_MIN_BITS) continue;
@@ -185,7 +260,7 @@ export function scanTerms(text: string, terms: string[]): RawSpan[] {
  * placeholders that no restore pass can undo.
  */
 export function resolveOverlaps(spans: RawSpan[]): RawSpan[] {
-  const severity: Record<FindingKind, number> = { secret: 5, identity: 4, term: 3, infra: 2, path: 1 };
+  const severity: Record<FindingKind, number> = { secret: 5, business: 4.5, identity: 4, term: 3, infra: 2, path: 1 };
   const sorted = [...spans].sort(
     (a, b) => a.start - b.start || b.end - b.start - (a.end - a.start) || severity[b.kind] - severity[a.kind],
   );
