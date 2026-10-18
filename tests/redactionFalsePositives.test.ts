@@ -38,14 +38,5 @@ test("a variable, a type or a sentence after `password:` is not a password", () 
   }
 });
 
-test("…while real credentials are still caught", () => {
-  for (const line of [
-    "token: Zx9Kq2Lm4Np7Rt5Vw8Yb1Dg3Hj6Kl0Qs",
-    'password = "hT7-x92Kd0qLm4"',
-    "API_TOKEN=9f8d7a6b5c4e3f2a1b0c9d8e",
-    "DATABASE_URL=postgres://app:h7Fk29QeL@10.0.0.4:5432/prod",
-    'const key = "AIzaSyA1234567890abcdefghijklmnopqrstuvw";',
-  ]) {
-    assert.notDeepEqual(flags(line), [], line);
-  }
-});
+// The other half — real credentials still caught — is in redaction.test.ts: its fake keys are the
+// one file the secret scanner is told to leave alone (`.gitleaks.toml`).
