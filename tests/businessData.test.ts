@@ -22,6 +22,8 @@ test("a company's data is found, by its shape and its own check", () => {
   assert.deepEqual(rules("TVA intracommunautaire FR40303265045"), ["vat-number"]);
   assert.deepEqual(rules("Client : Durand Conseil SARL, Lyon"), ["company-name"]);
   assert.deepEqual(rules("Chiffre d'affaires 2025 : 1 250 000 €"), ["amount"]);
+  // Typeset French: narrow no-break spaces between thousands, a no-break space before the currency.
+  assert.deepEqual(rules("Chiffre d'affaires : 1\u202f250\u202f000\u00a0€"), ["amount"]);
   assert.ok(ibanValid("DE89370400440532013000"));
   assert.ok(!ibanValid("FR7630006000011234567890188"), "one digit off: not an IBAN");
   assert.ok(luhn("4111111111111111") && !luhn("4111111111111112"));

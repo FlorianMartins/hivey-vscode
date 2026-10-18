@@ -138,7 +138,7 @@ const RULES: Rule[] = [
   // A name followed by its legal form. Not `SA` alone or `AG`: two capitals are everywhere in code.
   { name: "company-name", kind: "business", re: /\b[A-Z][A-Za-zÀ-ÿ&'-]{2,}(?: [A-Z][A-Za-zÀ-ÿ&'-]{1,}){0,2} (?:SAS|SASU|SARL|EURL|SNC|SCI|GmbH|Ltd|LLC|Inc|S\.A\.S\.?|S\.A\.R\.L\.?|Sàrl|S\.p\.A\.|B\.V\.)(?![A-Za-z])\.?/g },
   // An amount of at least a thousand, with its currency: a figure from the books, not a constant.
-  { name: "amount", kind: "business", re: /(?:[€$£] ?\d{1,3}(?:[  ,.]\d{3})+(?:[.,]\d{1,2})?|\b\d{1,3}(?:[  .,]\d{3})+(?:[.,]\d{1,2})? ?(?:€|EUR|USD|CHF|GBP|£|\$|k€|M€))/g },
+  { name: "amount", kind: "business", re: /(?:[€$£] ?\d{1,3}(?:[ \u00a0\u202f,.]\d{3})+(?:[.,]\d{1,2})?|\b\d{1,3}(?:[ \u00a0\u202f.,]\d{3})+(?:[.,]\d{1,2})?[ \u00a0\u202f]?(?:€|EUR|USD|CHF|GBP|£|\$|k€|M€))/g },
 
   // ── Machines ───────────────────────────────────────────────────────────────────────────────
   { name: "ipv4", kind: "infra", re: /\b(?:(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\b/g,
