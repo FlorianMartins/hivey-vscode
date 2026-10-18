@@ -7,7 +7,7 @@
 //   • Ollama exposes fill-in-the-middle through its native `/api/generate` with a `suffix`, and
 //     that path is much better than hand-writing FIM tokens into a chat prompt.
 
-import { request } from "../util/http.js";
+import { HttpError, request } from "../util/http.js";
 import { sseData, sseLines } from "../util/sse.js";
 import type {
   ChatDelta,
@@ -120,18 +120,32 @@ export class OpenAICompatibleProvider implements Provider {
     let attempt = body;
     let waits = 0;
     for (let tries = 0; ; tries++) {
-      const res = await request(`${this.baseUrl}/chat/completions`, {
-        method: "POST",
-        headers: this.headers(),
-        body: JSON.stringify(attempt),
-        signal,
+      let res: Response;
+      try {
+        res = await request(`${this.baseUrl}/chat/completions`, {
+          method: "POST",
+          headers: this.headers(),
+          body: JSON.stringify(attempt),
+          signal,
         // ⚠️ No deadline on the user's own server. One slot serves its users in turn, and a request
         // queued behind somebody else's long turn was cut at 180 s with "sent nothing within 180s" —
         // a failure for what is only a wait, and one the panel already shows as "In the queue…".
         // A server that is not there fails at once (connection refused); Stop ends any other wait.
-        timeoutMs: this.opts.timeoutMs ?? (isSelfHostedProvider(this.id) ? Infinity : 180_000),
-        label: "chat",
-      });
+          timeoutMs: this.opts.timeoutMs ?? (isSelfHostedProvider(this.id) ? Infinity : 180_000),
+          label: "chat",
+        });
+      } catch (err) {
+        // ⚠️ « il n'avance pas et fait rien » — a sub-agent queued behind a long step on a one-slot
+        // server was abandoned after exactly five minutes, reported as "sent nothing within
+        // Infinity s", came back empty, and the agent started the whole work over itself. Our own
+        // deadline is off for the user's server; Node's is not — its HTTP client gives up on a
+        // response whose headers have not come in five minutes, and a request waiting for its turn
+        // has none. Still waiting is not failing: on the user's own server it is sent again. The
+        // server had not started on it, so nothing is lost but the place in the queue; Stop ends it.
+        const waiting = err instanceof HttpError && err.kind === "timeout" && !signal?.aborted;
+        if (waiting && this.opts.timeoutMs === undefined && isSelfHostedProvider(this.id)) continue;
+        throw err;
+      }
 
       // A 402 that carries `Retry-After` is not an empty account.
       //

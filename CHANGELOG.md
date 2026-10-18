@@ -87,6 +87,22 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **Plus d'agent bloqué ni de sous-agent qui revient vide sur votre serveur.** Sur un serveur à une
+  place, une requête qui attendait son tour plus de cinq minutes était abandonnée par Node
+  (« n'a rien envoyé en Infinity s ») : le sous-agent revenait vide et l'agent recommençait tout
+  lui-même. Une attente n'est plus un échec : la requête est renvoyée (Arrêter l'interrompt).
+- **La même recherche donne le même résultat.** Dans un projet de plus de 4 000 fichiers,
+  `search_text` lisait un sous-ensemble différent à chaque appel : « aucun résultat », puis le
+  résultat, pour la même recherche. Les fichiers binaires (images, polices, bases…) sont exclus, et
+  les fichiers sont lus dans le même ordre à chaque fois.
+- **Relire en boucle les mêmes fichiers est de nouveau repéré** même quand le plan est mis à jour
+  entre deux lectures.
+- **Les images se lisent, comme dans Claude Code.** `read_file` sur une image (png, jpg, gif,
+  webp) la montre au modèle, avec sa taille ; un autre fichier binaire est décrit (type, taille) au
+  lieu d'échouer en « fichier binaire ».
+- **Un serveur à plusieurs places qui partagent leur contexte** (`--kv-unified`) peut refuser
+  toutes les requêtes en cours quand sa réserve est pleine : l'étape attend quelques secondes et
+  reprend, au lieu d'échouer ou de raccourcir la conversation à tort.
 - **La fenêtre des données sensibles ne s'ouvre plus pour du code, et dit où sont les données.**
   Sur un millier de fichiers de code ordinaire, un sur vingt était pris pour un identifiant, et les
   tracés d'icônes SVG pour des numéros de téléphone : la fenêtre s'ouvrait presque à chaque requête

@@ -574,6 +574,52 @@ test("⚠️ an edit lets its own file be read again, not every other file", asy
   assert.equal(read.calls.filter((c) => c["path"] === "b.ts").length, 2, "the untouched one, refused the third time");
 });
 
+test("⚠️ a plan update between two reads does not make the same read new again", async () => {
+  // « il y a toujours un souci avec les boucles »: ui.js and menu.js read four times, an
+  // update_plan between each pair, and the count started over every time.
+  const read = tool("read_file", { parallel: () => true });
+  const plan = tool("update_plan");
+  const pair = (id: string) => [
+    { id: `${id}a`, name: "read_file", args: '{"path":"src/ui.js"}' },
+    { id: `${id}b`, name: "read_file", args: '{"path":"src/menu.js"}' },
+  ];
+  const provider = scriptedProvider([
+    { toolCalls: pair("1") },
+    { toolCalls: [{ id: "2", name: "update_plan", args: "{}" }] },
+    { toolCalls: pair("3") },
+    { toolCalls: [{ id: "4", name: "update_plan", args: "{}" }] },
+    { toolCalls: pair("5") },
+    { text: "Done." },
+  ]);
+  await runTurn({ ...base, provider, tools: [read, plan] });
+  assert.equal(read.calls.filter((c) => c["path"] === "src/ui.js").length, 2, "read twice, refused the third time");
+});
+
+test("a server whose shared context is full: the step waits and goes again, nothing shortened", async () => {
+  // llama.cpp with `--kv-unified` fails every request in flight when the pool its places share is
+  // full. Not this conversation outgrowing its window: another one frees its share.
+  let calls = 0;
+  const provider: Provider = {
+    id: "local",
+    baseUrl: "http://127.0.0.1:11434/v1",
+    isLocal: true,
+    async chat(): Promise<ChatResult> {
+      calls++;
+      if (calls === 1) throw new Error("HTTP 500: Context size has been exceeded.");
+      return { text: "Fait.", reasoning: "", toolCalls: [], usage: { promptTokens: 1, completionTokens: 1, cachedTokens: 0 }, stopReason: "stop" };
+    },
+    async listModels() {
+      return [];
+    },
+  };
+  const reports: string[] = [];
+  const r = await runTurn({ ...base, provider, report: (m) => reports.push(m) });
+  assert.equal(r.text, "Fait.");
+  assert.equal(calls, 2);
+  assert.ok(reports.some((m) => /shared context is full/.test(m)));
+  assert.ok(!reports.some((m) => /shortened/.test(m)), "a full pool is not this turn's window");
+});
+
 test("the same tool with different arguments is never mistaken for a loop", async () => {
   const read = tool("read_file", { parallel: () => true });
   const provider = scriptedProvider([

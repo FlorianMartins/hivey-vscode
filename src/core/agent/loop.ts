@@ -19,6 +19,7 @@
 
 import type { ChatMessage, ChatResult, Provider, ReasoningEffort, ToolCall, ToolSchema, Usage, ImagePart } from "../providers/types.js";
 import { coerceArgs, parseToolArgs, unknownToolMessage, validateArgs } from "./toolcall.js";
+import { callSignature, safeArgs } from "./callSignature.js";
 import { estimateMessageTokens } from "../util/tokens.js";
 import { restoreDeep } from "../redaction/index.js";
 import { t } from "../../shared/i18n.js";
@@ -55,6 +56,12 @@ export interface ToolResult {
   isError?: boolean;
   /** Anything the UI wants to show (a diff, a file path) but the model does not need. */
   display?: unknown;
+  /**
+   * Images for the model to look at — a screenshot or an icon read with read_file. A tool message
+   * cannot carry one on an OpenAI-compatible server, so the loop hands them over in a message of
+   * their own right after the step's tool results, which is where the model reads them.
+   */
+  images?: ImagePart[];
 }
 
 export interface Tool {
@@ -245,6 +252,22 @@ const DEFAULT_MAX_STEPS = 30;
  */
 const MAX_CONTINUATIONS = 2;
 
+/** llama.cpp's answer when the context pool its places share is full — see `poolWaits`. */
+const POOL_FULL = /Context size has been exceeded/i;
+/** Waits of 2, 4, 8, 16, 30 and 30 s: a minute and a half for another conversation to free its share. */
+const MAX_POOL_WAITS = 6;
+
+/** Wait, unless the turn is stopped first. */
+function pause(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(resolve, ms);
+    signal?.addEventListener("abort", () => {
+      clearTimeout(timer);
+      resolve();
+    }, { once: true });
+  });
+}
+
 /** How many times one turn shortens old tool outputs before giving up on fitting the window. */
 const MAX_SHRINKS = 3;
 /** Room left for the answer once the request fits again, in tokens. */
@@ -329,6 +352,8 @@ const OUTDATED_OUTPUT =
   "[Outdated, removed to fit the context window: this file was read again or changed later in this turn, and that later result is the current one.]";
 
 const FILE_TOOLS = new Set(["read_file", "edit_file", "write_file"]);
+/** Tools that touch only the turn itself — what they do cannot make a repeated read say something new. */
+const TURN_ONLY_TOOLS = new Set(["update_plan", "note_aside", "recall", "search_memory"]);
 
 /** The file a call is about, for the tools that read or change one file. */
 function fileOf(name: string, args: string | undefined): string | undefined {
@@ -427,6 +452,7 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
   let continuations = 0;
   /** How many times this turn has shortened old tool outputs to fit the context window. */
   let shrinkAttempts = 0;
+  let poolWaits = 0;
   /** Which kept memory entry holds each tool output of this turn, by tool call id. */
   const recallIds = new Map<string, string>();
   const keptAs = (toolCallId: string): string | undefined => recallIds.get(toolCallId);
@@ -510,6 +536,18 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
       if (overflow && shrinkAttempts < MAX_SHRINKS && shrinkToolOutputs(working, overflow.excess + ANSWER_ROOM_TOKENS, keptAs)) {
         shrinkAttempts++;
         opts.report?.(t("the turn no longer fit the model's context — older tool outputs were shortened"));
+        step--;
+        continue;
+      }
+      // A server whose context pool is SHARED between its places (llama.cpp `--kv-unified`) fails
+      // every request in flight when the pool is full — "Context size has been exceeded." — however
+      // small this one is. It is not this conversation outgrowing its window, so nothing is shortened:
+      // another conversation finishes and frees its share, and the same step goes again.
+      if (POOL_FULL.test(String((err as Error)?.message ?? err)) && poolWaits < MAX_POOL_WAITS) {
+        poolWaits++;
+        opts.report?.(t("the server's shared context is full for a moment — the step will go again"));
+        await pause(Math.min(30_000, 2_000 * 2 ** (poolWaits - 1)), opts.signal);
+        if (opts.signal?.aborted) return done("cancelled");
         step--;
         continue;
       }
@@ -715,9 +753,15 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
         }
       } else {
         // An edit changes one file: only what reads it, or a search, can now say something new —
-        // re-reading any other file is still a repeat. Anything else (a command) can change anything.
+        // re-reading any other file is still a repeat. Anything else (a command) can change anything,
+        // except what only touches the turn itself: the plan, a note, the memory.
+        //
+        // ⚠️ « il y a toujours un souci avec les boucles » — `update_plan` reset the count, so a turn
+        // that read the same two files four times, a plan update between each pair, was never stopped.
         const file = fileOf(call.name, JSON.stringify(args));
-        if (file) {
+        if (TURN_ONLY_TOOLS.has(call.name)) {
+          // Nothing in the project changed.
+        } else if (file) {
           for (const key of [...callCounts.keys()]) {
             const [name, json] = key.split("\u0000") as [string, string];
             if (name !== "read_file" || fileOf(name, json) === file) callCounts.delete(key);
@@ -727,6 +771,7 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
       planned.push({ call, tool, args, parallel });
     }
 
+    const stepImages: Array<{ label: string; images: ImagePart[] }> = [];
     const execute = async (item: Planned): Promise<void> => {
       if (item.settled !== undefined) {
         working.push({ role: "tool", toolCallId: item.call.id, content: item.settled });
@@ -748,6 +793,7 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
         recallIds.set(item.call.id, opts.recall.put(result.content, `${item.call.name} ${(item.call.args ?? "").slice(0, 120)}`.trim()));
       }
       working.push({ role: "tool", toolCallId: item.call.id, content: result.content });
+      if (result.images?.length) stepImages.push({ label: `${item.call.name} ${callSignature(item.call.name, safeArgs(item.call.args))}`.trim(), images: result.images });
     };
 
     for (let i = 0; i < planned.length; ) {
@@ -765,6 +811,17 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
       if (batch.length > 1) opts.report?.(t("{0} in parallel", batch.length));
       await Promise.all(batch.map(execute));
       i = end;
+    }
+    // ⚠️ « rajouter le traitement des fichiers binaires (image, etc) […] le même fonctionnement que
+    // Claude Code »: an image read with read_file is shown to the model, not refused as binary.
+    // After every tool message of the step — a message between two of them breaks the exchange.
+    if (stepImages.length) {
+      working.push({
+        role: "user",
+        content: stepImages.map((x) => `[${x.label}, as read just above.]`).join("\n"),
+        images: stepImages.flatMap((x) => x.images),
+      });
+      stepImages.length = 0;
     }
   }
 
