@@ -628,8 +628,6 @@ export type ToPanel =
   | { type: "status"; text: string; tool?: string; ok?: boolean; call?: string; output?: string; result?: boolean }
   /** A tool is starting: what the folded step list shows as "in progress". `count` > 1 for a parallel batch. */
   | { type: "toolStart"; tool: string; call?: string; count?: number }
-  /** A note was rewritten after it streamed (put back in the user's language). */
-  | { type: "replaceText"; from: string; to: string }
   /** What the live turn is waiting for — the server's queue, the reading of the conversation — or "" when it is not. */
   | { type: "activity"; text: string; hint?: string }
   | { type: "turnStart" }

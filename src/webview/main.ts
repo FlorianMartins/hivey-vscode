@@ -502,15 +502,6 @@ class LiveTurn {
     });
   }
 
-  /** A note was rewritten after it streamed (put back in the user's language): the screen follows. */
-  replaceText(from: string, to: string): void {
-    if (this.buffer.includes(from)) {
-      this.buffer = this.buffer.replace(from, to);
-      this.shown = Math.min(this.shown, this.buffer.length);
-      this.scheduleRender();
-    }
-  }
-
   /**
    * The plan, redrawn in place.
    *
@@ -968,9 +959,6 @@ window.addEventListener("message", (event: MessageEvent<ToPanel>) => {
       break;
     case "plan":
       ensureLive().setPlan(m.plan);
-      break;
-    case "replaceText":
-      live?.replaceText(m.from, m.to);
       break;
     case "interjection":
       if (isStreaming()) ensureLive().appendInterjection(m.text);

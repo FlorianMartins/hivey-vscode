@@ -82,18 +82,6 @@ export class SegmentBuilder {
     const s = last && last.user === undefined ? last : this.open();
     (s.steps ??= []).push(step);
   }
-
-  /** A note was rewritten after it streamed (put back in the user's language): the record follows. */
-  replace(from: string, to: string): void {
-    if (!from || from === to) return;
-    for (let i = this.segments.length - 1; i >= 0; i--) {
-      const s = this.segments[i]!;
-      if (s.text?.includes(from)) {
-        s.text = s.text.replace(from, to);
-        return;
-      }
-    }
-  }
 }
 
 /**
