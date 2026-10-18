@@ -595,6 +595,31 @@ test("⚠️ a plan update between two reads does not make the same read new aga
   assert.equal(read.calls.filter((c) => c["path"] === "src/ui.js").length, 2, "read twice, refused the third time");
 });
 
+test("a server whose shared context is full: the step waits and goes again, nothing shortened", async () => {
+  // llama.cpp with `--kv-unified` fails every request in flight when the pool its places share is
+  // full. Not this conversation outgrowing its window: another one frees its share.
+  let calls = 0;
+  const provider: Provider = {
+    id: "local",
+    baseUrl: "http://127.0.0.1:11434/v1",
+    isLocal: true,
+    async chat(): Promise<ChatResult> {
+      calls++;
+      if (calls === 1) throw new Error("HTTP 500: Context size has been exceeded.");
+      return { text: "Fait.", reasoning: "", toolCalls: [], usage: { promptTokens: 1, completionTokens: 1, cachedTokens: 0 }, stopReason: "stop" };
+    },
+    async listModels() {
+      return [];
+    },
+  };
+  const reports: string[] = [];
+  const r = await runTurn({ ...base, provider, report: (m) => reports.push(m) });
+  assert.equal(r.text, "Fait.");
+  assert.equal(calls, 2);
+  assert.ok(reports.some((m) => /shared context is full/.test(m)));
+  assert.ok(!reports.some((m) => /shortened/.test(m)), "a full pool is not this turn's window");
+});
+
 test("the same tool with different arguments is never mistaken for a loop", async () => {
   const read = tool("read_file", { parallel: () => true });
   const provider = scriptedProvider([

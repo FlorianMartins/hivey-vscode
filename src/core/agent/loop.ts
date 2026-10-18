@@ -252,6 +252,22 @@ const DEFAULT_MAX_STEPS = 30;
  */
 const MAX_CONTINUATIONS = 2;
 
+/** llama.cpp's answer when the context pool its places share is full — see `poolWaits`. */
+const POOL_FULL = /Context size has been exceeded/i;
+/** Waits of 2, 4, 8, 16, 30 and 30 s: a minute and a half for another conversation to free its share. */
+const MAX_POOL_WAITS = 6;
+
+/** Wait, unless the turn is stopped first. */
+function pause(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(resolve, ms);
+    signal?.addEventListener("abort", () => {
+      clearTimeout(timer);
+      resolve();
+    }, { once: true });
+  });
+}
+
 /** How many times one turn shortens old tool outputs before giving up on fitting the window. */
 const MAX_SHRINKS = 3;
 /** Room left for the answer once the request fits again, in tokens. */
@@ -436,6 +452,7 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
   let continuations = 0;
   /** How many times this turn has shortened old tool outputs to fit the context window. */
   let shrinkAttempts = 0;
+  let poolWaits = 0;
   /** Which kept memory entry holds each tool output of this turn, by tool call id. */
   const recallIds = new Map<string, string>();
   const keptAs = (toolCallId: string): string | undefined => recallIds.get(toolCallId);
@@ -519,6 +536,18 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
       if (overflow && shrinkAttempts < MAX_SHRINKS && shrinkToolOutputs(working, overflow.excess + ANSWER_ROOM_TOKENS, keptAs)) {
         shrinkAttempts++;
         opts.report?.(t("the turn no longer fit the model's context — older tool outputs were shortened"));
+        step--;
+        continue;
+      }
+      // A server whose context pool is SHARED between its places (llama.cpp `--kv-unified`) fails
+      // every request in flight when the pool is full — "Context size has been exceeded." — however
+      // small this one is. It is not this conversation outgrowing its window, so nothing is shortened:
+      // another conversation finishes and frees its share, and the same step goes again.
+      if (POOL_FULL.test(String((err as Error)?.message ?? err)) && poolWaits < MAX_POOL_WAITS) {
+        poolWaits++;
+        opts.report?.(t("the server's shared context is full for a moment — the step will go again"));
+        await pause(Math.min(30_000, 2_000 * 2 ** (poolWaits - 1)), opts.signal);
+        if (opts.signal?.aborted) return done("cancelled");
         step--;
         continue;
       }

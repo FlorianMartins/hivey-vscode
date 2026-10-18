@@ -97,6 +97,12 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
   les fichiers sont lus dans le même ordre à chaque fois.
 - **Relire en boucle les mêmes fichiers est de nouveau repéré** même quand le plan est mis à jour
   entre deux lectures.
+- **Les images se lisent, comme dans Claude Code.** `read_file` sur une image (png, jpg, gif,
+  webp) la montre au modèle, avec sa taille ; un autre fichier binaire est décrit (type, taille) au
+  lieu d'échouer en « fichier binaire ».
+- **Un serveur à plusieurs places qui partagent leur contexte** (`--kv-unified`) peut refuser
+  toutes les requêtes en cours quand sa réserve est pleine : l'étape attend quelques secondes et
+  reprend, au lieu d'échouer ou de raccourcir la conversation à tort.
 - **La fenêtre des données sensibles ne s'ouvre plus pour du code, et dit où sont les données.**
   Sur un millier de fichiers de code ordinaire, un sur vingt était pris pour un identifiant, et les
   tracés d'icônes SVG pour des numéros de téléphone : la fenêtre s'ouvrait presque à chaque requête
