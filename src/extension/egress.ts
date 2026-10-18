@@ -76,6 +76,11 @@ export interface PreparedRequest {
 
 export class EgressGate {
   private readonly consented = new Set<string>();
+  /**
+   * The conversations whose user chose "Always send" at the credential warning. In memory only: a
+   * new conversation, or VS Code restarted, asks again.
+   */
+  private readonly secretsAllowed = new Set<string>();
 
   constructor(
     private readonly state: vscode.Memento,
@@ -94,7 +99,7 @@ export class EgressGate {
   async prepare(
     messages: ChatMessage[],
     settings: Settings,
-    target: { provider: string; model: string; baseUrl: string; isLocal: boolean },
+    target: { provider: string; model: string; baseUrl: string; isLocal: boolean; conversation?: string },
     vault = new Vault(),
   ): Promise<PreparedRequest | undefined> {
     // Local endpoints skip the whole gate: redacting text that never leaves the machine costs
@@ -107,7 +112,11 @@ export class EgressGate {
 
     const { messages: redacted, findings, hasSecret } = redactMessages(messages, vault, redactionPolicy(settings));
 
-    if (hasSecret) {
+    // ⚠️ « la fenêtre se déclenche tout le temps » — it is asked at every step of an agent turn, and the
+    // same credential-shaped text stays in the history, so the same question came back step after
+    // step. "Always send" answers it for the rest of the conversation; the markers stay in place.
+    if (hasSecret && !(target.conversation && this.secretsAllowed.has(target.conversation))) {
+      const always = t("Always send (this conversation)");
       const proceed = await vscode.window.showWarningMessage(
         t(
           "Hivey Code: what you are about to send contains {0} item(s) shaped like a credential. They were replaced by markers, but nothing replaces reading it yourself.",
@@ -116,8 +125,10 @@ export class EgressGate {
         // No "Cancel" of our own: a modal dialog already has one, and the window showed two.
         { modal: true },
         t("Send (markers in place)"),
+        ...(target.conversation ? [always] : []),
       );
-      if (proceed !== t("Send (markers in place)")) return undefined;
+      if (proceed === always && target.conversation) this.secretsAllowed.add(target.conversation);
+      else if (proceed !== t("Send (markers in place)")) return undefined;
     }
 
     const estimatedTokens = estimateMessageTokens(redacted);

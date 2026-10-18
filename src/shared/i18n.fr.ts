@@ -212,6 +212,7 @@ export const FR: Record<string, string> = {
   "Select some text in the terminal first.": "Sélectionnez d'abord du texte dans le terminal.",
   "Send": "Envoyer",
   "Send (markers in place)": "Envoyer (marqueurs en place)",
+  "Always send (this conversation)": "Toujours envoyer (cette conversation)",
   "Send (⏎)": "Envoyer (⏎)",
   "Served by a local endpoint: no cost, and nothing leaves.": "Modèle servi par un point de terminaison local : aucun coût, aucune sortie de données.",
   "Served from cache": "Servis par le cache",

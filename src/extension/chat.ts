@@ -4483,7 +4483,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         ...(directives ? [{ role: "user" as const, content: directives }] : []),
         ...(handover ? [{ role: "user" as const, content: handover.note }] : []),
       ];
-      const prepared = await this.gate.prepare(outgoing, settings, { provider: providerId, model, baseUrl, isLocal }, vault);
+      const prepared = await this.gate.prepare(outgoing, settings, { provider: providerId, model, baseUrl, isLocal, conversation: this.session.id }, vault);
       if (!prepared) {
         this.post({ type: "status", text: t("Request cancelled.") });
         this.post({ type: "turnEnd" });
@@ -4753,7 +4753,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         beforeRequest: async (messages) => {
           wait.request();
           if (isLocal) return messages;
-          const again = await this.gate.prepare(messages, settings, { provider: providerId, model, baseUrl, isLocal }, vault);
+          const again = await this.gate.prepare(messages, settings, { provider: providerId, model, baseUrl, isLocal, conversation: this.session.id }, vault);
           if (!again) throw new Error(t("Request refused: the rest of the turn was not sent."));
           return again.messages;
         },

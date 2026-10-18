@@ -57,13 +57,14 @@ const RULES: Rule[] = [
   { name: "anthropic-key", kind: "secret", re: /\bsk-ant-[A-Za-z0-9_-]{20,}\b/g },
   { name: "openai-key", kind: "secret", re: /\bsk-(?:proj-)?[A-Za-z0-9_-]{20,}\b/g },
   { name: "openrouter-key", kind: "secret", re: /\bsk-or-v1-[A-Za-z0-9]{32,}\b/g },
-  { name: "google-api-key", kind: "secret", re: /\bAIza[0-9A-Za-z_-]{35}\b/g },
+  { name: "google-api-key", kind: "secret", re: /\bAIza[0-9A-Za-z_-]{35,}\b/g },
   { name: "npm-token", kind: "secret", re: /\bnpm_[A-Za-z0-9]{36}\b/g },
   { name: "hugging-face-token", kind: "secret", re: /\bhf_[A-Za-z0-9]{30,}\b/g },
   { name: "private-key-block", kind: "secret", re: /-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY(?: BLOCK)?-----[\s\S]*?-----END [^-]*-----/g },
   { name: "jwt", kind: "secret", re: /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{4,}\b/g },
   // Credentials carried inside a URL: `postgres://user:p4ssw0rd@db.internal:5432/app`.
-  { name: "url-credentials", kind: "secret", re: /\b[a-z][a-z0-9+.-]*:\/\/[^\s/:@]+:([^\s/@]{3,})@/gi, group: 1 },
+  // Not the documentation's examples — `https://abc:xyz@example.com` is in every URL reference.
+  { name: "url-credentials", kind: "secret", re: /\b[a-z][a-z0-9+.-]*:\/\/[^\s/:@]+:([^\s/@]{3,})@(?!(?:example\.(?:com|org|net)|localhost)\b)/gi, group: 1 },
   // `PASSWORD = "…"`, `api_key: '…'`, `SECRET=…` — the assignment is what makes it a secret.
   //
   // The hard part is not finding these; it is not finding them in ordinary code. `apiKey: cfg.apiKey`,
@@ -90,11 +91,18 @@ const RULES: Rule[] = [
       // both match the label. No API key ever issued starts with # @ / or \, or ends with a colon
       // — they are base64, hex or alphanumeric — so refusing those shapes costs nothing real.
       if (/^[#@/\\]/.test(v) || v.endsWith(":")) return false;
-      if (quoted) return !/^(?:process\.|os\.|env[.[])/i.test(v);
+      // ⚠️ « il se déclenche alors qu'il n'y a pas de données sensibles (juste le projet avec du
+      // code) ». Measured over a thousand files of ordinary code, one in twenty was flagged. A sentence
+      // in quotes is a message or a doc example (`password = 'Password used to generate key'`), and no
+      // issued credential contains a space.
+      if (quoted) return !/^(?:process\.|os\.|env[.[])/i.test(v) && !/\s/.test(v);
       // Unquoted: reject anything with the shape of an expression, a type or a constant name.
       if (/[.(\[<]|::|->/.test(v)) return false;
       if (/^(?:string|number|boolean|any|unknown|null|true|false|undefined|none|nil|str|int)$/i.test(v)) return false;
       if (/^[A-Z_][A-Z0-9_]*$/.test(v)) return false; // SECRET = ANOTHER_CONSTANT
+      // A name without a digit is a variable or a type — `password: BinaryLike`, `token: discordToken`,
+      // `auth: requireAuth`. An unquoted credential in a .env file has digits; a name has words.
+      if (/^[A-Za-z_$][A-Za-z_$]*$/.test(v)) return false;
       // What is left must actually look random: a real value in a .env file does.
       return entropy(v) > 2.6 || v.length >= 16;
     },
@@ -142,6 +150,17 @@ export function scanShapes(text: string): RawSpan[] {
   return out;
 }
 
+/**
+ * Is this long string made of words — a camelCase name, a path, a URL — rather than random characters?
+ * Cut into its words (`Cipher`, `Cha`, `20`, `Poly`, `1305`, `Types`), a name averages four characters
+ * a piece or more; a key, cut the same way, averages under two: `Zx`, `9`, `Kq`, `2`, `Lm`…
+ */
+export function madeOfWords(v: string): boolean {
+  const pieces = v.split(/[/_.\-+=:]+/).filter(Boolean).flatMap((part) => part.match(/[A-Z]?[a-z]+|[A-Z]+(?![a-z])|\d+/g) ?? []);
+  if (!pieces.length) return false;
+  return pieces.reduce((n, w) => n + w.length, 0) / pieces.length >= 3;
+}
+
 /** Long, disordered strings that no vendor rule claimed. The safety net. */
 export function scanEntropy(text: string): RawSpan[] {
   const out: RawSpan[] = [];
@@ -153,6 +172,10 @@ export function scanEntropy(text: string): RawSpan[] {
     // subresource-integrity attribute. Redacting them adds noise and hides nothing.
     if (/(?:sha1|sha256|sha384|sha512|md5)-$/i.test(text.slice(Math.max(0, m.index - 8), m.index))) continue;
     if (/integrity["'\s:=]+$/i.test(text.slice(Math.max(0, m.index - 14), m.index))) continue;
+    // An image or a font inlined as base64 is content, not a credential.
+    if (/;base64,$/i.test(text.slice(Math.max(0, m.index - 8), m.index))) continue;
+    // A URL, a path, a long type or function name: words, not a key — see `madeOfWords`.
+    if (madeOfWords(v)) continue;
     if (v.length < HIGH_ENTROPY_MIN_LEN) continue;
     // A long identifier is words joined by _ or -, and reads with low entropy; a key does not.
     if (entropy(v) < HIGH_ENTROPY_MIN_BITS) continue;
