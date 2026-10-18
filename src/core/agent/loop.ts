@@ -24,6 +24,7 @@ import { restoreDeep } from "../redaction/index.js";
 import { t } from "../../shared/i18n.js";
 import type { RecallStore } from "./recall.js";
 import { steerMessage, withReplyLanguage } from "../prompts.js";
+import type { UserLang } from "../userLanguage.js";
 
 /** A message typed during the turn, with what was attached to it. See `RunTurnOptions.steer`. */
 export interface SteerInput {
@@ -157,7 +158,7 @@ export interface TurnOptions {
    * la réponse dans la langue de l'utilisateur »: a note that streamed in English and turned French
    * once it was done read as a glitch, and the answer is the model's to write in the right language.
    */
-  replyLanguage?: "en" | "fr";
+  replyLanguage?: UserLang;
   /**
    * What the person typed while the turn was running, handed over and forgotten by the caller.
    * Asked before every request: the messages go in after the last tool results, so the model reads

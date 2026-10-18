@@ -48,7 +48,7 @@ import { promptForMode, toolsForMode, MODES, type Mode } from "../core/session/m
 import { t, language } from "../shared/i18n.js";
 import { ENV, reasoningFromEnv, temperatureFromEnv } from "./env.js";
 import { isSelfHostedProvider } from "../core/redaction/index.js";
-import { detectLanguage } from "../core/prompts.js";
+import { detectUserLanguage } from "../core/userLanguage.js";
 
 interface CliConfig {
   provider: ProviderId;
@@ -528,7 +528,7 @@ async function main(): Promise<void> {
           return now;
         },
         // The user's language, held for the whole turn, as in the panel.
-        replyLanguage: detectLanguage(text, language()),
+        replyLanguage: detectUserLanguage(text, language()),
         // The same one self-check the panel does, by the same rule: it changed files and ran
         // nothing, so finish it before saying it is done.
         selfCheck: (trace) =>

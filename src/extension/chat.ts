@@ -34,6 +34,7 @@ import { runTurn, type Tool } from "../core/agent/loop.js";
 import { RecallStore, recallTools } from "../core/agent/recall.js";
 import { Permissions, commandPrefix, type PermissionStore, type Rule } from "../core/agent/permissions.js";
 import { detectLanguage, languageDirective, stablePrompt, turnDirectives } from "../core/prompts.js";
+import { detectUserLanguage } from "../core/userLanguage.js";
 import { costOf, estimateCost, makeLookup, type Price } from "../core/router/pricing.js";
 import { calibrate, observe, prune, type Calibration } from "../core/util/calibrate.js";
 import { acceptsImages, IMAGE_TOKENS, isCatalogued, isImageRefusal, withoutImages } from "../core/models/vision.js";
@@ -4281,7 +4282,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const lastQuestion = withoutModelText([...this.session.entries].reverse().find((e) => e.role === "user")?.text ?? "");
     const directives = turnDirectives({
       ...(this.participant ? { participant: participantDirective(this.participant) } : {}),
-      language: languageDirective(detectLanguage(lastQuestion, language())),
+      language: languageDirective(detectUserLanguage(lastQuestion, language())),
     });
     // Named rather than inlined, because the card that asks the user to consent has to be able to
     // say how big each of them is. A number nobody can attribute is a number nobody can act on.
@@ -4589,7 +4590,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       // EARLIER questions are in here too, which is why one refusal used to break every turn after.
       const imageKey = `${providerId}::${model}`;
       let sendMessages = this.isVisionless(imageKey) ? withoutImages(prepared.messages) : prepared.messages;
-      const turnLanguage = detectLanguage(withoutModelText(lastUser?.text ?? ""), language());
+      const turnLanguage = detectUserLanguage(withoutModelText(lastUser?.text ?? ""), language());
       // The answer as it happens, step by step — see core/session/segments.ts.
       const segments = new SegmentBuilder();
       // The same array, filled as the turn runs: what is saved with the answer, and what a redraw shows.
