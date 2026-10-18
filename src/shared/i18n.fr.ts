@@ -66,7 +66,6 @@ export const FR: Record<string, string> = {
   "By default Hivey Code reads without asking, and asks before every write and every command. What you allow here applies to the SHAPE of an action, never to one occurrence: allowing “npm test” does not allow “npm publish”.": "Par défaut, Hivey Code lit sans demander et demande avant toute écriture ou commande. Ce que vous autorisez ici s'applique à la FORME de l'action, jamais à une seule occurrence : autoriser « npm test » n'autorise pas « npm publish ».",
   "Cache": "Cache",
   "Calls": "Appels",
-  "Cancel": "Annuler",
   "Cannot list the models: {0}": "Impossible de lister les modèles : {0}",
   "Change applied — Ctrl+Z to undo.": "Modification appliquée — Ctrl+Z pour revenir.",
   "Chat": "Discussion",

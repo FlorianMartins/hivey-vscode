@@ -113,9 +113,9 @@ export class EgressGate {
           "Hivey Code: what you are about to send contains {0} item(s) shaped like a credential. They were replaced by markers, but nothing replaces reading it yourself.",
           findings.filter((f) => f.kind === "secret").length,
         ),
+        // No "Cancel" of our own: a modal dialog already has one, and the window showed two.
         { modal: true },
         t("Send (markers in place)"),
-        t("Cancel"),
       );
       if (proceed !== t("Send (markers in place)")) return undefined;
     }
