@@ -6,6 +6,15 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Ajouté
 
+- **Le modèle réfléchit et répond dans votre langue, quelle qu'elle soit.** L'espagnol,
+  l'allemand, l'italien, le portugais et le néerlandais étaient lus comme de l'anglais, et la
+  consigne demandait alors de répondre en anglais : ils sont reconnus, et la consigne est aussi
+  écrite dans la langue elle-même. Sur un serveur auto-hébergé, la réflexion est en plus amorcée
+  dans votre langue (« Analysons la situation en détail. La demande porte sur… ») : mesuré sur 60
+  tâches en français, espagnol et allemand, 92 à 98 % de la réflexion et 97 à 100 % des notes sont
+  dans votre langue (contre 0-1 % et 54-86 % sans), et 57 tâches sur 60 réussissent (contre 55).
+  En contrepartie, la réflexion est plus détaillée et un tour prend environ 40 % de temps en plus.
+  L'anglais ne change pas.
 - **Une commande qui échoue dit pourquoi.** « il a toujours des erreurs des commandes node ». Le cas
   le plus fréquent relevé : `npx tsc` sans TypeScript dans le projet télécharge un paquet sans rapport
   nommé `tsc`, et le modèle réessayait dix variantes. Pour ce piège et quelques autres (sous Windows,
