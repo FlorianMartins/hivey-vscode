@@ -12,6 +12,7 @@
 import * as vscode from "vscode";
 import { describeSlice, sliceLines } from "../core/fs/slice.js";
 import { cmdMultiLineProblem } from "../core/terminal/cmdLines.js";
+import { isBinaryFile, readBinary } from "../core/fs/binary.js";
 import { findUnique } from "../core/text/findText.js";
 import { cappedAt, describeCap } from "../core/agent/capped.js";
 import { searchPattern } from "../core/agent/regex.js";
@@ -247,6 +248,13 @@ export function buildTools(deps: ToolDeps): Tool[] {
       const uri = resolve(String(args["path"] ?? ""), s());
       const missing = await missingFile(uri);
       if (missing) return { content: missing, isError: true };
+      // An image is shown to the model; any other binary is described — see `core/fs/binary.ts`.
+      // It used to fail here with "the file seems to be binary", screenshots included.
+      const bytes = await vscode.workspace.fs.readFile(uri);
+      if (isBinaryFile(uri.fsPath, bytes.subarray(0, 8000))) {
+        ctx.report(t("read {0}", relative(uri)));
+        return readBinary(relative(uri), bytes);
+      }
       const doc = await vscode.workspace.openTextDocument(uri);
       // ⚠️ A range, and a notice that says how to get the rest. This returned the head of the file and
       // nothing else, so on anything long the model could not reach the part it needed and resorted

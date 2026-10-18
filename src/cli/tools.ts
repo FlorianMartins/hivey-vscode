@@ -13,6 +13,7 @@ import { findUnique, IDENTICAL_EDIT } from "../core/text/findText.js";
 import { commandHint } from "../core/terminal/hints.js";
 import { cappedAt, describeCap } from "../core/agent/capped.js";
 import { readFile, readdir, stat, writeFile } from "node:fs/promises";
+import { isBinaryFile, readBinary } from "../core/fs/binary.js";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import type { Tool, ToolResult } from "../core/agent/loop.js";
 import { isBlockedPath } from "../core/util/glob.js";
@@ -157,7 +158,10 @@ export function buildCliTools(opts: CliToolOptions): Tool[] {
     approval: () => false,
     async run(args, ctx): Promise<ToolResult> {
       const path = safeResolve(opts, String(args["path"] ?? ""));
-      const text = await readFile(path, "utf8");
+      const bytes = await readFile(path);
+      // An image is shown to the model; any other binary is described — see `core/fs/binary.ts`.
+      if (isBinaryFile(path, bytes)) return readBinary(String(args["path"] ?? ""), bytes);
+      const text = bytes.toString("utf8");
       // The same range and the same notice as the panel's reader: one behaviour, two surfaces. See
       // `core/fs/slice.ts` for why truncating in silence sent a real session chasing `sed`.
       const slice = sliceLines(

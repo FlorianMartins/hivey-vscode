@@ -19,6 +19,7 @@
 
 import type { ChatMessage, ChatResult, Provider, ReasoningEffort, ToolCall, ToolSchema, Usage, ImagePart } from "../providers/types.js";
 import { coerceArgs, parseToolArgs, unknownToolMessage, validateArgs } from "./toolcall.js";
+import { callSignature, safeArgs } from "./callSignature.js";
 import { estimateMessageTokens } from "../util/tokens.js";
 import { restoreDeep } from "../redaction/index.js";
 import { t } from "../../shared/i18n.js";
@@ -55,6 +56,12 @@ export interface ToolResult {
   isError?: boolean;
   /** Anything the UI wants to show (a diff, a file path) but the model does not need. */
   display?: unknown;
+  /**
+   * Images for the model to look at — a screenshot or an icon read with read_file. A tool message
+   * cannot carry one on an OpenAI-compatible server, so the loop hands them over in a message of
+   * their own right after the step's tool results, which is where the model reads them.
+   */
+  images?: ImagePart[];
 }
 
 export interface Tool {
@@ -735,6 +742,7 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
       planned.push({ call, tool, args, parallel });
     }
 
+    const stepImages: Array<{ label: string; images: ImagePart[] }> = [];
     const execute = async (item: Planned): Promise<void> => {
       if (item.settled !== undefined) {
         working.push({ role: "tool", toolCallId: item.call.id, content: item.settled });
@@ -756,6 +764,7 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
         recallIds.set(item.call.id, opts.recall.put(result.content, `${item.call.name} ${(item.call.args ?? "").slice(0, 120)}`.trim()));
       }
       working.push({ role: "tool", toolCallId: item.call.id, content: result.content });
+      if (result.images?.length) stepImages.push({ label: `${item.call.name} ${callSignature(item.call.name, safeArgs(item.call.args))}`.trim(), images: result.images });
     };
 
     for (let i = 0; i < planned.length; ) {
@@ -773,6 +782,17 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
       if (batch.length > 1) opts.report?.(t("{0} in parallel", batch.length));
       await Promise.all(batch.map(execute));
       i = end;
+    }
+    // ⚠️ « rajouter le traitement des fichiers binaires (image, etc) […] le même fonctionnement que
+    // Claude Code »: an image read with read_file is shown to the model, not refused as binary.
+    // After every tool message of the step — a message between two of them breaks the exchange.
+    if (stepImages.length) {
+      working.push({
+        role: "user",
+        content: stepImages.map((x) => `[${x.label}, as read just above.]`).join("\n"),
+        images: stepImages.flatMap((x) => x.images),
+      });
+      stepImages.length = 0;
     }
   }
 
