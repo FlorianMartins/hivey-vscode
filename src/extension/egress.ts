@@ -19,6 +19,8 @@
 import * as vscode from "vscode";
 import { t } from "../shared/i18n.js";
 import { redactMessages, Vault, type Finding } from "../core/redaction/index.js";
+import type { FindingKind } from "../core/redaction/types.js";
+import { masked, placeOf, type Place } from "../core/redaction/locate.js";
 import type { ChatMessage } from "../core/providers/types.js";
 import { Budget, type SpendStore, type Spend } from "../core/router/budget.js";
 import { isBlockedPath, matchGlob } from "../core/util/glob.js";
@@ -74,6 +76,45 @@ export interface PreparedRequest {
   estimatedTokens: number;
 }
 
+/** Besides credentials, the kinds the warning is about: a person's and a company's data, and listed terms. */
+const WARNED = new Set<FindingKind>(["identity", "business", "term"]);
+/** Beyond this, the list says how many more: a dialog is not a report. */
+const MAX_LISTED = 12;
+
+/** Where it is, in the interface's language: `src/config.js:12`, or what it came from. */
+function whereWords(place: Place): string {
+  switch (place.from) {
+    case "file":
+      return `${place.file}:${place.line}`;
+    case "typed":
+      return t("your message");
+    case "command":
+      return t("the output of {0}", `\`${place.command.slice(0, 60)}\``);
+    case "tool":
+      return t("the result of {0}", place.tool);
+    case "answer":
+      return t("an earlier answer");
+    default:
+      return t("the request");
+  }
+}
+
+/** What it is, in the interface's language. */
+function kindWords(f: Finding): string {
+  const byRule: Record<string, string> = {
+    email: t("e-mail address"),
+    phone: t("phone number"),
+    iban: t("IBAN"),
+    "payment-card": t("payment card number"),
+    "company-number": t("company number"),
+    "vat-number": t("VAT number"),
+    "company-name": t("company name"),
+    amount: t("amount"),
+    "custom-term": t("listed term"),
+  };
+  return byRule[f.rule] ?? (f.kind === "secret" ? t("credential") : t("personal data"));
+}
+
 export class EgressGate {
   private readonly consented = new Set<string>();
   /**
@@ -81,6 +122,8 @@ export class EgressGate {
    * new conversation, or VS Code restarted, asks again.
    */
   private readonly secretsAllowed = new Set<string>();
+  /** The values already accepted at the warning, per conversation: not asked about again there. */
+  private readonly acceptedValues = new Map<string, Set<string>>();
 
   constructor(
     private readonly state: vscode.Memento,
@@ -110,25 +153,40 @@ export class EgressGate {
       return { messages, vault, findings: [], estimatedTokens: estimateMessageTokens(messages) };
     }
 
-    const { messages: redacted, findings, hasSecret } = redactMessages(messages, vault, redactionPolicy(settings));
+    const { messages: redacted, findings } = redactMessages(messages, vault, redactionPolicy(settings));
 
-    // ⚠️ « la fenêtre se déclenche tout le temps » — it is asked at every step of an agent turn, and the
-    // same credential-shaped text stays in the history, so the same question came back step after
-    // step. "Always send" answers it for the rest of the conversation; the markers stay in place.
-    if (hasSecret && !(target.conversation && this.secretsAllowed.has(target.conversation))) {
+    // ⚠️ « il faut aussi les données d'entreprises (email, chiffres, nom de compagnies, etc) mais pas
+    // le code […] afficher précisément le fichier et la ligne concernée ». Asked for a credential
+    // wherever it is, and for a person's or a company's data found in a file or a tool result — not
+    // for what the person typed, which they know. Everything listed is already replaced by a marker;
+    // the question is whether to send it like that, and where to go and correct it.
+    //
+    // And « la fenêtre se déclenche tout le temps »: it is asked at every step of an agent turn, and
+    // the same values stay in the history. A value once accepted in a conversation is not asked about
+    // again there; "Always send" accepts everything for the rest of it.
+    const conversation = target.conversation;
+    const accepted = conversation ? (this.acceptedValues.get(conversation) ?? new Set<string>()) : new Set<string>();
+    const asked = findings
+      .map((f) => ({ f, place: placeOf(messages, f) }))
+      .filter(({ f, place }) => f.kind === "secret" || (WARNED.has(f.kind) && place.from !== "typed"))
+      .filter(({ f }) => !accepted.has(f.value));
+    if (asked.length && !(conversation && this.secretsAllowed.has(conversation))) {
       const always = t("Always send (this conversation)");
+      const lines = asked.slice(0, MAX_LISTED).map(({ f, place }) => `• ${whereWords(place)} — ${kindWords(f)} (${masked(f.value)})`);
+      if (asked.length > MAX_LISTED) lines.push(t("… and {0} more", asked.length - MAX_LISTED));
       const proceed = await vscode.window.showWarningMessage(
-        t(
-          "Hivey Code: what you are about to send contains {0} item(s) shaped like a credential. They were replaced by markers, but nothing replaces reading it yourself.",
-          findings.filter((f) => f.kind === "secret").length,
-        ),
+        t("Hivey Code: what you are about to send contains {0} sensitive item(s). Each was replaced by a marker; here is where they are, if you want to correct them.", asked.length),
         // No "Cancel" of our own: a modal dialog already has one, and the window showed two.
-        { modal: true },
+        { modal: true, detail: lines.join("\n") },
         t("Send (markers in place)"),
-        ...(target.conversation ? [always] : []),
+        ...(conversation ? [always] : []),
       );
-      if (proceed === always && target.conversation) this.secretsAllowed.add(target.conversation);
+      if (proceed === always && conversation) this.secretsAllowed.add(conversation);
       else if (proceed !== t("Send (markers in place)")) return undefined;
+      if (conversation) {
+        for (const { f } of asked) accepted.add(f.value);
+        this.acceptedValues.set(conversation, accepted);
+      }
     }
 
     const estimatedTokens = estimateMessageTokens(redacted);

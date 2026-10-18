@@ -4,6 +4,7 @@
 export type FindingKind =
   | "secret" // credentials, tokens, private keys — never leave, even redacted
   | "identity" // people: e-mail addresses, phone numbers, user names in paths
+  | "business" // a company's data: bank accounts, cards, company and VAT numbers, company names, amounts
   | "infra" // machines: hostnames, IP addresses, internal URLs
   | "path" // filesystem layout that leaks a user or a company
   | "term"; // organization-specific words the operator listed (client names, codenames)
@@ -17,6 +18,8 @@ export interface Finding {
   value: string;
   /** Placeholder that replaced it, e.g. `⟨EMAIL_1⟩`. */
   placeholder: string;
+  /** Which message of a request it was found in — set by `redactMessages`, for saying where it is. */
+  message?: number;
 }
 
 export type RedactionLevel = "strict" | "balanced" | "off";
@@ -39,9 +42,9 @@ export const DEFAULT_POLICY: RedactionPolicy = {
 export function kindsFor(level: RedactionLevel): Set<FindingKind> {
   switch (level) {
     case "strict":
-      return new Set<FindingKind>(["secret", "identity", "infra", "path", "term"]);
+      return new Set<FindingKind>(["secret", "identity", "business", "infra", "path", "term"]);
     case "balanced":
-      return new Set<FindingKind>(["secret", "identity", "term"]);
+      return new Set<FindingKind>(["secret", "identity", "business", "term"]);
     case "off":
       return new Set<FindingKind>(["secret"]);
   }

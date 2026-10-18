@@ -14,6 +14,7 @@ import type { FindingKind } from "./types.js";
 const LABEL: Record<FindingKind, string> = {
   secret: "SECRET",
   identity: "IDENT",
+  business: "DATA",
   infra: "HOST",
   path: "USER",
   term: "TERM",
@@ -31,6 +32,12 @@ const RULE_LABEL: Record<string, string> = {
   "unix-home": "USER",
   "windows-home": "USER",
   "custom-term": "TERM",
+  iban: "IBAN",
+  "payment-card": "CARD",
+  "company-number": "COMPANY_ID",
+  "vat-number": "VAT",
+  "company-name": "COMPANY",
+  amount: "AMOUNT",
 };
 
 export class Vault {
