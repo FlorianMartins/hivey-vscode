@@ -34,7 +34,7 @@ import { runTurn, type Tool } from "../core/agent/loop.js";
 import { RecallStore, recallTools } from "../core/agent/recall.js";
 import { Permissions, commandPrefix, type PermissionStore, type Rule } from "../core/agent/permissions.js";
 import { detectLanguage, languageDirective, stablePrompt, turnDirectives } from "../core/prompts.js";
-import { detectUserLanguage } from "../core/userLanguage.js";
+import { detectUserLanguage, THINK_STARTERS } from "../core/userLanguage.js";
 import { costOf, estimateCost, makeLookup, type Price } from "../core/router/pricing.js";
 import { calibrate, observe, prune, type Calibration } from "../core/util/calibrate.js";
 import { acceptsImages, IMAGE_TOKENS, isCatalogued, isImageRefusal, withoutImages } from "../core/models/vision.js";
@@ -4626,6 +4626,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         ...(useModel === model && this.modelWindow(settings) ? { contextWindow: this.modelWindow(settings) } : {}),
         // The user's language, held for the whole turn — see `withReplyLanguage`.
         replyLanguage: turnLanguage,
+        // The thinking started in the user's language on a self-hosted server, for the model asked — see `THINK_STARTERS`.
+        ...(useModel === model && isSelfHostedProvider(providerId) && THINK_STARTERS[turnLanguage] ? { thinkPrefix: THINK_STARTERS[turnLanguage] } : {}),
         recall: this.recallFor(this.session.id),
         // What the person typed since the last step, read now — and recorded where it was read, so
         // the saved turn and the next turns show the correction in its place. See `steer`.

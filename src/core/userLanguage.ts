@@ -32,6 +32,35 @@ export const REPLY_IN_OWN_WORDS: Partial<Record<UserLang, string>> = {
   nl: "Antwoord in het Nederlands: elke zin die je voor de gebruiker schrijft, ook de notities tussen de tools.",
 };
 
+/**
+ * The first words of the model's thinking in the user's language, on a server that continues a
+ * started answer. None for English, where it thinks anyway.
+ *
+ * ⚠️ Measured on Qwen3.8, start by start: « Bon, je » made the thinking a narration (« Bon, je vais
+ * lancer les tests maintenant »); « Réfléchissons étape par étape. » — a finished sentence — closed
+ * the thinking on the spot; « …D'abord, » left one short line; a second start for later steps
+ * (« Analysons ce résultat en détail : ») drifted into a generic report unrelated to the task. This
+ * one kept a whole reasoning, checks included, in French — at every step.
+ */
+export const THINK_STARTERS: Partial<Record<UserLang, string>> = {
+  fr: "Analysons la situation en détail. La demande porte sur",
+  es: "Analicemos la situación en detalle. La petición trata sobre",
+  de: "Analysieren wir die Situation im Detail. Die Anfrage betrifft",
+  it: "Analizziamo la situazione nel dettaglio. La richiesta riguarda",
+  pt: "Vamos analisar a situação em detalhe. O pedido trata de",
+  nl: "Laten we de situatie in detail analyseren. Het verzoek gaat over",
+};
+
+/** « Think in this language », in that language — said only where the thinking is started in it. */
+export const THINK_IN_OWN_WORDS: Partial<Record<UserLang, string>> = {
+  fr: "Réfléchis en français aussi.",
+  es: "Piensa en español también.",
+  de: "Denke auch auf Deutsch.",
+  it: "Pensa anche in italiano.",
+  pt: "Pense em português também.",
+  nl: "Denk ook in het Nederlands.",
+};
+
 /** Very common words of each language — the ones that decide, and almost nothing else. */
 const WORDS: Record<UserLang, string[]> = {
   en: ["the", "and", "is", "are", "for", "that", "with", "this", "please", "can", "you", "what", "why", "how", "does", "do", "not", "it", "of", "to", "in", "my", "should", "would", "could"],

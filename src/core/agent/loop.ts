@@ -160,6 +160,12 @@ export interface TurnOptions {
    */
   replyLanguage?: UserLang;
   /**
+   * The first words of the model's thinking, sent as the start of its answer so the thought goes on
+   * in the user's language — only where the server continues a started answer (a self-hosted one).
+   * See `THINK_STARTERS`.
+   */
+  thinkPrefix?: string;
+  /**
    * What the person typed while the turn was running, handed over and forgotten by the caller.
    * Asked before every request: the messages go in after the last tool results, so the model reads
    * them at its next step without the turn being stopped. Asked again when the model has just
@@ -457,8 +463,24 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
       }
     }
     const prepared0 = opts.beforeRequest ? await opts.beforeRequest(working) : working;
-    const prepared = opts.replyLanguage ? withReplyLanguage(prepared0, opts.replyLanguage) : prepared0;
-    const outgoing = opts.promptCache ? withRollingCacheMark(prepared) : prepared;
+    // The thinking started in the user's language, as the start of the model's answer — sent, never
+    // stored; put back in front of the thought it started, live and in the result. See `thinkPrefix`.
+    const prefix = opts.thinkPrefix && opts.reasoning !== "none" && !opts.chore ? opts.thinkPrefix : undefined;
+    const prepared = opts.replyLanguage ? withReplyLanguage(prepared0, opts.replyLanguage, Boolean(prefix)) : prepared0;
+    const outgoing0 = opts.promptCache ? withRollingCacheMark(prepared) : prepared;
+    const outgoing = prefix ? [...outgoing0, { role: "assistant" as const, content: "", reasoning: prefix }] : outgoing0;
+    let thoughtStarted = false;
+    const onDelta: TurnOptions["onDelta"] =
+      prefix && opts.onDelta
+        ? (d) => {
+            if (d.reasoning && !thoughtStarted) {
+              thoughtStarted = true;
+              opts.onDelta!({ ...d, reasoning: `${prefix} ${d.reasoning.replace(/^\s+/, "")}` });
+              return;
+            }
+            opts.onDelta!(d);
+          }
+        : opts.onDelta;
     let res: ChatResult;
     try {
       res = await opts.provider.chat(
@@ -472,8 +494,9 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
           reasoning: opts.reasoning,
           signal: opts.signal,
         },
-        opts.onDelta,
+        onDelta,
       );
+      if (prefix && res.reasoning) res = { ...res, reasoning: `${prefix} ${res.reasoning.replace(/^\s+/, "")}` };
     } catch (err) {
       if (opts.signal?.aborted) return done("cancelled");
       // ⚠️ The turn outgrew the server's context window MID-WAY: "request (69882 tokens) exceeds

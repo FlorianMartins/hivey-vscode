@@ -2,7 +2,7 @@
 // what the assistant refuses to do, how it formats an answer, and what it does when it is unsure
 // are all decided here, and they should be reviewable in one diff.
 
-import { LANG_NAMES, REPLY_IN_OWN_WORDS, type UserLang } from "./userLanguage.js";
+import { LANG_NAMES, REPLY_IN_OWN_WORDS, THINK_IN_OWN_WORDS, type UserLang } from "./userLanguage.js";
 
 const SHARED_RULES = `
 You are Hivey Code, a coding assistant running inside the user's editor, on infrastructure the
@@ -251,12 +251,13 @@ const ENGLISH_WORDS = new Set([
  * go on the copy that is sent: the stored transcript is untouched, the system text only changes when
  * the user's language does, and the reminder sits on the step that was going to change anyway.
  */
-export function withReplyLanguage<M extends { role: string; content: string }>(messages: M[], lang: UserLang): M[] {
+export function withReplyLanguage<M extends { role: string; content: string }>(messages: M[], lang: UserLang, thinksInIt = false): M[] {
   const name = LANG_NAMES[lang];
   // ⚠️ « je veux la réponse dans la langue de l'utilisateur » — an order about French, written in
   // English, is the weakest form of it: measured on the thinking, it moved nothing, and the same order
   // in French moved most of it. Said in the user's own words as well. English is unchanged.
-  const own = REPLY_IN_OWN_WORDS[lang] ? ` ${REPLY_IN_OWN_WORDS[lang]}` : "";
+  const think = thinksInIt && THINK_IN_OWN_WORDS[lang] ? ` ${THINK_IN_OWN_WORDS[lang]}` : "";
+  const own = REPLY_IN_OWN_WORDS[lang] ? ` ${REPLY_IN_OWN_WORDS[lang]}${think}` : "";
   const rule =
     `\nLanguage: the user writes in ${name}. Every sentence you write for them is in ${name} — short notes ` +
     `between tool calls included, even right after reading code, logs or your own reasoning in another ` +
