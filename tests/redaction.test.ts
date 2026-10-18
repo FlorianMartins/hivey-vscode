@@ -5,7 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { redact, redactMessages, isLocalEndpoint, Vault, entropy, DEFAULT_POLICY, restoreDeep, streamingRestorer } from "../src/core/redaction/index.js";
-import { scanShapes } from "../src/core/redaction/detectors.js";
+import { madeOfWords, scanShapes } from "../src/core/redaction/detectors.js";
 
 const strict = { ...DEFAULT_POLICY };
 const balanced = { ...DEFAULT_POLICY, level: "balanced" as const };
@@ -337,4 +337,6 @@ test("with ordinary code no longer flagged, real credentials still are", () => {
     const secrets = redact(line, new Vault(), strict).findings.filter((f) => f.kind === "secret");
     assert.notDeepEqual(secrets, [], line);
   }
+  // A key cut into its pieces is short pieces — not words, unlike `CipherChaCha20Poly1305Types`.
+  assert.equal(madeOfWords("Zx9Kq2Lm4Np7Rt5Vw8Yb1Dg3Hj6Kl0Qs"), false);
 });

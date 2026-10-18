@@ -23,7 +23,6 @@ test("a URL, a path or a long type name is words, not a key", () => {
     assert.deepEqual(flags(line), [], line);
   }
   assert.equal(madeOfWords("CipherChaCha20Poly1305Types"), true);
-  assert.equal(madeOfWords("Zx9Kq2Lm4Np7Rt5Vw8Yb1Dg3Hj6Kl0Qs"), false);
 });
 
 test("a variable, a type or a sentence after `password:` is not a password", () => {
