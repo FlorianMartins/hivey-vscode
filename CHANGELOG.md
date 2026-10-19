@@ -11,6 +11,9 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
     plan (fonctions, classes, exports et leurs lignes) et ses premières lignes ; l'agent lit ensuite
     la partie utile. Une relecture au résultat identique devient un renvoi vers la copie déjà là. Dans
     le panneau, une lecture prend au plus 5 % de la fenêtre (25 % avant), une commande 3 % (15 %).
+  - **Il ne relit pas ce qu'il a déjà sous les yeux.** Des lignes que la conversation contient déjà,
+    sans modification ni commande depuis, ne sont pas relues : le modèle est renvoyé à sa copie, et
+    rien ne s'affiche dans le panneau. Banc : 57/60 contre 53/60 sans.
   - **La recherche passe par ripgrep**, celui de VS Code : tous les fichiers, `.gitignore` respecté,
     binaires sautés, en une fraction de seconde.
   - **Les fichiers sont listés du plus récemment modifié au plus ancien.**
