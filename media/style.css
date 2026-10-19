@@ -927,11 +927,6 @@ pre.code {
   font-style: italic;
   color: color-mix(in srgb, var(--reasoning) 75%, var(--vscode-foreground));
 }
-.tl-glyph {
-  flex: 0 0 auto;
-  color: var(--reasoning);
-  margin-right: -2px;
-}
 .tl-thought {
   margin: 2px 0 var(--sp-2);
   padding: var(--sp-1) var(--sp-3);

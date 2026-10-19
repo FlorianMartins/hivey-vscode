@@ -70,6 +70,8 @@ export interface UiEntry {
   error?: string;
   model?: string;
   usdCost?: number;
+  /** For a finished answer: milliseconds from the question to the end of the answer. */
+  took?: number;
   /** What the answer consumed, so its price can be explained on hover rather than only asserted. */
   usage?: { promptTokens: number; completionTokens: number; cachedTokens: number };
   /**
