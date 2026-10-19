@@ -212,6 +212,8 @@ export const FR: Record<string, string> = {
   "Send": "Envoyer",
   "Send (markers in place)": "Envoyer (marqueurs en place)",
   "Always send (this conversation)": "Toujours envoyer (cette conversation)",
+  "fetch {0}": "lire {0}",
+  "fetched {0}": "lu {0}",
   "the server's shared context is full for a moment — the step will go again": "le contexte partagé du serveur est plein pour l'instant — l'étape va reprendre",
   "Hivey Code: what you are about to send contains {0} sensitive item(s). Each was replaced by a marker; here is where they are, if you want to correct them.": "Hivey Code : ce que vous allez envoyer contient {0} donnée(s) sensible(s). Chacune a été remplacée par un marqueur ; voici où elles se trouvent, si vous voulez les corriger.",
   "… and {0} more": "… et {0} autre(s)",
