@@ -14,7 +14,7 @@ import { describeSlice, sliceLines } from "../core/fs/slice.js";
 import { cmdMultiLineProblem } from "../core/terminal/cmdLines.js";
 import { isBinaryFile, readBinary } from "../core/fs/binary.js";
 import { readWhole } from "../core/fs/outline.js";
-import { findUnique } from "../core/text/findText.js";
+import { unnumbered, findUnique } from "../core/text/findText.js";
 import { cappedAt, describeCap } from "../core/agent/capped.js";
 import { searchPattern } from "../core/agent/regex.js";
 import { searchExclude } from "../core/agent/searchScope.js";
@@ -240,7 +240,9 @@ export function buildTools(deps: ToolDeps): Tool[] {
       description:
         "Read a file from the workspace, one page of up to 2000 lines at a time. On a large file, find " +
         "the place first with search_text (it gives the line), then read around it with `from` and `to` " +
-        "(1-based). The result always says which lines came back and how to read on.",
+        "(1-based). The result always says which lines came back and how to read on. Each line comes " +
+        "prefixed with its number and a tab (`     12\\t…`): that prefix is not part of the file — never " +
+        "put it in an edit.",
       parameters: {
         type: "object",
         properties: {
@@ -479,17 +481,19 @@ export function buildTools(deps: ToolDeps): Tool[] {
     approval: (args) => t("edit {0}", String(args["path"])),
     async run(args, ctx): Promise<ToolResult> {
       const uri = resolve(String(args["path"] ?? ""), s());
-      const oldText = String(args["old"] ?? "");
-      const newText = String(args["new"] ?? "");
+      const rawOld = String(args["old"] ?? "");
+      const rawNew = String(args["new"] ?? "");
       // ⚠️ Before anything else. A real session asked to replace a word with the very same word, six
       // times — it believed it was fixing a typo — and was told "the editor accepted the edit but the
       // file did not change", which sent it looking for a fault in the editor. The fault was in the
       // request, and saying so is what ends the loop.
-      if (oldText === newText) return { content: IDENTICAL_EDIT, isError: true };
+      if (rawOld === rawNew) return { content: IDENTICAL_EDIT, isError: true };
       const missing = await missingFile(uri);
       if (missing) return { content: missing, isError: true };
       const doc = await vscode.workspace.openTextDocument(uri);
       const text = doc.getText();
+      // A snippet copied with read_file's line numbers — see `unnumbered`.
+      const { oldText, newText } = unnumbered(text, rawOld, rawNew);
       // ⚠️ Not `indexOf`. A file holding `é` as `e` + a combining accent and a model writing it as a
       // single code point are the same text on screen and different strings to `indexOf` — so the
       // tool said "that snippet does not appear in the file" about a snippet plainly in the file. A

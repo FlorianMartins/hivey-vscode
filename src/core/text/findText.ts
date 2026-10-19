@@ -111,6 +111,29 @@ function occurrences(hay: string, needle: string): number {
  * normalisation ARE the same text to a reader, so matching one of them arbitrarily would edit a
  * place the model did not mean. Ambiguous is reported as ambiguous.
  */
+/** `     12\t` — the number read_file puts in front of each line. */
+const LINE_NUMBER = /^ *\d+\t/;
+
+/**
+ * An edit whose snippet still carries read_file's line numbers, understood without them.
+ *
+ * read_file numbers every line, and a model sometimes copies a passage with its numbers into `old` —
+ * and into `new`, which would write them into the file. Only when the snippet as given is NOT in the
+ * file and every line of it carries a number: both sides are then taken without them. Anything else
+ * is left exactly as sent.
+ */
+export function unnumbered(text: string, oldText: string, newText: string): { oldText: string; newText: string } {
+  const lines = oldText.split("\n").filter((l) => l.length);
+  if (!lines.length || !lines.every((l) => LINE_NUMBER.test(l)) || text.includes(oldText)) return { oldText, newText };
+  const strip = (s: string): string =>
+    s
+      .split("\n")
+      .map((l) => l.replace(LINE_NUMBER, ""))
+      .join("\n");
+  const newLines = newText.split("\n").filter((l) => l.length);
+  return { oldText: strip(oldText), newText: newLines.length && newLines.every((l) => LINE_NUMBER.test(l)) ? strip(newText) : newText };
+}
+
 export function findUnique(text: string, needle: string): FindResult {
   if (!needle) return { problem: "absent" };
 

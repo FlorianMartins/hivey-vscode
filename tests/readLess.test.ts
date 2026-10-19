@@ -3,6 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { OUTLINE_ABOVE_LINES, outlineOf, readWhole } from "../src/core/fs/outline.js";
+import { unnumbered } from "../src/core/text/findText.js";
 import { runTurn, sameEarlierResult, staleFileOutputs, type Tool } from "../src/core/agent/loop.js";
 import type { ChatMessage, ChatRequest, ChatResult, Provider } from "../src/core/providers/types.js";
 
@@ -31,16 +32,16 @@ test("a large file asked for whole gets its plan, its head and how to read on", 
   assert.ok(out.startsWith(`src/menu.js has ${lines.length} lines — too many to read whole usefully. Its plan`));
   assert.ok(out.includes(`\n${String(lineOf(0)).padStart(5)}  function bouton0(x) {\n`));
   assert.ok(out.includes(`\n${String(lines.length).padStart(5)}  module.exports = { bouton1 };`));
-  assert.match(out, /Its first 100 lines:\n'use strict';/);
+  assert.match(out, /Its first 100 lines:\n {5}1\t'use strict';/);
   assert.match(out, /read_file\(\{ path: "src\/menu\.js", from: <line>, to: <line> \}\)/);
   assert.ok(out.length < big.length / 2, `the plan (${out.length}) is much smaller than the file (${big.length})`);
 });
 
-test("a small file, or a range asked for, reads exactly as before", () => {
-  const small = "a\nb\nc";
-  assert.equal(readWhole(small, "x.js", undefined, undefined, 24_000), small);
+test("a small file, or a range asked for, reads whole — each line with its number, as Claude Code's Read", () => {
+  assert.equal(readWhole("a\nb\nc", "x.js", undefined, undefined, 24_000), "     1\ta\n     2\tb\n     3\tc");
   const part = readWhole(big, "src/menu.js", lineOf(1), lineOf(1) + 1, 24_000);
-  assert.ok(part.startsWith("function bouton1(x) {\n  const a = x + 1;"), part.slice(0, 80));
+  const n = String(lineOf(1)).padStart(6);
+  assert.ok(part.startsWith(`${n}\tfunction bouton1(x) {\n${String(lineOf(1) + 1).padStart(6)}\t  const a = x + 1;`), part.slice(0, 80));
   assert.deepEqual(outlineOf("const a = 1;\nconst f = (x) => x;\nclass A {}\n"), ["    2  const f = (x) => x;", "    3  class A {}"]);
 });
 
@@ -93,4 +94,16 @@ test("a repeated call with the same result points to the copy already there; a c
   assert.equal(sameEarlierResult(before, call, long + "changed\n"), false);
   assert.equal(sameEarlierResult(before, { ...call, args: '{"path":"src/menu.js"}' }, long), false, "another file is another call");
   assert.equal(sameEarlierResult([], { id: "x", name: "read_file", args: "{}" }, "short"), false);
+});
+
+test("an edit that copied the line numbers is understood without them — on both sides", () => {
+  const file = "const a = 1;\nconst b = 2;\n";
+  const r = unnumbered(file, "     1\tconst a = 1;\n     2\tconst b = 2;", "     1\tconst a = 10;\n     2\tconst b = 2;");
+  assert.deepEqual(r, { oldText: "const a = 1;\nconst b = 2;", newText: "const a = 10;\nconst b = 2;" });
+  // `new` without numbers stays as written.
+  assert.equal(unnumbered(file, "     1\tconst a = 1;", "const a = 10;").newText, "const a = 10;");
+  // A snippet without numbers, or one that IS in the file as given, is left exactly as sent.
+  assert.deepEqual(unnumbered(file, "const a = 1;", "x"), { oldText: "const a = 1;", newText: "x" });
+  const tsv = "id\tname\n12\tbob\n";
+  assert.deepEqual(unnumbered(tsv, "12\tbob", "12\talice"), { oldText: "12\tbob", newText: "12\talice" });
 });

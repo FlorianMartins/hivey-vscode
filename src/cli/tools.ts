@@ -9,7 +9,7 @@
 import { spawn } from "node:child_process";
 import { searchPattern } from "../core/agent/regex.js";
 import { describeSlice, sliceLines } from "../core/fs/slice.js";
-import { findUnique, IDENTICAL_EDIT } from "../core/text/findText.js";
+import { unnumbered, findUnique, IDENTICAL_EDIT } from "../core/text/findText.js";
 import { commandHint } from "../core/terminal/hints.js";
 import { cappedAt, describeCap } from "../core/agent/capped.js";
 import { readFile, readdir, stat, writeFile } from "node:fs/promises";
@@ -145,7 +145,9 @@ export function buildCliTools(opts: CliToolOptions): Tool[] {
       name: "read_file",
       description:
         "Read a file from the working directory. Give `from` and `to` (1-based line numbers) to read " +
-        "part of a large file; the result always says which lines came back and how to read on.",
+        "part of a large file; the result always says which lines came back and how to read on. Each " +
+        "line comes prefixed with its number and a tab (`     12\\t…`): that prefix is not part of the " +
+        "file — never put it in an edit.",
       parameters: {
         type: "object",
         properties: {
@@ -307,10 +309,12 @@ export function buildCliTools(opts: CliToolOptions): Tool[] {
     async run(args, ctx): Promise<ToolResult> {
       const rel = String(args["path"] ?? "");
       const path = safeResolve(opts, rel);
-      const oldText = String(args["old"] ?? "");
-      const newText = String(args["new"] ?? "");
-      if (oldText === newText) return { content: IDENTICAL_EDIT, isError: true };
+      const rawOld = String(args["old"] ?? "");
+      const rawNew = String(args["new"] ?? "");
+      if (rawOld === rawNew) return { content: IDENTICAL_EDIT, isError: true };
       const text = await readFile(path, "utf8");
+      // A snippet copied with read_file's line numbers — see `unnumbered`.
+      const { oldText, newText } = unnumbered(text, rawOld, rawNew);
       // The same matcher as the panel's editor: `é` written as one code point and as `e` plus a
       // combining accent are the same text on screen and different strings to `indexOf`. One
       // behaviour, two surfaces — see `core/text/findText.ts`.
