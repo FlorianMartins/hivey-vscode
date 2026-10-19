@@ -456,6 +456,8 @@ async function main(): Promise<void> {
             messages: prepared,
             tools: toolsForMode(sub, mode),
             maxSteps: definition.maxSteps ?? DEFAULT_AGENT_STEPS,
+            // Stopped before it wrote anything, it is asked for what it found — see `concludeWhenCut`.
+            concludeWhenCut: true,
             ...(signal ? { signal } : {}),
             approve: async () => yes,
             afterResponse: (text) => vault.restore(text),

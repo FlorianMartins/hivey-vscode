@@ -832,6 +832,29 @@ export function buildTools(deps: ToolDeps): Tool[] {
     },
   };
 
+  // ⚠️ « encore et toujours boucler » — a real turn tried fifteen variants of one API query
+  // (`$regex`, `$search`, `slug`, `name`…), most answered 400, while the project it worked in already
+  // called that very API in a file it had open. Failures are counted per endpoint, and from the second
+  // the model is told to stop guessing and look at how it is already done.
+  const fetchFailures = new Map<string, number>();
+  const guessingNote = (url: string): string => {
+    let key = url;
+    try {
+      const u = new URL(url);
+      key = `${u.origin}${u.pathname}`;
+    } catch {
+      /* the address as written */
+    }
+    const n = (fetchFailures.get(key) ?? 0) + 1;
+    fetchFailures.set(key, n);
+    if (n < 2) return "";
+    return (
+      `\n\n[${n} failures on ${key} now. Stop varying the query by guesswork: read the error above, ` +
+      `look for how this project already calls this API (search_text for the host or the path), or fetch ` +
+      `the API's documentation — then make one call you can justify.]`
+    );
+  };
+
   // A web page, read as text — Claude Code's WebFetch. Asked for first: it is a request that leaves the
   // machine. See core/web/page.ts.
   const fetchUrl: Tool = {
@@ -856,10 +879,12 @@ export function buildTools(deps: ToolDeps): Tool[] {
         });
         const body = await res.text();
         ctx.report(t("fetched {0}", url));
-        if (!res.ok) return { content: `${url} answered ${res.status} ${res.statusText}.\n${body.slice(0, 500)}`, isError: true };
+        if (!res.ok) {
+          return { content: `${url} answered ${res.status} ${res.statusText}.\n${body.slice(0, 2000)}${guessingNote(url)}`, isError: true };
+        }
         return { content: pageForModel(res.url || url, res.headers.get("content-type") ?? "", body, scaledChars(MAX_READ_CHARS, READ_SHARE)) };
       } catch (err) {
-        return { content: `Could not fetch ${url}: ${(err as Error).message}`, isError: true };
+        return { content: `Could not fetch ${url}: ${(err as Error).message}${guessingNote(url)}`, isError: true };
       }
     },
   };

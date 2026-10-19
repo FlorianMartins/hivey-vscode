@@ -2005,6 +2005,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       messages: prepared.messages,
       tools,
       maxSteps: definition.maxSteps ?? DEFAULT_AGENT_STEPS,
+      // Stopped before it wrote anything, it is asked for what it found — see `concludeWhenCut`.
+      concludeWhenCut: true,
       // The same cap as the turn that delegated, when the user set one. With none, a reply that fills
       // the server's window is caught by the loop, which shortens old outputs and asks again.
       ...(env.settings.chat.maxOutputTokens > 0 ? { maxTokens: env.settings.chat.maxOutputTokens } : {}),
@@ -4642,6 +4644,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         ...(useModel === model && this.modelWindow(settings) ? { contextWindow: this.modelWindow(settings) } : {}),
         // The user's language, held for the whole turn — see `withReplyLanguage`.
         replyLanguage: turnLanguage,
+        // Stopped by the loop, it still says where things stand — see `concludeWhenCut`.
+        concludeWhenCut: "always",
         // The thinking started in the user's language on a self-hosted server, for the model asked — see `THINK_STARTERS`.
         ...(useModel === model && isSelfHostedProvider(providerId) && THINK_STARTERS[turnLanguage] ? { thinkPrefix: THINK_STARTERS[turnLanguage] } : {}),
         recall: this.recallFor(this.session.id),
