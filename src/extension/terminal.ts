@@ -54,6 +54,11 @@ const INTEGRATION_TIMEOUT_WARM_MS = 3000;
 
 /** Beyond this the log is cut, keeping the end. Tool output is re-sent on every later step. */
 const MAX_OUTPUT_CHARS = 8000;
+/**
+ * The share of the window one command's output may take — its END, where a test run says what failed
+ * and how many. It was 15 %: a whole test suite's listing, 2 147 lines of "ok", reached the model.
+ */
+const OUTPUT_SHARE = 0.03;
 
 /** What a person presses to stop a runaway build. There is no API that kills one. */
 const CTRL_C = "\u0003";
@@ -208,7 +213,7 @@ export async function runCommandInTerminal(opts: RunOptions): Promise<RunResult>
     for await (const chunk of stream) {
       raw += chunk;
       // Keep twice the budget while collecting: the cut happens once, at the end, on clean text.
-      if (raw.length > scaledChars(MAX_OUTPUT_CHARS, 0.15) * 4) raw = raw.slice(-scaledChars(MAX_OUTPUT_CHARS, 0.15) * 4);
+      if (raw.length > scaledChars(MAX_OUTPUT_CHARS, OUTPUT_SHARE) * 4) raw = raw.slice(-scaledChars(MAX_OUTPUT_CHARS, OUTPUT_SHARE) * 4);
     }
   })();
 
@@ -268,7 +273,7 @@ export async function runCommandInTerminal(opts: RunOptions): Promise<RunResult>
   if (cancelled) {
     return { captured: true, isError: true, exitCode: undefined, content: `Cancelled by the user.\n${output}`.trim(), output: displayOutput(output) };
   }
-  const content = describeOutcome({ output, exitCode, timedOut }, scaledChars(MAX_OUTPUT_CHARS, 0.15));
+  const content = describeOutcome({ output, exitCode, timedOut }, scaledChars(MAX_OUTPUT_CHARS, OUTPUT_SHARE));
   // `grep` exiting 1 found nothing, which is an answer. See `isStatusAnswer`: the step is not drawn
   // as a failure, the model is not told the tool errored, and `verifyTurn` does not count a check
   // that failed — three wrong conclusions that used to come from one correct command.
@@ -329,7 +334,7 @@ export async function runCommandAsProcess(opts: RunOptions): Promise<RunResult> 
   }
 
   let raw = "";
-  const limit = scaledChars(MAX_OUTPUT_CHARS, 0.15) * 4;
+  const limit = scaledChars(MAX_OUTPUT_CHARS, OUTPUT_SHARE) * 4;
   const take = (chunk: string): void => {
     raw += chunk;
     if (raw.length > limit) raw = raw.slice(-limit);
@@ -385,7 +390,7 @@ export async function runCommandAsProcess(opts: RunOptions): Promise<RunResult> 
   }
   const timedOut = race.outcome === "timeout";
   view.write(`\r\n\x1b[2m${timedOut ? t("timed out and was killed") : `exit ${exitCode ?? "?"}`}\x1b[0m\r\n`);
-  const content = describeOutcome({ output, exitCode, timedOut }, scaledChars(MAX_OUTPUT_CHARS, 0.15));
+  const content = describeOutcome({ output, exitCode, timedOut }, scaledChars(MAX_OUTPUT_CHARS, OUTPUT_SHARE));
   const answered = isStatusAnswer(command, exitCode);
   return {
     captured: true,

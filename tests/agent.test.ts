@@ -450,7 +450,9 @@ test("⚠️ a turn that outgrows the context mid-way shortens old tool outputs 
   // "HTTP 400 Bad Request: request (69882 tokens) exceeds the available context size (69632
   // tokens)" — in the MIDDLE of an agent turn: tool results piled up and nothing trimmed them.
   const big = "line of a long build log\n".repeat(2000); // ~48 000 characters
-  const read = tool("read_file", { run: async () => ({ content: big }) });
+  // Two different outputs: an identical repeat is a pointer to the first, not a second copy.
+  let reads = 0;
+  const read = tool("read_file", { run: async () => ({ content: big + `build ${++reads}\n` }) });
   let calls = 0;
   const seen: string[][] = [];
   const provider: Provider = {
@@ -475,7 +477,7 @@ test("⚠️ a turn that outgrows the context mid-way shortens old tool outputs 
   assert.equal(r.text, "Done, from what fitted.", "the turn finished instead of dying on the error");
   const last = seen.at(-1)!;
   assert.match(last[0]!, /characters of this output were removed to fit/, "the OLDEST output was shortened");
-  assert.equal(last[1], big, "the latest output — the one the next step is about — is left whole");
+  assert.equal(last[1], big + "build 2\n", "the latest output — the one the next step is about — is left whole");
 });
 
 test("⚠️ with the window known, the turn is fitted BEFORE it is sent — no error at all", async () => {

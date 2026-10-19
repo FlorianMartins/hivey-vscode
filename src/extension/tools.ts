@@ -13,6 +13,7 @@ import * as vscode from "vscode";
 import { describeSlice, sliceLines } from "../core/fs/slice.js";
 import { cmdMultiLineProblem } from "../core/terminal/cmdLines.js";
 import { isBinaryFile, readBinary } from "../core/fs/binary.js";
+import { readWhole } from "../core/fs/outline.js";
 import { findUnique } from "../core/text/findText.js";
 import { cappedAt, describeCap } from "../core/agent/capped.js";
 import { searchPattern } from "../core/agent/regex.js";
@@ -51,6 +52,13 @@ const FOLD_CASE = process.platform === "win32";
 
 /** Characters, not tokens: a line budget has to be cut at a line boundary, which is a character count. */
 const MAX_READ_CHARS = 24_000;
+/**
+ * The share of the window one read may take. It was a quarter: on a 139k window a single file could
+ * bring 35 000 tokens, and a real turn filled the window to 129 000 tokens in reads of the same two
+ * files. A twentieth keeps a read to what is worth reading at once — the floor above on a 70k window,
+ * the terminal client's own figure — and the rest is a `from`/`to` away.
+ */
+const READ_SHARE = 0.05;
 const MAX_MATCHES = 60;
 /** The terminal client's numbers: the files a search reads, and the size past which it skips one. */
 const MAX_SEARCHED_FILES = 4000;
@@ -263,13 +271,14 @@ export function buildTools(deps: ToolDeps): Tool[] {
       // file ends there.
       const from = args["from"] === undefined ? undefined : Number(args["from"]);
       const to = args["to"] === undefined ? undefined : Number(args["to"]);
-      const slice = sliceLines(doc.getText(), from, to, scaledChars(MAX_READ_CHARS, 0.25));
+      const slice = sliceLines(doc.getText(), from, to, scaledChars(MAX_READ_CHARS, READ_SHARE));
       ctx.report(
         slice.from === 1 && slice.to === slice.total
           ? t("read {0} ({1} lines)", relative(uri), doc.lineCount)
           : t("read {0} (lines {1}-{2} of {3})", relative(uri), slice.from, slice.to, slice.total),
       );
-      return { content: slice.text + describeSlice(slice, relative(uri)) };
+      // A large file asked for whole gets its plan — see `core/fs/outline.ts`.
+      return { content: readWhole(doc.getText(), relative(uri), from, to, scaledChars(MAX_READ_CHARS, READ_SHARE)) };
     },
   };
 

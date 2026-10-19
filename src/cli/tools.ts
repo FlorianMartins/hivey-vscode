@@ -14,6 +14,7 @@ import { commandHint } from "../core/terminal/hints.js";
 import { cappedAt, describeCap } from "../core/agent/capped.js";
 import { readFile, readdir, stat, writeFile } from "node:fs/promises";
 import { isBinaryFile, readBinary } from "../core/fs/binary.js";
+import { readWhole } from "../core/fs/outline.js";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import type { Tool, ToolResult } from "../core/agent/loop.js";
 import { isBlockedPath } from "../core/util/glob.js";
@@ -174,7 +175,10 @@ export function buildCliTools(opts: CliToolOptions): Tool[] {
           ? t("read {0}", String(args["path"]))
           : t("read {0} (lines {1}-{2} of {3})", String(args["path"]), slice.from, slice.to, slice.total),
       );
-      return { content: slice.text + describeSlice(slice, String(args["path"])) };
+      // A large file asked for whole gets its plan — see `core/fs/outline.ts`.
+      const from = args["from"] === undefined ? undefined : Number(args["from"]);
+      const to = args["to"] === undefined ? undefined : Number(args["to"]);
+      return { content: readWhole(text, String(args["path"]), from, to, 24_000) };
     },
   };
 
