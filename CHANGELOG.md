@@ -6,6 +6,18 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Ajouté
 
+- **L'agent travaille comme Claude Code.**
+  - **Il lit ce qu'il faut, pas tout.** Un fichier de plus de 800 lignes demandé en entier donne son
+    plan (fonctions, classes, exports et leurs lignes) et ses premières lignes ; l'agent lit ensuite
+    la partie utile. Une relecture au résultat identique devient un renvoi vers la copie déjà là. Dans
+    le panneau, une lecture prend au plus 5 % de la fenêtre (25 % avant), une commande 3 % (15 %).
+  - **La recherche passe par ripgrep**, celui de VS Code : tous les fichiers, `.gitignore` respecté,
+    binaires sautés, en une fraction de seconde.
+  - **Les fichiers sont listés du plus récemment modifié au plus ancien.**
+  - **Commandes en arrière-plan** : un serveur, un watcher ou un bot démarre et continue de tourner ;
+    l'agent lit ce qu'il affiche (`command_output`) et l'arrête (`stop_command`).
+  - **Lecture de pages web** (`fetch_url`, demandée avant chaque sortie) : documentation, changelog,
+    erreur expliquée en ligne — le contenu principal de la page, code compris.
 - **Le modèle réfléchit et répond dans votre langue, quelle qu'elle soit.** L'espagnol,
   l'allemand, l'italien, le portugais et le néerlandais étaient lus comme de l'anglais, et la
   consigne demandait alors de répondre en anglais : ils sont reconnus, et la consigne est aussi
