@@ -4728,12 +4728,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         // The action under way, for the folded step list — a command that runs for a minute is the
         // one thing worth seeing while it runs, and its result arrives only when it is over.
         onStep: ({ toolCalls }) => {
-          if (ctl.signal.aborted || !toolCalls.length) return;
-          const first = toolCalls[0]!;
-          const call = callSignature(first.name, safeArgs(first.args));
+          if (ctl.signal.aborted) return;
           // The next step's thinking starts a paragraph of its own in the saved answer.
           if (thought && !thought.endsWith("\n\n")) thought += "\n\n";
           segments.acted();
+          // None when every call was answered from the conversation: nothing is under way.
+          const first = toolCalls[0];
+          if (!first) return;
+          const call = callSignature(first.name, safeArgs(first.args));
           this.post({ type: "toolStart", tool: first.name, ...(call ? { call } : {}), ...(toolCalls.length > 1 ? { count: toolCalls.length } : {}) });
         },
         onToolResult: ({ call, result }) => {

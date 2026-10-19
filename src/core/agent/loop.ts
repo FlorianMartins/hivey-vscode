@@ -778,7 +778,6 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
       return done("answer");
     }
 
-    opts.onStep?.({ step, toolCalls: res.toolCalls });
     // With the thinking that led to these calls: the next step continues it rather than redoing it.
     working.push({
       role: "assistant",
@@ -804,6 +803,8 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
       args?: Record<string, unknown>;
       /** Set when the call is already settled — unknown tool, bad JSON, refused, cancelled. */
       settled?: string;
+      /** Settled from the conversation by `alreadyRead`: not run, not shown. */
+      held?: boolean;
       parallel: boolean;
     }
 
@@ -876,11 +877,14 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
       // Lines the conversation already holds, unchanged: not read again — see `alreadyRead`.
       const held = parallel ? alreadyRead(working, call) : undefined;
       if (held) {
-        planned.push({ call, settled: held, parallel: false });
+        planned.push({ call, settled: held, held: true, parallel: false });
         continue;
       }
       planned.push({ call, tool, args, parallel });
     }
+    // What the panel shows as under way. Not a read answered from the conversation: nothing was done,
+    // and a « Read » flashing past for it would say the opposite.
+    opts.onStep?.({ step, toolCalls: planned.filter((p) => !p.held).map((p) => p.call) });
 
     const stepImages: Array<{ label: string; images: ImagePart[] }> = [];
     const execute = async (item: Planned): Promise<void> => {
