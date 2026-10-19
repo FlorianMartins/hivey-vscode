@@ -11,6 +11,9 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
     plan (fonctions, classes, exports et leurs lignes) et ses premières lignes ; l'agent lit ensuite
     la partie utile. Une relecture au résultat identique devient un renvoi vers la copie déjà là. Dans
     le panneau, une lecture prend au plus 5 % de la fenêtre (25 % avant), une commande 3 % (15 %).
+  - **Il ne relit pas ce qu'il a déjà sous les yeux.** Des lignes que la conversation contient déjà,
+    sans modification ni commande depuis, ne sont pas relues : le modèle est renvoyé à sa copie, et
+    rien ne s'affiche dans le panneau. Banc : 57/60 contre 53/60 sans.
   - **La recherche passe par ripgrep**, celui de VS Code : tous les fichiers, `.gitignore` respecté,
     binaires sautés, en une fraction de seconde.
   - **Les fichiers sont listés du plus récemment modifié au plus ancien.**
@@ -99,6 +102,17 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **L'agent ne tourne plus en rond sur la même réflexion.** Depuis #64, la réflexion du modèle
+  auto-hébergé était amorcée à chaque étape par « Analysons la situation en détail. La demande porte
+  sur… » : ramené à la demande à chaque fois, il refaisait les mêmes lectures (les trois mêmes
+  fichiers une trentaine de fois dans un même tour), remplissait le contexte et ne répondait plus.
+  - **Le modèle réfléchit à nouveau dans sa propre langue** ; ses réponses restent dans celle de
+    l'utilisateur, et il écrit une phrase pour l'utilisateur, dans sa langue, avant chaque série
+    d'actions. Les modèles cloud gardent leurs réglages.
+  - **Une boucle entre plusieurs étapes est coupée** : un même appel en lecture seule fait trois fois
+    sans aucun changement entre-temps n'est plus exécuté, même quand les étapes alternent.
+  - **Une recherche filtrée sur un dossier vide ou absent le dit**, avec les dossiers du projet, au
+    lieu de « aucun résultat ».
 - **Les adresses web s'affichent en lien bleu.** Entre backticks, une adresse prenait la couleur du
   code, rouge dans plusieurs thèmes (Light+) ; écrite nue, c'était du texte brut. Les deux s'affichent
   maintenant comme un lien `[texte](cible)`, dans la couleur des liens du thème.

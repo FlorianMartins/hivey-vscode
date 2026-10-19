@@ -73,3 +73,27 @@ test("each start is a sentence begun, not finished — a finished one closed the
     assert.doesNotMatch(start!, /\s$/, `${lang}: no trailing space — the model's next token carries its own`);
   }
 });
+
+test("a sentence for the person before the tools, asked only when the caller says so (self-hosted)", () => {
+  const sys = [{ role: "system", content: "s" }];
+  assert.match(withReplyLanguage(sys, "fr", false, true)[0]!.content, /one short sentence in French/);
+  assert.doesNotMatch(withReplyLanguage(sys, "fr")[0]!.content, /one short sentence/, "a cloud model: its own settings");
+  assert.doesNotMatch(withReplyLanguage(sys, "fr", false, true)[0]!.content, /Réfléchis/, "its thinking in its own language");
+});
+
+test("started at the first step only: later steps carry on from what was found, not from the request again", async () => {
+  // « il boucle, rempli le contexte en ayant à chaque fois la même réflexion » — « …La demande porte
+  // sur » at every step sent the model back to the request each time.
+  const call = { id: "1", name: "look", args: "{}" };
+  const { provider, seen } = recorder([
+    { text: "", reasoning: " la recherche.", toolCalls: [call], usage, stopReason: "tool_calls" },
+    { text: "Fait.", reasoning: "Le résultat montre", toolCalls: [], usage, stopReason: "stop" },
+  ]);
+  const look = { schema: { name: "look", description: "d", parameters: { type: "object", properties: {} } }, approval: () => false as const, parallel: () => true, run: async () => ({ content: "found" }) };
+  await runTurn({ provider, model: "m", messages: [{ role: "system", content: "s" }, { role: "user", content: "cherche" }], tools: [look], replyLanguage: "fr", thinkPrefix: THINK_STARTERS.fr! });
+  const first = seen[0]!.messages;
+  const second = seen[1]!.messages;
+  assert.equal(first[first.length - 1]!.role, "assistant", "started at the first step");
+  assert.equal(second[second.length - 1]!.role, "tool", "not at the next one");
+  assert.match(second[0]!.content, /Réfléchis en français aussi\./, "still told to think in it");
+});

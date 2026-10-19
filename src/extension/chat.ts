@@ -34,7 +34,7 @@ import { runTurn, type Tool } from "../core/agent/loop.js";
 import { RecallStore, recallTools } from "../core/agent/recall.js";
 import { Permissions, commandPrefix, type PermissionStore, type Rule } from "../core/agent/permissions.js";
 import { detectLanguage, languageDirective, stablePrompt, turnDirectives } from "../core/prompts.js";
-import { detectUserLanguage, THINK_STARTERS } from "../core/userLanguage.js";
+import { detectUserLanguage } from "../core/userLanguage.js";
 import { costOf, estimateCost, makeLookup, type Price } from "../core/router/pricing.js";
 import { calibrate, observe, prune, type Calibration } from "../core/util/calibrate.js";
 import { acceptsImages, IMAGE_TOKENS, isCatalogued, isImageRefusal, withoutImages } from "../core/models/vision.js";
@@ -4646,8 +4646,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         replyLanguage: turnLanguage,
         // Stopped by the loop, it still says where things stand — see `concludeWhenCut`.
         concludeWhenCut: "always",
-        // The thinking started in the user's language on a self-hosted server, for the model asked — see `THINK_STARTERS`.
-        ...(useModel === model && isSelfHostedProvider(providerId) && THINK_STARTERS[turnLanguage] ? { thinkPrefix: THINK_STARTERS[turnLanguage] } : {}),
+        // Its thinking in its own language, a sentence for the person in theirs — self-hosted only: a
+        // cloud model keeps its own settings. See `NOTE_BEFORE_TOOLS`.
+        notesBeforeTools: isSelfHostedProvider(providerId),
         recall: this.recallFor(this.session.id),
         // What the person typed since the last step, read now — and recorded where it was read, so
         // the saved turn and the next turns show the correction in its place. See `steer`.
@@ -4728,12 +4729,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         // The action under way, for the folded step list — a command that runs for a minute is the
         // one thing worth seeing while it runs, and its result arrives only when it is over.
         onStep: ({ toolCalls }) => {
-          if (ctl.signal.aborted || !toolCalls.length) return;
-          const first = toolCalls[0]!;
-          const call = callSignature(first.name, safeArgs(first.args));
+          if (ctl.signal.aborted) return;
           // The next step's thinking starts a paragraph of its own in the saved answer.
           if (thought && !thought.endsWith("\n\n")) thought += "\n\n";
           segments.acted();
+          // None when every call was answered from the conversation: nothing is under way.
+          const first = toolCalls[0];
+          if (!first) return;
+          const call = callSignature(first.name, safeArgs(first.args));
           this.post({ type: "toolStart", tool: first.name, ...(call ? { call } : {}), ...(toolCalls.length > 1 ? { count: toolCalls.length } : {}) });
         },
         onToolResult: ({ call, result }) => {

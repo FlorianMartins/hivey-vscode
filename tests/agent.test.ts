@@ -531,11 +531,36 @@ test("⚠️ the same call repeated is not run again, and a model that insists i
   const read = tool("read_file", { parallel: () => true });
   const provider = scriptedProvider([{ toolCalls: [{ id: "1", name: "read_file", args: '{"path":"a.ts"}' }] }]);
   const r = await runTurn({ ...base, provider, tools: [read] });
-  assert.equal(read.calls.length, 2, "run twice, then refused");
+  assert.equal(read.calls.length, 1, "read once, answered from the conversation the second time, refused the third");
   assert.equal(r.stoppedBecause, "repeating", "the turn ends instead of spending all its steps");
   assert.ok(provider.seen.length <= 6, `${provider.seen.length} requests — it should stop early, not at 30`);
   const told = provider.seen.at(-1)!.messages.filter((m) => m.role === "tool").at(-1)!;
   assert.match(String(told.content), /made this exact call/);
+});
+
+test("⚠️ a loop of two steps taking turns is seen too, and ends with an answer", async () => {
+  // The report: `list_files public/**/*.js` and a search, then another search, then the first two
+  // again — no two steps in a row alike, so it went on until the window was full and never answered.
+  const list = tool("list_files", { parallel: () => true });
+  const search = tool("search_text", { parallel: () => true });
+  const a = (id: string) => ({ toolCalls: [{ id, name: "list_files", args: '{"glob":"public/**/*.js"}' }] });
+  const b = (id: string) => ({ toolCalls: [{ id, name: "search_text", args: '{"pattern":"#succes"}' }] });
+  const provider = scriptedProvider([a("1"), b("2"), a("3"), b("4"), a("5"), b("6"), a("7"), b("8"), a("9"), b("10"), { text: "Voici où j'en suis." }]);
+  const r = await runTurn({ ...base, provider, tools: [list, search] });
+  assert.equal(list.calls.length, 2, "run twice, refused the third time");
+  assert.equal(search.calls.length, 2);
+  assert.equal(r.stoppedBecause, "repeating");
+});
+
+test("an edit in between: the same search may say something new, and is run", async () => {
+  const search = tool("search_text", { parallel: () => true });
+  const edit = tool("edit_file");
+  const s = (id: string) => ({ toolCalls: [{ id, name: "search_text", args: '{"pattern":"x"}' }] });
+  const e = (id: string) => ({ toolCalls: [{ id, name: "edit_file", args: '{"path":"a.ts"}' }] });
+  const provider = scriptedProvider([s("1"), s("2"), e("3"), s("4"), s("5"), e("6"), s("7"), { text: "Fait." }]);
+  const r = await runTurn({ ...base, provider, tools: [search, edit] });
+  assert.equal(search.calls.length, 5, "never three times without a change");
+  assert.equal(r.text, "Fait.");
 });
 
 test("⚠️ the test run repeated after each fix is never blocked", async () => {
@@ -664,7 +689,7 @@ test("the same reads three steps in a row are a loop, a plan update or not", asy
   ];
   const provider = scriptedProvider([{ toolCalls: pair("1") }, { toolCalls: pair("2") }, { toolCalls: pair("3") }, { text: "Done." }]);
   await runTurn({ ...base, provider, tools: [read] });
-  assert.equal(read.calls.filter((c) => c["path"] === "src/ui.js").length, 2, "read twice in a row, refused the third");
+  assert.equal(read.calls.filter((c) => c["path"] === "src/ui.js").length, 1, "read once, then answered from the conversation, then refused");
 });
 
 test("the same tool with different arguments is never mistaken for a loop", async () => {
