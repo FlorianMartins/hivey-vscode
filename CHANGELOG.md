@@ -102,6 +102,19 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 - **Les adresses web s'affichent en lien bleu.** Entre backticks, une adresse prenait la couleur du
   code, rouge dans plusieurs thèmes (Light+) ; écrite nue, c'était du texte brut. Les deux s'affichent
   maintenant comme un lien `[texte](cible)`, dans la couleur des liens du thème.
+- **L'agent va au bout au lieu de tourner en rond et de s'arrêter.**
+  - **Un sous-agent ne revient plus vide.** Arrivé à sa limite d'étapes sans avoir conclu, il est
+    invité, sans outils, à rendre ce qu'il a trouvé (fichiers, lignes, ce qui reste à établir) ;
+    l'agent qui l'a envoyé ne refait plus toute l'exploration. Vérifié en réel.
+  - **Le garde-fou contre les répétitions ne vise plus que les vraies boucles** : la même étape de
+    lecture trois fois d'affilée. Compté sur tout le tour, il refusait une relecture légitime plus
+    loin dans une longue tâche, puis arrêtait le tour. Une relecture identique reçoit un renvoi vers la
+    copie déjà là.
+  - **Un tour arrêté dit où il en est** : ce qui est fait, ce qui bloque, ce qu'il lui faut — au lieu de
+    « Arrêté : le modèle répétait le même appel » seul.
+  - **`fetch_url` arrête de deviner** : l'erreur complète du serveur est transmise, et dès le deuxième
+    échec sur la même adresse, le modèle est invité à regarder comment le projet appelle déjà cette
+    API, ou sa documentation.
 - **Plus d'agent bloqué ni de sous-agent qui revient vide sur votre serveur.** Sur un serveur à une
   place, une requête qui attendait son tour plus de cinq minutes était abandonnée par Node
   (« n'a rien envoyé en Infinity s ») : le sous-agent revenait vide et l'agent recommençait tout

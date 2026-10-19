@@ -167,6 +167,18 @@ export interface TurnOptions {
    */
   replyLanguage?: UserLang;
   /**
+   * A turn stopped by its step limit or by its repeats before it wrote anything is asked, once and
+   * without tools, for what it found. For a sub-agent: the turn that delegated reads only its text.
+   *
+   * ⚠️ « The sub-agent returned nothing » — an explorer sent to understand a site's search used its
+   * fifteen steps reading and searching, never wrote, and came back empty; the agent that sent it then
+   * did the whole exploration again itself.
+   *
+   * `"always"`, for the person's own turn: even after notes, a turn the loop stopped ends on where
+   * things stand — « Arrêté : le modèle répétait le même appel » alone left them with nothing to go on.
+   */
+  concludeWhenCut?: boolean | "always";
+  /**
    * The first words of the model's thinking, sent as the start of its answer so the thought goes on
    * in the user's language — only where the server continues a started answer (a self-hosted one).
    * See `THINK_STARTERS`.
@@ -276,15 +288,26 @@ const ANSWER_ROOM_TOKENS = 8192;
 const KEPT_HEAD_CHARS = 1500;
 
 /**
- * The same call — same tool, same arguments — made this many times in one turn is not run again.
+ * The same read-only step — same calls, same arguments — this many steps IN A ROW is not run again.
  * "it's been going round in circles for 12 hours on one request": a model that re-reads the same file
- * or re-runs the same search gets the same answer every time, and only a turn limit ever stopped it.
- * The model is told so instead, and the turn ends if it insists past `MAX_REPEAT_NUDGES`.
+ * or re-runs the same search gets the same answer every time. The model is told so instead, and the
+ * turn ends — saying where things stand — if it insists past `MAX_REPEAT_NUDGES`.
+ *
+ * ⚠️ In a row, not in the whole turn. Counted over the turn, a long task that went back to a file it
+ * had read an hour of steps earlier — or one whose old read had been shortened to fit the window, with
+ * the model told to read it again — was refused, then stopped: « il tourne en boucle et s'arrête »,
+ * on work that was going somewhere. A repeat further on costs little now: an identical result comes
+ * back as a pointer to the copy already there (see `unchangedNotice`). Commands are never refused —
+ * a test run after each fix is the job.
  */
 const REPEAT_LIMIT = 3;
+/** What a step did, to compare it with the step before — see `REPEAT_LIMIT`. */
+function stepSignature(calls: ToolCall[]): string {
+  return calls.map((c) => `${c.name}\u0000${c.args}`).sort().join("\u0001");
+}
 const MAX_REPEAT_NUDGES = 2;
 const REPEATED_CALL =
-  "You already made this exact call (same tool, same arguments) twice in this turn and have its result. " +
+  "You made this exact call (same tool, same arguments) in each of your last steps and have its result. " +
   "Do not repeat it: use what you already have, try a different approach, or give your answer.";
 
 /**
@@ -352,8 +375,6 @@ const OUTDATED_OUTPUT =
   "[Outdated, removed to fit the context window: this file was read again or changed later in this turn, and that later result is the current one.]";
 
 const FILE_TOOLS = new Set(["read_file", "edit_file", "write_file"]);
-/** Tools that touch only the turn itself — what they do cannot make a repeated read say something new. */
-const TURN_ONLY_TOOLS = new Set(["update_plan", "note_aside", "recall", "search_memory"]);
 
 /** The file a call is about, for the tools that read or change one file. */
 function fileOf(name: string, args: string | undefined): string | undefined {
@@ -421,6 +442,14 @@ export function sameEarlierResult(messages: ChatMessage[], call: ToolCall, conte
   );
   return messages.some((m) => m.role === "tool" && m.toolCallId !== undefined && ids.has(m.toolCallId) && m.content === content);
 }
+
+const CONCLUDE_NOW =
+  "Your steps are used up: no more tools. Write your conclusion now, for the agent that sent you — what you " +
+  "found, with the files and lines it is in, and what you could not establish.";
+
+const CONCLUDE_REPEATING =
+  "You were stopped: you kept making the same call and it kept giving the same result. No more tools. Tell " +
+  "the user, in a few lines, where things stand — what is done, what is blocking you, and what you need from them.";
 
 const CONTINUE_AFTER_CUT =
   "Your previous reply was cut off by the output token limit before you finished, and any tool call you were writing was lost. " +
@@ -498,7 +527,9 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
   const recallIds = new Map<string, string>();
   const keptAs = (toolCallId: string): string | undefined => recallIds.get(toolCallId);
   /** How many times each exact call (tool + arguments) was made this turn. See `REPEAT_LIMIT`. */
-  const callCounts = new Map<string, number>();
+  // The step before, and how many steps in a row it has been the same — see `REPEAT_LIMIT`.
+  let lastStep = "";
+  let sameSteps = 0;
   /** How many repeated calls were refused this turn. */
   let repeatNudges = 0;
   /**
@@ -514,7 +545,7 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
     // turn ends here rather than spending the rest of its steps — or hours — on the same thing.
     if (repeatNudges > MAX_REPEAT_NUDGES) {
       opts.report?.(t("the model kept repeating the same tool call — the turn was stopped"));
-      return done("repeating");
+      return await concluded("repeating");
     }
     // Typed by the person since the last request — read at this step, the turn carries on.
     const steered = opts.steer?.() ?? [];
@@ -726,6 +757,10 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
     }
 
     const planned: Planned[] = [];
+    const signature = stepSignature(res.toolCalls);
+    sameSteps = signature === lastStep ? sameSteps + 1 : 0;
+    lastStep = signature;
+    const loopingStep = sameSteps >= REPEAT_LIMIT - 1;
     for (const call of res.toolCalls) {
       if (opts.signal?.aborted) {
         planned.push({ call, settled: "Cancelled by the user.", parallel: false });
@@ -780,34 +815,11 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
       }
 
       const parallel = Boolean(tool.parallel?.(args));
-      // The same READ again — see `REPEAT_LIMIT`. Only reads are counted: anything that can change
-      // something (a write, an edit, a command such as the test run an agent repeats after each fix)
-      // starts the count again, because after it the same read may well say something new.
-      if (parallel) {
-        const callKey = `${call.name}\u0000${JSON.stringify(args)}`;
-        const made = (callCounts.get(callKey) ?? 0) + 1;
-        callCounts.set(callKey, made);
-        if (made >= REPEAT_LIMIT) {
-          repeatNudges++;
-          planned.push({ call, settled: REPEATED_CALL, parallel: false });
-          continue;
-        }
-      } else {
-        // An edit changes one file: only what reads it, or a search, can now say something new —
-        // re-reading any other file is still a repeat. Anything else (a command) can change anything,
-        // except what only touches the turn itself: the plan, a note, the memory.
-        //
-        // ⚠️ « il y a toujours un souci avec les boucles » — `update_plan` reset the count, so a turn
-        // that read the same two files four times, a plan update between each pair, was never stopped.
-        const file = fileOf(call.name, JSON.stringify(args));
-        if (TURN_ONLY_TOOLS.has(call.name)) {
-          // Nothing in the project changed.
-        } else if (file) {
-          for (const key of [...callCounts.keys()]) {
-            const [name, json] = key.split("\u0000") as [string, string];
-            if (name !== "read_file" || fileOf(name, json) === file) callCounts.delete(key);
-          }
-        } else callCounts.clear();
+      // A real loop — the same read-only step, again and again, nothing in between: see `REPEAT_LIMIT`.
+      if (parallel && loopingStep) {
+        repeatNudges++;
+        planned.push({ call, settled: REPEATED_CALL, parallel: false });
+        continue;
       }
       planned.push({ call, tool, args, parallel });
     }
@@ -868,7 +880,34 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
     }
   }
 
-  return done("max-steps");
+  return await concluded("max-steps");
+
+  /** `done`, after asking for the conclusion a cut turn never wrote — see `concludeWhenCut`. */
+  async function concluded(stoppedBecause: TurnResult["stoppedBecause"]): Promise<TurnResult> {
+    if (opts.concludeWhenCut && (opts.concludeWhenCut === "always" || !text.trim()) && !opts.signal?.aborted) {
+      try {
+        const res = await opts.provider.chat(
+          {
+            model: opts.model,
+            messages: [...working, { role: "user", content: stoppedBecause === "repeating" ? CONCLUDE_REPEATING : CONCLUDE_NOW }],
+            maxTokens: opts.maxTokens,
+            temperature: opts.temperature,
+            reasoning: opts.reasoning,
+            signal: opts.signal,
+          },
+          opts.onDelta,
+        );
+        usage.promptTokens += res.usage.promptTokens;
+        usage.completionTokens += res.usage.completionTokens;
+        usage.cachedTokens += res.usage.cachedTokens;
+        const said = opts.afterResponse ? opts.afterResponse(res.text) : res.text;
+        text = text.trim() && said.trim() ? `${text}\n\n${said}` : text || said;
+      } catch {
+        /* the turn ends as it was: nothing written */
+      }
+    }
+    return done(stoppedBecause);
+  }
 
   function done(stoppedBecause: TurnResult["stoppedBecause"]): TurnResult {
     return {
