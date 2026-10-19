@@ -99,6 +99,9 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **Les adresses web s'affichent en lien bleu.** Entre backticks, une adresse prenait la couleur du
+  code, rouge dans plusieurs thèmes (Light+) ; écrite nue, c'était du texte brut. Les deux s'affichent
+  maintenant comme un lien `[texte](cible)`, dans la couleur des liens du thème.
 - **Plus d'agent bloqué ni de sous-agent qui revient vide sur votre serveur.** Sur un serveur à une
   place, une requête qui attendait son tour plus de cinq minutes était abandonnée par Node
   (« n'a rien envoyé en Infinity s ») : le sous-agent revenait vide et l'agent recommençait tout

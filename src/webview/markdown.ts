@@ -133,21 +133,33 @@ export function markdown(text: string, actions?: CodeActions, highlight?: string
   return body;
 }
 
-/** Inline spans: `code`, **bold**, *italic*, [texte](cible). Everything else stays literal. */
+/**
+ * A web address, written bare or alone between backticks. Shown as a link, in the theme's link
+ * colour: between backticks it took the colour of code, which a good many themes paint red (Light+),
+ * and the model puts nearly every address it quotes between backticks. It ends before the punctuation
+ * that closes a sentence around it.
+ */
+export const URL_RE = /https?:\/\/[^\s<>()`"']*[^\s<>()`"'.,;:!?*_~]/;
+
+/** Inline spans: `code`, **bold**, *italic*, [texte](cible), web addresses. Everything else stays literal. */
 export function inline<K extends keyof HTMLElementTagNameMap>(
   text: string,
   tag: K,
   highlight?: string,
 ): HTMLElementTagNameMap[K] {
   const node = el(tag);
-  const re = /(`[^`\n]+`)|(\*\*[^*\n]+\*\*)|(__[^_\n]+__)|(~~[^~\n]+~~)|(\*[^*\n]+\*)|(\[[^\]\n]+\]\([^)\s]+\))/g;
+  // The address last: inside a [texte](cible) or between backticks, the earlier alternative takes it.
+  const re = new RegExp(String.raw`(\`[^\`\n]+\`)|(\*\*[^*\n]+\*\*)|(__[^_\n]+__)|(~~[^~\n]+~~)|(\*[^*\n]+\*)|(\[[^\]\n]+\]\([^)\s]+\))|(` + URL_RE.source + ")", "g");
   let last = 0;
   let m: RegExpExecArray | null;
   while ((m = re.exec(text))) {
     if (m.index > last) appendText(node, text.slice(last, m.index), highlight);
     const token = m[0];
     // Code is the one span whose contents are LITERAL: backticks mean "what is inside is text".
-    if (token.startsWith("`")) node.append(el("code", "md-code", token.slice(1, -1)));
+    if (token.startsWith("`")) {
+      const code = token.slice(1, -1);
+      node.append(isAddress(code) ? address(code) : el("code", "md-code", code));
+    } else if (isAddress(token)) node.append(address(token));
     // Everything else nests, and used to not.
     //
     // `**a `x` b**` came out as the literal characters `a \`x\` b` in bold, because the bold branch
@@ -168,6 +180,19 @@ export function inline<K extends keyof HTMLElementTagNameMap>(
   }
   if (last < text.length) appendText(node, text.slice(last), highlight);
   return node;
+}
+
+/** The whole of `text` is one web address — see `URL_RE`. */
+export function isAddress(text: string): boolean {
+  const m = URL_RE.exec(text);
+  return !!m && m.index === 0 && m[0].length === text.length;
+}
+
+/** A web address as a link: shown, never followed — see the [texte](cible) branch of `inline`. */
+function address(url: string): HTMLElement {
+  const link = el("span", "md-link", url);
+  link.title = url;
+  return link;
 }
 
 /**
