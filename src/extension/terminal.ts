@@ -17,7 +17,7 @@ import * as vscode from "vscode";
 import { spawn, type ChildProcess } from "node:child_process";
 import { homedir } from "node:os";
 import { t } from "../shared/i18n.js";
-import { cleanTerminalOutput, describeOutcome, isStatusAnswer } from "../core/terminal/output.js";
+import { cleanTerminalOutput, describeOutcome, isStatusAnswer, tailOutput } from "../core/terminal/output.js";
 import { scaledChars } from "../core/context/scale.js";
 
 /** The name is the contract: one terminal, reused, so only the first command waits for the shell. */
@@ -54,6 +54,11 @@ const INTEGRATION_TIMEOUT_WARM_MS = 3000;
 
 /** Beyond this the log is cut, keeping the end. Tool output is re-sent on every later step. */
 const MAX_OUTPUT_CHARS = 8000;
+/**
+ * The share of the window one command's output may take — its END, where a test run says what failed
+ * and how many. It was 15 %: a whole test suite's listing, 2 147 lines of "ok", reached the model.
+ */
+const OUTPUT_SHARE = 0.03;
 
 /** What a person presses to stop a runaway build. There is no API that kills one. */
 const CTRL_C = "\u0003";
@@ -208,7 +213,7 @@ export async function runCommandInTerminal(opts: RunOptions): Promise<RunResult>
     for await (const chunk of stream) {
       raw += chunk;
       // Keep twice the budget while collecting: the cut happens once, at the end, on clean text.
-      if (raw.length > scaledChars(MAX_OUTPUT_CHARS, 0.15) * 4) raw = raw.slice(-scaledChars(MAX_OUTPUT_CHARS, 0.15) * 4);
+      if (raw.length > scaledChars(MAX_OUTPUT_CHARS, OUTPUT_SHARE) * 4) raw = raw.slice(-scaledChars(MAX_OUTPUT_CHARS, OUTPUT_SHARE) * 4);
     }
   })();
 
@@ -268,7 +273,7 @@ export async function runCommandInTerminal(opts: RunOptions): Promise<RunResult>
   if (cancelled) {
     return { captured: true, isError: true, exitCode: undefined, content: `Cancelled by the user.\n${output}`.trim(), output: displayOutput(output) };
   }
-  const content = describeOutcome({ output, exitCode, timedOut }, scaledChars(MAX_OUTPUT_CHARS, 0.15));
+  const content = describeOutcome({ output, exitCode, timedOut }, scaledChars(MAX_OUTPUT_CHARS, OUTPUT_SHARE));
   // `grep` exiting 1 found nothing, which is an answer. See `isStatusAnswer`: the step is not drawn
   // as a failure, the model is not told the tool errored, and `verifyTurn` does not count a check
   // that failed — three wrong conclusions that used to come from one correct command.
@@ -329,7 +334,7 @@ export async function runCommandAsProcess(opts: RunOptions): Promise<RunResult> 
   }
 
   let raw = "";
-  const limit = scaledChars(MAX_OUTPUT_CHARS, 0.15) * 4;
+  const limit = scaledChars(MAX_OUTPUT_CHARS, OUTPUT_SHARE) * 4;
   const take = (chunk: string): void => {
     raw += chunk;
     if (raw.length > limit) raw = raw.slice(-limit);
@@ -385,7 +390,7 @@ export async function runCommandAsProcess(opts: RunOptions): Promise<RunResult> 
   }
   const timedOut = race.outcome === "timeout";
   view.write(`\r\n\x1b[2m${timedOut ? t("timed out and was killed") : `exit ${exitCode ?? "?"}`}\x1b[0m\r\n`);
-  const content = describeOutcome({ output, exitCode, timedOut }, scaledChars(MAX_OUTPUT_CHARS, 0.15));
+  const content = describeOutcome({ output, exitCode, timedOut }, scaledChars(MAX_OUTPUT_CHARS, OUTPUT_SHARE));
   const answered = isStatusAnswer(command, exitCode);
   return {
     captured: true,
@@ -394,6 +399,104 @@ export async function runCommandAsProcess(opts: RunOptions): Promise<RunResult> 
     content: answered ? `${content}\n(exit 1 from this command means "no match" or "not found", not an error.)` : content,
     output: displayOutput(output),
   };
+}
+
+// ── In the background ─────────────────────────────────────────────────────────────────────────
+//
+// ⚠️ « je veux que l'extension travaille comme Claude Code » — Claude Code starts a server, a watcher or
+// a bot in the background, goes on working, then reads what it printed or stops it. Here such a command
+// was cut at its timeout, so the agent could not run the very thing it was building and look at it.
+
+interface BackgroundCommand {
+  command: string;
+  child: ChildProcess;
+  output: string;
+  /** How much of `output` the model has already read. */
+  read: number;
+  exitCode?: number;
+  done: boolean;
+}
+
+const background = new Map<string, BackgroundCommand>();
+let backgroundCount = 0;
+/** What a background command keeps of its output: its latest part. */
+const BACKGROUND_KEEP_CHARS = 200_000;
+
+/** Start a command and leave it running; what it printed in its first seconds comes back now. */
+export async function startInBackground(opts: { command: string; cwd?: string; firstMs?: number }): Promise<RunResult> {
+  const id = `bg-${++backgroundCount}`;
+  const view = processTerminal();
+  view.write(`\r\n\x1b[2m${opts.cwd ?? ""}> (${id}, background)\x1b[0m ${opts.command}\r\n`);
+  let child: ChildProcess;
+  try {
+    child = spawn(opts.command, {
+      cwd: opts.cwd ?? homedir(),
+      shell: true,
+      windowsHide: true,
+      detached: process.platform !== "win32",
+      stdio: ["ignore", "pipe", "pipe"],
+      env: process.env,
+    });
+  } catch (err) {
+    return { captured: true, isError: true, content: `could not start the command: ${(err as Error).message}` };
+  }
+  const job: BackgroundCommand = { command: opts.command, child, output: "", read: 0, done: false };
+  background.set(id, job);
+  const take = (chunk: string): void => {
+    job.output += chunk;
+    if (job.output.length > BACKGROUND_KEEP_CHARS) {
+      const cut = job.output.length - BACKGROUND_KEEP_CHARS;
+      job.output = job.output.slice(cut);
+      job.read = Math.max(0, job.read - cut);
+    }
+    view.write(chunk.replace(/\r?\n/g, "\r\n"));
+  };
+  child.stdout?.setEncoding("utf8");
+  child.stderr?.setEncoding("utf8");
+  child.stdout?.on("data", take);
+  child.stderr?.on("data", take);
+  const ended = new Promise<void>((resolve) => {
+    child.on("close", (code) => {
+      job.exitCode = code ?? undefined;
+      job.done = true;
+      view.write(`\r\n\x1b[2m(${id}) exit ${code ?? "?"}\x1b[0m\r\n`);
+      resolve();
+    });
+    child.on("error", (err) => {
+      job.output += `\n${err.message}`;
+      job.done = true;
+      resolve();
+    });
+  });
+  await Promise.race([ended, new Promise((r) => setTimeout(r, opts.firstMs ?? 3000))]);
+  const first = readBackground(id);
+  return job.done
+    ? { captured: true, isError: job.exitCode !== 0, exitCode: job.exitCode, content: `It finished at once (${id}).\n${first.content}`, output: displayOutput(cleanTerminalOutput(job.output)) }
+    : { captured: true, isError: false, content: `Started in the background as ${id} — it keeps running. Read what it prints with command_output({ id: "${id}" }), stop it with stop_command({ id: "${id}" }). Its first output:\n${first.content}`, output: displayOutput(cleanTerminalOutput(job.output)) };
+}
+
+/** What a background command printed since it was last read, and whether it still runs. */
+export function readBackground(id: string): RunResult {
+  const job = background.get(id);
+  if (!job) return { captured: true, isError: true, content: `No background command ${id}. Running: ${[...background.keys()].join(", ") || "none"}.` };
+  const fresh = cleanTerminalOutput(job.output.slice(job.read));
+  job.read = job.output.length;
+  const state = job.done ? `finished, exit code ${job.exitCode ?? "unknown"}` : "still running";
+  return { captured: true, isError: false, content: `${id} (${job.command}) — ${state}.\n${tailOutput(fresh, scaledChars(MAX_OUTPUT_CHARS, OUTPUT_SHARE)) || "(nothing new)"}` };
+}
+
+/** Stop a background command and everything it started. */
+export function stopBackground(id: string): RunResult {
+  const job = background.get(id);
+  if (!job) return { captured: true, isError: true, content: `No background command ${id}.` };
+  if (!job.done) killTree(job.child);
+  background.delete(id);
+  return { captured: true, isError: false, content: `${id} stopped.` };
+}
+
+/** Every background command, stopped — when the extension goes away. */
+export function stopAllBackground(): void {
+  for (const id of [...background.keys()]) stopBackground(id);
 }
 
 /** The command and everything it started — a dev server under `npm run dev` included. */

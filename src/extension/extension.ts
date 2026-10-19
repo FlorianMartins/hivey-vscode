@@ -1,6 +1,7 @@
 // Activation. Everything the extension can do is registered here and nowhere else, so the list of
 // its capabilities is one file long and a reviewer can read it in a minute.
 
+import { stopAllBackground } from "./terminal.js";
 import * as vscode from "vscode";
 import { showKnowledge } from "./knowledge.js";
 import { announcePolicy, policySource, reloadPolicy } from "./policy.js";
@@ -850,6 +851,8 @@ async function announce(context: vscode.ExtensionContext, log: vscode.OutputChan
 let pendingShutdown: (() => Promise<void>) | undefined;
 
 export async function deactivate(): Promise<void> {
+  // What the agent left running in the background goes with the editor — see `startInBackground`.
+  stopAllBackground();
   await pendingShutdown?.();
   pendingShutdown = undefined;
 }

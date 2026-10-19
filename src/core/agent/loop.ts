@@ -366,19 +366,60 @@ function fileOf(name: string, args: string | undefined): string | undefined {
   }
 }
 
-/** The read_file results whose file was read again or changed by a later call of the same turn. */
+/** The lines a read_file call asked for — `1-end` when it named none. */
+function rangeOf(args: string | undefined): string {
+  try {
+    const a = JSON.parse(args || "{}") as Record<string, unknown>;
+    return `${Number(a["from"]) || 1}-${Number(a["to"]) || "end"}`;
+  } catch {
+    return "1-end";
+  }
+}
+
+/**
+ * The read_file results made out of date by a later call of the same turn: the same lines read again,
+ * or the file changed. Another part of the same file read later is not a newer copy of this one.
+ */
 export function staleFileOutputs(messages: ChatMessage[]): Set<string> {
   const calls = messages.flatMap((m) => (m.role === "assistant" ? (m.toolCalls ?? []) : []));
   const stale = new Set<string>();
-  const later = new Set<string>();
+  const changed = new Set<string>();
+  const reread = new Set<string>();
   for (let i = calls.length - 1; i >= 0; i--) {
     const call = calls[i]!;
     const file = fileOf(call.name, call.args);
     if (!file) continue;
-    if (call.name === "read_file" && later.has(file)) stale.add(call.id);
-    later.add(file);
+    if (call.name !== "read_file") {
+      changed.add(file);
+      continue;
+    }
+    const key = `${file}\u0000${rangeOf(call.args)}`;
+    if (changed.has(file) || reread.has(key)) stale.add(call.id);
+    reread.add(key);
   }
   return stale;
+}
+
+/**
+ * What a repeated call's identical result becomes: a pointer to the copy the model already has.
+ *
+ * ⚠️ « il doit chercher directement les éléments qu'il a besoin au lieu de tout lire » — a real turn
+ * read ui.js and menu.js four times each, whole, and every copy stayed in the context: the window
+ * filled to 129 000 tokens. An identical copy holds nothing the first one does not. It is the NEW copy
+ * that gives way, never the first: changing an earlier message makes the server re-read everything
+ * after it — up to 100 000 tokens, minutes per step — while the newest message was never cached.
+ */
+export function unchangedNotice(name: string): string {
+  return `[Unchanged: exactly the same result as your earlier ${name} call with these arguments, which is still above. Use it rather than asking again.]`;
+}
+
+/** The earlier tool result of the same call with the same content, if there is one in `messages`. */
+export function sameEarlierResult(messages: ChatMessage[], call: ToolCall, content: string): boolean {
+  if (content.length < 400) return false;
+  const ids = new Set(
+    messages.flatMap((m) => (m.role === "assistant" ? (m.toolCalls ?? []) : [])).filter((c) => c.id !== call.id && c.name === call.name && c.args === call.args).map((c) => c.id),
+  );
+  return messages.some((m) => m.role === "tool" && m.toolCallId !== undefined && ids.has(m.toolCallId) && m.content === content);
 }
 
 const CONTINUE_AFTER_CUT =
@@ -792,7 +833,9 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
       if (opts.recall && result.content.length > 500) {
         recallIds.set(item.call.id, opts.recall.put(result.content, `${item.call.name} ${(item.call.args ?? "").slice(0, 120)}`.trim()));
       }
-      working.push({ role: "tool", toolCallId: item.call.id, content: result.content });
+      // A repeat with the same result points to the copy already there — see `unchangedNotice`.
+      const content = sameEarlierResult(working, item.call, result.content) ? unchangedNotice(item.call.name) : result.content;
+      working.push({ role: "tool", toolCallId: item.call.id, content });
       if (result.images?.length) stepImages.push({ label: `${item.call.name} ${callSignature(item.call.name, safeArgs(item.call.args))}`.trim(), images: result.images });
     };
 
