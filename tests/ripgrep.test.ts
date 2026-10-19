@@ -3,10 +3,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { findRipgrep, ripgrep, ripgrepArgs } from "../src/core/search/ripgrep.js";
+import { findRipgrep, ripgrep, ripgrepArgs, ripgrepFiles } from "../src/core/search/ripgrep.js";
 
 test("VS Code's ripgrep is found where each version keeps it", () => {
   const app = "/opt/vscode/resources/app";
@@ -64,4 +64,24 @@ test("a real search: sources found, binaries and dependencies left out, the pane
   assert.equal(one?.capped, true);
   const refused = await ripgrep({ rg, cwd: dir, pattern: "(", literal: false, exclude: [], maxMatches: 5, maxFileBytes: 400_000 });
   assert.equal(refused, undefined, "a pattern ripgrep refuses: the caller searches the old way");
+});
+
+test("a listing puts the most recently changed file first, as Claude Code's Glob; .gitignore applies without git", async (t) => {
+  const rg = anyRipgrep();
+  if (!rg) {
+    t.skip("no ripgrep on this machine");
+    return;
+  }
+  const dir = mkdtempSync(join(tmpdir(), "rgf-"));
+  mkdirSync(join(dir, "src"));
+  mkdirSync(join(dir, "tmp"));
+  mkdirSync(join(dir, "node_modules"));
+  writeFileSync(join(dir, ".gitignore"), "tmp/\n");
+  for (const [name, age] of [["src/old.js", 3000], ["src/menu.js", 10], ["src/ui.js", 600], ["tmp/scratch.js", 1], ["node_modules/x.js", 1]] as const) {
+    writeFileSync(join(dir, name), "x");
+    const at = Date.now() / 1000 - age;
+    utimesSync(join(dir, name), at, at);
+  }
+  const r = await ripgrepFiles({ rg, cwd: dir, glob: "**/*.js", exclude: ["**/node_modules/**"], limit: 2 });
+  assert.deepEqual(r, { files: ["src/menu.js", "src/ui.js"], capped: true });
 });

@@ -17,8 +17,8 @@ import { readWhole } from "../core/fs/outline.js";
 import { unnumbered, findUnique } from "../core/text/findText.js";
 import { cappedAt, describeCap } from "../core/agent/capped.js";
 import { searchPattern } from "../core/agent/regex.js";
-import { searchExclude, searchExcludeGlobs } from "../core/agent/searchScope.js";
-import { findRipgrep, ripgrep } from "../core/search/ripgrep.js";
+import { SKIPPED_DIRS, searchExclude, searchExcludeGlobs } from "../core/agent/searchScope.js";
+import { findRipgrep, ripgrep, ripgrepFiles } from "../core/search/ripgrep.js";
 import { t } from "../shared/i18n.js";
 import { parsePlan, planSummary, PLAN_TOOL_DESCRIPTION, type Plan } from "../core/agent/plan.js";
 import { NOTE_ASIDE_TOOL, type Notice } from "../core/session/notices.js";
@@ -289,7 +289,7 @@ export function buildTools(deps: ToolDeps): Tool[] {
     parallel: () => true,
     schema: {
       name: "list_files",
-      description: "List workspace files matching a glob, e.g. `src/**/*.ts`.",
+      description: "List workspace files matching a glob, e.g. `src/**/*.ts` — the most recently changed first.",
       parameters: {
         type: "object",
         properties: { glob: { type: "string" }, limit: { type: "number" } },
@@ -300,12 +300,17 @@ export function buildTools(deps: ToolDeps): Tool[] {
     async run(args, ctx): Promise<ToolResult> {
       const glob = String(args["glob"] ?? "**/*");
       const limit = Math.min(Number(args["limit"] ?? 100), 300);
-      const uris = await vscode.workspace.findFiles(glob, undefined, limit);
+      // The most recently changed first, as Claude Code's Glob — with ripgrep, .gitignore respected and
+      // dependencies left out. The old listing, in path order, when ripgrep cannot run.
+      const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      const rg = root ? findRipgrep(vscode.env.appRoot) : undefined;
+      const viaRg = rg && root ? await ripgrepFiles({ rg, cwd: root, glob, exclude: SKIPPED_DIRS.map((d) => `**/${d}/**`), limit }) : undefined;
+      const files = viaRg ? viaRg.files : (await vscode.workspace.findFiles(glob, undefined, limit)).map(relative).sort();
       // ⚠️ Said, not swallowed. A listing cut at its limit and reported as a plain list has told the
       // model those are all the files there are. See `core/agent/capped.ts`.
-      const cut = describeCap(cappedAt(uris.length, limit), "files", "Pass a narrower `glob`, or raise `limit` (max 300).");
-      ctx.report(t("{0} file(s) for {1}", uris.length, glob));
-      return { content: (uris.map(relative).join("\n") || "(no match)") + cut };
+      const cut = describeCap(viaRg ? { shown: files.length, cap: limit, hitCap: viaRg.capped } : cappedAt(files.length, limit), "files", "Pass a narrower `glob`, or raise `limit` (max 300).");
+      ctx.report(t("{0} file(s) for {1}", files.length, glob));
+      return { content: (files.join("\n") || "(no match)") + cut };
     },
   };
 

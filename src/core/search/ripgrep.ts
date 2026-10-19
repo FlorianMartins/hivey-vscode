@@ -39,6 +39,41 @@ export interface RipgrepSearch {
   signal?: AbortSignal;
 }
 
+/**
+ * The files matching a glob, the most recently changed first — as Claude Code's Glob lists them: the
+ * file someone is working on is the one the question is most likely about. .gitignore respected.
+ * Undefined when ripgrep cannot run; `capped` when there were more than `limit`.
+ */
+export function ripgrepFiles(s: { rg: string; cwd: string; glob: string; exclude: string[]; limit: number }): Promise<{ files: string[]; capped: boolean } | undefined> {
+  return new Promise((resolve) => {
+    // .gitignore applies in a project that is not a repository too.
+    const args = ["--files", "--sortr", "modified", "--color", "never", "--no-require-git"];
+    if (s.glob && s.glob !== "**/*") args.push("--glob", s.glob);
+    for (const g of s.exclude) args.push("--glob", `!${g}`);
+    let child;
+    try {
+      child = spawn(s.rg, args, { cwd: s.cwd, stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
+    } catch {
+      resolve(undefined);
+      return;
+    }
+    let all = "";
+    child.stdout.setEncoding("utf8");
+    child.stdout.on("data", (chunk: string) => {
+      all += chunk;
+    });
+    child.on("error", () => resolve(undefined));
+    child.on("close", (code) => {
+      if (code !== 0 && code !== 1) return resolve(undefined);
+      const files = all
+        .split("\n")
+        .map((l) => l.replace(/\r$/, "").replace(/^\.[\\/]/, "").replace(/\\/g, "/"))
+        .filter(Boolean);
+      resolve({ files: files.slice(0, s.limit), capped: files.length > s.limit });
+    });
+  });
+}
+
 /** The arguments ripgrep is run with — in path order, so the same search reads the same files. */
 export function ripgrepArgs(s: Omit<RipgrepSearch, "rg" | "cwd" | "signal" | "maxMatches">): string[] {
   const args = [
@@ -52,6 +87,8 @@ export function ripgrepArgs(s: Omit<RipgrepSearch, "rg" | "cwd" | "signal" | "ma
     "--max-columns-preview",
     "--max-filesize",
     String(s.maxFileBytes),
+    // .gitignore applies in a project that is not a repository too.
+    "--no-require-git",
     "--sort",
     "path",
     s.literal ? "--fixed-strings" : "--pcre2",
