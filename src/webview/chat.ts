@@ -6,7 +6,7 @@
 // assistant is ALLOWED to do rather than how clever it is, the model button carries its price, and
 // every exchange can be muted out of the context without being deleted from the story.
 
-import { button, closeMenu, el, formatTokens, icon, ICON, menu, menuItem, menuTitle, messageTime, messageTimeFull, separator, vendorIcon } from "./dom.js";
+import { button, closeMenu, el, formatTokens, icon, ICON, menu, menuItem, menuTitle, messageTime, messageTimeFull, duration, separator, vendorIcon } from "./dom.js";
 import { markdown } from "./markdown.js";
 import { t } from "../shared/i18n.js";
 import { vendorSlug } from "../core/router/vendorIcon.js";
@@ -491,7 +491,7 @@ function renderEntry(entry: UiEntry, state: UiState, deps: ChatDeps, first = fal
   head.append(el("span", `entry-mark ${entry.role}`, entry.role === "user" ? "\u25CF" : "\u25C6"));
   head.append(el("span", "entry-who", entry.role === "user" ? t("You") : "Hivey Code"));
   // When you wrote it, beside your name — always there, quietly: « horodater les messages […] au côté
-  // de "Vous" ». The answer's time is with its receipt, on hover (below).
+  // de "Vous" ». The answer's end time, and how long it took, is on a line under the answer (below).
   if (entry.role === "user" && entry.at) {
     const when = el("span", "entry-time", messageTime(entry.at));
     when.title = messageTimeFull(entry.at);
@@ -671,11 +671,13 @@ function renderEntry(entry: UiEntry, state: UiState, deps: ChatDeps, first = fal
   }
   const receipt = el("div", "entry-receipt");
   if (entry.model && entry.role === "assistant") receipt.append(el("span", "entry-meta", entry.model));
-  // The answer's time, at the end of its receipt — revealed on hover with the model and the cost.
-  if (entry.role === "assistant" && entry.at) {
-    const when = el("span", "entry-meta entry-time", messageTime(entry.at));
-    when.title = messageTimeFull(entry.at);
-    receipt.append(when);
+  // When the answer ended and how long the whole request took — on a line of its own under the
+  // answer, always shown: the row of buttons and the receipt appear on hover only, and this is what
+  // tells someone their question took four minutes. See `tookSince`.
+  let ended: HTMLElement | undefined;
+  if (entry.role === "assistant" && entry.at && !entry.streaming) {
+    ended = el("div", "entry-time answer-end", entry.took ? `${messageTime(entry.at)} · ${duration(entry.took)}` : messageTime(entry.at));
+    ended.title = entry.took ? t("Finished {0} — {1} after the question", messageTimeFull(entry.at), duration(entry.took)) : messageTimeFull(entry.at);
   }
   if (entry.usdCost) {
     const cost = el("span", "entry-meta cost", formatCost(entry.usdCost));
@@ -697,7 +699,7 @@ function renderEntry(entry: UiEntry, state: UiState, deps: ChatDeps, first = fal
     actions.append(receipt);
   }
 
-  block.append(wrap, actions);
+  block.append(wrap, ...(ended ? [ended] : []), actions);
   return block;
 }
 
@@ -1114,7 +1116,7 @@ export function thinkingLine(text: string, opts: { live?: boolean } = {}): {
   const item = el("div", `tl-item tl-think${opts.live ? " live" : ""}`);
   item.append(el("span", "tl-mark"));
   const line = el("div", "tl-line");
-  line.append(el("span", "tl-glyph", "∴"), el("span", "tl-name", t("Thinking")));
+  line.append(el("span", "tl-name", t("Thinking")));
   const body = el("div", "tl-thought");
   let latest = text;
   const render = (value: string): void => {

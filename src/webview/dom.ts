@@ -389,6 +389,15 @@ export function messageTime(at: number, now = Date.now()): string {
 }
 
 /** The full date and time, for the tooltip. */
+/** How long something took, to the second: « 42 s », « 3 min 12 s », « 1 h 05 min ». */
+export function duration(ms: number): string {
+  const s = Math.max(0, Math.round(ms / 1000));
+  if (s < 60) return `${s} s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m} min ${String(s % 60).padStart(2, "0")} s`;
+  return `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, "0")} min`;
+}
+
 export function messageTimeFull(at: number): string {
   return new Date(at).toLocaleString(locale(), { dateStyle: "full", timeStyle: "short" });
 }

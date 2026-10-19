@@ -203,6 +203,21 @@ class MementoPermissionStore implements PermissionStore {
 // stopped the panel counting it, and the learned routing would have gone on measuring the old set.
 // One source, imported.
 
+/**
+ * How long a finished answer took: from the question it answers to its own end.
+ *
+ * ⚠️ « il y a l'heure sur le prompt mais pas sur la réponse finale (qui permet à l'utilisateur de voir
+ * le temps qu'a pris la requête totale) ». The answer's time was on its receipt, shown on hover only.
+ */
+function tookSince(entries: readonly Entry[], answer: Entry): { took?: number } {
+  const at = entries.indexOf(answer);
+  for (let i = at - 1; i >= 0; i--) {
+    const q = entries[i]!;
+    if (q.role === "user") return answer.at > q.at ? { took: answer.at - q.at } : {};
+  }
+  return {};
+}
+
 export class ChatViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewId = "hiveyCode.chat";
   /** The same panel, declared a second time so it can live in the right-hand bar as well. */
@@ -726,6 +741,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       model: e.model,
       usdCost: e.usdCost,
       ...(e.id === this.streamingEntryId ? { streaming: true } : {}),
+      ...(e.role === "assistant" && e.id !== this.streamingEntryId ? tookSince(this.session.entries, e) : {}),
       ...(e.usage ? { usage: e.usage } : {}),
       ...(e.checkpoint?.length ? { checkpointFiles: e.checkpoint.length } : {}),
       ...(e.checkpointPartial ? { checkpointPartial: true } : {}),

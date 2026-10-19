@@ -212,6 +212,7 @@ export const FR: Record<string, string> = {
   "Send": "Envoyer",
   "Send (markers in place)": "Envoyer (marqueurs en place)",
   "Always send (this conversation)": "Toujours envoyer (cette conversation)",
+  "Finished {0} — {1} after the question": "Terminée {0} — {1} après la question",
   "fetch {0}": "lire {0}",
   "fetched {0}": "lu {0}",
   "the server's shared context is full for a moment — the step will go again": "le contexte partagé du serveur est plein pour l'instant — l'étape va reprendre",
