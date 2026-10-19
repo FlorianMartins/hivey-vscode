@@ -491,7 +491,7 @@ function renderEntry(entry: UiEntry, state: UiState, deps: ChatDeps, first = fal
   head.append(el("span", `entry-mark ${entry.role}`, entry.role === "user" ? "\u25CF" : "\u25C6"));
   head.append(el("span", "entry-who", entry.role === "user" ? t("You") : "Hivey Code"));
   // When you wrote it, beside your name — always there, quietly: « horodater les messages […] au côté
-  // de "Vous" ». The answer's end time, and how long it took, is on a line under the answer (below).
+  // de "Vous" ». The answer's end time, and how long it took, is in its receipt, on hover (below).
   if (entry.role === "user" && entry.at) {
     const when = el("span", "entry-time", messageTime(entry.at));
     when.title = messageTimeFull(entry.at);
@@ -671,13 +671,12 @@ function renderEntry(entry: UiEntry, state: UiState, deps: ChatDeps, first = fal
   }
   const receipt = el("div", "entry-receipt");
   if (entry.model && entry.role === "assistant") receipt.append(el("span", "entry-meta", entry.model));
-  // When the answer ended and how long the whole request took — on a line of its own under the
-  // answer, always shown: the row of buttons and the receipt appear on hover only, and this is what
-  // tells someone their question took four minutes. See `tookSince`.
-  let ended: HTMLElement | undefined;
+  // When the answer ENDED, and how long the whole request took — at the end of its receipt, revealed on
+  // hover with the model and the cost. See `tookSince`.
   if (entry.role === "assistant" && entry.at && !entry.streaming) {
-    ended = el("div", "entry-time answer-end", entry.took ? `${messageTime(entry.at)} · ${duration(entry.took)}` : messageTime(entry.at));
-    ended.title = entry.took ? t("Finished {0} — {1} after the question", messageTimeFull(entry.at), duration(entry.took)) : messageTimeFull(entry.at);
+    const when = el("span", "entry-meta entry-time", entry.took ? `${messageTime(entry.at)} · ${duration(entry.took)}` : messageTime(entry.at));
+    when.title = entry.took ? t("Finished {0} — {1} after the question", messageTimeFull(entry.at), duration(entry.took)) : messageTimeFull(entry.at);
+    receipt.append(when);
   }
   if (entry.usdCost) {
     const cost = el("span", "entry-meta cost", formatCost(entry.usdCost));
@@ -699,7 +698,7 @@ function renderEntry(entry: UiEntry, state: UiState, deps: ChatDeps, first = fal
     actions.append(receipt);
   }
 
-  block.append(wrap, ...(ended ? [ended] : []), actions);
+  block.append(wrap, actions);
   return block;
 }
 

@@ -5206,11 +5206,3 @@ pre.code code {
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
-
-/* The end of an answer: when it finished and how long the request took. Quiet, but not on hover —
- * the row of buttons under it is. */
-.answer-end {
-  display: block;
-  margin-top: var(--sp-1);
-  opacity: 0.85;
-}
