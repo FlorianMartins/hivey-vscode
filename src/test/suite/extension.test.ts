@@ -783,6 +783,31 @@ suite("Hivey Code", () => {
    * is never legitimate is claiming a result. So the branch that cannot read says so in words, and
    * the branch that can must produce the real output and the real exit code.
    */
+  test("a command left running in the background is read, then stopped — as Claude Code's", async () => {
+    const ext = vscode.extensions.getExtension(ID)!;
+    await ext.activate();
+    const tools = buildTools({ settings: () => readSettings() });
+    const run = tools.find((tool) => tool.schema.name === "run_command")!;
+    const read = tools.find((tool) => tool.schema.name === "command_output");
+    const stop = tools.find((tool) => tool.schema.name === "stop_command");
+    assert.ok(read && stop, "command_output and stop_command are offered with the process runner");
+    const ctx = { report: () => {} };
+    const ticker = `node -e "let n = 0; setInterval(() => console.log('tick ' + ++n), 300)"`;
+    const started = await run.run({ command: ticker, background: true }, ctx);
+    assert.ok(!started.isError, started.content);
+    const id = /Started in the background as (bg-\d+)/.exec(started.content)?.[1];
+    assert.ok(id, started.content);
+    assert.match(started.content, /tick 1/, "its first output comes back at once");
+    await new Promise((r) => setTimeout(r, 1200));
+    const later = await read.run({ id }, ctx);
+    assert.match(later.content, /still running/);
+    assert.match(later.content, /tick \d+/);
+    assert.doesNotMatch(later.content, /tick 1\n/, "only what is new since the last read");
+    const stopped = await stop.run({ id }, ctx);
+    assert.match(stopped.content, new RegExp(`${id} stopped`));
+    assert.ok((await read.run({ id }, ctx)).isError, "a stopped command is gone");
+  });
+
   test("a command run in the editor comes back with its output and its exit code", async () => {
     const ext = vscode.extensions.getExtension(ID)!;
     await ext.activate();

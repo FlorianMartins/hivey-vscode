@@ -33,7 +33,7 @@ import { buildGitTools, gitAvailable } from "./integrations/git.js";
 import { readSettings } from "./config.js";
 import { buildKnowledgeTools } from "./knowledge.js";
 import type { McpManager } from "./integrations/mcp.js";
-import { describesProcessRunner, runCommandAsProcess, runCommandInTerminal, usesProcessRunner } from "./terminal.js";
+import { describesProcessRunner, readBackground, runCommandAsProcess, runCommandInTerminal, startInBackground, stopBackground, usesProcessRunner } from "./terminal.js";
 import { withHooks, type Hooks } from "./hooks.js";
 import { buildSymbolTools } from "./symbols.js";
 import { isAbsolutePath, tidyPath, underRoot } from "../core/fs/within.js";
@@ -687,6 +687,16 @@ export function buildTools(deps: ToolDeps): Tool[] {
           command: { type: "string" },
           why: { type: "string" },
           timeoutMs: { type: "number", description: "Give up after this long. Default 120000, maximum 600000." },
+          ...(asProcess
+            ? {
+                background: {
+                  type: "boolean",
+                  description:
+                    "Start it and keep it running — a server, a watcher, a bot — and get its first output now. " +
+                    "Then read what it prints with command_output and stop it with stop_command.",
+                },
+              }
+            : {}),
         },
         required: ["command"],
       },
@@ -697,6 +707,15 @@ export function buildTools(deps: ToolDeps): Tool[] {
       // Only where cmd.exe is the shell: the integrated terminal may be PowerShell, which takes them.
       const multiLine = asProcess ? cmdMultiLineProblem(command, process.platform) : undefined;
       if (multiLine) return { content: multiLine, isError: true };
+      // Left running — see `startInBackground`.
+      if (asProcess && args["background"] === true) {
+        const started = await startInBackground({ command, cwd: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath });
+        return {
+          content: started.content,
+          isError: started.isError,
+          display: { captured: true, exitCode: started.exitCode, command, ...(started.output !== undefined ? { output: started.output } : {}) },
+        };
+      }
       const result = await (asProcess ? runCommandAsProcess : runCommandInTerminal)({
         command,
         // Not `root()`, which throws when no folder is open: a terminal does not need one. Someone
@@ -815,6 +834,33 @@ export function buildTools(deps: ToolDeps): Tool[] {
     },
   };
 
+  // A command left running with `background` — read what it printed, or stop it. See `startInBackground`.
+  const commandOutput: Tool = {
+    parallel: () => true,
+    schema: {
+      name: "command_output",
+      description: "What a command started with run_command({ background: true }) printed since you last asked, and whether it still runs.",
+      parameters: { type: "object", properties: { id: { type: "string", description: "Its id, e.g. bg-1." } }, required: ["id"] },
+    },
+    approval: () => false,
+    async run(args): Promise<ToolResult> {
+      const r = readBackground(String(args["id"] ?? ""));
+      return { content: r.content, isError: r.isError };
+    },
+  };
+  const stopCommand: Tool = {
+    schema: {
+      name: "stop_command",
+      description: "Stop a command started with run_command({ background: true }), and everything it started.",
+      parameters: { type: "object", properties: { id: { type: "string", description: "Its id, e.g. bg-1." } }, required: ["id"] },
+    },
+    approval: () => false,
+    async run(args): Promise<ToolResult> {
+      const r = stopBackground(String(args["id"] ?? ""));
+      return { content: r.content, isError: r.isError };
+    },
+  };
+
   return withHooks([
     ...buildSymbolTools(),
     readFile,
@@ -824,6 +870,7 @@ export function buildTools(deps: ToolDeps): Tool[] {
     writeFile,
     editFile,
     runCommand,
+    ...(asProcess ? [commandOutput, stopCommand] : []),
     ...(deps.onPlan ? [updatePlan] : []),
     ...(deps.onNotice ? [noteAside] : []),
     ...integrations,
