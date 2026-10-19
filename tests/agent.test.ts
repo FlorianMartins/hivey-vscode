@@ -535,7 +535,7 @@ test("⚠️ the same call repeated is not run again, and a model that insists i
   assert.equal(r.stoppedBecause, "repeating", "the turn ends instead of spending all its steps");
   assert.ok(provider.seen.length <= 6, `${provider.seen.length} requests — it should stop early, not at 30`);
   const told = provider.seen.at(-1)!.messages.filter((m) => m.role === "tool").at(-1)!;
-  assert.match(String(told.content), /already made this exact call/);
+  assert.match(String(told.content), /made this exact call/);
 });
 
 test("⚠️ the test run repeated after each fix is never blocked", async () => {
@@ -552,49 +552,6 @@ test("⚠️ the test run repeated after each fix is never blocked", async () =>
   const r = await runTurn({ ...base, provider, tools: [run] });
   assert.equal(run.calls.length, 4, "every run happened");
   assert.equal(r.text, "Green.");
-});
-
-test("⚠️ an edit lets its own file be read again, not every other file", async () => {
-  // « il tourne en rond » — read, edit, re-read every file, edit again: an edit reset the whole
-  // count, so the loop never saw the re-reads of the files the edit had not touched.
-  const read = tool("read_file", { parallel: () => true });
-  const edit = tool("edit_file");
-  const reads = (id: string) => [
-    { id: `${id}a`, name: "read_file", args: '{"path":"a.ts"}' },
-    { id: `${id}b`, name: "read_file", args: '{"path":"b.ts"}' },
-  ];
-  const provider = scriptedProvider([
-    { toolCalls: reads("1") },
-    { toolCalls: [{ id: "2", name: "edit_file", args: '{"path":"a.ts"}' }] },
-    { toolCalls: reads("3") },
-    { toolCalls: [{ id: "4", name: "edit_file", args: '{"path":"a.ts"}' }] },
-    { toolCalls: reads("5") },
-    { text: "Done." },
-  ]);
-  await runTurn({ ...base, provider, tools: [read, edit] });
-  assert.equal(read.calls.filter((c) => c["path"] === "a.ts").length, 3, "the edited file, read after each edit");
-  assert.equal(read.calls.filter((c) => c["path"] === "b.ts").length, 2, "the untouched one, refused the third time");
-});
-
-test("⚠️ a plan update between two reads does not make the same read new again", async () => {
-  // « il y a toujours un souci avec les boucles »: ui.js and menu.js read four times, an
-  // update_plan between each pair, and the count started over every time.
-  const read = tool("read_file", { parallel: () => true });
-  const plan = tool("update_plan");
-  const pair = (id: string) => [
-    { id: `${id}a`, name: "read_file", args: '{"path":"src/ui.js"}' },
-    { id: `${id}b`, name: "read_file", args: '{"path":"src/menu.js"}' },
-  ];
-  const provider = scriptedProvider([
-    { toolCalls: pair("1") },
-    { toolCalls: [{ id: "2", name: "update_plan", args: "{}" }] },
-    { toolCalls: pair("3") },
-    { toolCalls: [{ id: "4", name: "update_plan", args: "{}" }] },
-    { toolCalls: pair("5") },
-    { text: "Done." },
-  ]);
-  await runTurn({ ...base, provider, tools: [read, plan] });
-  assert.equal(read.calls.filter((c) => c["path"] === "src/ui.js").length, 2, "read twice, refused the third time");
 });
 
 test("a server whose shared context is full: the step waits and goes again, nothing shortened", async () => {
@@ -620,6 +577,94 @@ test("a server whose shared context is full: the step waits and goes again, noth
   assert.equal(calls, 2);
   assert.ok(reports.some((m) => /shared context is full/.test(m)));
   assert.ok(!reports.some((m) => /shortened/.test(m)), "a full pool is not this turn's window");
+});
+
+test("⚠️ a sub-agent cut by its step limit before writing anything is asked for its conclusion, without tools", async () => {
+  // « The sub-agent returned nothing »: fifteen steps of reading, no text, and the agent that sent it
+  // did the whole exploration again.
+  const read = tool("read_file", { parallel: () => true });
+  const seen: ChatRequest[] = [];
+  let step = 0;
+  const provider: Provider = {
+    id: "fake",
+    baseUrl: "http://127.0.0.1:11434/v1",
+    isLocal: true,
+    async chat(req): Promise<ChatResult> {
+      seen.push({ ...req, messages: req.messages.map((m) => ({ ...m })) });
+      step++;
+      const usage = { promptTokens: 1, completionTokens: 1, cachedTokens: 0 };
+      if (req.tools?.length) return { text: "", reasoning: "", toolCalls: [{ id: `c${step}`, name: "read_file", args: `{"path":"f${step}.js"}` }], usage, stopReason: "tool_calls" };
+      return { text: "La recherche est dans src/dashboardGuilde.js:3381 (rechercheGlobale).", reasoning: "", toolCalls: [], usage, stopReason: "stop" };
+    },
+    async listModels() {
+      return [];
+    },
+  };
+  const r = await runTurn({ ...base, provider, tools: [read], maxSteps: 3, concludeWhenCut: true });
+  assert.equal(r.stoppedBecause, "max-steps");
+  assert.match(r.text, /dashboardGuilde\.js:3381/);
+  const last = seen.at(-1)!;
+  assert.equal(last.tools, undefined, "the conclusion is asked without tools");
+  assert.match(last.messages.at(-1)!.content, /Your steps are used up/);
+  // Not asked for: the turn ends as it always did.
+  const plain = await runTurn({ ...base, provider, tools: [read], maxSteps: 2 });
+  assert.equal(plain.text, "");
+});
+
+test("a turn stopped for repeating still says where things stand — after its notes, without tools", async () => {
+  // « Arrêté : le modèle répétait le même appel », and nothing else to go on.
+  const read = tool("read_file", { parallel: () => true });
+  const seen: ChatRequest[] = [];
+  const provider: Provider = {
+    id: "fake",
+    baseUrl: "http://127.0.0.1:11434/v1",
+    isLocal: true,
+    async chat(req): Promise<ChatResult> {
+      seen.push({ ...req, messages: req.messages.map((m) => ({ ...m })) });
+      const usage = { promptTokens: 1, completionTokens: 1, cachedTokens: 0 };
+      if (req.tools?.length) return { text: "Je relis.", reasoning: "", toolCalls: [{ id: `c${seen.length}`, name: "read_file", args: '{"path":"a.ts"}' }], usage, stopReason: "tool_calls" };
+      return { text: "J'ai relu a.ts en boucle : il me manque le nom du champ à afficher.", reasoning: "", toolCalls: [], usage, stopReason: "stop" };
+    },
+    async listModels() {
+      return [];
+    },
+  };
+  const r = await runTurn({ ...base, provider, tools: [read], concludeWhenCut: "always" });
+  assert.equal(r.stoppedBecause, "repeating");
+  assert.match(r.text, /Je relis\.[\s\S]*\n\nJ'ai relu a\.ts en boucle/);
+  assert.equal(seen.at(-1)!.tools, undefined);
+  assert.match(seen.at(-1)!.messages.at(-1)!.content, /You were stopped: you kept making the same call/);
+});
+
+test("⚠️ a re-read further on, after other work, is never refused — only a loop is", async () => {
+  // « il tourne en boucle et s'arrête »: counted over the whole turn, the guard refused a model that
+  // went back to a file after editing others, then stopped a turn that was going somewhere.
+  const read = tool("read_file", { parallel: () => true });
+  const edit = tool("edit_file");
+  const provider = scriptedProvider([
+    { toolCalls: [{ id: "1", name: "read_file", args: '{"path":"b.ts"}' }] },
+    { toolCalls: [{ id: "2", name: "edit_file", args: '{"path":"a.ts"}' }] },
+    { toolCalls: [{ id: "3", name: "read_file", args: '{"path":"b.ts"}' }] },
+    { toolCalls: [{ id: "4", name: "edit_file", args: '{"path":"c.ts"}' }] },
+    { toolCalls: [{ id: "5", name: "read_file", args: '{"path":"b.ts"}' }] },
+    { toolCalls: [{ id: "6", name: "edit_file", args: '{"path":"d.ts"}' }] },
+    { toolCalls: [{ id: "7", name: "read_file", args: '{"path":"b.ts"}' }] },
+    { text: "Done." },
+  ]);
+  const r = await runTurn({ ...base, provider, tools: [read, edit] });
+  assert.equal(read.calls.length, 4, "every read ran");
+  assert.equal(r.stoppedBecause, "answer");
+});
+
+test("the same reads three steps in a row are a loop, a plan update or not", async () => {
+  const read = tool("read_file", { parallel: () => true });
+  const pair = (id: string) => [
+    { id: `${id}a`, name: "read_file", args: '{"path":"src/ui.js"}' },
+    { id: `${id}b`, name: "read_file", args: '{"path":"src/menu.js"}' },
+  ];
+  const provider = scriptedProvider([{ toolCalls: pair("1") }, { toolCalls: pair("2") }, { toolCalls: pair("3") }, { text: "Done." }]);
+  await runTurn({ ...base, provider, tools: [read] });
+  assert.equal(read.calls.filter((c) => c["path"] === "src/ui.js").length, 2, "read twice in a row, refused the third");
 });
 
 test("the same tool with different arguments is never mistaken for a loop", async () => {
