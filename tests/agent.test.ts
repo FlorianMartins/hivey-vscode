@@ -531,7 +531,7 @@ test("⚠️ the same call repeated is not run again, and a model that insists i
   const read = tool("read_file", { parallel: () => true });
   const provider = scriptedProvider([{ toolCalls: [{ id: "1", name: "read_file", args: '{"path":"a.ts"}' }] }]);
   const r = await runTurn({ ...base, provider, tools: [read] });
-  assert.equal(read.calls.length, 2, "run twice, then refused");
+  assert.equal(read.calls.length, 1, "read once, answered from the conversation the second time, refused the third");
   assert.equal(r.stoppedBecause, "repeating", "the turn ends instead of spending all its steps");
   assert.ok(provider.seen.length <= 6, `${provider.seen.length} requests — it should stop early, not at 30`);
   const told = provider.seen.at(-1)!.messages.filter((m) => m.role === "tool").at(-1)!;
@@ -664,7 +664,7 @@ test("the same reads three steps in a row are a loop, a plan update or not", asy
   ];
   const provider = scriptedProvider([{ toolCalls: pair("1") }, { toolCalls: pair("2") }, { toolCalls: pair("3") }, { text: "Done." }]);
   await runTurn({ ...base, provider, tools: [read] });
-  assert.equal(read.calls.filter((c) => c["path"] === "src/ui.js").length, 2, "read twice in a row, refused the third");
+  assert.equal(read.calls.filter((c) => c["path"] === "src/ui.js").length, 1, "read once, then answered from the conversation, then refused");
 });
 
 test("the same tool with different arguments is never mistaken for a loop", async () => {

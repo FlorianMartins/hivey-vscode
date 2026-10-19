@@ -84,7 +84,7 @@ test("a repeated call with the same result points to the copy already there; a c
   await runTurn({ provider, model: "m", messages: [{ role: "user", content: "x" }], tools: [read] });
   const tools = seen[2]!.messages.filter((m) => m.role === "tool").map((m) => m.content);
   assert.equal(tools[0], long, "the first copy is never touched: the server's cache of it stays whole");
-  assert.match(tools[1]!, /^\[Unchanged: exactly the same result as your earlier read_file call/);
+  assert.match(tools[1]!, /^\[Already in this conversation: your read_file of src\/ui\.js above holds these lines/, "not even read again");
   // A different result for the same call is new information: kept whole. (A third identical call
   // is refused by the repeat guard before it runs, so this is checked on the rule itself.)
   const call = { id: "c9", name: "read_file", args: '{"path":"src/ui.js"}' };

@@ -434,6 +434,57 @@ export function unchangedNotice(name: string): string {
   return `[Unchanged: exactly the same result as your earlier ${name} call with these arguments, which is still above. Use it rather than asking again.]`;
 }
 
+/** Calls that only look: after one of these, a file read before is still what is on disk. */
+const PURE_READS = new Set([
+  "read_file", "list_files", "search_text", "get_diagnostics", "git_status", "git_diff", "git_log", "git_show",
+  "git_blame", "git_branches", "fetch_url", "command_output", "recall", "search_memory", "update_plan", "note_aside",
+  "workspace_symbols", "document_symbols", "find_references", "go_to_definition", "knowledge_read", "knowledge_search", "use_skill",
+]);
+
+/** The lines a read_file call asks for: `from`–`to`, `to` open when it names none. */
+function wantedRange(args: string | undefined): { from: number; to: number } {
+  try {
+    const a = JSON.parse(args || "{}") as Record<string, unknown>;
+    return { from: Number(a["from"]) || 1, to: Number(a["to"]) || Infinity };
+  } catch {
+    return { from: 1, to: Infinity };
+  }
+}
+
+/**
+ * Lines the conversation already holds: the earlier read of the same file that covers them, intact (not
+ * shortened to fit, not a large file's plan) and with no edit or write of the file since. A pointer to
+ * it, or nothing when they have to be read.
+ *
+ * ⚠️ « il ne devrait pas avoir à lire ce qu'il a déjà lu (sauf si c'est autre chose qu'il cherche) ». A
+ * model that had a whole file in front of it read lines 40–80 of it again, and again; each time a copy,
+ * each copy room the task needed. Another part of the file, or a file changed since, is read as usual.
+ */
+export function alreadyRead(messages: ChatMessage[], call: ToolCall): string | undefined {
+  if (call.name !== "read_file") return undefined;
+  const file = fileOf(call.name, call.args);
+  if (!file) return undefined;
+  const want = wantedRange(call.args);
+  const results = new Map(messages.filter((m) => m.role === "tool" && m.toolCallId).map((m) => [m.toolCallId!, m.content]));
+  const calls = messages.flatMap((m) => (m.role === "assistant" ? (m.toolCalls ?? []) : []));
+  for (let i = calls.length - 1; i >= 0; i--) {
+    const c = calls[i]!;
+    // Anything that can change a file — an edit, a write, a command (a formatter, a script, `sed`), a
+    // sub-agent — between that copy and now: the disk is the one to ask.
+    if (!PURE_READS.has(c.name)) return undefined;
+    if (fileOf(c.name, c.args) !== file) continue;
+    const out = results.get(c.id);
+    if (!out || /characters of this output were removed|too many to read whole usefully|^\[(Outdated|Unchanged|Already in this conversation)/.test(out)) continue;
+    // What it actually holds: the range it says it returned, or the whole file when it says nothing.
+    const said = /\[lines (\d+)-(\d+) of (\d+)/.exec(out);
+    const had = said ? { from: Number(said[1]), to: Number(said[2]) === Number(said[3]) ? Infinity : Number(said[2]) } : wantedRange(c.args);
+    if (want.from >= had.from && want.to <= had.to) {
+      return `[Already in this conversation: your read_file of ${file}${had.from > 1 || had.to !== Infinity ? ` (lines ${had.from}-${had.to === Infinity ? "end" : had.to})` : ""} above holds these lines, and the file has not changed since. Use it.]`;
+    }
+  }
+  return undefined;
+}
+
 /** The earlier tool result of the same call with the same content, if there is one in `messages`. */
 export function sameEarlierResult(messages: ChatMessage[], call: ToolCall, content: string): boolean {
   if (content.length < 400) return false;
@@ -816,9 +867,16 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
 
       const parallel = Boolean(tool.parallel?.(args));
       // A real loop — the same read-only step, again and again, nothing in between: see `REPEAT_LIMIT`.
+      // Checked first: answered from what is already there, a loop would never be seen as one.
       if (parallel && loopingStep) {
         repeatNudges++;
         planned.push({ call, settled: REPEATED_CALL, parallel: false });
+        continue;
+      }
+      // Lines the conversation already holds, unchanged: not read again — see `alreadyRead`.
+      const held = parallel ? alreadyRead(working, call) : undefined;
+      if (held) {
+        planned.push({ call, settled: held, parallel: false });
         continue;
       }
       planned.push({ call, tool, args, parallel });
