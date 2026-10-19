@@ -285,6 +285,32 @@ export function buildTools(deps: ToolDeps): Tool[] {
     },
   };
 
+  /**
+   * Said when a filter matches no file at all, with the folders there are. ⚠️ « (no match) » for a
+   * search filtered on `public/**` — a folder the project does not have — read as "it is not in the
+   * code", and the model went on looking for the code that was in `src/dashboard/` elsewhere, round
+   * and round. Empty for the whole workspace, or when the filter does match files.
+   */
+  async function noFileNote(glob: string): Promise<string> {
+    if (!glob || glob === "**/*") return "";
+    const root = vscode.workspace.workspaceFolders?.[0];
+    if (!root) return "";
+    const rg = findRipgrep(vscode.env.appRoot);
+    const viaRg = rg ? await ripgrepFiles({ rg, cwd: root.uri.fsPath, glob, exclude: SKIPPED_DIRS.map((d) => `**/${d}/**`), limit: 1 }) : undefined;
+    const any = viaRg ? viaRg.files.length > 0 : (await vscode.workspace.findFiles(glob, undefined, 1)).length > 0;
+    if (any) return "";
+    let dirs: string[] = [];
+    try {
+      dirs = (await vscode.workspace.fs.readDirectory(root.uri))
+        .filter(([name, type]) => type === vscode.FileType.Directory && !name.startsWith(".") && !SKIPPED_DIRS.includes(name))
+        .map(([name]) => `${name}/`)
+        .sort();
+    } catch {
+      dirs = [];
+    }
+    return `\n(No file at all matches \`${glob}\` — that is the filter, not the code: check the folder.${dirs.length ? ` The workspace's top-level folders: ${dirs.slice(0, 30).join(", ")}.` : ""})`;
+  }
+
   const listFiles: Tool = {
     parallel: () => true,
     schema: {
@@ -310,7 +336,7 @@ export function buildTools(deps: ToolDeps): Tool[] {
       // model those are all the files there are. See `core/agent/capped.ts`.
       const cut = describeCap(viaRg ? { shown: files.length, cap: limit, hitCap: viaRg.capped } : cappedAt(files.length, limit), "files", "Pass a narrower `glob`, or raise `limit` (max 300).");
       ctx.report(t("{0} file(s) for {1}", files.length, glob));
-      return { content: (files.join("\n") || "(no match)") + cut };
+      return { content: files.length ? files.join("\n") + cut : "(no match)" + (await noFileNote(glob)) };
     },
   };
 
@@ -412,7 +438,7 @@ export function buildTools(deps: ToolDeps): Tool[] {
         out.length < MAX_MATCHES && searchedPart
           ? `\n(only the first ${MAX_SEARCHED_FILES} files were searched: pass a \`glob\` such as \`src/**\` to search where the code is.)`
           : "";
-      return { content: note + (out.join("\n") || "(no match)") + cut + partial };
+      return { content: note + (out.length ? out.join("\n") + cut + partial : "(no match)" + (await noFileNote(glob)) + partial) };
     },
   };
 

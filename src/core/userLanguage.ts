@@ -41,6 +41,12 @@ export const REPLY_IN_OWN_WORDS: Partial<Record<UserLang, string>> = {
  * the thinking on the spot; « …D'abord, » left one short line; a second start for later steps
  * (« Analysons ce résultat en détail : ») drifted into a generic report unrelated to the task. This
  * one kept a whole reasoning, checks included, in French — at every step.
+ *
+ * ⚠️ NOT USED any more, by the panel or the terminal. Measured on 10 short tasks; on long ones, every
+ * step began « …La demande porte sur » and went back to the request instead of on from what it had
+ * found: the same thought, the same three files read thirty times in one turn, the window filled and
+ * no answer — « il boucle […] en ayant à chaque fois la même réflexion ». The model thinks in its own
+ * language again; what it writes for the person is in theirs (see `withReplyLanguage`).
  */
 export const THINK_STARTERS: Partial<Record<UserLang, string>> = {
   fr: "Analysons la situation en détail. La demande porte sur",

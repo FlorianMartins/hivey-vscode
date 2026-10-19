@@ -184,6 +184,8 @@ export interface TurnOptions {
    * See `THINK_STARTERS`.
    */
   thinkPrefix?: string;
+  /** A sentence for the person before each set of tool calls, in their language — see `NOTE_BEFORE_TOOLS`. Self-hosted models only. */
+  notesBeforeTools?: boolean;
   /**
    * What the person typed while the turn was running, handed over and forgotten by the caller.
    * Asked before every request: the messages go in after the last tool results, so the model reads
@@ -288,12 +290,13 @@ const ANSWER_ROOM_TOKENS = 8192;
 const KEPT_HEAD_CHARS = 1500;
 
 /**
- * The same read-only step — same calls, same arguments — this many steps IN A ROW is not run again.
+ * The same read-only call — same tool, same arguments — made this many times since anything changed is
+ * not run again (see `repeatsSinceChange`).
  * "it's been going round in circles for 12 hours on one request": a model that re-reads the same file
  * or re-runs the same search gets the same answer every time. The model is told so instead, and the
  * turn ends — saying where things stand — if it insists past `MAX_REPEAT_NUDGES`.
  *
- * ⚠️ In a row, not in the whole turn. Counted over the turn, a long task that went back to a file it
+ * ⚠️ Since the last change, not in the whole turn. Counted over the turn, a long task that went back to a file it
  * had read an hour of steps earlier — or one whose old read had been shortened to fit the window, with
  * the model told to read it again — was refused, then stopped: « il tourne en boucle et s'arrête »,
  * on work that was going somewhere. A repeat further on costs little now: an identical result comes
@@ -301,13 +304,9 @@ const KEPT_HEAD_CHARS = 1500;
  * a test run after each fix is the job.
  */
 const REPEAT_LIMIT = 3;
-/** What a step did, to compare it with the step before — see `REPEAT_LIMIT`. */
-function stepSignature(calls: ToolCall[]): string {
-  return calls.map((c) => `${c.name}\u0000${c.args}`).sort().join("\u0001");
-}
 const MAX_REPEAT_NUDGES = 2;
 const REPEATED_CALL =
-  "You made this exact call (same tool, same arguments) in each of your last steps and have its result. " +
+  "You already made this exact call (same tool, same arguments) twice since anything changed, and its result is above. " +
   "Do not repeat it: use what you already have, try a different approach, or give your answer.";
 
 /**
@@ -485,6 +484,36 @@ export function alreadyRead(messages: ChatMessage[], call: ToolCall): string | u
   return undefined;
 }
 
+/**
+ * How many times `call` — same tool, same arguments — was already made since anything last changed,
+ * with its result still whole in `messages` — the steps BEFORE this one: ids are not to be relied on,
+ * some servers number every step's calls from 0. See `REPEAT_LIMIT`.
+ *
+ * ⚠️ Not steps in a row: the loop in the report went A, B, A, B, A — `list_files public/**` and a
+ * search, then another search, again and again — and no two steps in a row were alike, so it ran until
+ * the window was full and never answered. Not the whole turn either: after an edit or a command, a
+ * search or a read may well say something new, and an output shortened to fit the window is one the
+ * model is right to ask for again.
+ */
+export function repeatsSinceChange(messages: ChatMessage[], call: ToolCall): number {
+  if (POLLED.has(call.name)) return 0;
+  const results = new Map(messages.filter((m) => m.role === "tool" && m.toolCallId).map((m) => [m.toolCallId!, m.content]));
+  const calls = messages.flatMap((m) => (m.role === "assistant" ? (m.toolCalls ?? []) : []));
+  let n = 0;
+  for (let i = calls.length - 1; i >= 0; i--) {
+    const c = calls[i]!;
+    if (!PURE_READS.has(c.name)) break;
+    if (c.name !== call.name || c.args !== call.args) continue;
+    const out = results.get(c.id);
+    if (out === undefined || /characters of this output were removed/.test(out)) continue;
+    n++;
+  }
+  return n;
+}
+
+/** Read-only calls whose answer changes on its own — a command still running, the problems list. */
+const POLLED = new Set(["command_output", "get_diagnostics"]);
+
 /** The earlier tool result of the same call with the same content, if there is one in `messages`. */
 export function sameEarlierResult(messages: ChatMessage[], call: ToolCall, content: string): boolean {
   if (content.length < 400) return false;
@@ -577,10 +606,6 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
   /** Which kept memory entry holds each tool output of this turn, by tool call id. */
   const recallIds = new Map<string, string>();
   const keptAs = (toolCallId: string): string | undefined => recallIds.get(toolCallId);
-  /** How many times each exact call (tool + arguments) was made this turn. See `REPEAT_LIMIT`. */
-  // The step before, and how many steps in a row it has been the same — see `REPEAT_LIMIT`.
-  let lastStep = "";
-  let sameSteps = 0;
   /** How many repeated calls were refused this turn. */
   let repeatNudges = 0;
   /**
@@ -614,8 +639,15 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
     const prepared0 = opts.beforeRequest ? await opts.beforeRequest(working) : working;
     // The thinking started in the user's language, as the start of the model's answer — sent, never
     // stored; put back in front of the thought it started, live and in the result. See `thinkPrefix`.
-    const prefix = opts.thinkPrefix && opts.reasoning !== "none" && !opts.chore ? opts.thinkPrefix : undefined;
-    const prepared = opts.replyLanguage ? withReplyLanguage(prepared0, opts.replyLanguage, Boolean(prefix)) : prepared0;
+    //
+    // ⚠️ The first step only. Its words — « …La demande porte sur » — restate the REQUEST: started that
+    // way at every step, the model went back to the request each time instead of on from what it had
+    // just found, thought the same thought again, and ran the same searches again until the window was
+    // full: « il boucle, rempli le contexte en ayant à chaque fois la même réflexion ». The later
+    // steps are told to think in the language (see `withReplyLanguage`) and carry on from there.
+    const thinksInIt = Boolean(opts.thinkPrefix) && opts.reasoning !== "none" && !opts.chore;
+    const prefix = thinksInIt && step === 0 ? opts.thinkPrefix : undefined;
+    const prepared = opts.replyLanguage ? withReplyLanguage(prepared0, opts.replyLanguage, thinksInIt, Boolean(opts.notesBeforeTools)) : prepared0;
     const outgoing0 = opts.promptCache ? withRollingCacheMark(prepared) : prepared;
     const outgoing = prefix ? [...outgoing0, { role: "assistant" as const, content: "", reasoning: prefix }] : outgoing0;
     let thoughtStarted = false;
@@ -809,10 +841,6 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
     }
 
     const planned: Planned[] = [];
-    const signature = stepSignature(res.toolCalls);
-    sameSteps = signature === lastStep ? sameSteps + 1 : 0;
-    lastStep = signature;
-    const loopingStep = sameSteps >= REPEAT_LIMIT - 1;
     for (const call of res.toolCalls) {
       if (opts.signal?.aborted) {
         planned.push({ call, settled: "Cancelled by the user.", parallel: false });
@@ -869,7 +897,7 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
       const parallel = Boolean(tool.parallel?.(args));
       // A real loop — the same read-only step, again and again, nothing in between: see `REPEAT_LIMIT`.
       // Checked first: answered from what is already there, a loop would never be seen as one.
-      if (parallel && loopingStep) {
+      if (parallel && repeatsSinceChange(working.slice(0, -1), call) >= REPEAT_LIMIT - 1) {
         repeatNudges++;
         planned.push({ call, settled: REPEATED_CALL, parallel: false });
         continue;

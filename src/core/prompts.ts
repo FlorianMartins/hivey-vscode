@@ -251,7 +251,7 @@ const ENGLISH_WORDS = new Set([
  * go on the copy that is sent: the stored transcript is untouched, the system text only changes when
  * the user's language does, and the reminder sits on the step that was going to change anyway.
  */
-export function withReplyLanguage<M extends { role: string; content: string }>(messages: M[], lang: UserLang, thinksInIt = false): M[] {
+export function withReplyLanguage<M extends { role: string; content: string }>(messages: M[], lang: UserLang, thinksInIt = false, notes = false): M[] {
   const name = LANG_NAMES[lang];
   // ⚠️ « je veux la réponse dans la langue de l'utilisateur » — an order about French, written in
   // English, is the weakest form of it: measured on the thinking, it moved nothing, and the same order
@@ -261,7 +261,7 @@ export function withReplyLanguage<M extends { role: string; content: string }>(m
   const rule =
     `\nLanguage: the user writes in ${name}. Every sentence you write for them is in ${name} — short notes ` +
     `between tool calls included, even right after reading code, logs or your own reasoning in another ` +
-    `language. Code, identifiers and file names stay as they are.${own}\n`;
+    `language. Code, identifiers and file names stay as they are.${notes ? NOTE_BEFORE_TOOLS(name) : ""}${own}\n`;
   const reminder =
     `\n\n[Reply language: ${name}. Every sentence you write for the user — notes between tool calls ` +
     `included — is in ${name}.${own}]`;
@@ -274,6 +274,16 @@ export function withReplyLanguage<M extends { role: string; content: string }>(m
     return content === m.content ? m : { ...m, content };
   });
 }
+
+/**
+ * The summary of the thinking, in the user's language — a self-hosted model's thinking is in its own.
+ * One sentence before each set of tool calls, as Claude Code writes them: free, where a translation of
+ * the thinking would be one more request per step on a server the person shares. Never for a cloud
+ * model, which keeps its own settings.
+ */
+const NOTE_BEFORE_TOOLS = (name: string): string =>
+  ` Think in whatever language suits you; before each set of tool calls, write one short sentence in ${name} ` +
+  `telling the user what you are about to check or do, and why — they see that sentence, not your thinking.`;
 
 /**
  * What the person typed while the turn was running, as the model reads it at its next step.
