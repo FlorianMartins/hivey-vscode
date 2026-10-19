@@ -102,6 +102,17 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **L'agent ne tourne plus en rond sur la même réflexion.** Depuis #64, la réflexion du modèle
+  auto-hébergé était amorcée à chaque étape par « Analysons la situation en détail. La demande porte
+  sur… » : ramené à la demande à chaque fois, il refaisait les mêmes lectures (les trois mêmes
+  fichiers une trentaine de fois dans un même tour), remplissait le contexte et ne répondait plus.
+  - **Le modèle réfléchit à nouveau dans sa propre langue** ; ses réponses restent dans celle de
+    l'utilisateur, et il écrit une phrase pour l'utilisateur, dans sa langue, avant chaque série
+    d'actions. Les modèles cloud gardent leurs réglages.
+  - **Une boucle entre plusieurs étapes est coupée** : un même appel en lecture seule fait trois fois
+    sans aucun changement entre-temps n'est plus exécuté, même quand les étapes alternent.
+  - **Une recherche filtrée sur un dossier vide ou absent le dit**, avec les dossiers du projet, au
+    lieu de « aucun résultat ».
 - **Les adresses web s'affichent en lien bleu.** Entre backticks, une adresse prenait la couleur du
   code, rouge dans plusieurs thèmes (Light+) ; écrite nue, c'était du texte brut. Les deux s'affichent
   maintenant comme un lien `[texte](cible)`, dans la couleur des liens du thème.
