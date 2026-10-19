@@ -99,6 +99,9 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **Les adresses web s'affichent en lien bleu.** Entre backticks, une adresse prenait la couleur du
+  code, rouge dans plusieurs thèmes (Light+) ; écrite nue, c'était du texte brut. Les deux s'affichent
+  maintenant comme un lien `[texte](cible)`, dans la couleur des liens du thème.
 - **L'agent va au bout au lieu de tourner en rond et de s'arrêter.**
   - **Un sous-agent ne revient plus vide.** Arrivé à sa limite d'étapes sans avoir conclu, il est
     invité, sans outils, à rendre ce qu'il a trouvé (fichiers, lignes, ce qui reste à établir) ;
