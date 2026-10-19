@@ -40,11 +40,16 @@ export const BINARY_EXTENSIONS = [
   "exe", "dll", "so", "dylib", "bin", "wasm", "node", "map",
 ];
 
-/** One exclude glob for `findFiles`, from the skipped folders, binaries, `.gitignore` and the user's settings. */
-export function searchExclude(gitignore: string, settingExcludes: Record<string, unknown>): string {
+/** The globs a search leaves out: skipped folders, binaries, `.gitignore` and the user's settings. */
+export function searchExcludeGlobs(gitignore: string, settingExcludes: Record<string, unknown>): string[] {
   const globs = new Set<string>(SKIPPED_DIRS.map((d) => `**/${d}/**`));
   for (const ext of BINARY_EXTENSIONS) globs.add(`**/*.${ext}`);
   for (const g of gitignoreGlobs(gitignore)) globs.add(g);
   for (const [g, on] of Object.entries(settingExcludes)) if (on === true && !/[{},]/.test(g)) globs.add(g);
-  return `{${[...globs].join(",")}}`;
+  return [...globs];
+}
+
+/** The same, as one exclude glob for `findFiles`. */
+export function searchExclude(gitignore: string, settingExcludes: Record<string, unknown>): string {
+  return `{${searchExcludeGlobs(gitignore, settingExcludes).join(",")}}`;
 }

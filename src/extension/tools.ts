@@ -17,7 +17,8 @@ import { readWhole } from "../core/fs/outline.js";
 import { unnumbered, findUnique } from "../core/text/findText.js";
 import { cappedAt, describeCap } from "../core/agent/capped.js";
 import { searchPattern } from "../core/agent/regex.js";
-import { searchExclude } from "../core/agent/searchScope.js";
+import { searchExclude, searchExcludeGlobs } from "../core/agent/searchScope.js";
+import { findRipgrep, ripgrep } from "../core/search/ripgrep.js";
 import { t } from "../shared/i18n.js";
 import { parsePlan, planSummary, PLAN_TOOL_DESCRIPTION, type Plan } from "../core/agent/plan.js";
 import { NOTE_ASIDE_TOOL, type Notice } from "../core/session/notices.js";
@@ -337,32 +338,60 @@ export function buildTools(deps: ToolDeps): Tool[] {
       }
       // Without dependencies, build output and what the project does not track — see
       // `core/agent/searchScope.ts`.
-      const exclude = searchExclude(await rootGitignore(), {
+      const gitignore = await rootGitignore();
+      const settingExcludes = {
         ...(vscode.workspace.getConfiguration("files").get<Record<string, unknown>>("exclude") ?? {}),
         ...(vscode.workspace.getConfiguration("search").get<Record<string, unknown>>("exclude") ?? {}),
-      });
-      // ⚠️ The same files every time. Asked for at most N, `findFiles` returns AN N of them, not the
-      // same N twice: in a project bigger than the limit, one search said "(no match)" and the same
-      // search a step later found `src/artisanFlow.js:22`, and the model could trust neither. All of
-      // them, in path order, then the first N.
-      const uris = (await vscode.workspace.findFiles(glob, exclude))
-        .sort((a, b) => (a.fsPath < b.fsPath ? -1 : a.fsPath > b.fsPath ? 1 : 0))
-        .slice(0, MAX_SEARCHED_FILES + 1);
-      const out: string[] = [];
-      for (const uri of uris.slice(0, MAX_SEARCHED_FILES)) {
-        if (out.length >= MAX_MATCHES) break;
-        try {
-          // A database, a dump or a bundle is not where a line of code is, and reading it is what
-          // made one search take a minute.
-          if ((await vscode.workspace.fs.stat(uri)).size > MAX_SEARCHED_BYTES) continue;
-          const text = new TextDecoder().decode(await vscode.workspace.fs.readFile(uri));
-          const lines = text.split("\n");
-          for (let i = 0; i < lines.length && out.length < MAX_MATCHES; i++) {
-            re.lastIndex = 0;
-            if (re.test(lines[i]!)) out.push(`${relative(uri)}:${i + 1}: ${lines[i]!.trim().slice(0, 200)}`);
+      };
+      // ripgrep first — VS Code's own, the engine Claude Code searches with: every file, .gitignore
+      // respected, binaries skipped, in path order, in a fraction of a second. See core/search/ripgrep.ts.
+      const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      const rg = root ? findRipgrep(vscode.env.appRoot) : undefined;
+      const viaRg =
+        rg && root
+          ? await ripgrep({
+              rg,
+              cwd: root,
+              pattern,
+              literal,
+              glob,
+              exclude: searchExcludeGlobs(gitignore, settingExcludes),
+              maxMatches: MAX_MATCHES,
+              maxFileBytes: MAX_SEARCHED_BYTES,
+              ...(ctx.signal ? { signal: ctx.signal } : {}),
+            })
+          : undefined;
+      let out: string[] = [];
+      let searchedPart = false;
+      if (viaRg) {
+        out = viaRg.matches;
+      } else {
+        // Without dependencies, build output and what the project does not track — see
+        // `core/agent/searchScope.ts`.
+        const exclude = searchExclude(gitignore, settingExcludes);
+        // ⚠️ The same files every time. Asked for at most N, `findFiles` returns AN N of them, not the
+        // same N twice: in a project bigger than the limit, one search said "(no match)" and the same
+        // search a step later found `src/artisanFlow.js:22`, and the model could trust neither. All of
+        // them, in path order, then the first N.
+        const uris = (await vscode.workspace.findFiles(glob, exclude))
+          .sort((a, b) => (a.fsPath < b.fsPath ? -1 : a.fsPath > b.fsPath ? 1 : 0))
+          .slice(0, MAX_SEARCHED_FILES + 1);
+        searchedPart = uris.length > MAX_SEARCHED_FILES;
+        for (const uri of uris.slice(0, MAX_SEARCHED_FILES)) {
+          if (out.length >= MAX_MATCHES) break;
+          try {
+            // A database, a dump or a bundle is not where a line of code is, and reading it is what
+            // made one search take a minute.
+            if ((await vscode.workspace.fs.stat(uri)).size > MAX_SEARCHED_BYTES) continue;
+            const text = new TextDecoder().decode(await vscode.workspace.fs.readFile(uri));
+            const lines = text.split("\n");
+            for (let i = 0; i < lines.length && out.length < MAX_MATCHES; i++) {
+              re.lastIndex = 0;
+              if (re.test(lines[i]!)) out.push(`${relative(uri)}:${i + 1}: ${lines[i]!.trim().slice(0, 200)}`);
+            }
+          } catch {
+            /* unreadable file */
           }
-        } catch {
-          /* unreadable file */
         }
       }
       ctx.report(
@@ -375,7 +404,7 @@ export function buildTools(deps: ToolDeps): Tool[] {
       const cut = describeCap(cappedAt(out.length, MAX_MATCHES), "matches", "Narrow the pattern, or pass a `glob` to search fewer files.");
       // And when the FILES were cut: "(no match)" over part of the project is not "it is not there".
       const partial =
-        out.length < MAX_MATCHES && uris.length > MAX_SEARCHED_FILES
+        out.length < MAX_MATCHES && searchedPart
           ? `\n(only the first ${MAX_SEARCHED_FILES} files were searched: pass a \`glob\` such as \`src/**\` to search where the code is.)`
           : "";
       return { content: note + (out.join("\n") || "(no match)") + cut + partial };
