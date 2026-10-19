@@ -18,6 +18,16 @@ test("a page reads as text: headings, lists, code and links kept, scripts and me
   assert.doesNotMatch(text, /alert|\.x\{\}|Menu Menu/);
 });
 
+test("what the code scanner warned of: links that run code, markup rebuilt or spelled in entities", () => {
+  const tricky =
+    `<p>Go <a href="javascript:alert(1)">here</a>, <a href="data:text/html,x">there</a>, <a href="vbscript:x">or</a> <a href="#top">up</a>.</p>` +
+    `<p>A <scr<!-- -->ipt>alert(2)</script> comment, and &lt;script&gt;text&lt;/script&gt; in prose.</p>` +
+    `<script>alert(3)</script><style>x</style><p>a < b</p>`;
+  const text = htmlToText(tricky, "https://example.org/");
+  assert.equal(text, "Go here, there, or up.\nA ipt>alert(2) comment, and <script>text</script> in prose.\na < b");
+  assert.doesNotMatch(text, /\(javascript:|\(data:|\(vbscript:|alert\(3\)/);
+});
+
 test("a documentation page is read from its main part, not its side menu — quotes or none", () => {
   const menu = Array.from({ length: 60 }, (_, i) => `<li><a href="/m${i}">Module ${i}</a></li>`).join("");
   const doc = `<div role=navigation><ul>${menu}</ul></div><div role=main id=apicontent><h2>Child process</h2><p>${"The node:child_process module provides the ability to spawn subprocesses. ".repeat(5)}</p></div>`;

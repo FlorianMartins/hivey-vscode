@@ -3,47 +3,148 @@
 // ⚠️ « je veux que l'extension travaille comme Claude Code et prenne toutes les optimisations ». The
 // agent could not read a library's documentation, a changelog or an error explained online, and wrote
 // code against what it remembered of an API — discord.js among them, whose API moves.
+//
+// One pass over the page, tag by tag, rather than a chain of regular-expression replacements: a
+// replacement chain leaves what it builds back up — a tag split by a comment, an entity that decodes
+// to `<script` — and the code scanner rightly refused it. Here a tag is recognised once, the content
+// of a script, a style or a menu is skipped to its closing tag, and entities are decoded only in text,
+// after parsing, so what they spell is never read as markup.
 
-/** HTML as plain text: headings, lists and paragraphs kept as such, links with their address. */
+/** Elements whose content is not the page's text. */
+const SKIPPED = new Set(["script", "style", "noscript", "svg", "head", "template", "iframe", "nav", "footer", "object", "canvas"]);
+/** Elements that end a line of text. */
+const BLOCKS = new Set(["p", "div", "section", "article", "tr", "table", "ul", "ol", "blockquote", "dd", "dt", "header", "main", "aside", "figure", "form"]);
+/** Only links a reader can follow: no `javascript:`, `data:` or `vbscript:`. */
+const SAFE_LINK = /^(?:https?|mailto):$/i;
+
+const TAG = /<\/?([a-zA-Z][a-zA-Z0-9-]*)((?:[^>"']|"[^"]*"|'[^']*')*)>/y;
+
+function attribute(attrs: string, name: string): string | undefined {
+  const m = new RegExp(`(?:^|\\s)${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s"'>]+))`, "i").exec(attrs);
+  return m ? (m[1] ?? m[2] ?? m[3]) : undefined;
+}
+
+/** The index just past `</name ...>` from `from`, or the end of the text when it never closes. */
+function pastClosing(html: string, name: string, from: number): number {
+  const lower = html.toLowerCase();
+  const at = lower.indexOf(`</${name}`, from);
+  if (at < 0) return html.length;
+  const end = html.indexOf(">", at);
+  return end < 0 ? html.length : end + 1;
+}
+
+/** HTML as plain text: headings, lists and paragraphs kept as such, links with their address, code as written. */
 export function htmlToText(html: string, base?: string): string {
-  // Code keeps its indentation: <pre> blocks are set aside, converted on their own, and put back after
-  // the whitespace of the rest is tidied.
-  const blocks: string[] = [];
-  let s = html.replace(/<pre\b[^>]*>([\s\S]*?)<\/pre>/gi, (_, code: string) => {
-    blocks.push(decodeEntities(code.replace(/<[^>]+>/g, "")).replace(/^\n+|\s+$/g, ""));
-    return `\n\u0000PRE${blocks.length - 1}\u0000\n`;
-  });
-  s = s
-    .replace(/<!--[\s\S]*?-->/g, "")
-    .replace(/<(script|style|noscript|svg|head|template|iframe)\b[\s\S]*?<\/\1>/gi, "")
-    .replace(/<(nav|footer)\b[\s\S]*?<\/\1>/gi, "\n");
-  s = s.replace(/<a\b[^>]*href\s*=\s*["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi, (_, href: string, text: string) => {
-    const label = text.replace(/<[^>]+>/g, "").trim();
-    let url = href;
-    try {
-      if (base) url = new URL(href, base).toString();
-    } catch {
-      /* left as written */
+  const out: string[] = [];
+  const code: string[] = [];
+  const links: Array<{ at: number; href: string | undefined }> = [];
+  let text = "";
+  const flush = (): void => {
+    if (text) out.push(decodeEntities(text));
+    text = "";
+  };
+  const emit = (s: string): void => {
+    flush();
+    out.push(s);
+  };
+  let i = 0;
+  while (i < html.length) {
+    const lt = html.indexOf("<", i);
+    if (lt < 0) {
+      text += html.slice(i);
+      break;
     }
-    return label && !url.startsWith("javascript:") && !url.startsWith("#") ? `${label} (${url})` : label;
-  });
-  s = s
-    .replace(/<h([1-6])\b[^>]*>/gi, (_, n: string) => `\n\n${"#".repeat(Number(n))} `)
-    .replace(/<\/h[1-6]>/gi, "\n")
-    .replace(/<li\b[^>]*>/gi, "\n- ")
-    .replace(/<(br|hr)\b[^>]*>/gi, "\n")
-    .replace(/<\/(p|div|section|article|tr|table|ul|ol|blockquote|dd|dt)>/gi, "\n")
-    .replace(/<td\b[^>]*>/gi, " | ")
-    .replace(/<[^>]+>/g, "");
-  s = decodeEntities(s);
-  return s
+    text += html.slice(i, lt);
+    if (html.startsWith("<!--", lt)) {
+      const end = html.indexOf("-->", lt + 4);
+      i = end < 0 ? html.length : end + 3;
+      continue;
+    }
+    if (html.startsWith("<!", lt) || html.startsWith("<?", lt)) {
+      const end = html.indexOf(">", lt);
+      i = end < 0 ? html.length : end + 1;
+      continue;
+    }
+    TAG.lastIndex = lt;
+    const m = TAG.exec(html);
+    if (!m) {
+      // A lone `<` is text: "x < 3".
+      text += "<";
+      i = lt + 1;
+      continue;
+    }
+    i = TAG.lastIndex;
+    const closing = html[lt + 1] === "/";
+    const name = m[1]!.toLowerCase();
+    const attrs = m[2] ?? "";
+    if (!closing && SKIPPED.has(name)) {
+      i = pastClosing(html, name, i);
+      continue;
+    }
+    if (!closing && name === "pre") {
+      const end = html.toLowerCase().indexOf("</pre", i);
+      const inner = html.slice(i, end < 0 ? html.length : end);
+      i = end < 0 ? html.length : pastClosing(html, "pre", end);
+      code.push(stripTags(inner).replace(/^\n+|\s+$/g, ""));
+      emit(`\n\u0000PRE${code.length - 1}\u0000\n`);
+      continue;
+    }
+    if (/^h[1-6]$/.test(name)) emit(closing ? "\n" : `\n\n${"#".repeat(Number(name[1]))} `);
+    else if (name === "li" && !closing) emit("\n- ");
+    else if ((name === "br" || name === "hr") && !closing) emit("\n");
+    else if (name === "td" && !closing) emit(" | ");
+    else if (BLOCKS.has(name) && closing) emit("\n");
+    else if (name === "a" && !closing) {
+      flush();
+      links.push({ at: out.length, href: attribute(attrs, "href") });
+    } else if (name === "a" && closing) {
+      flush();
+      const link = links.pop();
+      // A link to another place on the same page says nothing a reader of the text can use.
+      if (link?.href && !link.href.startsWith("#")) {
+        const label = out.slice(link.at).join("").trim();
+        let url: URL | undefined;
+        try {
+          url = new URL(decodeEntities(link.href), base);
+        } catch {
+          url = undefined;
+        }
+        if (label && url && SAFE_LINK.test(url.protocol)) out.push(` (${url.toString()})`);
+      }
+    }
+  }
+  flush();
+  return out
+    .join("")
     .split("\n")
     .map((l) => l.replace(/[ \t ]+/g, " ").trimEnd())
     .join("\n")
     .replace(/\n{3,}/g, "\n\n")
     .replace(/\n\n(?=- )/g, "\n")
-    .replace(/\u0000PRE(\d+)\u0000/g, (_, i: string) => `\`\`\`\n${blocks[Number(i)]}\n\`\`\``)
+    .replace(/\u0000PRE(\d+)\u0000/g, (_, n: string) => `\`\`\`\n${code[Number(n)]}\n\`\`\``)
     .trim();
+}
+
+/** The text of a fragment, tags dropped and entities decoded once — for code inside <pre>. */
+function stripTags(html: string): string {
+  let out = "";
+  let i = 0;
+  while (i < html.length) {
+    const lt = html.indexOf("<", i);
+    if (lt < 0) {
+      out += html.slice(i);
+      break;
+    }
+    out += html.slice(i, lt);
+    TAG.lastIndex = lt;
+    const m = TAG.exec(html);
+    if (m) i = TAG.lastIndex;
+    else {
+      out += "<";
+      i = lt + 1;
+    }
+  }
+  return decodeEntities(out);
 }
 
 function decodeEntities(s: string): string {
@@ -58,14 +159,20 @@ function decodeEntities(s: string): string {
 }
 
 /**
- * The part of a page that is the page: its `<main>`, `<article>` or `role="main"` when it marks one.
- * A documentation site's side menu lists every module before the one asked for, and it filled the room
- * the answer was in.
+ * The part of a page that is the page: its `<main>`, `role="main"` element or `<article>` when it marks
+ * one. A documentation site's side menu lists every module before the one asked for, and it filled the
+ * room the answer was in. Located, not cleaned: the part found still goes through `htmlToText`.
  */
 export function mainPart(html: string): string {
-  for (const re of [/<main\b[^>]*>([\s\S]*?)<\/main>/i, /<[a-z]+\b[^>]*role\s*=\s*["']?main\b["']?[^>]*>([\s\S]*)/i, /<article\b[^>]*>([\s\S]*?)<\/article>/i]) {
-    const m = re.exec(html);
-    if (m && m[1]!.replace(/<[^>]+>/g, "").trim().length > 200) return m[1]!;
+  const lower = html.toLowerCase();
+  const candidates: Array<{ open: RegExp; name?: string }> = [{ open: /<main\b[^>]*>/i, name: "main" }, { open: /<[a-z]+\b[^>]*\brole\s*=\s*["']?main\b["']?[^>]*>/i }, { open: /<article\b[^>]*>/i, name: "article" }];
+  for (const c of candidates) {
+    const m = c.open.exec(html);
+    if (!m) continue;
+    const start = m.index + m[0].length;
+    const end = c.name ? lower.indexOf(`</${c.name}`, start) : -1;
+    const part = html.slice(start, end < 0 ? html.length : end);
+    if (htmlToText(part).length > 200) return part;
   }
   return html;
 }
@@ -75,7 +182,7 @@ export function pageForModel(url: string, contentType: string, body: string, max
   const type = contentType.split(";")[0]!.trim().toLowerCase();
   let text: string;
   if (type.includes("html")) {
-    const title = /<title\b[^>]*>([\s\S]*?)<\/title>/i.exec(body)?.[1]?.trim();
+    const title = /<title\b[^>]*>([^<]*)<\/title>/i.exec(body)?.[1]?.trim();
     text = (title ? `# ${decodeEntities(title)}\n\n` : "") + htmlToText(mainPart(body), url);
   } else if (type.startsWith("text/") || /json|xml|javascript|yaml|markdown/.test(type) || !type) {
     text = body;
