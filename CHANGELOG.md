@@ -108,6 +108,11 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **Par OpenRouter, le modèle garde le fil de sa réflexion d'une étape à l'autre.** Il ne recevait
+  rien de ce qu'il avait pensé à l'étape précédente — seulement ses appels et leurs résultats — et
+  repartait de zéro à chaque action : DeepSeek « s'éparpillait ». Les `reasoning_details`
+  d'OpenRouter sont maintenant recueillis et renvoyés tels quels à l'étape suivante, comme OpenRouter
+  le demande ; Claude et les modèles à réflexion chiffrée en profitent aussi.
 - **« Réessayer » affiche l'heure du nouvel essai.** La question gardait l'heure où elle avait été
   posée la première fois ; une question modifiée puis renvoyée aussi. Elle prend maintenant l'heure
   où elle est renvoyée.
