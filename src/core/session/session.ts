@@ -14,6 +14,7 @@
 // Excluding is not cosmetic: it is the cheapest and most direct control anyone has over both the
 // quality and the price of the next turn.
 
+import { randomBytes } from "node:crypto";
 import type { Notice } from "./notices.js";
 import type { ChatMessage, ImagePart } from "../providers/types.js";
 import type { FileSnapshot } from "./checkpoint.js";
@@ -155,9 +156,9 @@ export interface BuiltPrompt {
 
 /** 128 random bits, in hex — see `Session.fence`. */
 function randomFence(): string {
-  const bytes = new Uint8Array(16);
-  globalThis.crypto.getRandomValues(bytes);
-  return [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
+  // `node:crypto`, not `globalThis.crypto`: Node 18 — which the terminal client supports — has no
+  // global one, and every new conversation threw there.
+  return randomBytes(16).toString("hex");
 }
 
 let counter = 0;
