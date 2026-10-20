@@ -108,6 +108,10 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **Plus de « terminated » quand la connexion coupe pendant une réponse.** Une coupure côté réseau (Wi-Fi,
+  VPN, box, fenêtre rechargée) ne terminait pas le flux : sa lecture levait une erreur, affichée telle
+  quelle à la place de la réponse. Elle est maintenant traitée comme une réponse interrompue : ce qui
+  était arrivé est gardé, et le modèle reprend où il s'était arrêté.
 - **Votre serveur ne relit plus toute la conversation à chaque question.** llama.cpp ne relit une
   requête qu'à partir du premier caractère qui change ; deux choses changeaient le début à presque
   chaque tour.
