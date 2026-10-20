@@ -35,10 +35,12 @@ export interface RequestOptions extends RequestInit {
   timeoutMs?: number;
   /** What the user was doing, used in the error message. */
   label?: string;
+  /** Set on the second attempt after a reset — see `resetBeforeAnswer`. Never more than one. */
+  retried?: boolean;
 }
 
 export async function request(url: string, opts: RequestOptions = {}): Promise<Response> {
-  const { timeoutMs = 120_000, label = "request", signal, ...init } = opts;
+  const { timeoutMs = 120_000, label = "request", signal, retried, ...init } = opts;
   const ctl = new AbortController();
   // Whose abort was it? `fetch` rejects with the abort REASON, so without this flag a deadline we
   // set ourselves is indistinguishable from a cancellation by the user.
@@ -58,12 +60,32 @@ export async function request(url: string, opts: RequestOptions = {}): Promise<R
   } catch (err) {
     // The request is over; nothing is left for the caller's signal to cancel.
     unlink();
+    // Reset before a byte of the answer came back: sent again, once, on a new connection.
+    const replayable = init.body === undefined || init.body === null || typeof init.body === "string";
+    if (!retried && !ctl.signal.aborted && replayable && resetBeforeAnswer(err)) return request(url, { ...opts, retried: true });
     throw explain(err, url, label, timeoutMs, signal?.aborted === true, timedOut);
   } finally {
     // Only the deadline. The link to the caller's signal deliberately OUTLIVES this function —
     // see `linkAbort`.
     clearTimeout(timer);
   }
+}
+
+/**
+ * The connection was reset before a single byte of the answer came back.
+ *
+ * ⚠️ « chat vers ai.hivey.be a échoué : read ECONNRESET », with no trace on the gateway nor on the
+ * server: Node keeps idle connections open to reuse them, and one the network or the far end had
+ * quietly closed meanwhile fails the first request sent on it — before that request reached anybody.
+ * Sent again at once on a new connection, it simply goes through. Only that: a refusal, a timeout or a
+ * cancellation is not a reset, and a reset AFTER the answer began is the stream's business (see
+ * `isConnectionDrop` in providers/openai.ts).
+ */
+export function resetBeforeAnswer(err: unknown): boolean {
+  const e = err as { code?: string; message?: string; cause?: { code?: string; message?: string } };
+  const codes = ["ECONNRESET", "EPIPE", "UND_ERR_SOCKET", "UND_ERR_CLOSED"];
+  if (codes.includes(String(e?.code)) || codes.includes(String(e?.cause?.code))) return true;
+  return /other side closed|socket hang up/i.test(`${e?.message ?? ""} ${e?.cause?.message ?? ""}`);
 }
 
 /**
