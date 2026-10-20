@@ -213,7 +213,11 @@ export class OpenAICompatibleProvider implements Provider {
         // DeepSeek too: with tools and thinking on, it REQUIRES it back on every later request (a 400
         // otherwise — https://api-docs.deepseek.com/guides/thinking_mode).
         const thought =
-          m.role === "assistant" && m.reasoning && (isSelfHostedProvider(this.id) || this.id === "deepseek") ? { reasoning_content: m.reasoning } : {};
+          m.role === "assistant" && m.reasoning && (isSelfHostedProvider(this.id) || this.id === "deepseek")
+            ? { reasoning_content: m.reasoning }
+            : m.role === "assistant" && this.id === "openrouter" && m.thinkingBlocks?.length
+              ? { reasoning_details: m.thinkingBlocks }
+              : {};
         if (m.toolCalls?.length) {
           return {
             role: m.role,
@@ -295,6 +299,8 @@ export class OpenAICompatibleProvider implements Provider {
     // Whether the provider ever said it was done: a `finish_reason`, or the `[DONE]` sentinel. A
     // stream that simply stops without either was cut — see `ChatResult.interrupted`.
     let finished = false;
+    // OpenRouter's `reasoning_details`, rebuilt from its streamed pieces — see `mergeReasoningDetail`.
+    const details: Array<Record<string, unknown>> = [];
     // ⚠️ « terminated » — the connection cut in the middle of the answer (a network blip, the
     // gateway, a reload) does not END the stream: reading it THROWS. That error reached the panel as
     // the whole message, where a stream that merely stopped is picked up and continued (see
@@ -320,6 +326,7 @@ export class OpenAICompatibleProvider implements Provider {
         if (!choice) continue;
         if (choice.finish_reason === "length") stopReason = "length";
         const delta = choice.delta ?? {};
+        if (Array.isArray(delta.reasoning_details)) for (const d of delta.reasoning_details) mergeReasoningDetail(details, d);
         // DeepSeek names it reasoning_content, OpenRouter normalizes to reasoning.
         const r = delta.reasoning_content ?? delta.reasoning;
         if (typeof r === "string" && r) {
@@ -380,6 +387,7 @@ export class OpenAICompatibleProvider implements Provider {
     return {
       text,
       reasoning,
+      ...(details.length ? { thinkingBlocks: details } : {}),
       toolCalls: usable,
       usage,
       stopReason,
@@ -783,4 +791,33 @@ export function isConnectionDrop(err: unknown): boolean {
   const codes = ["ECONNRESET", "EPIPE", "ETIMEDOUT", "UND_ERR_SOCKET", "UND_ERR_CLOSED"];
   if (codes.includes(String(e?.code)) || codes.includes(String(e?.cause?.code))) return true;
   return e?.name === "TypeError" && /^terminated$|other side closed|socket hang up/i.test(String(e?.message ?? ""));
+}
+
+/**
+ * One streamed piece of OpenRouter's `reasoning_details`, added to the ones before it.
+ *
+ * ⚠️ « Deepseek v4.1 via openrouter semble se perdre trop souvent (il s'éparpille) ». Through
+ * OpenRouter the extension sent the model nothing of what it had thought at the step before — only
+ * its calls and their results — so a model that reasons before every action started each step over
+ * from the results alone. OpenRouter asks for `reasoning_details` back, unchanged, on the assistant
+ * message ("Pass back unmodified"): it is how a DeepSeek, a Claude or an encrypted-reasoning model
+ * keeps its train of thought between tool calls.
+ *
+ * Streamed, a detail arrives in pieces carrying the same `index`: their text, summary or encrypted
+ * data is concatenated in order, the rest (id, format, signature) taken as it last came.
+ */
+export function mergeReasoningDetail(into: Array<Record<string, unknown>>, piece: unknown): void {
+  if (!piece || typeof piece !== "object") return;
+  const p = piece as Record<string, unknown>;
+  const last = into.at(-1);
+  const same = last && p["index"] !== undefined && last["index"] === p["index"] && last["type"] === p["type"];
+  if (!same) {
+    into.push({ ...p });
+    return;
+  }
+  for (const [k, v] of Object.entries(p)) {
+    if (v === null || v === undefined) continue;
+    if ((k === "text" || k === "summary" || k === "data") && typeof v === "string") last[k] = String(last[k] ?? "") + v;
+    else last[k] = v;
+  }
 }

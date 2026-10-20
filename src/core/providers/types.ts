@@ -60,9 +60,10 @@ export interface ChatMessage {
    */
   reasoning?: string;
   /**
-   * Anthropic's own thinking blocks for this assistant message, signed, given back unchanged on the
-   * next step of the same turn. Opaque to everything but `anthropic.ts`: the Messages API asks for
-   * them back with the tool calls they led to. Every other provider ignores the field.
+   * The provider's own thinking blocks for this assistant message, given back unchanged on the next
+   * step of the same turn: Anthropic's signed thinking blocks (`anthropic.ts`), or OpenRouter's
+   * `reasoning_details` (`openai.ts`, see `mergeReasoningDetail`). Opaque everywhere else, and every
+   * other provider ignores the field.
    */
   thinkingBlocks?: unknown[];
   /** Marks a prefix that is worth caching remotely (system prompt + repo map). */
