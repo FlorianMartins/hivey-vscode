@@ -56,6 +56,23 @@ test("editing a question invalidates everything that came after it", () => {
   assert.match(s.entries[0]!.text, /python/);
 });
 
+test("a question asked again — retried or edited — takes the time it is asked again", () => {
+  // « il garde l'heure du prompt alors qu'il devrait afficher l'heure du retry »
+  const s = seeded();
+  for (const e of s.entries) e.at = 1000;
+  const before = Date.now();
+  s.dropLastAnswer();
+  const retried = s.entries[s.entries.length - 1]!;
+  assert.equal(retried.role, "user");
+  assert.ok(retried.at >= before, "retried: the time of the retry");
+  assert.equal(s.entries[0]!.at, 1000, "the questions before it keep theirs");
+
+  const t = seeded();
+  for (const e of t.entries) e.at = 1000;
+  t.editUserEntry(t.entries[0]!.id, "how do I read a file in python?");
+  assert.ok(t.entries[0]!.at >= before, "edited and sent again: the time it was sent again");
+});
+
 test("a failed turn is never replayed as if it were an answer", () => {
   const s = new Session();
   s.add({ role: "user", text: "explain this" });

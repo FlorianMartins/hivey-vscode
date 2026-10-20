@@ -108,6 +108,9 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **« Réessayer » affiche l'heure du nouvel essai.** La question gardait l'heure où elle avait été
+  posée la première fois ; une question modifiée puis renvoyée aussi. Elle prend maintenant l'heure
+  où elle est renvoyée.
 - **Plus de « terminated » quand la connexion coupe pendant une réponse.** Une coupure côté réseau (Wi-Fi,
   VPN, box, fenêtre rechargée) ne terminait pas le flux : sa lecture levait une erreur, affichée telle
   quelle à la place de la réponse. Elle est maintenant traitée comme une réponse interrompue : ce qui
