@@ -35,10 +35,12 @@ export interface RequestOptions extends RequestInit {
   timeoutMs?: number;
   /** What the user was doing, used in the error message. */
   label?: string;
+  /** Set on the second attempt after a reset — see `resetBeforeAnswer`. Never more than one. */
+  retried?: boolean;
 }
 
 export async function request(url: string, opts: RequestOptions = {}): Promise<Response> {
-  const { timeoutMs = 120_000, label = "request", signal, ...init } = opts;
+  const { timeoutMs = 120_000, label = "request", signal, retried, ...init } = opts;
   const ctl = new AbortController();
   // Whose abort was it? `fetch` rejects with the abort REASON, so without this flag a deadline we
   // set ourselves is indistinguishable from a cancellation by the user.
@@ -53,19 +55,14 @@ export async function request(url: string, opts: RequestOptions = {}): Promise<R
         }, timeoutMs)
       : undefined;
   const unlink = linkAbort(signal ?? undefined, ctl);
-  // A second attempt only for a connection reset before the answer began — see `resetBeforeAnswer`.
-  const replayable = init.body === undefined || init.body === null || typeof init.body === "string";
   try {
-    for (let attempt = 0; ; attempt++) {
-      try {
-        return await fetch(url, { ...init, signal: ctl.signal });
-      } catch (err) {
-        if (attempt > 0 || ctl.signal.aborted || !replayable || !resetBeforeAnswer(err)) throw err;
-      }
-    }
+    return await fetch(url, { ...init, signal: ctl.signal });
   } catch (err) {
     // The request is over; nothing is left for the caller's signal to cancel.
     unlink();
+    // Reset before a byte of the answer came back: sent again, once, on a new connection.
+    const replayable = init.body === undefined || init.body === null || typeof init.body === "string";
+    if (!retried && !ctl.signal.aborted && replayable && resetBeforeAnswer(err)) return request(url, { ...opts, retried: true });
     throw explain(err, url, label, timeoutMs, signal?.aborted === true, timedOut);
   } finally {
     // Only the deadline. The link to the caller's signal deliberately OUTLIVES this function —
