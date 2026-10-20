@@ -26,6 +26,7 @@ import { t } from "../../shared/i18n.js";
 import type { RecallStore } from "./recall.js";
 import { steerMessage, withReplyLanguage } from "../prompts.js";
 import type { UserLang } from "../userLanguage.js";
+import { compactBrief } from "../session/digest.js";
 
 /** A message typed during the turn, with what was attached to it. See `RunTurnOptions.steer`. */
 export interface SteerInput {
@@ -584,6 +585,47 @@ export function repeatingTail(text: string): boolean {
   return false;
 }
 
+/** How many times one turn summarizes itself to go on — see `compactLive`. */
+const MAX_LIVE_COMPACTS = 3;
+const LIVE_SUMMARY_HEAD =
+  "[What was done before this point, summarized: the whole conversation no longer fit your context window. " +
+  "It is your own record — work from it, and read a file again only for content you need and no longer have.]";
+const CONTINUE_AFTER_COMPACT = "Continue the task where you stopped.";
+
+/**
+ * Where the part of a request that never changes ends: the system prompt, then the repository map
+ * and its acknowledgement. Kept as it is when a turn is summarized — it is the cached prefix.
+ */
+export function stablePrefixLength(messages: ChatMessage[]): number {
+  let i = 0;
+  while (i < messages.length && (messages[i]!.role === "system" || messages[i]!.cacheable)) i++;
+  const next = messages[i];
+  if (i > 0 && messages[i - 1]!.cacheable && next?.role === "assistant" && !next.toolCalls?.length) i++;
+  return i;
+}
+
+/**
+ * The messages after the stable prefix, as text a model can summarize within `maxChars`: what was
+ * asked and said in full (up to a point), each call on one line, each result by its head. Past the
+ * budget the beginning — where the request is — and the end — where the work is — are kept.
+ */
+export function transcriptForSummary(messages: ChatMessage[], maxChars: number): string {
+  const cut = (s: string, n: number): string => (s.length > n ? `${s.slice(0, n)} […]` : s);
+  const lines: string[] = [];
+  for (const m of messages) {
+    if (m.role === "user") lines.push(`USER: ${cut(m.content, 6000)}`);
+    else if (m.role === "assistant") {
+      if (m.content.trim()) lines.push(`ASSISTANT: ${cut(m.content, 3000)}`);
+      for (const c of m.toolCalls ?? []) lines.push(`CALL ${c.name} ${cut(c.args, 300)}`);
+    } else if (m.role === "tool") lines.push(`RESULT: ${cut(m.content, 800)}`);
+  }
+  const all = lines.join("\n");
+  if (all.length <= maxChars) return all;
+  const head = all.slice(0, Math.floor(maxChars * 0.25));
+  const tail = all.slice(all.length - Math.floor(maxChars * 0.75));
+  return `${head}\n[… the middle of the work, left out to fit …]\n${tail}`;
+}
+
 const CONTINUE_AFTER_INTERRUPT =
   "Your previous reply was interrupted before you finished (the connection to you was closed), and any tool call you were writing was lost. " +
   "Continue exactly from where you stopped, without repeating what you already wrote.";
@@ -659,6 +701,8 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
   let repeatNudges = 0;
   /** How many times this turn was told its reply ran away — see `RUNAWAY_NOTES`. */
   let runawayNotes = 0;
+  /** How many times this turn summarized itself to go on — see `compactLive`. */
+  let liveCompacts = 0;
   /**
    * Real prompt tokens over estimated, from the last response. ⚠️ The estimate counts ~4 characters
    * a token and code packs tighter: a turn the estimate put at 56k was 68k on the server, and
@@ -686,6 +730,8 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
       if (estimate > limit && shrinkToolOutputs(working, estimate - limit, keptAs)) {
         opts.report?.(t("the turn was approaching the model's context window — older tool outputs were shortened"));
       }
+      // Shortening was not enough: the turn summarizes itself and goes on — see `compactLive`.
+      if (Math.ceil(estimateMessageTokens(working) * tokenRatio) > limit) await compactLive();
     }
     const prepared0 = opts.beforeRequest ? await opts.beforeRequest(working) : working;
     // The thinking started in the user's language, as the start of the model's answer — sent, never
@@ -770,6 +816,10 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
           step--;
           continue;
         }
+        if (overflow && (await compactLive())) {
+          step--;
+          continue;
+        }
         // A server whose context pool is SHARED between its places (llama.cpp `--kv-unified`) fails
         // every request in flight when the pool is full — "Context size has been exceeded." — however
         // small this one is. It is not this conversation outgrowing its window, so nothing is shortened:
@@ -826,7 +876,7 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
     if (windowFull && !res.toolCalls.length && res.usage.completionTokens >= RUNAWAY_SHARE * (opts.contextWindow ?? 65_536)) {
       if (runawayNotes >= RUNAWAY_NOTES) return await concluded("repeating", CONCLUDE_RUNAWAY);
       runawayNotes++;
-      shrinkToolOutputs(working, ANSWER_ROOM_TOKENS, keptAs);
+      if (!(await compactLive())) shrinkToolOutputs(working, ANSWER_ROOM_TOKENS, keptAs);
       const onlyThought = !res.text.trim() && Boolean(res.reasoning?.trim());
       opts.report?.(t("the model's reply filled the whole context window — it was told to split it up"));
       working.push({ role: "user", content: onlyThought ? windowFilledThinking(res.usage.completionTokens) : windowFilledReply(res.usage.completionTokens) });
@@ -840,6 +890,10 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
     ) {
       shrinkAttempts++;
       opts.report?.(t("the model's context window filled up mid-reply — older tool outputs were shortened and the step asked again"));
+      step--;
+      continue;
+    }
+    if (windowFull && !res.toolCalls.length && (await compactLive())) {
       step--;
       continue;
     }
@@ -1071,6 +1125,57 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
   return await concluded("max-steps");
 
   /** `done`, after asking for the conclusion a cut turn never wrote — see `concludeWhenCut`. */
+  /**
+   * The turn summarized, in the middle of the work, when its context window is full — and the work
+   * goes on from the summary.
+   *
+   * ⚠️ « il faut faire du compactage en live pendant une réponse s'il atteint le context max, comme
+   * Claude Code le fait ». Inside a turn only old tool outputs could be shortened; once there was
+   * nothing left to shorten the turn stopped — and it was the summary made AFTERWARDS, then
+   * "Continue", that finished the task. The same thing now happens without stopping: the same model,
+   * no tools and no thinking, writes the record the rest of the turn works from. The system prompt and
+   * the repository map stay as they are: they are the cached prefix. False when it could not be done
+   * (no window known, three times already, the summary failed) — the caller's earlier handling stands.
+   */
+  async function compactLive(): Promise<boolean> {
+    if (!opts.contextWindow || liveCompacts >= MAX_LIVE_COMPACTS || opts.signal?.aborted) return false;
+    const keep = stablePrefixLength(working);
+    if (working.length - keep < 2) return false;
+    // What the summary request may carry: half the window, at ~3 characters a token.
+    const transcript = transcriptForSummary(working.slice(keep), Math.floor(opts.contextWindow * 0.5 * 3));
+    let summary = "";
+    try {
+      const asked: ChatMessage[] = [
+        { role: "system", content: "You keep the record of a coding agent's work so that it can carry on after its context window filled up." },
+        {
+          role: "user",
+          content: `${compactBrief()}\nStart with the user's latest request, word for word.\n\n--- the work so far ---\n${transcript}`,
+        },
+      ];
+      // Through the same door as every other request: pseudonymized where it leaves the machine.
+      const outgoing = opts.beforeRequest ? await opts.beforeRequest(asked) : asked;
+      const res = await opts.provider.chat({
+        model: opts.model,
+        messages: outgoing,
+        chore: true,
+        reasoning: "none",
+        temperature: 0.2,
+        signal: opts.signal,
+      });
+      usage.promptTokens += res.usage.promptTokens;
+      usage.completionTokens += res.usage.completionTokens;
+      usage.cachedTokens += res.usage.cachedTokens;
+      summary = res.text.trim();
+    } catch {
+      return false;
+    }
+    if (!summary) return false;
+    liveCompacts++;
+    working.splice(keep, working.length - keep, { role: "user", content: `${LIVE_SUMMARY_HEAD}\n${summary}\n\n${CONTINUE_AFTER_COMPACT}` });
+    opts.report?.(t("the context window was full — the work so far was summarized, and the turn goes on"));
+    return true;
+  }
+
   async function concluded(stoppedBecause: TurnResult["stoppedBecause"], note?: string): Promise<TurnResult> {
     if (opts.concludeWhenCut && (opts.concludeWhenCut === "always" || !text.trim()) && !opts.signal?.aborted) {
       try {

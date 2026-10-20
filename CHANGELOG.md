@@ -108,6 +108,12 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **Compactage en direct, comme Claude Code.** Quand le contexte est plein en pleine tâche et que
+  raccourcir les vieux résultats ne suffit plus, l'agent résume lui-même le travail fait (la demande
+  mot pour mot, les fichiers modifiés, les commandes, l'état des erreurs, la suite) et continue à partir
+  de ce résumé, au lieu de s'arrêter. Le prompt système et la carte du dépôt restent intacts (le cache
+  du serveur tient). Trois fois au plus par tour. Vérifié avec Qwen sur un contexte volontairement
+  réduit : résumé fidèle, tâche terminée.
 - **Plus de blocage quand le modèle s'emballe.** Qwen a écrit 29 000 jetons d'une seule traite —
   trois minutes — jusqu'à remplir tout son contexte ; l'étape était redemandée telle quelle, ou le tour
   s'arrêtait sans réponse.

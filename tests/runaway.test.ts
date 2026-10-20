@@ -60,6 +60,8 @@ test("a reply that fills the window by itself is not asked again unchanged: told
     isLocal: true,
     async chat(req): Promise<ChatResult> {
       seen.push(req);
+      // The live summary — see `compactLive`.
+      if (req.chore) return { text: "Demande : fais-le. Fait : rien encore.", reasoning: "", toolCalls: [], usage: usage(), stopReason: "stop" };
       // The conclusion request has no tools to offer: it answers.
       if (/kept filling the context window/.test(String(req.messages.at(-1)!.content))) {
         return { text: "Voici où j'en suis.", reasoning: "", toolCalls: [], usage: usage(), stopReason: "stop" };
@@ -70,9 +72,15 @@ test("a reply that fills the window by itself is not asked again unchanged: told
       return [];
     },
   };
-  const r = await runTurn({ ...base, provider, contextWindow: 69_632, concludeWhenCut: "always" });
-  assert.match(String(seen[1]!.messages.at(-1)!.content), /thinking ran to 29026 tokens/);
-  assert.equal(seen.length, 4, "the reply, two notes, then the conclusion");
+  // A conversation of the size the server reported (~40 000 tokens), so the estimate is a real one.
+  const long = [...base.messages.slice(0, 1), { role: "user" as const, content: "contexte ".repeat(18_000) }, { role: "assistant" as const, content: "Lu." }, base.messages[1]!];
+  const r = await runTurn({ ...base, messages: long, provider, contextWindow: 69_632, concludeWhenCut: "always" });
+  // reply, summary, reply, summary, reply, conclusion
+  assert.equal(seen.length, 6);
+  assert.equal(seen[1]!.chore, true, "summarized first, the window being full");
+  const next = seen[2]!.messages.map((m) => String(m.content));
+  assert.ok(next.some((c) => /Demande : fais-le\. Fait : rien encore\./.test(c)), "the next step works from the summary");
+  assert.match(next.at(-1)!, /thinking ran to 29026 tokens/, "and is told what happened");
   assert.equal(r.stoppedBecause, "repeating");
   assert.match(r.text, /Voici où j'en suis/);
 });
