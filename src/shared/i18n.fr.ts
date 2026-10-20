@@ -261,6 +261,7 @@ export const FR: Record<string, string> = {
   "No diagnostics.": "Aucun diagnostic.",
   "exit code {0}": "code de sortie {0}",
   "timed out and was killed": "délai dépassé, commande arrêtée",
+  "stopped: it was waiting for an answer": "arrêtée : elle attendait une réponse",
   "Plan updated ({0}/{1} done).": "Plan mis à jour ({0}/{1} faits).",
   "(no match)": "(aucun résultat)",
   "(the tool returned nothing)": "(l'outil n'a rien renvoyé)",

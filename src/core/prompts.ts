@@ -201,10 +201,12 @@ export interface TurnDirectiveParts {
   participant?: string;
   /** Which language to reply in. See `languageDirective`. */
   language?: string;
+  /** Files created or deleted since the repository map was taken. See `structureNote`. */
+  structure?: string;
 }
 
 export function turnDirectives(parts: TurnDirectiveParts): string {
-  return [parts.participant, parts.language].filter(Boolean).join("\n\n").trim();
+  return [parts.structure, parts.participant, parts.language].filter(Boolean).join("\n\n").trim();
 }
 
 /**

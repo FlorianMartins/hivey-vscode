@@ -14,6 +14,7 @@
 // Excluding is not cosmetic: it is the cheapest and most direct control anyone has over both the
 // quality and the price of the next turn.
 
+import { randomBytes } from "node:crypto";
 import type { Notice } from "./notices.js";
 import type { ChatMessage, ImagePart } from "../providers/types.js";
 import type { FileSnapshot } from "./checkpoint.js";
@@ -132,6 +133,8 @@ export interface SessionData {
   entries: Entry[];
   /** The mode the conversation was held in — shown and filtered on in the history. */
   mode?: Mode;
+  /** The delimiter of its attachment fences — see `Session.fence`. */
+  fence?: string;
 }
 
 export interface BuildOptions {
@@ -151,6 +154,13 @@ export interface BuiltPrompt {
   estimatedTokens: number;
 }
 
+/** 128 random bits, in hex — see `Session.fence`. */
+function randomFence(): string {
+  // `node:crypto`, not `globalThis.crypto`: Node 18 — which the terminal client supports — has no
+  // global one, and every new conversation threw there.
+  return randomBytes(16).toString("hex");
+}
+
 let counter = 0;
 /** Ids are local and ordered; nothing about them needs to be unguessable. */
 export function newId(prefix = "e"): string {
@@ -165,6 +175,17 @@ export class Session {
   updatedAt: number;
   entries: Entry[];
   mode: Mode;
+  /**
+   * The delimiter of the attachment fences (see `renderEntry`), one per conversation and kept with
+   * it.
+   *
+   * ⚠️ Not one per turn. A new one each turn rewrote the fence of every file attached earlier — and
+   * the file on screen is attached to nearly every question — so the request differed from the
+   * previous one right after the repository map, and a self-hosted server re-read the whole
+   * conversation at every question instead of the new part. Still unguessable by what it fences:
+   * random, and any copy of it inside an attachment is defused before it is sent.
+   */
+  readonly fence: string;
 
   constructor(data?: Partial<SessionData>) {
     this.id = data?.id ?? newId("s");
@@ -173,6 +194,7 @@ export class Session {
     this.updatedAt = data?.updatedAt ?? this.createdAt;
     this.entries = data?.entries ?? [];
     this.mode = data?.mode ?? "agent";
+    this.fence = data?.fence ?? randomFence();
   }
 
   add(entry: Omit<Entry, "id" | "at" | "included"> & Partial<Pick<Entry, "id" | "at" | "included">>): Entry {
@@ -294,6 +316,7 @@ export class Session {
       updatedAt: this.updatedAt,
       entries: this.entries,
       mode: this.mode,
+      fence: this.fence,
     };
   }
 

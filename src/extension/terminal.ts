@@ -17,7 +17,7 @@ import * as vscode from "vscode";
 import { spawn, type ChildProcess } from "node:child_process";
 import { homedir } from "node:os";
 import { t } from "../shared/i18n.js";
-import { cleanTerminalOutput, describeOutcome, isStatusAnswer, tailOutput } from "../core/terminal/output.js";
+import { cleanTerminalOutput, describeOutcome, isStatusAnswer, tailOutput, waitingForInput } from "../core/terminal/output.js";
 import { scaledChars } from "../core/context/scale.js";
 
 /** The name is the contract: one terminal, reused, so only the first command waits for the shell. */
@@ -305,6 +305,16 @@ export async function runCommandInTerminal(opts: RunOptions): Promise<RunResult>
  * output is also copied into a terminal of its own, created without being shown: whoever opens it
  * sees the session's commands, and Ctrl+C there still stops the one running.
  */
+/** How long a command may print nothing, its last line a question, before it is taken as waiting — see `waitingForInput`. */
+const ASKING_IDLE_MS = 15_000;
+
+/**
+ * Told to every command the agent runs: there is nobody to answer. Version control asks for
+ * credentials on the terminal and a pager waits for a key — both only ever hang here. Nothing that
+ * changes what a command does when it does not ask (no `CI=1`: test runners and builds read it).
+ */
+const NO_PROMPTS: Record<string, string> = { GIT_TERMINAL_PROMPT: "0", GIT_PAGER: "cat", PAGER: "cat", DEBIAN_FRONTEND: "noninteractive" };
+
 export async function runCommandAsProcess(opts: RunOptions): Promise<RunResult> {
   const command = opts.command;
   const timeoutMs = Math.min(Math.max(Number(opts.timeoutMs) || DEFAULT_TIMEOUT_MS, 1000), MAX_TIMEOUT_MS);
@@ -327,15 +337,17 @@ export async function runCommandAsProcess(opts: RunOptions): Promise<RunResult> 
       detached: !windows,
       // Nothing to type into: a command that asks a question gets an end of input, not a hang.
       stdio: ["ignore", "pipe", "pipe"],
-      env: process.env,
+      env: { ...process.env, ...NO_PROMPTS },
     });
   } catch (err) {
     return { captured: true, isError: true, content: `could not start the command: ${(err as Error).message}` };
   }
 
   let raw = "";
+  let lastOutputAt = Date.now();
   const limit = scaledChars(MAX_OUTPUT_CHARS, OUTPUT_SHARE) * 4;
   const take = (chunk: string): void => {
+    lastOutputAt = Date.now();
     raw += chunk;
     if (raw.length > limit) raw = raw.slice(-limit);
     view.write(chunk.replace(/\r?\n/g, "\r\n"));
@@ -345,8 +357,9 @@ export async function runCommandAsProcess(opts: RunOptions): Promise<RunResult> 
   child.stdout?.on("data", take);
   child.stderr?.on("data", take);
 
-  const race: { outcome: "ended" | "timeout" | "cancelled" | "failed"; error?: string } = { outcome: "ended" };
+  const race: { outcome: "ended" | "timeout" | "cancelled" | "failed" | "asking"; error?: string; askedFor?: string } = { outcome: "ended" };
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let watch: ReturnType<typeof setInterval> | undefined;
   let onAbort: (() => void) | undefined;
   const exitCode = await new Promise<number | undefined>((resolve) => {
     // `close`, not `exit`: by then both pipes are drained, so the last lines are in.
@@ -362,6 +375,16 @@ export async function runCommandAsProcess(opts: RunOptions): Promise<RunResult> 
       // A process that ignores the kill must not hold the turn: give up waiting shortly after.
       setTimeout(() => resolve(undefined), 3000);
     }, timeoutMs);
+    // Stopped on a question — see `waitingForInput`. Silent AND ending on a question, never silent alone.
+    watch = setInterval(() => {
+      if (race.outcome !== "ended" || Date.now() - lastOutputAt < ASKING_IDLE_MS) return;
+      const asked = waitingForInput(raw);
+      if (asked === undefined) return;
+      race.outcome = "asking";
+      race.askedFor = asked;
+      killTree(child);
+      setTimeout(() => resolve(undefined), 3000);
+    }, 1000);
     const stop = (): void => {
       race.outcome = "cancelled";
       killTree(child);
@@ -375,6 +398,7 @@ export async function runCommandAsProcess(opts: RunOptions): Promise<RunResult> 
     }
   }).finally(() => {
     if (timer) clearTimeout(timer);
+    if (watch) clearInterval(watch);
     if (onAbort) opts.signal?.removeEventListener("abort", onAbort);
     view.onInterrupt = undefined;
   });
@@ -387,6 +411,11 @@ export async function runCommandAsProcess(opts: RunOptions): Promise<RunResult> 
   if (race.outcome === "cancelled") {
     view.write(`\r\n\x1b[2m^C\x1b[0m\r\n`);
     return { captured: true, isError: true, exitCode: undefined, content: `Cancelled by the user.\n${output}`.trim(), output: displayOutput(output) };
+  }
+  if (race.outcome === "asking") {
+    view.write(`\r\n\x1b[2m${t("stopped: it was waiting for an answer")}\x1b[0m\r\n`);
+    const content = describeOutcome({ output, askedFor: race.askedFor }, scaledChars(MAX_OUTPUT_CHARS, OUTPUT_SHARE));
+    return { captured: true, isError: true, exitCode: undefined, content, output: displayOutput(output) };
   }
   const timedOut = race.outcome === "timeout";
   view.write(`\r\n\x1b[2m${timedOut ? t("timed out and was killed") : `exit ${exitCode ?? "?"}`}\x1b[0m\r\n`);
@@ -435,7 +464,7 @@ export async function startInBackground(opts: { command: string; cwd?: string; f
       windowsHide: true,
       detached: process.platform !== "win32",
       stdio: ["ignore", "pipe", "pipe"],
-      env: process.env,
+      env: { ...process.env, ...NO_PROMPTS },
     });
   } catch (err) {
     return { captured: true, isError: true, content: `could not start the command: ${(err as Error).message}` };

@@ -137,6 +137,30 @@ test("an attachment repeated across turns is sent once, in full, at its newest p
   );
 });
 
+test("the summary works from what the agent DID, failures included — not only from what it said", () => {
+  // After a compaction the agent no longer knew what it had changed or what was still failing: the
+  // summary had only the words of the answers to go on.
+  const e = (role: "user" | "assistant", text: string, extra: Partial<Entry> = {}): Entry => ({ id: text || "x", role, text, at: 0, included: true, ...extra });
+  const digest = digestEntries(
+    [
+      e("user", "Corrige le calcul de la TVA"),
+      e("assistant", "C'est corrigé.", {
+        steps: [
+          { tool: "edit_file", call: "src/tva.ts", summary: "Edited.", ok: true },
+          { tool: "run_command", call: "npm test", summary: "exit code 1", ok: false },
+        ],
+      }),
+      e("assistant", "", { steps: [{ tool: "read_file", call: "src/a.ts", summary: "40 lines", ok: true }] }),
+    ],
+    { maxTokens: 10_000, you: "User", assistant: "Assistant", omittedNote: (n) => `${n} omitted` },
+  );
+  assert.match(digest, /edit_file src\/tva\.ts/);
+  assert.match(digest, /run_command npm test → FAILED: exit code 1/);
+  assert.match(digest, /read_file src\/a\.ts/, "an answer with actions and no words is not dropped");
+  assert.match(compactBrief(), /current state of errors/);
+  assert.match(compactBrief(), /\[actions\]/);
+});
+
 test("a file that CHANGED between two turns is sent twice, because it is two different things", () => {
   const session = new Session();
   session.add({ role: "user", text: "before", context: [{ kind: "file", label: "a.ts", body: "const a = 1;" }] });
