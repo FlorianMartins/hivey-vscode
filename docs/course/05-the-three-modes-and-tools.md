@@ -51,18 +51,21 @@ Here is what actually happens when you write, in Agent mode: "the tests are fail
 The number of steps in a turn is **not capped** by default (`hiveyCode.agent.maxSteps` is 0): a fixed
 cap stopped real tasks half-way, silently, and it looked like the model giving up. What ends a turn is
 the work being done, your **Stop** button, or a detector that spots a model repeating the same call
-in a loop. A number in that setting puts a cap back; when it is reached you are told, and you can
-carry on.
+in a loop: the same read-only call made a third time with nothing changed in between is not run
+again, and a model that insists is stopped — the turn then ends by saying what is done, what blocks
+and what it needs. A number in that setting puts a cap back; when it is reached you are told, and you
+can carry on.
 
 Three things you will see along the way:
 
-- **The turn reads in order.** Each step is a block — the thinking, then the actions — followed by the
-  text written at that point, then the next step. While it works, when you read it back, and in the
-  conversation's Markdown export.
+- **The turn reads in order**, as one timeline: each stretch of thinking is a folded **Thinking**
+  line, each action a compact row, and the text written at that point between them. While it works,
+  when you read it back, and in the conversation's Markdown export.
 - **The answer stays in your language**, from start to end of the turn, including the short notes
   between two actions, which the model tended to write in English right after reading code. The rule
-  is repeated at every step, and a note written in another language anyway is translated back by a
-  small request before it is shown.
+  is repeated at every step; nothing is translated afterwards. On a self-hosted server the model
+  thinks in its own language and writes one short sentence in yours before each set of actions;
+  cloud models keep their own settings.
 - **Leaving a conversation stops its turn.** New conversation, opening another one from the history,
   deleting this one: the running turn is stopped first. It used to carry on in a conversation nobody
   was looking at any more.

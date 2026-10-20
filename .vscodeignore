@@ -11,7 +11,6 @@ dist-tests/**
 # runner alongside the product is how a test fixture ends up looking like a feature.
 dist-integration/**
 node_modules/**
-docs/screenshots/**
 # Screenshots belong to the README on GitHub, not in the installed package (vsce rewrites the
 # relative links to the repository when publishing).
 docs/images/**

@@ -83,11 +83,12 @@ Open a folder containing code, then the **Hivey Code** panel in the right-hand b
   it reopens the turn; typed too late, it becomes the next question; after a Stop it goes back into the
   box. In the terminal client (`hivey`), a line typed during a turn does the same.
 - **A turn reads as a timeline**, the way Claude Code draws one: each stretch of thinking is a folded
-  "∴ Thinking" line (it shows its latest sentence while it is written, and a click opens all of it),
-  each action a compact row — `Read(src/x.ts)`, `Bash(npm test)`, `Update(src/y.ts)` — whose dot says
+  **Thinking** line (its mark pulses while it is written, and a click opens all of it), each action a
+  compact row — `Read(src/x.ts)`, `Bash(npm test)`, `Update(src/y.ts)` — whose dot says
   whether it worked, and what the model writes in between as paragraphs. A command no longer brings
   the terminal up: a click on its row shows what it printed. While the turn runs, **your request stays
   pinned** at the top of the conversation once it has scrolled out of sight; a click goes back to it.
+  Hovering over the answer shows when it finished and how long the request took.
 - **After an answer**, the likely next request appears greyed in the composer: **Tab** (or an arrow)
   makes it your text, **Enter** sends it. Setting `hiveyCode.chat.suggestNext`.
 - **`Ctrl+I`** in the editor rewrites the selection in place.

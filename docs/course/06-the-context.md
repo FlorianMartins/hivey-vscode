@@ -64,10 +64,12 @@ Four design choices that show in use:
   at least room for one answer), as long as `hiveyCode.context.maxTokens` is 0 (the default); 8,000
   tokens when the window is unknown. With a fixed value of 8,000 tokens, conversations were being summarised after three
   exchanges and the answer came from the summary — when 8,000 tokens are a speck for a modern model.
-- **A file is read in pages.** With no range asked for, the reading tool returns a page of 2,000 lines
-  and says how to read on; on a large file, the model searches for the right line first and reads
-  around it. Nothing is out of reach, but a 14,000-line file read in one go weighed on every later step
-  of the turn.
+- **A large file is read by the part that matters.** A file of more than 800 lines asked for whole
+  returns its plan — every function, class and export with its line — and its first lines; the model
+  then reads the part it needs, by a range of up to 2,000 lines, or searches for the right line first.
+  Nothing is out of reach, but a 14,000-line file read in one go weighed on every later step of the
+  turn. Lines the conversation already holds, with no change and no command since, are not read
+  again: the model is pointed to its copy.
 - **An attachment that is too large arrives as an outline**: every symbol it declares with its line,
   followed by its beginning — rather than its first N lines and nothing about the rest. An outline says
   *what the file is about*; its first hundred lines say only how it starts.

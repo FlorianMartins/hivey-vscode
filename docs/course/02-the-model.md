@@ -79,9 +79,9 @@ part — in 51 cases out of 56 it did not **even try** to act.
 - **Temperature** sets the randomness. At 0 the model always takes the most likely word: repetitive
   but predictable. Higher, it varies: useful for writing, risky for code.
 - Some models can **reason out loud** before answering: they first produce a draft of their thinking.
-  It improves hard answers and it costs tokens. Hivey Code shows it **while** it is being written —
-  the only moment it is interesting — then folds it away as soon as the action or answer it decided
-  on starts. The level is chosen in the composer: **Direct** (no thinking), **Brief**, **Standard**,
+  It improves hard answers and it costs tokens. Hivey Code shows each stretch of it as one folded
+  **Thinking** line, whose mark pulses while it is being written; a click opens it, rendered as it
+  arrives. The level is chosen in the composer: **Direct** (no thinking), **Brief**, **Standard**,
   **Deep** — and only the ones the model really has: its server says so when it is yours, its
   documentation otherwise. Each level really changes the request, whichever the provider: Direct
   **turns thinking off** wherever the model allows it; on a model that always thinks (Claude Opus 5.5,

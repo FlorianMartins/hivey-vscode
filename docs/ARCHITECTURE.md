@@ -194,7 +194,8 @@ Trois niveaux, et ils ne mesurent pas la même chose.
   vers l'autre modèle. Chacun de ces trois-là a été vérifié en **retirant le correctif** et en
   constatant que le test tombe — un test qui passe dans les deux cas ne prouve rien.
 - **`eval/`** — ce que les deux précédents ne peuvent pas dire : est-ce que la **réponse** est bonne.
-  Quarante petits dépôts cassés, une commande par tâche qui décide si le résultat marche, et le harnais
+  Soixante petits dépôts cassés — vingt d'entre eux avec des tests décisifs cachés à l'agent —, une
+  commande par tâche qui décide si le résultat marche, et le harnais
   pilote le vrai client terminal — une évaluation qui aurait sa propre boucle mesurerait
   l'évaluation. La règle qui donne un sens aux chiffres tourne à chaque commit : **le contrôle de
   chaque tâche doit échouer sur la version non modifiée**, sans quoi la tâche note tout le monde à
