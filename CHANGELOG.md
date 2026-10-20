@@ -108,6 +108,10 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **Plus de « read ECONNRESET » au début d'une requête.** Node réutilise les connexions inactives ;
+  une connexion que le réseau ou la passerelle avait fermée entre-temps faisait échouer la requête
+  suivante avant même qu'elle n'atteigne le serveur. Dans ce cas précis — réinitialisée avant le
+  premier octet de réponse — la requête est renvoyée une fois, sur une connexion neuve.
 - **Par OpenRouter, le modèle garde le fil de sa réflexion d'une étape à l'autre.** Il ne recevait
   rien de ce qu'il avait pensé à l'étape précédente — seulement ses appels et leurs résultats — et
   repartait de zéro à chaque action : DeepSeek « s'éparpillait ». Les `reasoning_details`

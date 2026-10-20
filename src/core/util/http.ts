@@ -54,7 +54,13 @@ export async function request(url: string, opts: RequestOptions = {}): Promise<R
       : undefined;
   const unlink = linkAbort(signal ?? undefined, ctl);
   try {
-    return await fetch(url, { ...init, signal: ctl.signal });
+    try {
+      return await fetch(url, { ...init, signal: ctl.signal });
+    } catch (err) {
+      // Sent again, once, on a fresh connection — see `resetBeforeAnswer`.
+      if (ctl.signal.aborted || !resetBeforeAnswer(err) || !(init.body === undefined || typeof init.body === "string")) throw err;
+      return await fetch(url, { ...init, signal: ctl.signal });
+    }
   } catch (err) {
     // The request is over; nothing is left for the caller's signal to cancel.
     unlink();
@@ -64,6 +70,23 @@ export async function request(url: string, opts: RequestOptions = {}): Promise<R
     // see `linkAbort`.
     clearTimeout(timer);
   }
+}
+
+/**
+ * The connection was reset before a single byte of the answer came back.
+ *
+ * ⚠️ « chat vers ai.hivey.be a échoué : read ECONNRESET », with no trace on the gateway nor on the
+ * server: Node keeps idle connections open to reuse them, and one the network or the far end had
+ * quietly closed meanwhile fails the first request sent on it — before that request reached anybody.
+ * Sent again at once on a new connection, it simply goes through. Only that: a refusal, a timeout or a
+ * cancellation is not a reset, and a reset AFTER the answer began is the stream's business (see
+ * `isConnectionDrop` in providers/openai.ts).
+ */
+export function resetBeforeAnswer(err: unknown): boolean {
+  const e = err as { code?: string; message?: string; cause?: { code?: string; message?: string } };
+  const codes = ["ECONNRESET", "EPIPE", "UND_ERR_SOCKET", "UND_ERR_CLOSED"];
+  if (codes.includes(String(e?.code)) || codes.includes(String(e?.cause?.code))) return true;
+  return /other side closed|socket hang up/i.test(`${e?.message ?? ""} ${e?.cause?.message ?? ""}`);
 }
 
 /**
