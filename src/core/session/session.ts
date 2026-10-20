@@ -249,6 +249,8 @@ export class Session {
     const i = this.entries.findIndex((e) => e.id === id);
     if (i < 0 || this.entries[i]!.role !== "user") return;
     this.entries[i]!.text = text;
+    // Asked now: the time above it is when it was sent, and it is being sent again.
+    this.entries[i]!.at = Date.now();
     this.entries.splice(i + 1);
     this.updatedAt = Date.now();
   }
@@ -271,9 +273,19 @@ export class Session {
   }
 
   /** Drop the last answer so the same question can be asked again. */
+  /**
+   * For « Retry »: the last answer goes, and the question it answered is asked again — NOW.
+   *
+   * ⚠️ The question kept the time it was first asked, so a retry twenty minutes later still showed
+   * the old time above it: « il garde l'heure du prompt alors qu'il devrait afficher l'heure du
+   * retry ». The answer's own time is taken when it ends, as for any answer.
+   */
   dropLastAnswer(): void {
     const last = this.entries[this.entries.length - 1];
     if (last?.role === "assistant") this.entries.pop();
+    const question = this.entries[this.entries.length - 1];
+    if (question?.role === "user") question.at = Date.now();
+    this.updatedAt = Date.now();
   }
 
   /**
