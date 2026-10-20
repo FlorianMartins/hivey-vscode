@@ -108,6 +108,16 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **Plus de blocage quand le modèle s'emballe.** Qwen a écrit 29 000 jetons d'une seule traite —
+  trois minutes — jusqu'à remplir tout son contexte ; l'étape était redemandée telle quelle, ou le tour
+  s'arrêtait sans réponse.
+  - **Une réflexion qui tourne en boucle** (le même passage trois fois de suite) est arrêtée tout de
+    suite, et le modèle est invité à trancher avec ce qu'il a déjà trouvé. Rejouée sur 1 666 réflexions
+    enregistrées : aucun déclenchement à tort.
+  - **Une réponse qui remplit à elle seule le contexte** (plus d'un quart) n'est plus redemandée
+    telle quelle : le modèle apprend qu'elle a été perdue et qu'il faut la découper (un gros fichier
+    en plusieurs écritures). Deux fois au plus ; ensuite le tour dit où il en est au lieu de s'arrêter
+    en silence.
 - **Plus de « read ECONNRESET » au début d'une requête.** Node réutilise les connexions inactives ;
   une connexion que le réseau ou la passerelle avait fermée entre-temps faisait échouer la requête
   suivante avant même qu'elle n'atteigne le serveur. Dans ce cas précis — réinitialisée avant le
