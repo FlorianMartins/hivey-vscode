@@ -535,6 +535,55 @@ const CONTINUE_AFTER_CUT =
   "Your previous reply was cut off by the output token limit before you finished, and any tool call you were writing was lost. " +
   "Continue from where you stopped without repeating what you already wrote. " +
   "If you were writing a large file, a long plan or a big edit, split it into several smaller tool calls, each well under the limit.";
+/**
+ * A step whose own output took more than this share of the context window ran away — see
+ * `RUNAWAY_NOTES`. Below it, a full window is the CONVERSATION's size, and shortening old outputs
+ * then asking the same step again is the right answer.
+ */
+const RUNAWAY_SHARE = 0.25;
+/**
+ * How many times a turn is told its last reply ran away before it is ended — saying where things stand.
+ *
+ * ⚠️ « Il a encore bloqué en plein milieu ». Qwen wrote 29 000 tokens in one step — three minutes —
+ * until the server's window was full (69 631 of 69 632). The step was then asked AGAIN, unchanged,
+ * after shortening old outputs: the same model, the same prompt, the same runaway; and when nothing
+ * was left to shorten, a reply that was only thinking ended the turn with no answer at all. The model
+ * is now told what happened and what to do instead — and the lost reply is not kept, so there is room
+ * to tell it, whatever the size of the conversation.
+ */
+const RUNAWAY_NOTES = 2;
+const THOUGHT_LOOPING =
+  "Your thinking started repeating the same passage over and over, and was stopped there. Everything you have found " +
+  "is above: do not think it through again. Decide now — make the next tool call, or give your answer.";
+const windowFilledThinking = (n: number): string =>
+  `Your thinking ran to ${n} tokens, until the whole context window was full, and it was lost. Do not reason it all ` +
+  "through again: decide from what you have already found, and act — the next tool call, or your answer.";
+const windowFilledReply = (n: number): string =>
+  `Your reply ran to ${n} tokens and filled the whole context window before it finished; it was lost, with any tool ` +
+  "call you were writing. Do not write it again in one piece: a large file goes in several smaller writes (create it " +
+  "with its first part, then add the rest with edits), a long answer in shorter steps.";
+const CONCLUDE_RUNAWAY =
+  "You were stopped: your replies kept filling the context window. No more tools. Tell the user, in a few lines, " +
+  "where things stand — what is done, what is not, and what you need from them.";
+
+/**
+ * Whether `text` ends on the same passage written three times in a row — a model thinking in a loop.
+ *
+ * Exact repeats, white space aside, of 80 characters or more: a sentence coming back once is how
+ * people think; the same paragraph three times in a row is a sampler stuck, and it does not get
+ * unstuck by itself — it runs on until the window is full. Only the thinking is watched: a file being
+ * written may well repeat its lines on purpose.
+ */
+export function repeatingTail(text: string): boolean {
+  const flat = text.replace(/\s+/g, " ");
+  const tail = flat.slice(-6000);
+  for (let p = 80; p * 3 <= tail.length; p++) {
+    const a = tail.slice(-p);
+    if (tail.slice(-2 * p, -p) === a && tail.slice(-3 * p, -2 * p) === a) return true;
+  }
+  return false;
+}
+
 const CONTINUE_AFTER_INTERRUPT =
   "Your previous reply was interrupted before you finished (the connection to you was closed), and any tool call you were writing was lost. " +
   "Continue exactly from where you stopped, without repeating what you already wrote.";
@@ -608,6 +657,8 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
   const keptAs = (toolCallId: string): string | undefined => recallIds.get(toolCallId);
   /** How many repeated calls were refused this turn. */
   let repeatNudges = 0;
+  /** How many times this turn was told its reply ran away — see `RUNAWAY_NOTES`. */
+  let runawayNotes = 0;
   /**
    * Real prompt tokens over estimated, from the last response. ⚠️ The estimate counts ~4 characters
    * a token and code packs tighter: a turn the estimate put at 56k was 68k on the server, and
@@ -662,6 +713,28 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
             opts.onDelta!(d);
           }
         : opts.onDelta;
+    // The step's own stop, for a thinking that loops — see `repeatingTail`. The user's stop still
+    // reaches it, and is still told apart: `opts.signal` is what says "cancelled".
+    const stepCtl = new AbortController();
+    const forwardStop = (): void => stepCtl.abort();
+    if (opts.signal?.aborted) stepCtl.abort();
+    else opts.signal?.addEventListener("abort", forwardStop, { once: true });
+    let thought = "";
+    let checkedAt = 0;
+    let looped = false;
+    const watched: TurnOptions["onDelta"] = (d) => {
+      if (d.reasoning && !looped) {
+        thought += d.reasoning;
+        if (thought.length - checkedAt >= 1000) {
+          checkedAt = thought.length;
+          if (repeatingTail(thought)) {
+            looped = true;
+            stepCtl.abort();
+          }
+        }
+      }
+      onDelta?.(d);
+    };
     let res: ChatResult;
     try {
       res = await opts.provider.chat(
@@ -673,40 +746,55 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
           ...(opts.chore ? { chore: true } : {}),
           temperature: opts.temperature,
           reasoning: opts.reasoning,
-          signal: opts.signal,
+          signal: stepCtl.signal,
         },
-        onDelta,
+        watched,
       );
       if (prefix && res.reasoning) res = { ...res, reasoning: `${prefix} ${res.reasoning.replace(/^\s+/, "")}` };
     } catch (err) {
       if (opts.signal?.aborted) return done("cancelled");
-      // ⚠️ The turn outgrew the server's context window MID-WAY: "request (69882 tokens) exceeds
-      // the available context size (69632 tokens)". Tool results pile up inside a turn and nothing
-      // trimmed them, so a long agent turn died on an error after doing half its work. The oldest
-      // tool outputs are shortened — their head is kept, which is where a listing or a log says
-      // what it is — by what the server says is missing plus room to answer, and the same step is
-      // asked again. Bounded; when nothing is left to shorten the error stands, and the extension's
-      // own recovery (summarize, ask again) handles a conversation too long before the turn began.
-      const overflow = contextOverflow(String((err as Error)?.message ?? err));
-      if (overflow && shrinkAttempts < MAX_SHRINKS && shrinkToolOutputs(working, overflow.excess + ANSWER_ROOM_TOKENS, keptAs)) {
-        shrinkAttempts++;
-        opts.report?.(t("the turn no longer fit the model's context — older tool outputs were shortened"));
-        step--;
-        continue;
+      if (looped) {
+        res = { text: "", reasoning: thought, toolCalls: [], usage: { promptTokens: 0, completionTokens: 0, cachedTokens: 0 }, stopReason: "stop" };
+      } else {
+        // ⚠️ The turn outgrew the server's context window MID-WAY: "request (69882 tokens) exceeds
+        // the available context size (69632 tokens)". Tool results pile up inside a turn and nothing
+        // trimmed them, so a long agent turn died on an error after doing half its work. The oldest
+        // tool outputs are shortened — their head is kept, which is where a listing or a log says
+        // what it is — by what the server says is missing plus room to answer, and the same step is
+        // asked again. Bounded; when nothing is left to shorten the error stands, and the extension's
+        // own recovery (summarize, ask again) handles a conversation too long before the turn began.
+        const overflow = contextOverflow(String((err as Error)?.message ?? err));
+        if (overflow && shrinkAttempts < MAX_SHRINKS && shrinkToolOutputs(working, overflow.excess + ANSWER_ROOM_TOKENS, keptAs)) {
+          shrinkAttempts++;
+          opts.report?.(t("the turn no longer fit the model's context — older tool outputs were shortened"));
+          step--;
+          continue;
+        }
+        // A server whose context pool is SHARED between its places (llama.cpp `--kv-unified`) fails
+        // every request in flight when the pool is full — "Context size has been exceeded." — however
+        // small this one is. It is not this conversation outgrowing its window, so nothing is shortened:
+        // another conversation finishes and frees its share, and the same step goes again.
+        if (POOL_FULL.test(String((err as Error)?.message ?? err)) && poolWaits < MAX_POOL_WAITS) {
+          poolWaits++;
+          opts.report?.(t("the server's shared context is full for a moment — the step will go again"));
+          await pause(Math.min(30_000, 2_000 * 2 ** (poolWaits - 1)), opts.signal);
+          if (opts.signal?.aborted) return done("cancelled");
+          step--;
+          continue;
+        }
+        throw err;
       }
-      // A server whose context pool is SHARED between its places (llama.cpp `--kv-unified`) fails
-      // every request in flight when the pool is full — "Context size has been exceeded." — however
-      // small this one is. It is not this conversation outgrowing its window, so nothing is shortened:
-      // another conversation finishes and frees its share, and the same step goes again.
-      if (POOL_FULL.test(String((err as Error)?.message ?? err)) && poolWaits < MAX_POOL_WAITS) {
-        poolWaits++;
-        opts.report?.(t("the server's shared context is full for a moment — the step will go again"));
-        await pause(Math.min(30_000, 2_000 * 2 ** (poolWaits - 1)), opts.signal);
-        if (opts.signal?.aborted) return done("cancelled");
-        step--;
-        continue;
-      }
-      throw err;
+    } finally {
+      opts.signal?.removeEventListener("abort", forwardStop);
+    }
+    if (opts.signal?.aborted) return done("cancelled");
+    // Thinking in a loop: stopped, nothing of it kept, and the model told to decide — see `repeatingTail`.
+    if (looped) {
+      if (runawayNotes >= RUNAWAY_NOTES) return await concluded("repeating", CONCLUDE_RUNAWAY);
+      runawayNotes++;
+      opts.report?.(t("the model's thinking was going round in circles — it was stopped and asked to decide"));
+      working.push({ role: "user", content: THOUGHT_LOOPING });
+      continue;
     }
 
     // Measured against `outgoing`, which is what actually left — after redaction, after whatever
@@ -734,6 +822,16 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
       (!opts.maxTokens ||
         (opts.contextWindow !== undefined &&
           res.usage.promptTokens + res.usage.completionTokens >= opts.contextWindow * 0.97));
+    // The reply ITSELF filled it — see `RUNAWAY_NOTES`. Not asked again unchanged: told.
+    if (windowFull && !res.toolCalls.length && res.usage.completionTokens >= RUNAWAY_SHARE * (opts.contextWindow ?? 65_536)) {
+      if (runawayNotes >= RUNAWAY_NOTES) return await concluded("repeating", CONCLUDE_RUNAWAY);
+      runawayNotes++;
+      shrinkToolOutputs(working, ANSWER_ROOM_TOKENS, keptAs);
+      const onlyThought = !res.text.trim() && Boolean(res.reasoning?.trim());
+      opts.report?.(t("the model's reply filled the whole context window — it was told to split it up"));
+      working.push({ role: "user", content: onlyThought ? windowFilledThinking(res.usage.completionTokens) : windowFilledReply(res.usage.completionTokens) });
+      continue;
+    }
     if (
       windowFull &&
       !res.toolCalls.length &&
@@ -973,13 +1071,13 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
   return await concluded("max-steps");
 
   /** `done`, after asking for the conclusion a cut turn never wrote — see `concludeWhenCut`. */
-  async function concluded(stoppedBecause: TurnResult["stoppedBecause"]): Promise<TurnResult> {
+  async function concluded(stoppedBecause: TurnResult["stoppedBecause"], note?: string): Promise<TurnResult> {
     if (opts.concludeWhenCut && (opts.concludeWhenCut === "always" || !text.trim()) && !opts.signal?.aborted) {
       try {
         const res = await opts.provider.chat(
           {
             model: opts.model,
-            messages: [...working, { role: "user", content: stoppedBecause === "repeating" ? CONCLUDE_REPEATING : CONCLUDE_NOW }],
+            messages: [...working, { role: "user", content: note ?? (stoppedBecause === "repeating" ? CONCLUDE_REPEATING : CONCLUDE_NOW) }],
             maxTokens: opts.maxTokens,
             temperature: opts.temperature,
             reasoning: opts.reasoning,
