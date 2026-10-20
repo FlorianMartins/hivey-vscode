@@ -132,6 +132,8 @@ export interface SessionData {
   entries: Entry[];
   /** The mode the conversation was held in — shown and filtered on in the history. */
   mode?: Mode;
+  /** The delimiter of its attachment fences — see `Session.fence`. */
+  fence?: string;
 }
 
 export interface BuildOptions {
@@ -151,6 +153,13 @@ export interface BuiltPrompt {
   estimatedTokens: number;
 }
 
+/** 128 random bits, in hex — see `Session.fence`. */
+function randomFence(): string {
+  const bytes = new Uint8Array(16);
+  globalThis.crypto.getRandomValues(bytes);
+  return [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 let counter = 0;
 /** Ids are local and ordered; nothing about them needs to be unguessable. */
 export function newId(prefix = "e"): string {
@@ -165,6 +174,17 @@ export class Session {
   updatedAt: number;
   entries: Entry[];
   mode: Mode;
+  /**
+   * The delimiter of the attachment fences (see `renderEntry`), one per conversation and kept with
+   * it.
+   *
+   * ⚠️ Not one per turn. A new one each turn rewrote the fence of every file attached earlier — and
+   * the file on screen is attached to nearly every question — so the request differed from the
+   * previous one right after the repository map, and a self-hosted server re-read the whole
+   * conversation at every question instead of the new part. Still unguessable by what it fences:
+   * random, and any copy of it inside an attachment is defused before it is sent.
+   */
+  readonly fence: string;
 
   constructor(data?: Partial<SessionData>) {
     this.id = data?.id ?? newId("s");
@@ -173,6 +193,7 @@ export class Session {
     this.updatedAt = data?.updatedAt ?? this.createdAt;
     this.entries = data?.entries ?? [];
     this.mode = data?.mode ?? "agent";
+    this.fence = data?.fence ?? randomFence();
   }
 
   add(entry: Omit<Entry, "id" | "at" | "included"> & Partial<Pick<Entry, "id" | "at" | "included">>): Entry {
@@ -294,6 +315,7 @@ export class Session {
       updatedAt: this.updatedAt,
       entries: this.entries,
       mode: this.mode,
+      fence: this.fence,
     };
   }
 

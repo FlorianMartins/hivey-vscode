@@ -370,7 +370,8 @@ async function main(): Promise<void> {
       systemPrompt: promptForMode(mode) + skillsPrompt(cliSkills),
       ambient,
       maxTokens: contextTokens,
-      nonce: randomNonce(),
+      // The conversation's own, not a new one per question — see `Session.fence`.
+      nonce: session.fence,
     });
 
     let outgoing = built.messages;

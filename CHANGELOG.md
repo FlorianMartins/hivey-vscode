@@ -102,6 +102,25 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **Votre serveur ne relit plus toute la conversation à chaque question.** llama.cpp ne relit une
+  requête qu'à partir du premier caractère qui change ; deux choses changeaient le début à presque
+  chaque tour.
+  - **Le marqueur qui encadre les fichiers joints** était tiré à nouveau à chaque tour : tous les
+    fichiers joints plus haut changeaient, et la conversation était relue depuis la carte du dépôt.
+    Il est maintenant fixé une fois par conversation, aussi sûr : toute copie du marqueur dans un
+    fichier est neutralisée.
+  - **La carte du dépôt était reprise dès qu'un fichier était créé ou supprimé**, ce que l'agent fait
+    lui-même à presque chaque tour. Elle est gardée ; les fichiers créés ou supprimés depuis sont
+    listés après l'historique. Au-delà de 50 changements, ou sur demande, elle est reprise. Les
+    dépendances et la sortie de build (`node_modules`, `dist`…) ne comptent plus comme des changements.
+- **Une commande qui attend une réponse est arrêtée et le modèle sait pourquoi.** Muette depuis 15 s
+  et finissant sur une question (« Ok to proceed? (y) », `[Y/n]`, mot de passe, « Press any key »),
+  elle bloquait le tour deux minutes, puis était déclarée « trop lente ». Le modèle reçoit la question
+  et la façon d'y répondre sur la ligne de commande (`--yes`, `-y`…). Les commandes reçoivent aussi de
+  quoi ne jamais demander d'identifiants à git ni attendre un pager.
+- **Le résumé d'une compaction part de ce que l'agent a fait.** Il ne voyait que le texte des
+  réponses : les fichiers modifiés et les commandes lancées n'y étaient que si la réponse les citait.
+  Il reçoit maintenant la liste des actions, échecs marqués, et dit l'état des erreurs.
 - **L'agent ne tourne plus en rond sur la même réflexion.** Depuis #64, la réflexion du modèle
   auto-hébergé était amorcée à chaque étape par « Analysons la situation en détail. La demande porte
   sur… » : ramené à la demande à chaque fois, il refaisait les mêmes lectures (les trois mêmes

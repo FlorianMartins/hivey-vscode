@@ -114,6 +114,25 @@ export interface CommandOutcome {
   exitCode?: number;
   /** True when the command was still running when the budget ran out. */
   timedOut?: boolean;
+  /** The question it stopped on, when it was stopped for waiting on an answer — see `waitingForInput`. */
+  askedFor?: string;
+}
+
+/**
+ * The question a command is stopped on, waiting for somebody to type — or undefined.
+ *
+ * ⚠️ « une commande qui attend une saisie bloque le tour ». Nothing can be typed into a command the
+ * agent runs, so `npx` asking "Ok to proceed? (y)", a script asking for a password or "Press any key"
+ * held the turn until the timeout — two minutes — and the model was then told it had TIMED OUT, which
+ * it read as "too slow" and ran again with a longer timeout. Only the last line counts, and only these
+ * shapes: a silent build ending on "Compiling…" must never be taken for a question.
+ */
+export function waitingForInput(output: string): string | undefined {
+  const last = stripAnsi(output).split(/\r?\n/).map((l) => l.trim()).filter(Boolean).at(-1);
+  if (!last) return undefined;
+  const asks =
+    /\((y|yes)\/(n|no)\)|\[(y\/n|Y\/n|y\/N|yes\/no)\]|\(y\)\s*$|\?\s*$|\bpass(word|phrase)\b[^\n]*:\s*$|\bpress (any key|enter|return)\b|\b(username|login|token|otp)\b[^\n]*:\s*$/i;
+  return asks.test(last) ? last.slice(-200) : undefined;
 }
 
 /**
@@ -125,6 +144,13 @@ export interface CommandOutcome {
  * pressing ctrl+c all land here, and none of them means the build passed.
  */
 export function describeOutcome(outcome: CommandOutcome, maxChars = 4000): string {
+  if (outcome.askedFor !== undefined) {
+    return (
+      `stopped: it was waiting for an answer to « ${outcome.askedFor} », and nothing can be typed into a command run here. ` +
+      `Run it again with the answer on the command line — a flag such as \`--yes\`, \`-y\`, \`--no-input\` or \`--force\`, ` +
+      `or \`echo y | …\` — or tell the user it needs them.\n${tailOutput(outcome.output, maxChars) || "(no output)"}`
+    );
+  }
   const head = outcome.timedOut
     ? "timed out and was killed"
     : outcome.exitCode === undefined

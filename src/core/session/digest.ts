@@ -46,8 +46,12 @@ export interface DigestOptions {
  * context would undo a decision they made deliberately.
  */
 export function digestEntries(entries: Entry[], opts: DigestOptions): string {
-  const usable = entries.filter((e) => e.included && !e.error && e.text.trim());
-  const rendered = usable.map((e) => `${roleLabel(e.role, opts.you, opts.assistant)}: ${e.text.trim()}`);
+  const usable = entries.filter((e) => e.included && !e.error && (e.text.trim() || actionsOf(e)));
+  const rendered = usable.map((e) => {
+    const did = actionsOf(e);
+    const said = e.text.trim();
+    return `${roleLabel(e.role, opts.you, opts.assistant)}: ${did ? `${did}${said ? `\n${said}` : ""}` : said}`;
+  });
 
   const kept: string[] = [];
   let budget = opts.maxTokens;
@@ -142,6 +146,21 @@ export function shouldSuggestCompact(contextTokens: number, budgetTokens: number
 }
 
 /**
+ * What an answer DID, one line per action, failures marked — for the summary to work from.
+ *
+ * ⚠️ The summary was written from the words of the answers alone. The files an agent changed and the
+ * checks it ran are in its actions, not always in what it said, so "files touched" held whatever the
+ * prose happened to name and the state of the errors was not there at all: after a compaction the
+ * agent no longer knew what it had changed or what was still failing.
+ */
+function actionsOf(e: Entry): string {
+  if (e.role !== "assistant") return "";
+  const steps = e.segments?.some((s) => s.steps?.length) ? e.segments.flatMap((s) => s.steps ?? []) : (e.steps ?? []);
+  if (!steps.length) return "";
+  return `[actions]\n${steps.map((s) => `- ${s.tool}${s.call ? ` ${s.call}` : ""} → ${s.ok ? "" : "FAILED: "}${s.summary}`).join("\n")}`;
+}
+
+/**
  * What the model is asked to produce when compacting.
  *
  * Written as a brief rather than as "summarize this": a summary optimized for prose is the wrong
@@ -158,8 +177,9 @@ export function compactBrief(): string {
     "1. What the user is trying to achieve, in their terms.",
     "2. Decisions already taken, and the reasoning that settled them.",
     "3. Approaches tried and rejected, with why — so they are not tried again.",
-    "4. Files, symbols and commands touched, by exact name.",
-    "5. What is still open, and the immediate next step.",
+    "4. Files changed and commands run, by exact name — from the [actions] lists, not only from what was said.",
+    "5. The current state of errors: the last check or command that failed and its error, or that the last checks passed.",
+    "6. What is still open, and the immediate next step.",
     "Keep every identifier verbatim. Prefer omitting a pleasantry to omitting a fact.",
     "Do not address the user, do not apologize, and do not describe the conversation as a conversation.",
     // The whole point of compacting is the space it frees, so the budget is stated rather than

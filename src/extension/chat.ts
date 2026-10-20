@@ -35,6 +35,7 @@ import { RecallStore, recallTools } from "../core/agent/recall.js";
 import { Permissions, commandPrefix, type PermissionStore, type Rule } from "../core/agent/permissions.js";
 import { detectLanguage, languageDirective, stablePrompt, turnDirectives } from "../core/prompts.js";
 import { detectUserLanguage } from "../core/userLanguage.js";
+import { MAP_REBUILD_AFTER, structureNote } from "../core/context/structure.js";
 import { costOf, estimateCost, makeLookup, type Price } from "../core/router/pricing.js";
 import { calibrate, observe, prune, type Calibration } from "../core/util/calibrate.js";
 import { acceptsImages, IMAGE_TOKENS, isCatalogued, isImageRefusal, withoutImages } from "../core/models/vision.js";
@@ -4175,7 +4176,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this.turn = ctl;
     this.post({ type: "turnStart" });
 
-    const nonce = randomNonce();
+    // The conversation's own, not a new one per turn — see `Session.fence`.
+    const nonce = this.session.fence;
     // Chat mode answers from what it was given: no repository map, no tools, no surprises.
     // The repository's own rules, if it has any. They sit in the cacheable prefix, which is where
     // text that is identical on every turn belongs.
@@ -4198,7 +4200,19 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     // Rebuilt when the repository has gained or lost a file since the map was taken. Freezing it
     // protects the cacheable prefix from a tab switch; it must not outlive the structure it
     // describes, or the agent asks for a file it created a minute ago and is told it does not exist.
-    if (this.frozenMapAt !== this.workspace.structureVersion()) this.frozenMap = undefined;
+    //
+    // ⚠️ Kept, not rebuilt, when the agent creates or deletes a file: rebuilt, it rewrote the prefix
+    // right after the system prompt at nearly every turn of agent work, and a self-hosted server
+    // re-read the whole conversation each time. What changed since is said after the transcript
+    // instead (`structureNote`) — taken again only past `MAP_REBUILD_AFTER` changes, or when asked.
+    const sinceMap = this.frozenMap ? this.workspace.changesSince(this.frozenMapAt) : undefined;
+    if (
+      this.frozenMapForced !== this.workspace.forcedVersion() ||
+      !sinceMap ||
+      sinceMap.created.length + sinceMap.deleted.length > MAP_REBUILD_AFTER
+    ) {
+      this.frozenMap = undefined;
+    }
     if (mode !== "chat" && settings.context.repoMap && !this.frozenMap) {
       // The first question of a conversation is what the map is ranked around, and it is frozen
       // there afterwards — which is the right trade: the question that opens a conversation is what
@@ -4207,6 +4221,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       const opening = [...this.session.entries].reverse().find((e) => e.role === "user")?.text;
       this.frozenMap = await this.workspace.repoMap(repoMapBudget(this.budgetTokensFor(settings)), false, opening);
       this.frozenMapAt = this.workspace.structureVersion();
+      this.frozenMapForced = this.workspace.forcedVersion();
     }
     const ambient = mode !== "chat" && settings.context.repoMap ? this.frozenMap : undefined;
     // The workspace's own commands, run around every tool call. The steps they produce are pushed
@@ -4298,9 +4313,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     // Built-in skill instructions are taken out first: they are English on purpose, and `/explain`
     // typed in a French interface must not read as a question asked in English.
     const lastQuestion = withoutModelText([...this.session.entries].reverse().find((e) => e.role === "user")?.text ?? "");
+    const structureChanged = ambient && this.frozenMap ? this.workspace.changesSince(this.frozenMapAt) : undefined;
     const directives = turnDirectives({
       ...(this.participant ? { participant: participantDirective(this.participant) } : {}),
       language: languageDirective(detectUserLanguage(lastQuestion, language())),
+      // Files created or deleted since the map — see `structureNote`.
+      ...(structureChanged ? { structure: structureNote(structureChanged) } : {}),
     });
     // Named rather than inlined, because the card that asks the user to consent has to be able to
     // say how big each of them is. A number nobody can attribute is a number nobody can act on.
@@ -5680,6 +5698,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private frozenMap: { text: string; files: number; omitted: number } | undefined;
   /** The workspace structure the frozen map describes. See `WorkspaceContext.structureVersion`. */
   private frozenMapAt = -1;
+  /** `forcedVersion()` when the map was taken — a fresh one asked for since means taking it again. */
+  private frozenMapForced = -1;
 
   /** What sub-agents spent during the turn in progress, to be added to the answer that ordered it. */
   private delegatedCostUsd = 0;

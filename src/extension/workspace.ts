@@ -9,6 +9,7 @@ import * as vscode from "vscode";
 import { isDocumentUri } from "./models.js";
 import { t } from "../shared/i18n.js";
 import { buildRepoMap, isMappable, type MapFile } from "../core/context/repomap.js";
+import { isStructural, netChanges, type StructureChange } from "../core/context/structure.js";
 import { contextBudget } from "../core/context/budget.js";
 import { fileExcerpt } from "../core/context/outline.js";
 import type { ContextItem } from "../core/session/session.js";
@@ -37,18 +38,26 @@ export class WorkspaceContext {
    * rebuilding the prefix for.
    */
   private structure = 0;
+  /** Bumped by `invalidate` alone: a map asked to be taken again is taken again — see `forcedVersion`. */
+  private forced = 0;
+  /** Each file created or deleted, with the `structure` it took the count to — see `changesSince`. */
+  private readonly changes: Array<StructureChange & { at: number }> = [];
   private readonly recent: string[] = [];
 
   constructor(private readonly disposables: vscode.Disposable[]) {
     const watcher = vscode.workspace.createFileSystemWatcher("**/*");
-    watcher.onDidCreate(() => {
+    // Dependencies and build output are not the structure: an `npm install` used to count as
+    // thousands of changes to a repository whose map does not list a single one of them.
+    const changed = (kind: StructureChange["kind"]) => (uri: vscode.Uri) => {
+      const path = relative(uri).replace(/\\/g, "/");
+      if (!isStructural(path)) return;
       this.dirty = true;
       this.structure += 1;
-    });
-    watcher.onDidDelete(() => {
-      this.dirty = true;
-      this.structure += 1;
-    });
+      this.changes.push({ kind, path, at: this.structure });
+      if (this.changes.length > 2000) this.changes.splice(0, this.changes.length - 2000);
+    };
+    watcher.onDidCreate(changed("created"));
+    watcher.onDidDelete(changed("deleted"));
     disposables.push(watcher);
     disposables.push(
       vscode.workspace.onDidSaveTextDocument((doc) => {
@@ -69,6 +78,23 @@ export class WorkspaceContext {
   invalidate(): void {
     this.dirty = true;
     this.structure += 1;
+    this.forced += 1;
+  }
+
+  /** Changes only when a fresh map was asked for — see `invalidate`. */
+  forcedVersion(): number {
+    return this.forced;
+  }
+
+  /**
+   * The files created and deleted since `structureVersion()` was `version`, net — or undefined when
+   * the record does not reach back that far, which is as good as "too much changed".
+   */
+  changesSince(version: number): { created: string[]; deleted: string[] } | undefined {
+    if (version >= this.structure) return { created: [], deleted: [] };
+    const first = this.changes[0];
+    if (!first || first.at > version + 1) return undefined;
+    return netChanges(this.changes.filter((c) => c.at > version));
   }
 
   /** Changes whenever a file appears or disappears. A frozen map built at another value is stale. */
