@@ -295,44 +295,52 @@ export class OpenAICompatibleProvider implements Provider {
     // Whether the provider ever said it was done: a `finish_reason`, or the `[DONE]` sentinel. A
     // stream that simply stops without either was cut — see `ChatResult.interrupted`.
     let finished = false;
-    for await (const line of sseLines(res.body, req.signal)) {
-      if (line === "data: [DONE]" || line === "data:[DONE]") finished = true;
-      const payload = sseData(line) as any;
-      if (!payload) continue;
-      if (payload.choices?.[0]?.finish_reason) finished = true;
-      if (payload.error) throw new Error(payload.error.message ?? String(payload.error));
-      const choice = payload.choices?.[0];
-      if (payload.usage) {
-        usage.promptTokens = payload.usage.prompt_tokens ?? usage.promptTokens;
-        usage.completionTokens = payload.usage.completion_tokens ?? usage.completionTokens;
-        usage.cachedTokens = payload.usage.prompt_tokens_details?.cached_tokens ?? usage.cachedTokens;
-        if (typeof payload.usage.cost === "number") usage.costUsd = payload.usage.cost;
+    // ⚠️ « terminated » — the connection cut in the middle of the answer (a network blip, the
+    // gateway, a reload) does not END the stream: reading it THROWS. That error reached the panel as
+    // the whole message, where a stream that merely stopped is picked up and continued (see
+    // `ChatResult.interrupted`). The same outcome now, whichever way the connection went.
+    try {
+      for await (const line of sseLines(res.body, req.signal)) {
+        if (line === "data: [DONE]" || line === "data:[DONE]") finished = true;
+        const payload = sseData(line) as any;
+        if (!payload) continue;
+        if (payload.choices?.[0]?.finish_reason) finished = true;
+        if (payload.error) throw new Error(payload.error.message ?? String(payload.error));
+        const choice = payload.choices?.[0];
+        if (payload.usage) {
+          usage.promptTokens = payload.usage.prompt_tokens ?? usage.promptTokens;
+          usage.completionTokens = payload.usage.completion_tokens ?? usage.completionTokens;
+          usage.cachedTokens = payload.usage.prompt_tokens_details?.cached_tokens ?? usage.cachedTokens;
+          if (typeof payload.usage.cost === "number") usage.costUsd = payload.usage.cost;
+        }
+        const pp = payload.prompt_progress;
+        if (pp && typeof pp.total === "number") {
+          onDelta?.({ progress: { processed: Number(pp.processed) || 0, total: pp.total, cache: Number(pp.cache) || 0 } });
+        }
+        if (!choice) continue;
+        if (choice.finish_reason === "length") stopReason = "length";
+        const delta = choice.delta ?? {};
+        // DeepSeek names it reasoning_content, OpenRouter normalizes to reasoning.
+        const r = delta.reasoning_content ?? delta.reasoning;
+        if (typeof r === "string" && r) {
+          reasoning += r;
+          onDelta?.({ reasoning: r });
+        }
+        if (typeof delta.content === "string" && delta.content) {
+          text += delta.content;
+          onDelta?.({ text: delta.content });
+        }
+        for (const tc of delta.tool_calls ?? []) {
+          const idx = tc.index ?? 0;
+          const cur = partial.get(idx) ?? { id: "", name: "", args: "" };
+          if (tc.id) cur.id = tc.id;
+          if (tc.function?.name) cur.name += tc.function.name;
+          if (tc.function?.arguments) cur.args += tc.function.arguments;
+          partial.set(idx, cur);
+        }
       }
-      const pp = payload.prompt_progress;
-      if (pp && typeof pp.total === "number") {
-        onDelta?.({ progress: { processed: Number(pp.processed) || 0, total: pp.total, cache: Number(pp.cache) || 0 } });
-      }
-      if (!choice) continue;
-      if (choice.finish_reason === "length") stopReason = "length";
-      const delta = choice.delta ?? {};
-      // DeepSeek names it reasoning_content, OpenRouter normalizes to reasoning.
-      const r = delta.reasoning_content ?? delta.reasoning;
-      if (typeof r === "string" && r) {
-        reasoning += r;
-        onDelta?.({ reasoning: r });
-      }
-      if (typeof delta.content === "string" && delta.content) {
-        text += delta.content;
-        onDelta?.({ text: delta.content });
-      }
-      for (const tc of delta.tool_calls ?? []) {
-        const idx = tc.index ?? 0;
-        const cur = partial.get(idx) ?? { id: "", name: "", args: "" };
-        if (tc.id) cur.id = tc.id;
-        if (tc.function?.name) cur.name += tc.function.name;
-        if (tc.function?.arguments) cur.args += tc.function.arguments;
-        partial.set(idx, cur);
-      }
+    } catch (err) {
+      if (req.signal?.aborted || !isConnectionDrop(err)) throw err;
     }
 
     const toolCalls: ToolCall[] = [...partial.entries()]
@@ -764,4 +772,15 @@ export function contextWindowOf(entry: unknown): number {
     if (Number.isFinite(n) && n > 0) return Math.floor(n);
   }
   return 0;
+}
+
+/**
+ * The connection closed under a response being read — not a refusal, not a bad request. Node's fetch
+ * says « terminated » (with the socket's own reason in `cause`), others name the socket error.
+ */
+export function isConnectionDrop(err: unknown): boolean {
+  const e = err as { name?: string; message?: string; code?: string; cause?: { code?: string; message?: string } };
+  const codes = ["ECONNRESET", "EPIPE", "ETIMEDOUT", "UND_ERR_SOCKET", "UND_ERR_CLOSED"];
+  if (codes.includes(String(e?.code)) || codes.includes(String(e?.cause?.code))) return true;
+  return e?.name === "TypeError" && /^terminated$|other side closed|socket hang up/i.test(String(e?.message ?? ""));
 }
