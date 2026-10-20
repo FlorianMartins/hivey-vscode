@@ -171,7 +171,6 @@ const server = createServer((req, res) => {
   // screen a blocked turn needs the user to act on, and the thing that used to vanish with any
   // rebuild of the panel.
   if (/list the files|liste les fichiers/i.test(sent)) {
-    res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });
     res.write(
       `data: ${JSON.stringify({
         choices: [

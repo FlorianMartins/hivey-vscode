@@ -86,12 +86,13 @@ Ouvrez un dossier contenant du code, puis le panneau **Hivey Code** dans la barr
   question suivante ; après un Stop, il revient dans la zone de saisie. Dans la ligne de commande
   (`hivey`), une ligne tapée pendant un tour fait de même.
 - **Un tour se lit comme une frise**, à la manière de Claude Code : chaque moment de réflexion est une
-  ligne repliée « ∴ Réflexion » (elle montre sa dernière phrase pendant qu'elle s'écrit, et un clic
-  l'ouvre en entier), chaque action une ligne compacte — `Read(src/x.ts)`, `Bash(npm test)`,
+  ligne repliée **Réflexion** (sa pastille pulse pendant qu'elle s'écrit, et un clic l'ouvre en
+  entier), chaque action une ligne compacte — `Read(src/x.ts)`, `Bash(npm test)`,
   `Update(src/y.ts)` — dont la pastille dit si elle a réussi, et ce que le modèle écrit entre les deux,
   en paragraphes. Une commande ne fait plus apparaître le terminal : un clic sur sa ligne montre ce
   qu'elle a affiché. Tant que le tour tourne, **votre demande reste épinglée** en haut de la
-  conversation dès qu'elle sort de l'écran ; un clic y revient.
+  conversation dès qu'elle sort de l'écran ; un clic y revient. Au survol de la réponse s'affichent
+  l'heure à laquelle elle s'est terminée et la durée de la requête.
 - **Après une réponse**, la prochaine demande probable s'affiche en grisé dans la zone de saisie :
   **Tab** (ou une flèche) en fait votre texte, **Entrée** l'envoie. Réglage
   `hiveyCode.chat.suggestNext`.

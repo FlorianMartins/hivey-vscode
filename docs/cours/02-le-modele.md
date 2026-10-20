@@ -82,8 +82,8 @@ et — c'est le plus instructif — dans 51 cas sur 56 il n'a **même pas essay�
   répétitif mais prévisible. Plus haut, il varie : utile pour écrire, risqué pour du code.
 - Certains modèles savent **raisonner à voix haute** avant de répondre : ils produisent d'abord un
   brouillon de réflexion. Ça améliore les réponses difficiles et ça coûte des jetons. Hivey Code
-  l'affiche **pendant** qu'il s'écrit — c'est le seul moment où c'est intéressant — puis le replie
-  dès que commence l'action ou la réponse qu'il a décidée. Le niveau se choisit dans la zone de
+  en montre chaque moment sur une ligne repliée **Réflexion**, dont la pastille pulse pendant qu'il
+  s'écrit ; un clic l'ouvre, rendu au fur et à mesure. Le niveau se choisit dans la zone de
   saisie : **Direct** (aucune réflexion), **Bref**, **Standard**, **Approfondi** — et seulement ceux
   que le modèle possède vraiment : son serveur le dit quand il est chez vous, sa documentation sinon.
   Chaque niveau change vraiment la requête, d'un fournisseur à l'autre : Direct **coupe** la
