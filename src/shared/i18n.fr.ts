@@ -263,6 +263,8 @@ export const FR: Record<string, string> = {
   "timed out and was killed": "délai dépassé, commande arrêtée",
   "the model's thinking was going round in circles — it was stopped and asked to decide":
     "la réflexion du modèle tournait en rond — elle a été arrêtée et il lui est demandé de trancher",
+  "the context window was full — the work so far was summarized, and the turn goes on":
+    "le contexte était plein — le travail a été résumé, et le tour continue",
   "the model's reply filled the whole context window — it was told to split it up":
     "la réponse du modèle a rempli tout le contexte — il lui est demandé de la découper",
   "stopped: it was waiting for an answer": "arrêtée : elle attendait une réponse",
