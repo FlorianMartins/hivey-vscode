@@ -100,6 +100,12 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
   unitaire le vérifie. Les tâches TypeScript sont compilées par le `tsc` du dépôt (`eval/bin/tsc`), les tâches
   Java par `javac`.
 
+### Modifié
+
+- **Node 20 au minimum pour le client en ligne de commande** ; la CI teste Node 20, 22 et 24 (Windows
+  et tâches uniques sur Node 24). Node 18 n'est plus maintenu depuis avril 2025, et sa suite de tests
+  prenait 17 minutes, contre moins d'une sur les versions suivantes.
+
 ### Corrigé
 
 - **Documentation et captures à jour, dépôt nettoyé.** README, cours (deux éditions) et architecture
