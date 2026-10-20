@@ -66,10 +66,12 @@ Quatre choix de conception qui se voient à l'usage :
   `hiveyCode.context.maxTokens` vaut 0 (le défaut) ; 8 000 jetons si la fenêtre est inconnue. Avec une valeur fixe de 8 000 jetons, les
   conversations étaient résumées au bout de trois échanges et la réponse venait du résumé — alors que
   8 000 jetons sont une poussière pour un modèle moderne.
-- **Un fichier se lit par pages.** Sans plage demandée, l'outil de lecture rend une page de 2 000
-  lignes et dit comment lire la suite ; sur un gros fichier, le modèle cherche d'abord la bonne ligne
-  puis lit autour. Rien n'est inaccessible, mais un fichier de 14 000 lignes lu d'un bloc encombrait
-  chaque étape suivante du tour.
+- **Un gros fichier se lit par la partie utile.** Un fichier de plus de 800 lignes demandé en entier
+  rend son plan — chaque fonction, classe et export avec sa ligne — et ses premières lignes ; le
+  modèle lit ensuite la partie qu'il lui faut, par une plage de 2 000 lignes au plus, ou cherche
+  d'abord la bonne ligne. Rien n'est inaccessible, mais un fichier de 14 000 lignes lu d'un bloc
+  encombrait chaque étape suivante du tour. Des lignes que la conversation contient déjà, sans
+  modification ni commande depuis, ne sont pas relues : le modèle est renvoyé à sa copie.
 - **Une pièce jointe trop grosse arrive sous forme de plan** : tous les symboles qu'elle déclare avec
   leur ligne, suivis de son début — plutôt que ses N premières lignes et rien sur le reste. Un plan
   dit *de quoi parle* le fichier ; ses cent premières lignes disent seulement comment il commence.

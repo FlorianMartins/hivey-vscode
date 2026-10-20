@@ -52,18 +52,21 @@ Voici ce qui se passe réellement quand vous écrivez, en mode Agent : « les te
 Le nombre d'étapes d'un tour **n'est pas plafonné** par défaut (`hiveyCode.agent.maxSteps` vaut 0) :
 un plafond fixe arrêtait de vraies tâches à mi-chemin, en silence, et ça ressemblait à un modèle qui
 abandonne. Ce qui termine un tour, c'est la fin du travail, votre bouton **Stop**, ou un détecteur qui
-repère un modèle répétant le même appel en boucle. Un nombre dans ce réglage remet un plafond ; quand
-il est atteint, on vous le dit et vous pouvez continuer.
+repère un modèle répétant le même appel en boucle : un même appel en lecture seule fait une troisième
+fois sans aucun changement entre-temps n'est pas exécuté, et un modèle qui insiste est arrêté — le
+tour se termine alors en disant ce qui est fait, ce qui bloque et ce qu'il lui faut. Un nombre dans ce
+réglage remet un plafond ; quand il est atteint, on vous le dit et vous pouvez continuer.
 
 Trois choses que vous verrez en route :
 
-- **Le tour se lit dans l'ordre.** Chaque étape est un bloc — la réflexion, puis les actions — suivi
-  du texte écrit à ce moment-là, puis l'étape suivante. Pendant le travail, à la relecture, et dans
-  l'export Markdown de la conversation.
+- **Le tour se lit dans l'ordre**, comme une frise : chaque moment de réflexion est une ligne repliée
+  **Réflexion**, chaque action une ligne compacte, et le texte écrit à ce moment-là entre les deux.
+  Pendant le travail, à la relecture, et dans l'export Markdown de la conversation.
 - **La réponse reste dans votre langue**, du début à la fin du tour, y compris les courtes notes
   entre deux actions, que le modèle avait tendance à écrire en anglais juste après avoir lu du code.
-  La consigne est répétée à chaque étape, et une note écrite malgré tout dans une autre langue est
-  retraduite par une petite requête avant de s'afficher.
+  La consigne est répétée à chaque étape ; rien n'est traduit après coup. Sur un serveur
+  auto-hébergé, le modèle réfléchit dans sa propre langue et écrit une phrase courte dans la vôtre
+  avant chaque série d'actions ; les modèles cloud gardent leurs réglages.
 - **Quitter une conversation arrête son tour.** Nouvelle conversation, ouvrir une autre depuis
   l'historique, supprimer celle-ci : le tour en cours s'arrête d'abord. Avant, il continuait dans une
   conversation que plus personne ne regardait.

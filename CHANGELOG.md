@@ -121,6 +121,12 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 - **Le résumé d'une compaction part de ce que l'agent a fait.** Il ne voyait que le texte des
   réponses : les fichiers modifiés et les commandes lancées n'y étaient que si la réponse les citait.
   Il reçoit maintenant la liste des actions, échecs marqués, et dit l'état des erreurs.
+- **Documentation et captures à jour, dépôt nettoyé.** README, cours (deux éditions) et architecture
+  décrivent le comportement actuel (ligne « Réflexion », langue de la réflexion, lecture des gros
+  fichiers, garde-fou de répétition, sous-agents, `fetch_url`). Captures refaites dans un vrai VS Code.
+  Retirés car inutilisés : `a.out`, un `SHA256SUMS` figé sur la 1.14.1 (la CI publie le vrai avec
+  chaque build), deux rapports du banc du 3 octobre, `docs/PROMPT-ROADMAP.md` (périmé), 28 captures
+  liées nulle part. Le script de capture n'envoie plus deux fois ses en-têtes.
 - **L'agent ne tourne plus en rond sur la même réflexion.** Depuis #64, la réflexion du modèle
   auto-hébergé était amorcée à chaque étape par « Analysons la situation en détail. La demande porte
   sur… » : ramené à la demande à chaque fois, il refaisait les mêmes lectures (les trois mêmes
