@@ -4788,6 +4788,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           if (ctl.signal.aborted) return;
           this.post({ type: "status", text: msg });
         },
+        // Housekeeping (old outputs shortened, a summary made): beside "thinking…", for a moment —
+        // not in the timeline, under the thinking, where the model's own sentence goes.
+        maintenance: (msg) => {
+          if (ctl.signal.aborted) return;
+          this.post({ type: "activity", text: msg });
+        },
         approve: (req) => this.askApproval(req),
         // Redaction runs on EVERY step, because a tool result is new text that never went through
         // the gate — a file the agent just read can contain the credential the first prompt did not.
