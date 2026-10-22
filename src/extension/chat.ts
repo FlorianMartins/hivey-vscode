@@ -5227,7 +5227,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       const res = await provider.chat({
         model,
         messages: prepared.messages,
-        maxTokens: 80,
+        // ⚠️ No cap. « Il n'y a pas les propositions de prochain prompt sur les modèles cloud » : at 80
+        // tokens, a model that thinks — DeepSeek on OpenRouter spent 60 of them thinking on a two-line
+        // exchange; Claude Sonnet 5.5 cannot stop thinking at all — had nothing left to write the line
+        // with, and an empty reply is no suggestion, silently. Only the first line is kept anyway
+        // (`parseNextStep`); the provider knows the model's own limit.
         chore: true,
         reasoning: effortToSend(model, "none"),
       });
