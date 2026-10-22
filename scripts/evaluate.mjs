@@ -65,6 +65,8 @@ function sh(command, cwd, timeoutMs = 120_000, env = {}) {
     const child = spawn(argv ? command[0] : command, argv ? command.slice(1) : undefined, {
       cwd,
       shell: !argv,
+      // Its own process group, so what it started can be stopped with it — see `stopAll`.
+      detached: process.platform !== "win32",
       // `eval/bin` on PATH, which is how a check gets `codeonly` — a structural check must look at
       // the code and not at the comments, and the helper that strips them has to live OUTSIDE the
       // working copy: a tool the agent can edit is not a check. See `eval/bin/codeonly`.
@@ -73,24 +75,45 @@ function sh(command, cwd, timeoutMs = 120_000, env = {}) {
     });
     let out = "";
     let killed = false;
+    let settled = false;
+    // ⚠️ A check that never ended held the whole bench for 2 h 40: the agent's code left a promise
+    // pending, `sh` was killed at the deadline but the `node --test` it had started was not, and kept
+    // the pipes open — so `close` never came. The whole group goes, and the run is over when its own
+    // process is, give or take a moment for the last lines.
+    const stopAll = () => {
+      try {
+        if (process.platform !== "win32" && child.pid) process.kill(-child.pid, "SIGKILL");
+        else child.kill("SIGKILL");
+      } catch {
+        /* already gone */
+      }
+    };
+    const finish = (result) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolveRun(result);
+    };
     const timer = setTimeout(() => {
       killed = true;
-      child.kill("SIGKILL");
+      stopAll();
+      setTimeout(() => finish({ code: 124, out, killed: true }), 2000);
     }, timeoutMs);
+    child.on("exit", (code) => {
+      setTimeout(() => {
+        if (settled) return;
+        stopAll();
+        finish({ code: killed ? 124 : (code ?? 1), out, killed });
+      }, 2000);
+    });
     const append = (chunk) => {
       out += chunk.toString();
       if (out.length > 40_000) out = out.slice(-40_000);
     };
     child.stdout.on("data", append);
     child.stderr.on("data", append);
-    child.on("close", (code) => {
-      clearTimeout(timer);
-      resolveRun({ code: killed ? 124 : (code ?? 1), out, killed });
-    });
-    child.on("error", (err) => {
-      clearTimeout(timer);
-      resolveRun({ code: 127, out: String(err), killed: false });
-    });
+    child.on("close", (code) => finish({ code: killed ? 124 : (code ?? 1), out, killed }));
+    child.on("error", (err) => finish({ code: 127, out: String(err), killed: false }));
   });
 }
 

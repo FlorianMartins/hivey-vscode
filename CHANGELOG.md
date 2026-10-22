@@ -111,6 +111,14 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **Plus de blocage d'une heure sur des tests qui ne se terminent pas.** Une commande finie mais qui
+  laissait tourner un processus (un test qui ne finit jamais, un serveur lancé en arrière-plan) gardait
+  sa sortie ouverte : l'agent attendait jusqu'au délai, se faisait dire « délai dépassé », relançait
+  avec un délai plus long, et ainsi de suite pendant une heure. Une commande finie revient maintenant
+  aussitôt avec son vrai code de sortie, ce qui restait en cours est arrêté et le modèle le sait ; et
+  le message de délai dépassé dit enfin quoi chercher (une promesse jamais résolue, un minuteur, un
+  serveur jamais fermé) au lieu d'inviter à attendre plus longtemps. Le banc applique la même règle à
+  ses vérifications.
 - **Les niveaux de réflexion font enfin une différence sur votre serveur.** Un niveau n'était qu'un
   mot pour le gabarit de Qwen (« sois bref »), que le modèle cessait de suivre sur un problème
   difficile, d'où des réflexions sans fin (« Wait… hmm »). Chaque niveau a maintenant un vrai budget

@@ -471,6 +471,41 @@ suite("Hivey Code", () => {
     }
   });
 
+  /**
+   * « il bloque sur le même souci pendant 1 h » : the command was over, but a process it started held
+   * its output open — and the turn waited for the timeout, then said "timed out".
+   */
+  test("a finished command whose leftover process holds the output comes back at once, with its exit code", async () => {
+    const ext = vscode.extensions.getExtension(ID)!;
+    await ext.activate();
+    // Ends at once; leaves a child that inherits the output and lives a minute.
+    const command = `node -e "require('child_process').spawn(process.execPath,['-e','setTimeout(()=>{},60000)'],{stdio:'inherit'}); console.log('tests done'); process.exit(1)"`;
+    const stub = await scriptedStub([{ tool: { name: "run_command", args: { command, timeoutMs: 120000 } } }, { text: "ok" }]);
+    const restore = await useStub(stub.port);
+    const config = vscode.workspace.getConfiguration(SECTION);
+    const before = { runner: config.get("agent.commandRunner"), approve: config.get("permissions.autoApprove") };
+    await config.update("agent.commandRunner", "process", vscode.ConfigurationTarget.Global);
+    await config.update("permissions.autoApprove", "all", vscode.ConfigurationTarget.Global);
+    try {
+      await vscode.commands.executeCommand("hiveyCode.newSession");
+      await vscode.commands.executeCommand("hiveyCode.setMode", "agent");
+      const started = Date.now();
+      await vscode.commands.executeCommand("hiveyCode.askWith", "run the tests");
+      const took = Date.now() - started;
+      const tool = JSON.stringify((JSON.parse(stub.bodies()[1] ?? "{}").messages ?? []).filter((m: { role: string }) => m.role === "tool").pop() ?? {});
+      assert.ok(took < 20000, `the turn waited ${took} ms for a command that was over`);
+      assert.match(tool, /exit code 1/, tool);
+      assert.match(tool, /tests done/);
+      assert.match(tool, /still running and holding its output/, "the model is told what was left running");
+      assert.doesNotMatch(tool, /timed out/);
+    } finally {
+      await config.update("agent.commandRunner", before.runner, vscode.ConfigurationTarget.Global);
+      await config.update("permissions.autoApprove", before.approve, vscode.ConfigurationTarget.Global);
+      await restore();
+      stub.close();
+    }
+  });
+
   test("a file the model misspelt is answered with the one it meant", async () => {
     const ext = vscode.extensions.getExtension(ID)!;
     await ext.activate();
