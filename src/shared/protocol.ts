@@ -102,7 +102,7 @@ export interface UiEntry {
   context?: UiContextItem[];
   steps?: UiStep[];
   /** The answer as it happened: thinking and actions, then the words written there, step by step. */
-  segments?: Array<{ reasoning?: string; steps?: UiStep[]; text?: string; user?: string }>;
+  segments?: Array<{ reasoning?: string; lead?: string; steps?: UiStep[]; text?: string; user?: string }>;
 }
 
 export interface UiSession {

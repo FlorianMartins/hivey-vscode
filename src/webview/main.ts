@@ -6,7 +6,7 @@
 // rendered incrementally is the answer being streamed, because that one has to be.
 
 import { button, closeMenu, el, icon, ICON, menuIsOpen, searchInput } from "./dom.js";
-import { chatScreen, isStreaming, planBlock, setStreaming, timeline, toolRow, thinkingLine, textItem, noteItem, interjectionBubble, type ChatDeps, captureDraft, restoreDraft,
+import { chatScreen, isStreaming, planBlock, setStreaming, timeline, toolRow, thinkingLine, textItem, leadItem, noteItem, interjectionBubble, type ChatDeps, captureDraft, restoreDraft,
   NOTE_FADE_MS,
   setComposerNote,
   dictationStopped,
@@ -412,7 +412,9 @@ class LiveTurn {
     if (!this.text) {
       const text = el("div", "live-text");
       this.text = text;
-      following(() => this.lineOf().append(textItem(text)));
+      const item = textItem(text);
+      this.textItem = item;
+      following(() => this.lineOf().append(item));
     }
     this.scheduleRender();
   }
@@ -476,6 +478,7 @@ class LiveTurn {
       following(() => text.replaceChildren(...Array.from(rendered.childNodes)));
     }
     this.text = undefined;
+    this.textItem = undefined;
     this.buffer = "";
     this.shown = 0;
     this.typing = false;
@@ -521,9 +524,14 @@ class LiveTurn {
     this.planNode = next;
   }
 
+  /** The words under way, as an item of the line — see `leadItem`. */
+  private textItem?: HTMLElement;
+
   /** The action under way: a row of its own, pulsing, that its result will replace. */
   toolStart(tool: string, call?: string, count?: number): void {
     this.endThinking();
+    // The words just written announced this action: they lead it — see `leadItem`.
+    if (this.text && this.textItem && this.buffer.trim()) leadItem(this.textItem);
     this.closeText();
     this.running?.classList.remove("running");
     const row = toolRow(

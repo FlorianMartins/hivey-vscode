@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 import { runTurn, type Tool } from "../src/core/agent/loop.js";
 import type { ChatResult, Provider } from "../src/core/providers/types.js";
 
-test("old outputs shortened before every step: said once, through the housekeeping channel, never in the timeline", async () => {
+test("old outputs shortened before every step: said nowhere — routine, not news", async () => {
   const read: Tool = {
     schema: { name: "read_file", description: "d", parameters: { type: "object", properties: { path: { type: "string" } } } },
     approval: () => false,
@@ -42,7 +42,7 @@ test("old outputs shortened before every step: said once, through the housekeepi
     maintenance: (m) => maintained.push(m),
   });
   assert.match(r.text, /Fait\.$/);
-  const shortened = maintained.filter((m) => /older tool outputs were shortened/.test(m));
-  assert.equal(shortened.length, 1, `said once, not at each of the ${step} steps`);
-  assert.equal(reported.filter((m) => /older tool outputs were shortened|context window/.test(m)).length, 0, "not in the timeline");
+  // « retirer aussi le message "le tour approchait de la fenêtre de contexte…" car ça pollue » :
+  // shortening old outputs is routine — said nowhere at all.
+  assert.equal([...maintained, ...reported].filter((m) => /older tool outputs were shortened|approaching the model's context window/.test(m)).length, 0);
 });

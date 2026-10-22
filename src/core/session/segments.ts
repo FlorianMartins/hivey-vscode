@@ -7,8 +7,8 @@
 // and the text it wrote there. Drawn in order, the turn reads the way it was lived.
 //
 // A new segment starts when the model thinks again after it has written or acted, or writes again
-// after it has acted. Text written before the actions of the same step stays with them: the panel
-// shows the block (thinking and actions) first, then the words.
+// after it has acted. Text written before the actions of the same step is their `lead` — the model's
+// one sentence on what it is about to do — and is drawn before them, under the thinking.
 
 export interface SegmentStep {
   tool: string;
@@ -24,6 +24,12 @@ export interface SegmentStep {
 
 export interface Segment {
   reasoning?: string;
+  /**
+   * What the model wrote BEFORE this segment's actions — its sentence on what it is about to do and
+   * why. ⚠️ It was stored as the segment's `text` and drawn after the actions: « Je lis src/prix.js
+   * pour vérifier… » came under the `Read` it announced, and read as a comment on the result.
+   */
+  lead?: string;
   steps?: SegmentStep[];
   text?: string;
   /**
@@ -70,10 +76,14 @@ export class SegmentBuilder {
     target.text = (target.text ?? "") + chunk;
   }
 
-  /** An action is starting: it belongs to the current segment. */
+  /** An action is starting: it belongs to the current segment, and what was written so far leads it. */
   acted(): void {
     const s = this.last();
     if (!s || s.user !== undefined) this.open();
+    else if (s.text && !s.steps?.length) {
+      s.lead = (s.lead ?? "") + s.text;
+      delete s.text;
+    }
     this.acting = true;
   }
 
@@ -96,7 +106,10 @@ export function answerWithInterjections(text: string, segments?: Segment[]): str
   const parts: string[] = [];
   for (const s of segments) {
     if (s.user !== undefined) parts.push(`[The user, while you were working: ${s.user}]`);
-    else if (s.text?.trim()) parts.push(s.text.trim());
+    else {
+      if (s.lead?.trim()) parts.push(s.lead.trim());
+      if (s.text?.trim()) parts.push(s.text.trim());
+    }
   }
   return parts.join("\n\n");
 }
