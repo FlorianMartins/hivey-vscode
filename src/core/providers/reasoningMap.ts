@@ -473,10 +473,13 @@ export function selfHostedEffort(level: ReasoningEffort): string {
  * it stops following the moment a problem is hard; "medium" adds nothing at all. Measured over 12 229
  * recorded steps: half think under ~50 tokens, 95 % under ~1 000, 99 % under ~3 600 — and the rest
  * run to 23 000, with up to 138 "Wait / Hmm / Actually" in one step. Bref stops at the 95th
- * percentile, Standard at the 99th: an ordinary step never meets its budget, a runaway does.
+ * percentile — measured: as precise as before (20/24 against 20/24 on the tasks that moved), 29 %
+ * faster. Standard is only there to stop a runaway: at 4096 it cut a 15 000-character thought a hard
+ * task needed (ts-cursor-pagination, 1/3 against 3/3), so it stops at 8192 — above every step of
+ * the bench, far below the 23 000 of a loop.
  */
 export function selfHostedThinkingBudget(level: ReasoningEffort | undefined): Record<string, unknown> {
-  const tokens = level === "low" ? 1024 : level === "medium" ? 4096 : undefined;
+  const tokens = level === "low" ? 1024 : level === "medium" ? 8192 : undefined;
   if (!tokens) return {};
   return {
     reasoning_budget_tokens: tokens,

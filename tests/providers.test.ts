@@ -421,7 +421,7 @@ test("each level's thinking budget on the user's own server — none for Direct,
   await p.chat({ model: "m", messages: [{ role: "user", content: "hi" }], reasoning: "medium", chore: true });
   assert.deepEqual(
     s.requests.map((r) => r.body.reasoning_budget_tokens),
-    [1024, 4096, undefined, undefined, undefined],
+    [1024, 8192, undefined, undefined, undefined],
   );
   await s.close();
 });
