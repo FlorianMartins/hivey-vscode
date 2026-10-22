@@ -111,6 +111,14 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **Les niveaux de réflexion font enfin une différence sur votre serveur.** Un niveau n'était qu'un
+  mot pour le gabarit de Qwen (« sois bref »), que le modèle cessait de suivre sur un problème
+  difficile, d'où des réflexions sans fin (« Wait… hmm »). Chaque niveau a maintenant un vrai budget
+  de réflexion par étape, que llama.cpp fait respecter : **Bref** 1 024 jetons, **Standard** 8 192
+  (il n'arrête que les emballements), **Approfondi** sans limite, **Direct** sans réflexion. Mesuré :
+  Bref aussi précis qu'avant (20/24 contre 20/24 sur les tâches relancées) et **29 % plus rapide** ;
+  Standard identique à avant sur tout le banc. Votre serveur seulement (local et passerelle) ; les
+  modèles cloud gardent leurs réglages.
 - **La suggestion de la prochaine demande revient sur les modèles cloud.** Elle était demandée en
   80 jetons au plus ; un modèle qui réfléchit les dépensait à réfléchir (DeepSeek par OpenRouter :
   3 fois sur 3 vide ou coupée sur une vraie conversation), et une réponse vide ne donnait aucune

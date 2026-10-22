@@ -387,11 +387,13 @@ test("Qwen on DashScope: enable_thinking and a thinking budget that grows with t
   assert.deepEqual(await wireBody("qwen", "qwen-turbo", "high"), {});
 });
 
-test("self-hosted and gateway: the panel's word, none for Direct, none for a chore — unchanged", async () => {
+test("self-hosted and gateway: the panel's word — Bref as \"medium\" — none for Direct, none for a chore", async () => {
   for (const provider of ["local", "openai-compatible"]) {
     const sent = [];
     for (const level of LEVELS) sent.push((await wireBody(provider, "qwen3.8", level)).reasoning_effort);
-    assert.deepEqual(sent, ["none", "low", "medium", "high"], provider);
+    // Bref sends "medium": on Qwen3.8 "low" thinks longer; Bref is brief by its budget — see
+    // `selfHostedThinkingBudget`.
+    assert.deepEqual(sent, ["none", "medium", "medium", "high"], provider);
     assert.deepEqual(await wireBody(provider, "qwen3.8", undefined), {}, "nothing chosen: nothing sent");
     assert.equal((await wireBody(provider, "qwen3.8", "high", { chore: true })).reasoning_effort, "none");
     assert.equal(reasoningMenu(provider, "qwen3.8"), undefined, "the template's own refusal decides the menu");
