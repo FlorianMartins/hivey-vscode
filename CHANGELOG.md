@@ -111,6 +111,10 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **La suggestion de la prochaine demande revient sur les modèles cloud.** Elle était demandée en
+  80 jetons au plus ; un modèle qui réfléchit les dépensait à réfléchir (DeepSeek par OpenRouter :
+  3 fois sur 3 vide ou coupée sur une vraie conversation), et une réponse vide ne donnait aucune
+  suggestion, sans rien dire. Sans ce plafond : 3 suggestions justes sur 3, en 75 à 127 jetons.
 - **La phrase du modèle s'affiche avant les actions qu'elle annonce, en bleu, à la taille des
   lignes.** Écrite avant ses actions (« Je lis `src/prix.js` pour vérifier… »), elle était redessinée
   après elles et lue comme un commentaire du résultat, dans la taille de la réponse finale et avec un
