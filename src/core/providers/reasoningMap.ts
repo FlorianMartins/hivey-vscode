@@ -457,7 +457,31 @@ export function effortFor(p: ReasoningProfile, level: ReasoningEffort): Effort |
  * decide; change it here, and only here.
  */
 export function selfHostedEffort(level: ReasoningEffort): string {
-  return level;
+  // Bref sends "medium": on Qwen3.8 "low" thinks LONGER (above). What makes Bref brief is its budget —
+  // see `selfHostedThinkingBudget`.
+  return level === "low" ? "medium" : level;
+}
+
+/**
+ * The thinking budget of each level on the user's own server, in tokens — llama.cpp closes the
+ * thought itself when it is spent (`reasoning_budget_tokens`, with `reasoning_budget_message` said
+ * as the thought's last words). None for Direct (no thinking) or Deep (as long as it takes).
+ *
+ * ⚠️ « Il n'y a absolument aucune différence entre les modes de réflexion (il met 1 h en mode bref
+ * et réfléchit trop) … il se contredit souvent en mode "Wait… hum" en continu ». A level was only
+ * a word in the template — Qwen3.8 turns "low" into one sentence, "Keep your thinking brief", which
+ * it stops following the moment a problem is hard; "medium" adds nothing at all. Measured over 12 229
+ * recorded steps: half think under ~50 tokens, 95 % under ~1 000, 99 % under ~3 600 — and the rest
+ * run to 23 000, with up to 138 "Wait / Hmm / Actually" in one step. Bref stops at the 95th
+ * percentile, Standard at the 99th: an ordinary step never meets its budget, a runaway does.
+ */
+export function selfHostedThinkingBudget(level: ReasoningEffort | undefined): Record<string, unknown> {
+  const tokens = level === "low" ? 1024 : level === "medium" ? 4096 : undefined;
+  if (!tokens) return {};
+  return {
+    reasoning_budget_tokens: tokens,
+    reasoning_budget_message: "\n\nI have thought this through enough. Now I act on what I have: the next tool call, or my answer.\n",
+  };
 }
 
 export interface WireReasoning {

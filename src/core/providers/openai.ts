@@ -23,7 +23,7 @@ import { keepCacheMarks } from "./cache.js";
 import { isSelfHostedProvider } from "../redaction/index.js";
 import { toolCallsFromText } from "./textToolCall.js";
 import { PROBE_EFFORT } from "../router/reasoningLevels.js";
-import { wireReasoning } from "./reasoningMap.js";
+import { selfHostedThinkingBudget, wireReasoning } from "./reasoningMap.js";
 
 export interface OpenAIProviderOptions {
   id: string;
@@ -280,6 +280,9 @@ export class OpenAICompatibleProvider implements Provider {
     // core/agent/waiting.ts. Self-hosted only; a server that does not know it ignores it, and one
     // that refuses it gets the request again without it (`adaptRequest`).
     if (isSelfHostedProvider(this.id) && !isOllama(this.baseUrl)) body["return_progress"] = true;
+    // The level's thinking budget on the user's own server — see `selfHostedThinkingBudget`. Not for a
+    // side task, whose thinking is off already; not for Ollama, which has no such field.
+    if (isSelfHostedProvider(this.id) && !isOllama(this.baseUrl) && !req.chore) Object.assign(body, selfHostedThinkingBudget(req.reasoning));
 
     // Ask for the accounting. OpenAI-compatible servers that do not know the field ignore it.
     body["stream_options"] = { include_usage: true };

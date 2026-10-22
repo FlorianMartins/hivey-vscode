@@ -406,8 +406,24 @@ test("reasoning effort is translated per provider, not passed through", async ()
     messages: [{ role: "user", content: "hi" }],
     reasoning: "low",
   });
-  assert.equal(gateway.requests[0]!.body.reasoning_effort, "low");
+  // Bref on the user's own server: "medium" (Qwen3.8's "low" thinks LONGER) and a real budget — see
+  // `selfHostedThinkingBudget`.
+  assert.equal(gateway.requests[0]!.body.reasoning_effort, "medium");
+  assert.equal(gateway.requests[0]!.body.reasoning_budget_tokens, 1024);
+  assert.match(String(gateway.requests[0]!.body.reasoning_budget_message), /act on what I have/);
   await gateway.close();
+});
+
+test("each level's thinking budget on the user's own server — none for Direct, Deep or a side task", async () => {
+  const s = await serve((_req, res) => sse(res, [{ choices: [{ delta: { content: "x" } }] }]));
+  const p = new OpenAICompatibleProvider({ id: "local", baseUrl: s.url, isLocal: true });
+  for (const reasoning of ["low", "medium", "high", "none"] as const) await p.chat({ model: "m", messages: [{ role: "user", content: "hi" }], reasoning });
+  await p.chat({ model: "m", messages: [{ role: "user", content: "hi" }], reasoning: "medium", chore: true });
+  assert.deepEqual(
+    s.requests.map((r) => r.body.reasoning_budget_tokens),
+    [1024, 4096, undefined, undefined, undefined],
+  );
+  await s.close();
 });
 
 test("asking for no reasoning tells OpenRouter to turn it off, so a thinking model stops billing for it", async () => {
