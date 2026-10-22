@@ -108,6 +108,11 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **La phrase du modèle reprend sa place sous « Réflexion ».** Près de la limite du contexte, l'avis
+  « Le tour approchait de la fenêtre de contexte… » s'affichait après chaque étape, juste sous la
+  réflexion, à la place de la phrase où le modèle dit ce qu'il fait. Les avis d'entretien (anciens
+  résultats raccourcis, résumé, serveur occupé) passent maintenant dans l'indicateur d'activité, une
+  seule fois par tâche.
 - **Compactage en direct, comme Claude Code.** Quand le contexte est plein en pleine tâche et que
   raccourcir les vieux résultats ne suffit plus, l'agent résume lui-même le travail fait (la demande
   mot pour mot, les fichiers modifiés, les commandes, l'état des erreurs, la suite) et continue à partir

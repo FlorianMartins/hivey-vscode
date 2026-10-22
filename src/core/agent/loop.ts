@@ -185,6 +185,10 @@ export interface TurnOptions {
    * See `THINK_STARTERS`.
    */
   thinkPrefix?: string;
+  /**
+   * Where the turn's housekeeping is said — see `maintenance` in `runTurn`. `report` when absent.
+   */
+  maintenance?: (message: string) => void;
   /** A sentence for the person before each set of tool calls, in their language — see `NOTE_BEFORE_TOOLS`. Self-hosted models only. */
   notesBeforeTools?: boolean;
   /**
@@ -701,6 +705,21 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
   let repeatNudges = 0;
   /** How many times this turn was told its reply ran away — see `RUNAWAY_NOTES`. */
   let runawayNotes = 0;
+  /**
+   * The turn's housekeeping — old outputs shortened, a summary made, a busy server waited for — said
+   * once per turn each, and through `opts.maintenance` when the caller has a quieter place for it.
+   *
+   * ⚠️ « le résumé de la réflexion affiche "Le tour approchait de la fenêtre de contexte…" et pas le
+   * résumé de la réflexion ». Near the window, old outputs are shortened before EVERY step, and each
+   * time the notice went into the timeline right under the thinking — where the model's own sentence
+   * about what it is doing belongs. Housekeeping is not news about the work.
+   */
+  const maintained = new Set<string>();
+  const maintenance = (message: string): void => {
+    if (maintained.has(message)) return;
+    maintained.add(message);
+    (opts.maintenance ?? opts.report)?.(message);
+  };
   /** How many times this turn summarized itself to go on — see `compactLive`. */
   let liveCompacts = 0;
   /**
@@ -728,7 +747,7 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
       const limit = Math.floor(opts.contextWindow * 0.9) - ANSWER_ROOM_TOKENS;
       const estimate = Math.ceil(estimateMessageTokens(working) * tokenRatio);
       if (estimate > limit && shrinkToolOutputs(working, estimate - limit, keptAs)) {
-        opts.report?.(t("the turn was approaching the model's context window — older tool outputs were shortened"));
+        maintenance(t("the turn was approaching the model's context window — older tool outputs were shortened"));
       }
       // Shortening was not enough: the turn summarizes itself and goes on — see `compactLive`.
       if (Math.ceil(estimateMessageTokens(working) * tokenRatio) > limit) await compactLive();
@@ -812,7 +831,7 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
         const overflow = contextOverflow(String((err as Error)?.message ?? err));
         if (overflow && shrinkAttempts < MAX_SHRINKS && shrinkToolOutputs(working, overflow.excess + ANSWER_ROOM_TOKENS, keptAs)) {
           shrinkAttempts++;
-          opts.report?.(t("the turn no longer fit the model's context — older tool outputs were shortened"));
+          maintenance(t("the turn no longer fit the model's context — older tool outputs were shortened"));
           step--;
           continue;
         }
@@ -826,7 +845,7 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
         // another conversation finishes and frees its share, and the same step goes again.
         if (POOL_FULL.test(String((err as Error)?.message ?? err)) && poolWaits < MAX_POOL_WAITS) {
           poolWaits++;
-          opts.report?.(t("the server's shared context is full for a moment — the step will go again"));
+          maintenance(t("the server's shared context is full for a moment — the step will go again"));
           await pause(Math.min(30_000, 2_000 * 2 ** (poolWaits - 1)), opts.signal);
           if (opts.signal?.aborted) return done("cancelled");
           step--;
@@ -889,7 +908,7 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
       shrinkToolOutputs(working, Math.max(res.usage.completionTokens, ANSWER_ROOM_TOKENS) + ANSWER_ROOM_TOKENS, keptAs)
     ) {
       shrinkAttempts++;
-      opts.report?.(t("the model's context window filled up mid-reply — older tool outputs were shortened and the step asked again"));
+      maintenance(t("the model's context window filled up mid-reply — older tool outputs were shortened and the step asked again"));
       step--;
       continue;
     }
@@ -1172,7 +1191,7 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
     if (!summary) return false;
     liveCompacts++;
     working.splice(keep, working.length - keep, { role: "user", content: `${LIVE_SUMMARY_HEAD}\n${summary}\n\n${CONTINUE_AFTER_COMPACT}` });
-    opts.report?.(t("the context window was full — the work so far was summarized, and the turn goes on"));
+    maintenance(t("the context window was full — the work so far was summarized, and the turn goes on"));
     return true;
   }
 
