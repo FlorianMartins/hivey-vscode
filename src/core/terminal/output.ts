@@ -151,8 +151,14 @@ export function describeOutcome(outcome: CommandOutcome, maxChars = 4000): strin
       `or \`echo y | …\` — or tell the user it needs them.\n${tailOutput(outcome.output, maxChars) || "(no output)"}`
     );
   }
+  // ⚠️ « il bloque sur le même souci pendant 1 h ». "Timed out" read as "too slow": the model ran the
+  // same tests again with a longer timeout, ten minutes at a time, for an hour. A test run that does not
+  // end is almost always one that never CAN — said, with where to look.
   const head = outcome.timedOut
-    ? "timed out and was killed"
+    ? "timed out and was killed. Running it again with a longer timeout rarely helps: a test run or script that " +
+      "does not finish usually never will — a promise that never settles, a timer or interval left running, a " +
+      "server or connection never closed, a watch mode. Find what keeps it alive (run one test file alone, add a " +
+      "per-test timeout such as `--test-timeout=5000`) instead of waiting longer."
     : outcome.exitCode === undefined
       ? "finished, but the shell reported no exit code (treat this as unproven, not as success)"
       : outcome.exitCode === 0

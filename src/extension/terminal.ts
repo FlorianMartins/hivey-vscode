@@ -305,6 +305,9 @@ export async function runCommandInTerminal(opts: RunOptions): Promise<RunResult>
  * output is also copied into a terminal of its own, created without being shown: whoever opens it
  * sees the session's commands, and Ctrl+C there still stops the one running.
  */
+/** How long the last lines of a finished command may take, before what it left running is stopped. */
+const LEFTOVER_GRACE_MS = 2_000;
+
 /** How long a command may print nothing, its last line a question, before it is taken as waiting — see `waitingForInput`. */
 const ASKING_IDLE_MS = 15_000;
 
@@ -357,13 +360,25 @@ export async function runCommandAsProcess(opts: RunOptions): Promise<RunResult> 
   child.stdout?.on("data", take);
   child.stderr?.on("data", take);
 
-  const race: { outcome: "ended" | "timeout" | "cancelled" | "failed" | "asking"; error?: string; askedFor?: string } = { outcome: "ended" };
+  const race: { outcome: "ended" | "timeout" | "cancelled" | "failed" | "asking"; error?: string; askedFor?: string; leftovers?: boolean } = { outcome: "ended" };
   let timer: ReturnType<typeof setTimeout> | undefined;
   let watch: ReturnType<typeof setInterval> | undefined;
   let onAbort: (() => void) | undefined;
   const exitCode = await new Promise<number | undefined>((resolve) => {
     // `close`, not `exit`: by then both pipes are drained, so the last lines are in.
     child.on("close", (code) => resolve(code ?? undefined));
+    // ⚠️ …unless something the command started is still running and holds the pipes open — a test
+    // worker that never ends, a server started with `&`. `close` then never came: the command was over
+    // and the turn waited for the timeout, then told the model it had been TOO SLOW. « il bloque en
+    // plein milieu ». Over is over: a moment for the last lines, then whatever is left is stopped.
+    child.on("exit", (code) => {
+      setTimeout(() => {
+        if (child.stdout?.readableEnded !== false && child.stderr?.readableEnded !== false) return;
+        race.leftovers = true;
+        killTree(child, true);
+        resolve(code ?? undefined);
+      }, LEFTOVER_GRACE_MS);
+    });
     child.on("error", (err) => {
       race.outcome = "failed";
       race.error = err.message;
@@ -419,7 +434,10 @@ export async function runCommandAsProcess(opts: RunOptions): Promise<RunResult> 
   }
   const timedOut = race.outcome === "timeout";
   view.write(`\r\n\x1b[2m${timedOut ? t("timed out and was killed") : `exit ${exitCode ?? "?"}`}\x1b[0m\r\n`);
-  const content = describeOutcome({ output, exitCode, timedOut }, scaledChars(MAX_OUTPUT_CHARS, OUTPUT_SHARE));
+  const content0 = describeOutcome({ output, exitCode, timedOut }, scaledChars(MAX_OUTPUT_CHARS, OUTPUT_SHARE));
+  const content = race.leftovers
+    ? `${content0}\n(The command ended, but processes it started were still running and holding its output — a test that never finishes, a server started in the background — and were stopped. If that was not meant, look for what keeps running: an open handle, a timer, a server never closed.)`
+    : content0;
   const answered = isStatusAnswer(command, exitCode);
   return {
     captured: true,
@@ -529,8 +547,9 @@ export function stopAllBackground(): void {
 }
 
 /** The command and everything it started — a dev server under `npm run dev` included. */
-function killTree(child: ChildProcess): void {
-  if (child.pid === undefined || child.exitCode !== null) return;
+function killTree(child: ChildProcess, leftovers = false): void {
+  // `leftovers`: the command itself is over, what it started is not — its process group still is.
+  if (child.pid === undefined || (child.exitCode !== null && !leftovers)) return;
   if (process.platform === "win32") {
     spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"], { windowsHide: true, stdio: "ignore" }).on("error", () => child.kill());
     return;
