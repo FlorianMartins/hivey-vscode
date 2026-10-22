@@ -626,6 +626,29 @@ export function transcriptForSummary(messages: ChatMessage[], maxChars: number):
   return `${head}\n[… the middle of the work, left out to fit …]\n${tail}`;
 }
 
+/** How many times the same failure may come back before the agent is told to change approach. */
+const SAME_FAILURE_LIMIT = 3;
+
+/**
+ * What identifies a failure from one run to the next: its last lines, with the numbers that move —
+ * durations, line and column numbers, ports, counts — made alike. Undefined when there is too little
+ * to tell one failure from another.
+ */
+export function failureSignature(output: string): string | undefined {
+  const lines = output
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l && !/^exit code \d+$/i.test(l));
+  const tail = lines.slice(-6).join(" ").replace(/\d+(\.\d+)?/g, "#").replace(/\s+/g, " ").trim();
+  return tail.length >= 20 ? tail : undefined;
+}
+
+const sameFailure = (n: number, said: string): string =>
+  `The same failure has now come back ${n} times — your last attempts did not change it:\n${said}\n` +
+  "Stop repeating the same kind of fix. Read the error again from the top, question the assumption your fixes " +
+  "rest on (the cause may be elsewhere: another file, the test's setup, the environment), and try a different " +
+  "approach — or, if something outside the code is blocking you, say what.";
+
 const CONTINUE_AFTER_INTERRUPT =
   "Your previous reply was interrupted before you finished (the connection to you was closed), and any tool call you were writing was lost. " +
   "Continue exactly from where you stopped, without repeating what you already wrote.";
@@ -701,6 +724,10 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
   let repeatNudges = 0;
   /** How many times this turn was told its reply ran away — see `RUNAWAY_NOTES`. */
   let runawayNotes = 0;
+  /** Each failure seen this turn, by `failureSignature`, and how many times — see `SAME_FAILURE_LIMIT`. */
+  const failures = new Map<string, number>();
+  /** The failures the model was already told about: once each. */
+  const toldFailures = new Set<string>();
   /** How many times this turn summarized itself to go on — see `compactLive`. */
   let liveCompacts = 0;
   /**
@@ -1067,6 +1094,7 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
     opts.onStep?.({ step, toolCalls: planned.filter((p) => !p.held).map((p) => p.call) });
 
     const stepImages: Array<{ label: string; images: ImagePart[] }> = [];
+    const stepTraceFrom = trace.length;
     const execute = async (item: Planned): Promise<void> => {
       if (item.settled !== undefined) {
         working.push({ role: "tool", toolCallId: item.call.id, content: item.settled });
@@ -1119,6 +1147,24 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
         images: stepImages.flatMap((x) => x.images),
       });
       stepImages.length = 0;
+    }
+
+    // ⚠️ The same failure, again and again: « si l'IA se heurte 3 fois au même message d'erreur, …
+    // injecter un ordre de changement de stratégie ». Calls are not repeated — the fix changes each
+    // time — so the repeat guard never sees it; the test fails the same way after every one of them,
+    // and the turn goes on until the window is full. Told once per failure, after this step's results.
+    for (const entry of trace.slice(stepTraceFrom)) {
+      if (entry.call.name !== "run_command" || !entry.result.isError) continue;
+      const sig = failureSignature(String(entry.result.content));
+      if (!sig) continue;
+      const n = (failures.get(sig) ?? 0) + 1;
+      failures.set(sig, n);
+      if (n >= SAME_FAILURE_LIMIT && !toldFailures.has(sig)) {
+        toldFailures.add(sig);
+        const said = String(entry.result.content).split(/\r?\n/).filter((l) => l.trim()).slice(-6).join("\n");
+        working.push({ role: "user", content: sameFailure(n, said) });
+        opts.report?.(t("the same failure came back three times — the model was told to change approach"));
+      }
     }
   }
 
