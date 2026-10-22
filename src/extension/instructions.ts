@@ -20,15 +20,10 @@ import * as vscode from "vscode";
 import { t } from "../shared/i18n.js";
 import { estimateTokens } from "../core/util/tokens.js";
 import { scaledTokens } from "../core/context/scale.js";
+import { firstRulesFile, RULES_FILES } from "../core/context/houseRules.js";
 
 const MAX_TOKENS = 1200;
 
-/** In order of preference. The first that exists wins; they are not concatenated. */
-const CANDIDATES = [
-  [".hiveycode", "instructions.md"],
-  [".github", "copilot-instructions.md"],
-  [".github", "instructions.md"],
-];
 
 export interface Instructions {
   path: string;
@@ -40,7 +35,7 @@ let cached: { key: string; value: Instructions | undefined } | undefined;
 
 /** Drops the cache when one of the candidate files changes, so an edit takes effect immediately. */
 export function watchInstructions(disposables: vscode.Disposable[]): void {
-  const watcher = vscode.workspace.createFileSystemWatcher("**/{.hiveycode/instructions.md,.github/*instructions.md}");
+  const watcher = vscode.workspace.createFileSystemWatcher("**/{.hiveycode/instructions.md,.github/*instructions.md,AGENTS.md,CLAUDE.md}");
   const clear = () => {
     cached = undefined;
   };
@@ -56,21 +51,11 @@ export async function readInstructions(): Promise<Instructions | undefined> {
   const key = folder.uri.toString();
   if (cached?.key === key) return cached.value;
 
-  for (const parts of CANDIDATES) {
-    const uri = vscode.Uri.joinPath(folder.uri, ...parts);
-    try {
-      const bytes = await vscode.workspace.fs.readFile(uri);
-      const raw = new TextDecoder().decode(bytes).trim();
-      if (!raw) continue;
-      const value = clip(raw, parts.join("/"));
-      cached = { key, value };
-      return value;
-    } catch {
-      // Not there. The next candidate, or none at all.
-    }
-  }
-  cached = { key, value: undefined };
-  return undefined;
+  // The first rules file there is — see `RULES_FILES`.
+  const found = await firstRulesFile(async (parts) => new TextDecoder().decode(await vscode.workspace.fs.readFile(vscode.Uri.joinPath(folder.uri, ...parts))));
+  const value = found ? clip(found.text, found.path) : undefined;
+  cached = { key, value };
+  return value;
 }
 
 function clip(raw: string, path: string): Instructions {
@@ -100,7 +85,7 @@ export async function instructionFiles(): Promise<string[]> {
   const folder = vscode.workspace.workspaceFolders?.[0];
   if (!folder) return [];
   const found: string[] = [];
-  for (const parts of CANDIDATES) {
+  for (const parts of RULES_FILES) {
     const uri = vscode.Uri.joinPath(folder.uri, ...parts);
     try {
       await vscode.workspace.fs.stat(uri);
