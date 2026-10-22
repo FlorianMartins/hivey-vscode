@@ -6,6 +6,9 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Ajouté
 
+- **`AGENTS.md` et `CLAUDE.md` sont lus.** Les règles du projet écrites pour les agents de code (à la
+  racine) sont gardées dans le prompt système de chaque tour, à travers tous les compactages, comme
+  `.hiveycode/instructions.md` (qui reste prioritaire) et `.github/copilot-instructions.md`.
 - **L'agent travaille comme Claude Code.**
   - **Il lit ce qu'il faut, pas tout.** Un fichier de plus de 800 lignes demandé en entier donne son
     plan (fonctions, classes, exports et leurs lignes) et ses premières lignes ; l'agent lit ensuite
@@ -108,6 +111,21 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **La suggestion de la prochaine demande revient sur les modèles cloud.** Elle était demandée en
+  80 jetons au plus ; un modèle qui réfléchit les dépensait à réfléchir (DeepSeek par OpenRouter :
+  3 fois sur 3 vide ou coupée sur une vraie conversation), et une réponse vide ne donnait aucune
+  suggestion, sans rien dire. Sans ce plafond : 3 suggestions justes sur 3, en 75 à 127 jetons.
+- **La phrase du modèle s'affiche avant les actions qu'elle annonce, en bleu, à la taille des
+  lignes.** Écrite avant ses actions (« Je lis `src/prix.js` pour vérifier… »), elle était redessinée
+  après elles et lue comme un commentaire du résultat, dans la taille de la réponse finale et avec un
+  point gris. Elle vient maintenant sous « Réflexion », avant les actions, à la taille des lignes
+  d'action, son point dans le bleu du thème. L'avis « Le tour approchait de la fenêtre de contexte… »
+  n'apparaît plus du tout : raccourcir d'anciens résultats est de l'entretien courant.
+- **La phrase du modèle reprend sa place sous « Réflexion ».** Près de la limite du contexte, l'avis
+  « Le tour approchait de la fenêtre de contexte… » s'affichait après chaque étape, juste sous la
+  réflexion, à la place de la phrase où le modèle dit ce qu'il fait. Les avis d'entretien (anciens
+  résultats raccourcis, résumé, serveur occupé) passent maintenant dans l'indicateur d'activité, une
+  seule fois par tâche.
 - **Compactage en direct, comme Claude Code.** Quand le contexte est plein en pleine tâche et que
   raccourcir les vieux résultats ne suffit plus, l'agent résume lui-même le travail fait (la demande
   mot pour mot, les fichiers modifiés, les commandes, l'état des erreurs, la suite) et continue à partir

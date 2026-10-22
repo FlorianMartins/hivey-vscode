@@ -4788,6 +4788,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           if (ctl.signal.aborted) return;
           this.post({ type: "status", text: msg });
         },
+        // Housekeeping (old outputs shortened, a summary made): beside "thinking…", for a moment —
+        // not in the timeline, under the thinking, where the model's own sentence goes.
+        maintenance: (msg) => {
+          if (ctl.signal.aborted) return;
+          this.post({ type: "activity", text: msg });
+        },
         approve: (req) => this.askApproval(req),
         // Redaction runs on EVERY step, because a tool result is new text that never went through
         // the gate — a file the agent just read can contain the credential the first prompt did not.
@@ -5221,7 +5227,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       const res = await provider.chat({
         model,
         messages: prepared.messages,
-        maxTokens: 80,
+        // ⚠️ No cap. « Il n'y a pas les propositions de prochain prompt sur les modèles cloud » : at 80
+        // tokens, a model that thinks — DeepSeek on OpenRouter spent 60 of them thinking on a two-line
+        // exchange; Claude Sonnet 5.5 cannot stop thinking at all — had nothing left to write the line
+        // with, and an empty reply is no suggestion, silently. Only the first line is kept anyway
+        // (`parseNextStep`); the provider knows the model's own limit.
         chore: true,
         reasoning: effortToSend(model, "none"),
       });

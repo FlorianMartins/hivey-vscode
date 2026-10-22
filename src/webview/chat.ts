@@ -636,6 +636,8 @@ function renderEntry(entry: UiEntry, state: UiState, deps: ChatDeps, first = fal
         continue;
       }
       if (seg.reasoning?.trim()) line.append(thinkingLine(seg.reasoning).item);
+      // The model's sentence on what it is about to do: under the thinking, before the actions.
+      if (seg.lead?.trim()) line.append(leadItem(textItem(markdown(seg.lead, actions, state.searchQuery || undefined))));
       for (const s of seg.steps ?? []) line.append(toolRow(s));
       if (seg.text?.trim()) line.append(textItem(markdown(seg.text, actions, state.searchQuery || undefined)));
     }
@@ -1132,6 +1134,16 @@ export function thinkingLine(text: string, opts: { live?: boolean } = {}): {
 export function textItem(content: HTMLElement): HTMLElement {
   const item = el("div", "tl-item tl-text");
   item.append(el("span", "tl-mark"), content);
+  return item;
+}
+
+/**
+ * A text item that leads the actions after it — the model's sentence on what it is about to do. In
+ * the size of the rows around it, its mark in the theme's accent: « la couleur bleu (thème de vscode)
+ * comme le reste du design … et garder la même taille de police que les autres points ».
+ */
+export function leadItem(item: HTMLElement): HTMLElement {
+  item.classList.add("tl-lead");
   return item;
 }
 
