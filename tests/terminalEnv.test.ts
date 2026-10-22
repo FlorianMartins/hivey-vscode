@@ -8,7 +8,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ENV, missingKey, reasoningFromEnv, temperatureFromEnv, terminalEnvironment } from "../src/cli/env.js";
+import { ENV, contextFromEnv, missingKey, reasoningFromEnv, temperatureFromEnv, terminalEnvironment } from "../src/cli/env.js";
 
 /**
  * Deliberately not shaped like a key.
@@ -73,4 +73,13 @@ test("the evaluation knobs change nothing unless they are set to something valid
   assert.equal(temperatureFromEnv("3"), undefined, "out of range");
   assert.equal(temperatureFromEnv("0.6"), 0.6);
   assert.equal(temperatureFromEnv("0"), 0);
+});
+
+test("a context window asked for a measurement: a whole number of tokens, 4096 at least — or nothing", () => {
+  assert.equal(ENV.context, "HIVEY_CODE_CONTEXT");
+  assert.equal(contextFromEnv("16384"), 16384);
+  assert.equal(contextFromEnv(" 20000 "), 20000);
+  assert.equal(contextFromEnv(undefined), undefined, "unset: the window is what it always was");
+  assert.equal(contextFromEnv("1000"), undefined, "too small to hold a system prompt");
+  assert.equal(contextFromEnv("16k"), undefined);
 });
