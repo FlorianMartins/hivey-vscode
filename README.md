@@ -63,7 +63,7 @@ that does leave is **reversibly pseudonymized** first.
 | **Paste or drop it in** | A screenshot, a stack trace, a log, a file from the explorer — pasted or dropped onto the composer and attached to the question. A short paste still goes into the box, as it does everywhere else; a wall of text becomes an attachment instead of burying the thing you are writing. Images are reduced before they travel and go only to models the catalogue says can read them — you are told when the one you have chosen cannot, instead of it answering about a picture nobody looked at. What a `.docx` or a `.pdf` cannot honestly be turned into is refused rather than attached as noise. |
 | **Context notation** | `#file:`, `#selection`, `#editor`, `#openFiles`, `#changes`, `#problems`, `#codebase`, `#terminal`, `#sym:` — Copilot's notation, because you should not have to learn a second one. Resolved **on your machine** before anything is sent, which is what lets `#changes` attach unreleased code to a conversation with a local model. |
 | **Participants** | `@workspace`, `@editor`, `@terminal`, `@git` — a hint about where to look first, not a different personality. |
-| **House rules** | `.github/copilot-instructions.md` is read as written: a team that has one should not write it twice. `.hiveycode/instructions.md` wins if both exist. |
+| **House rules** | The project's own rules file is read as written and kept in the system prompt of every turn, through every compaction: `.hiveycode/instructions.md`, else `AGENTS.md`, else `CLAUDE.md` at the root, else `.github/copilot-instructions.md` — a team that already wrote one should not write it twice. |
 | **Git** | Status, diff, log, blame, show, branches, stage, commit — through the editor's own Git extension, not through a shell. It never pushes. |
 | **MCP** | Connect any Model Context Protocol server, stdio or HTTP. Its tools join the set, under the same permissions. A local server never starts until you have said so in a dialog that names the command. |
 | **Compacting** | A summary the model writes replaces the conversation in the prompt **and deletes nothing**: every exchange stays on screen, muted, one click from coming back. It happens by itself (`hiveyCode.context.autoCompact`, on by default): a conversation at three quarters of its budget is summarized before the next question is sent, and if the window fills **in the middle of a task**, what was already done is written into the answer, the conversation is summarized and the task carries on where it stopped. Turned off, an offer appears at 70 % instead, and a full context asks whether to summarize and continue. `/compact`, or *This conversation → Summarize it now* under the context ring, does it on demand; Stop during a summary also cancels what was going to follow it. The gain is measured and shown (`8 200 → 900 tokens`), not asserted. |
@@ -504,7 +504,7 @@ Those documents are currently written in French; translations are welcome.
 ## Development
 
 ```bash
-npm test                   # builds the bundles, then 1349 tests (node:test)
+npm test                   # builds the bundles, then 1352 tests (node:test)
 npm run test:integration   # loads the extension into a real VS Code (56 tests, headless)
 npm run eval:verify        # every evaluation task must fail before a model touches it
 node scripts/screenshots.mjs  # retakes the README's images from that same editor
