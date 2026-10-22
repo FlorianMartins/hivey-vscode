@@ -829,6 +829,18 @@ pre.code {
   top: 7px;
   transform: scale(0.75);
 }
+/* The model's sentence before its actions: the size of the rows it leads, its mark in the theme's
+   accent — the blue of links and of the rest of the panel. The answer, last, keeps the reading size. */
+.tl-text.tl-lead {
+  margin: 0;
+  font-size: var(--fs-meta);
+  line-height: 20px;
+}
+.tl-text.tl-lead > .tl-mark {
+  background: var(--vscode-textLink-foreground, var(--vscode-focusBorder));
+  opacity: 1;
+  top: 6px;
+}
 .tl-think > .tl-mark {
   /* Hollow, but the spine must not show through it: the panel's own background. */
   background: var(--vscode-sideBar-background, var(--vscode-editor-background));

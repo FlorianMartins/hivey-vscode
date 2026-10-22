@@ -747,7 +747,6 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
       const limit = Math.floor(opts.contextWindow * 0.9) - ANSWER_ROOM_TOKENS;
       const estimate = Math.ceil(estimateMessageTokens(working) * tokenRatio);
       if (estimate > limit && shrinkToolOutputs(working, estimate - limit, keptAs)) {
-        maintenance(t("the turn was approaching the model's context window — older tool outputs were shortened"));
       }
       // Shortening was not enough: the turn summarizes itself and goes on — see `compactLive`.
       if (Math.ceil(estimateMessageTokens(working) * tokenRatio) > limit) await compactLive();
@@ -831,7 +830,6 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
         const overflow = contextOverflow(String((err as Error)?.message ?? err));
         if (overflow && shrinkAttempts < MAX_SHRINKS && shrinkToolOutputs(working, overflow.excess + ANSWER_ROOM_TOKENS, keptAs)) {
           shrinkAttempts++;
-          maintenance(t("the turn no longer fit the model's context — older tool outputs were shortened"));
           step--;
           continue;
         }
@@ -908,7 +906,6 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
       shrinkToolOutputs(working, Math.max(res.usage.completionTokens, ANSWER_ROOM_TOKENS) + ANSWER_ROOM_TOKENS, keptAs)
     ) {
       shrinkAttempts++;
-      maintenance(t("the model's context window filled up mid-reply — older tool outputs were shortened and the step asked again"));
       step--;
       continue;
     }

@@ -111,6 +111,12 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **La phrase du modèle s'affiche avant les actions qu'elle annonce, en bleu, à la taille des
+  lignes.** Écrite avant ses actions (« Je lis `src/prix.js` pour vérifier… »), elle était redessinée
+  après elles et lue comme un commentaire du résultat, dans la taille de la réponse finale et avec un
+  point gris. Elle vient maintenant sous « Réflexion », avant les actions, à la taille des lignes
+  d'action, son point dans le bleu du thème. L'avis « Le tour approchait de la fenêtre de contexte… »
+  n'apparaît plus du tout : raccourcir d'anciens résultats est de l'entretien courant.
 - **La phrase du modèle reprend sa place sous « Réflexion ».** Près de la limite du contexte, l'avis
   « Le tour approchait de la fenêtre de contexte… » s'affichait après chaque étape, juste sous la
   réflexion, à la place de la phrase où le modèle dit ce qu'il fait. Les avis d'entretien (anciens
