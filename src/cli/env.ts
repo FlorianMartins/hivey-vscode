@@ -29,12 +29,24 @@ export const ENV = {
    */
   reasoning: "HIVEY_CODE_REASONING",
   temperature: "HIVEY_CODE_TEMPERATURE",
+  /**
+   * The model's context window, in tokens, for a run that must fill it — the evaluation's "full
+   * context" bench, where compaction and the shortening of old outputs are what is measured. Unset,
+   * the window is what the configuration or the catalogue says, and nothing changes.
+   */
+  context: "HIVEY_CODE_CONTEXT",
 } as const;
 
 /** The thinking level asked for in the environment, if it is one this client knows. */
 export function reasoningFromEnv(value: string | undefined): "none" | "low" | "medium" | "high" | undefined {
   const v = value?.trim().toLowerCase();
   return v === "none" || v === "low" || v === "medium" || v === "high" ? v : undefined;
+}
+
+/** The context window asked for in the environment, in tokens — 4096 at least, or nothing. */
+export function contextFromEnv(value: string | undefined): number | undefined {
+  const n = Number(value?.trim());
+  return Number.isInteger(n) && n >= 4096 ? n : undefined;
 }
 
 /** The temperature asked for in the environment, if it is a number between 0 and 2. */

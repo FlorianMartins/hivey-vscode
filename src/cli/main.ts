@@ -46,7 +46,7 @@ import { buildRepoMap } from "../core/context/repomap.js";
 import { buildCliTools } from "./tools.js";
 import { promptForMode, toolsForMode, MODES, type Mode } from "../core/session/modes.js";
 import { t, language } from "../shared/i18n.js";
-import { ENV, reasoningFromEnv, temperatureFromEnv } from "./env.js";
+import { ENV, contextFromEnv, reasoningFromEnv, temperatureFromEnv } from "./env.js";
 import { isSelfHostedProvider } from "../core/redaction/index.js";
 import { detectUserLanguage } from "../core/userLanguage.js";
 
@@ -188,6 +188,10 @@ async function main(): Promise<void> {
   // and a budget of zero collapses everything derived from it. The floor is what `contextBudget`
   // exists for, and reaching for the lookup without the rule put the terminal back in a different
   // version of the same hole.
+  // A window set for a measurement — see `ENV.context` — and then handed to the turn as well, so the
+  // shortening of old outputs and the live summary run as they do in the panel.
+  const contextOverride = contextFromEnv(process.env[ENV.context]);
+  if (contextOverride) cfg.contextTokens = contextOverride;
   const contextTokens = contextBudget(cfg.contextTokens > 0 ? cfg.contextTokens : undefined, catalogueWindow(cfg.model));
   // The window itself, when anything says what it is: what "how full is the context" is measured against.
   const contextWindowKnown = cfg.contextTokens > 0 ? cfg.contextTokens : catalogueWindow(cfg.model);
@@ -511,6 +515,7 @@ async function main(): Promise<void> {
         messages: outgoing,
         tools,
         signal: ctl.signal,
+        ...(contextOverride ? { contextWindow: contextOverride } : {}),
         // ⚠️ No answer cap, and Standard thinking on the user's own server — what the panel does
         // (see `effectiveReasoning` in the extension). A 4096-token cap with the template's maximum
         // thinking left a thinking model with nothing to answer with: the turn ended on an empty
