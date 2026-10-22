@@ -6,6 +6,9 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Ajouté
 
+- **`AGENTS.md` et `CLAUDE.md` sont lus.** Les règles du projet écrites pour les agents de code (à la
+  racine) sont gardées dans le prompt système de chaque tour, à travers tous les compactages, comme
+  `.hiveycode/instructions.md` (qui reste prioritaire) et `.github/copilot-instructions.md`.
 - **L'agent travaille comme Claude Code.**
   - **Il lit ce qu'il faut, pas tout.** Un fichier de plus de 800 lignes demandé en entier donne son
     plan (fonctions, classes, exports et leurs lignes) et ses premières lignes ; l'agent lit ensuite
