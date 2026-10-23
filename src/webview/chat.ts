@@ -36,7 +36,7 @@ const REASONING: Array<{ id: Reasoning; label: string; hint: string }> = [
   { id: "medium", label: t("Standard"), hint: t("For diagnosis and design work.") },
   { id: "high", label: t("Deep"), hint: t("For genuinely hard problems. Costs the most.") },
   // Only on a model that has them — see `reasoningMenu`: never in the usual four.
-  { id: "xhigh", label: t("Very deep"), hint: t("Longer thinking than Deep, for the hardest problems.") },
+  { id: "xhigh", label: t("Extreme"), hint: t("Longer thinking than Deep, for the hardest problems.") },
   { id: "max", label: t("Maximum"), hint: t("As much thinking as the model can do. Can cost far more.") },
 ];
 /** The menu when nothing says which levels the model has. */
