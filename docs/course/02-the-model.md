@@ -92,9 +92,16 @@ part — in 51 cases out of 56 it did not **even try** to act.
   cloud model receives exactly the request it always did: it thinks at its own default, and the
   button says so ("Model default"). On your own server, a
   level nobody chose means **Standard**: left to itself, a model like Qwen thinks at its maximum, even
-  for a small task. The thinking is never sent back to the model from one question to the next; the
+  for a small task. On that server each level is also a real **thinking budget** per step, which the
+  server enforces by closing the thought itself once it is spent: **Brief** 1,024 tokens, **Standard**
+  8,192 (it only stops runaways), **Deep** no limit, **Direct** no thinking. A level used to be only a
+  word there ("keep it brief") that the model stopped following as soon as a problem got hard, hence
+  endless thoughts; measured, Brief is as accurate as before and 29% faster. Cloud models keep their
+  own settings. The thinking is never sent back to the model from one question to the next; the
   exception is within one agent turn, where each step gets the earlier steps' thinking back so it does
-  not start over — on a self-hosted server, and in the signed form Claude and DeepSeek ask for.
+  not start over — on a self-hosted server, in the signed form Claude and DeepSeek ask for, and through
+  OpenRouter, which asks to be given its own back unchanged. Without it, a model like DeepSeek started
+  from scratch at every action; measured, giving it back costs 15% less and takes 13% less time.
 
 ## In Hivey Code
 

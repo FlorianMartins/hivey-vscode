@@ -75,7 +75,8 @@ Ouvrez un dossier contenant du code, puis le panneau **Hivey Code** dans la barr
   rien.
 - **Choisissez combien il réfléchit** : Direct, Bref, Standard ou Approfondi, à côté du mode
   ([chapitre 2](02-le-modele.md)). Seuls les niveaux que le modèle connaît sont proposés, et chacun
-  change vraiment sa réflexion ; Direct manque sur un modèle qui ne peut pas cesser de réfléchir.
+  change vraiment sa réflexion — sur votre propre serveur, c'est un budget de jetons par étape ;
+  Direct manque sur un modèle qui ne peut pas cesser de réfléchir.
 - **Stop** arrête le tour tout de suite. Sur un serveur partagé occupé par quelqu'un d'autre, le tour
   affiche « En file d'attente… 12 s » plutôt qu'un « réfléchit… » trompeur : il attend son tour, et il
   n'y a plus de délai au bout duquel il serait abandonné.
@@ -92,7 +93,8 @@ Ouvrez un dossier contenant du code, puis le panneau **Hivey Code** dans la barr
   en paragraphes. Une commande ne fait plus apparaître le terminal : un clic sur sa ligne montre ce
   qu'elle a affiché. Tant que le tour tourne, **votre demande reste épinglée** en haut de la
   conversation dès qu'elle sort de l'écran ; un clic y revient. Au survol de la réponse s'affichent
-  l'heure à laquelle elle s'est terminée et la durée de la requête.
+  l'heure à laquelle elle s'est terminée et la durée de la requête. L'heure de chacun de vos messages
+  s'affiche à côté de « Vous » ; une question réessayée ou modifiée prend celle du nouvel envoi.
 - **Après une réponse**, la prochaine demande probable s'affiche en grisé dans la zone de saisie :
   **Tab** (ou une flèche) en fait votre texte, **Entrée** l'envoie. Réglage
   `hiveyCode.chat.suggestNext`.

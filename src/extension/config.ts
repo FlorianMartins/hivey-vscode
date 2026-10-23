@@ -575,12 +575,3 @@ export async function providerFor(s: Settings, keys: Keys, id: ProviderId): Prom
   }
   return makeProvider({ id, baseUrl, apiKey, ...(s.chat.promptCache ? { promptCache: true } : {}) });
 }
-
-/** True when this role would send data off the machine — the question consent depends on. */
-export function isRemote(s: Settings, id: ProviderId): boolean {
-  try {
-    return !isLocalEndpoint(endpointFor(s, id));
-  } catch {
-    return false;
-  }
-}

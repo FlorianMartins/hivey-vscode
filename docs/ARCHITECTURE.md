@@ -109,6 +109,15 @@ ailleurs l'envoie deux fois.
 Il ne se déclenche pas non plus une fois qu'un mot est arrivé à l'écran : un tour qui a déjà diffusé
 une phrase ou lancé un outil ne peut pas être rejoué ailleurs sans répéter les deux.
 
+En dessous de la chaîne, deux pannes de connexion ne sont pas des échecs du modèle et ne la
+déclenchent pas. `core/util/http.ts` (`resetBeforeAnswer`) : Node réutilise les connexions inactives,
+et une connexion que le réseau a refermée entre-temps fait échouer la requête suivante
+(`ECONNRESET`) avant qu'elle n'atteigne qui que ce soit — elle est renvoyée **une fois**, sur une
+connexion neuve, et seulement si rien de la réponse n'est arrivé. `core/providers/openai.ts`
+(`isConnectionDrop`) : une coupure **pendant** le flux ne le termine pas, elle fait lever sa lecture
+(« terminated ») ; elle est traitée comme une réponse interrompue (`ChatResult.interrupted`), le texte
+et la réflexion reçus sont gardés, et la boucle demande au modèle de reprendre où il s'était arrêté.
+
 ### 5. Une carte, pas le territoire
 
 `core/context/repomap.ts`. Les symboles de tête sont extraits par expressions régulières et non par
@@ -150,8 +159,61 @@ explicite. Une carte en retard d'un changement d'onglet ne coûte rien : ce sont
 symboles, le modèle peut lire n'importe quel fichier, et le classement ne décide que de ce qu'il
 voit **en premier**.
 
+Les fichiers créés ou supprimés ne la font pas reconstruire non plus (`core/context/structure.ts`) :
+en mode agent, l'agent en crée lui-même à presque chaque tour, et un serveur llama.cpp — qui ne
+relit une requête qu'à partir du premier caractère changé — relisait alors toute la conversation,
+carte comprise, à chaque question. Ils sont listés dans le message qui suit l'historique, relu de
+toute façon ; au-delà de 50 changements, la carte est reprise. Dépendances et sortie de build ne
+comptent pas. Même raison pour le délimiteur des pièces jointes (`Session.fence`) : tiré une fois par
+conversation et non à chaque tour, sans quoi chaque fichier joint plus haut changeait d'octets.
+
+Les règles du dépôt font partie des parties stables (`houseRules`) : le premier fichier qui existe
+parmi `.hiveycode/instructions.md`, `AGENTS.md`, `CLAUDE.md` et `.github/copilot-instructions.md`
+(`core/context/houseRules.ts`, ordre de préférence, jamais concaténés). Placées dans le prompt
+système, elles survivent à chaque compactage sans qu'aucun résumé ait à les recopier.
+
 Rien de tout cela ne se lit dans le code, ce qui est la raison pour laquelle l'invariant est tenu par
 un test d'intégration qui compare le premier message de deux requêtes **octet par octet**.
+
+### 5ter. Un contexte plein n'arrête pas le tour
+
+`core/agent/loop.ts`. Avant chaque requête, quand la fenêtre du modèle est connue, la boucle estime
+ce qu'elle envoie. Trois paliers, du moins cher au plus cher :
+
+1. **Raccourcir les anciens résultats d'outils** — en commençant par les lectures d'un fichier relu
+   ou modifié ensuite. Rien n'est perdu : chaque résultat reste entier en mémoire, et le modèle reçoit
+   une étiquette à passer à `recall` pour le relire mot pour mot.
+2. **Se résumer en pleine tâche** (`compactLive`), quand raccourcir ne suffit plus — avant l'envoi,
+   sur un refus « exceeds the available context size », ou sur une réponse coupée par la fenêtre
+   pleine. Le même modèle, sans outils ni réflexion, écrit le relevé dont le reste du tour repart : la
+   demande mot pour mot, les fichiers modifiés, les commandes, l'état des erreurs, la suite. Le prompt
+   système et la carte restent tels quels — c'est le préfixe en cache. Trois fois au plus par tour.
+3. **Ce qui existait avant** : le tour s'arrête, la conversation est résumée et la tâche reprend
+   (`context.autoCompact`), ou la question est posée à l'utilisateur.
+
+Une réponse qui remplit **à elle seule** la fenêtre (plus d'un quart) n'est pas un problème de taille
+de conversation, et la redemander telle quelle redonnait le même emballement : elle est jetée, et le
+modèle apprend qu'elle a été perdue et qu'il faut la découper — deux fois au plus, ensuite le tour dit
+où il en est. Une réflexion qui écrit trois fois de suite le même passage est coupée à la volée
+(`repeatingTail`), avant d'avoir rempli quoi que ce soit.
+
+Le client terminal ne connaît pas toujours la fenêtre : il ne passe par ces paliers que quand
+`HIVEY_CODE_CONTEXT` la lui donne — ce qui sert au banc « contexte plein ».
+
+### 5quater. Un niveau de réflexion se traduit, il ne s'envoie pas tel quel
+
+`core/providers/reasoningMap.ts`. Direct, Bref, Standard et Approfondi sont des mots du produit ;
+chaque fournisseur et chaque famille de modèles attend autre chose (`output_config.effort`, un budget
+en jetons, `reasoning: {effort}`, `enable_thinking`…), et un champ refusé est un 400. Une seule table,
+chaque règle à côté de la documentation du fournisseur. Sur un serveur auto-hébergé, un niveau n'était
+qu'un mot dans le gabarit, que le modèle cessait de suivre sur un problème difficile : chaque niveau y
+porte maintenant un budget de réflexion par étape que llama.cpp fait respecter
+(`selfHostedThinkingBudget` : 1 024 jetons pour Bref, 8 192 pour Standard, aucun pour Approfondi).
+
+Ce que le modèle a pensé à une étape lui est rendu à la suivante, dans le format que chaque API
+exige : `reasoning_content` pour le serveur auto-hébergé et DeepSeek, blocs signés pour Anthropic,
+`reasoning_details` tels quels pour OpenRouter. Sans cela, un modèle qui réfléchit avant chaque action
+repartait de zéro à chaque étape.
 
 ### 6. Zéro dépendance à l'exécution
 

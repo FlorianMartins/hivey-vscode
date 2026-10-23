@@ -14,11 +14,6 @@ import { inflateRawSync } from "node:zlib";
 const END_OF_CENTRAL_DIRECTORY = 0x06054b50;
 const CENTRAL_FILE_HEADER = 0x02014b50;
 
-export interface ZipEntry {
-  name: string;
-  bytes: Buffer;
-}
-
 /** One record of the central directory, as the walk below hands it over. */
 interface CentralRecord {
   name: string;

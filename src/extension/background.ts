@@ -13,7 +13,7 @@
 
 import * as vscode from "vscode";
 import { execFile } from "node:child_process";
-import { mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runTurn, type Tool, type ToolResult } from "../core/agent/loop.js";
@@ -341,14 +341,4 @@ export class Background {
       this.onChange();
     }
   }
-}
-
-/** Whether a path is inside a directory — exported for the test that holds the containment claim. */
-export async function isInside(path: string, root: string): Promise<boolean> {
-  try {
-    await stat(path);
-  } catch {
-    /* a file that does not exist yet is still inside or outside */
-  }
-  return Boolean(underRoot(path, [root]));
 }

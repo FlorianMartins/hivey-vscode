@@ -14,9 +14,8 @@ import { transcriptPieces } from "../core/session/checkpoint.js";
 import { REMOTE_VENDORS, vendor } from "../core/providers/vendors.js";
 import { closeModelCombo, isModelComboOpen, openModelCombo } from "./modelCombo.js";
 import { wirePaste } from "./paste.js";
-import { microphonePossible, startRecording, type Recorder } from "./dictate.js";
 import { focusGateway } from "./setup.js";
-import type { Mode, Reasoning, ToExtension, UiApproval, UiEntry, UiSkill, UiState } from "../shared/protocol.js";
+import type { Mode, Reasoning, ToExtension, UiApproval, UiEntry, UiState } from "../shared/protocol.js";
 import { applySuggestion, suggestionsFor, type Suggestion } from "../core/session/mentions.js";
 import { BUILTIN_SKILLS, type BuiltinSkill } from "../core/session/skills.js";
 import { planComplete, planSummary, type Plan } from "../core/agent/plan.js";
@@ -976,24 +975,6 @@ export const NOTE_FADE_MS = 8000;
  * between as ordinary paragraphs. The data is unchanged (core/session/segments.ts); only the drawing is.
  */
 
-/** "9 steps · 3 commands · 1 edit" — what a run of actions amounts to. */
-export function stepSummary(steps: Array<{ tool: string; ok: boolean }>): string {
-  const count = (names: string[]): number => steps.filter((s) => names.includes(s.tool)).length;
-  // One of each reads as one: "1 étapes · 1 commandes" was the plural printed on every short step.
-  const n = (count: number, one: string, many: string): string => (count === 1 ? t(one) : t(many, count));
-  const parts = [n(steps.length, "1 step", "{0} steps")];
-  const commands = count(["run_command"]);
-  // Counted by what they DID, not by tool name: `write_file` and `edit_file` are one thing to
-  // somebody deciding whether to open this, and "1 write, 2 edits" is a distinction the reader did
-  // not ask for.
-  const edits = count(["edit_file", "write_file"]);
-  const reads = count(["read_file", "list_files", "search_text"]);
-  if (edits) parts.push(n(edits, "1 edit", "{0} edits"));
-  if (commands) parts.push(n(commands, "1 command", "{0} commands"));
-  if (!edits && !commands && reads) parts.push(n(reads, "1 read", "{0} reads"));
-  return parts.join(" · ");
-}
-
 /**
  * The short name an action goes by on its row — Claude Code's names, because they are the ones a
  * developer already reads at a glance. Not translated, like a command name. A tool not listed here
@@ -1156,30 +1137,6 @@ export function noteItem(text: string, ok?: boolean): HTMLElement {
   line.title = text;
   item.append(line);
   return item;
-}
-
-export function collapsible(
-  title: string,
-  // An element as well as text: a folded list of steps is a list, not a paragraph, and building it
-  // as a string would mean losing the per-step markup the rows already have.
-  body: string | HTMLElement,
-  opts: { open?: boolean; onToggle?: (open: boolean) => void } = {},
-): HTMLElement {
-  const wrap = el("div", "collapsible");
-  const head = el("button", "collapsible-head");
-  head.append(icon("chevron", "collapsible-chevron"));
-  head.append(el("span", undefined, title));
-  const content = el("div", "collapsible-body", typeof body === "string" ? body : undefined);
-  if (typeof body !== "string") content.append(body);
-  content.hidden = !opts.open;
-  wrap.classList.toggle("open", Boolean(opts.open));
-  head.addEventListener("click", () => {
-    content.hidden = !content.hidden;
-    wrap.classList.toggle("open", !content.hidden);
-    opts.onToggle?.(!content.hidden);
-  });
-  wrap.append(head, content);
-  return wrap;
 }
 
 /**
@@ -2541,16 +2498,4 @@ function submit(area: HTMLTextAreaElement, deps: ChatDeps): void {
     return;
   }
   deps.send({ type: "send", text });
-}
-
-/**
- * Roughly what attaching every open tab would cost.
- *
- * The panel does not have the files' contents — only their paths — so this cannot be measured, only
- * estimated: a middling source file is a few hundred lines, and four characters make a token. The
- * number is there to separate "three small files" from "the whole codebase", which is the only
- * distinction the user needs before clicking. It is prefixed with ~ for that reason.
- */
-function estimateOpenFiles(state: UiState): number {
-  return state.openFiles.length * 1200;
 }

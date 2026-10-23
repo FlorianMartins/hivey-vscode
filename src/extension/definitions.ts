@@ -69,8 +69,6 @@ export interface Definitions {
   problems: string[];
 }
 
-const EMPTY: Definitions = { skills: [], agents: [], problems: [] };
-
 export class DefinitionStore {
   private cache: Definitions | undefined;
 

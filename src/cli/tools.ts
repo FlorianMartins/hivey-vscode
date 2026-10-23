@@ -8,7 +8,7 @@
 
 import { spawn } from "node:child_process";
 import { searchPattern } from "../core/agent/regex.js";
-import { describeSlice, sliceLines } from "../core/fs/slice.js";
+import { sliceLines } from "../core/fs/slice.js";
 import { findUnique, IDENTICAL_EDIT } from "../core/text/findText.js";
 import { commandHint } from "../core/terminal/hints.js";
 import { cappedAt, describeCap } from "../core/agent/capped.js";

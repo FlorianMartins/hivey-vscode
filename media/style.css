@@ -983,48 +983,6 @@ pre.code {
   margin-bottom: var(--sp-2);
 }
 
-.collapsible {
-  margin: var(--sp-2) 0;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  overflow: hidden;
-}
-.collapsible-head {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  width: 100%;
-  text-align: left;
-  font-family: inherit;
-  font-size: var(--fs-meta);
-  color: var(--muted);
-  background: transparent;
-  border: none;
-  padding: var(--sp-1) var(--sp-2);
-  cursor: pointer;
-}
-.collapsible-head:hover {
-  background: var(--hover);
-}
-.collapsible-chevron {
-  transition: transform 120ms ease;
-  width: 12px;
-  height: 12px;
-  flex: 0 0 auto;
-}
-.collapsible.open .collapsible-chevron {
-  transform: rotate(180deg);
-}
-.collapsible-body {
-  padding: var(--sp-2) var(--sp-3);
-  border-top: 1px solid var(--border);
-  font-size: var(--fs-control);
-  color: var(--muted);
-  white-space: pre-wrap;
-  max-height: 260px;
-  overflow-y: auto;
-}
-
 /* The model's reasoning, in a colour of its own.
  *
  * The "∴ Thinking" lines of the timeline wear it, so the model talking to itself never reads as one
@@ -5170,17 +5128,8 @@ pre.code code {
  *
  * « que les box de raisonnement IA ne prennent pas toute la largeur de la page pour que ça fasse
  * vraiment une conversation (gauche IA, droite utilisateur) ». Every block spanned the panel, so the
- * two speakers were told apart by a label alone. The assistant's thinking and steps now take the
- * width of what they say (never more than most of the panel) and its words keep a margin on the
+ * two speakers were told apart by a label alone. The assistant's words now keep a margin on the
  * right; your messages are a bubble the size of what you wrote, against the right edge. */
-.entry.assistant .collapsible {
-  width: fit-content;
-  min-width: min(14rem, 88%);
-  max-width: 88%;
-}
-.entry.assistant .collapsible.open {
-  width: 88%;
-}
 .entry.assistant .md,
 .entry.assistant .live-text {
   max-width: 92%;

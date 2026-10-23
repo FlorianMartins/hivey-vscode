@@ -5,7 +5,7 @@
 // showing a muted message as active, or a model name that changed three turns ago. The only thing
 // rendered incrementally is the answer being streamed, because that one has to be.
 
-import { button, closeMenu, el, icon, ICON, menuIsOpen, searchInput } from "./dom.js";
+import { button, closeMenu, el, ICON, menuIsOpen, searchInput } from "./dom.js";
 import { chatScreen, isStreaming, planBlock, setStreaming, timeline, toolRow, thinkingLine, textItem, leadItem, noteItem, interjectionBubble, type ChatDeps, captureDraft, restoreDraft,
   NOTE_FADE_MS,
   setComposerNote,

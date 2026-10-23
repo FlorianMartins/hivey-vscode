@@ -2,20 +2,14 @@
 // `scripts/update-models.mjs` (a scheduled workflow commits the diff), so no version or price is
 // ever hard-coded by hand in this repository — the lesson from the sidebar's model catalogue.
 //
-// The table below is only the FALLBACK used before the first refresh, and to price the providers
-// OpenRouter does not list. A model that is absent is priced as 0 and reported as "unknown"
-// rather than guessed: a wrong price silently spends someone's budget.
+// A model that is absent is priced as 0 and reported as "unknown" rather than guessed: a wrong
+// price silently spends someone's budget.
 
 export interface Price {
   in: number; // USD per 1M input tokens
   out: number; // USD per 1M output tokens
   cachedIn?: number; // USD per 1M tokens served from the provider's prompt cache
 }
-
-export const FALLBACK_PRICES: Record<string, Price> = {
-  // Local inference costs electricity, not tokens.
-  "local:*": { in: 0, out: 0 },
-};
 
 export interface PriceLookup {
   (model: string): Price | undefined;

@@ -35,6 +35,13 @@ des morceaux jusqu'à ce qu'il ait fini.
 L'intérêt n'est pas cosmétique : vous pouvez **arrêter** une réponse qui partait de travers avant
 qu'elle soit entièrement calculée, et donc avant de l'avoir entièrement payée.
 
+Une connexion qui reste ouverte peut aussi se couper : le Wi-Fi qui décroche, un VPN, une fenêtre
+rechargée. Hivey Code traite une coupure en pleine réponse comme une réponse interrompue : ce qui était
+déjà arrivé est gardé, et le modèle est invité à reprendre là où il s'était arrêté, au lieu d'afficher
+une erreur (« terminated ») à la place de la réponse. Et une connexion fermée entre deux requêtes,
+qui ferait échouer la suivante avant même qu'elle n'atteigne le serveur, est retentée une fois, sur
+une connexion neuve.
+
 ## Les deux langues des modèles
 
 C'est le point important du chapitre. Il n'y a pas une forme de formulaire, il y en a **deux** :

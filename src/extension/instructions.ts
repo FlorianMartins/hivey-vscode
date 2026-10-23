@@ -17,7 +17,6 @@
 //     to say the authority the user granted when they opened the folder.
 
 import * as vscode from "vscode";
-import { t } from "../shared/i18n.js";
 import { estimateTokens } from "../core/util/tokens.js";
 import { scaledTokens } from "../core/context/scale.js";
 import { firstRulesFile, RULES_FILES } from "../core/context/houseRules.js";
@@ -103,9 +102,4 @@ export async function instructionsPrompt(): Promise<string> {
   const header = `\n\nThe team that owns this repository wrote the following rules in ${found.path}. Follow them; where they contradict a general habit of yours, they win.`;
   const note = found.truncated ? `\n\n(${found.path} was longer than the budget allows and was cut.)` : "";
   return `${header}\n\n${found.text}${note}`;
-}
-
-/** For the interface: what is in force, in one line. */
-export function instructionsLabel(found: Instructions | undefined): string {
-  return found ? t("Rules from {0} are applied.", found.path) : t("No repository rules file.");
 }

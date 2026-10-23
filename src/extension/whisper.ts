@@ -9,7 +9,7 @@
 // already has, and a program is run.
 
 import { spawn } from "node:child_process";
-import { chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, rm, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import {
@@ -165,15 +165,6 @@ export async function runWhisper(where: Installed, wav: string, language: string
       else reject(new Error(err.trim().split("\n").slice(-3).join(" ") || `whisper-cli exited ${code}`));
     });
   });
-}
-
-/** For the one caller that wants to know whether a model file is already on disk. */
-export async function modelBytes(storage: string, modelId: string): Promise<number> {
-  try {
-    return (await readFile(join(whisperHome(storage), "models", modelFor(modelId).file))).length;
-  } catch {
-    return 0;
-  }
 }
 
 // ── Recording, from outside the panel ────────────────────────────────────────────────────────────

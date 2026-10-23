@@ -43,10 +43,21 @@ prompt à chaque étape.
 proposer une commande. En mode agent, cela devient une tentative d'action.
 
 **Parade (code).** `src/core/session/session.ts` — `renderEntry()`. Le contenu joint n'est jamais
-concaténé à la phrase de l'utilisateur : il forme un bloc clos par un **nonce de 128 bits tiré à
-chaque tour**, et toute séquence en forme de délimiteur présente dans le contenu est remplacée par
-`⟦removed-fence⟧`. Le canal d'instruction se réduit à deux choses : le prompt système et ce que la
+concaténé à la phrase de l'utilisateur : il forme un bloc clos par un **délimiteur aléatoire de
+128 bits, tiré une fois par conversation** (`Session.fence`), et toute copie de ce délimiteur présente
+dans le contenu est remplacée par `⟦removed-fence⟧`. Il n'est plus tiré à chaque tour : un délimiteur
+neuf réécrivait chaque fichier joint plus haut, et le serveur auto-hébergé relisait toute la
+conversation à chaque question. Il reste impossible à deviner pour le contenu qu'il encadre, et
+une copie qui s'y glisserait est neutralisée avant l'envoi. Le canal d'instruction se réduit à deux choses : le prompt système et ce que la
 personne a tapé.
+
+**Exception délibérée : le fichier de règles du dépôt.** Le premier qui existe parmi
+`.hiveycode/instructions.md`, `AGENTS.md`, `CLAUDE.md` (à la racine) et
+`.github/copilot-instructions.md`, `.github/instructions.md` (`src/core/context/houseRules.ts`) entre dans le prompt système,
+sans clôture : c'est sa raison d'être. Le dépôt ouvert écrit donc une partie du canal d'instruction,
+et depuis que `AGENTS.md` et `CLAUDE.md` sont lus, c'est le cas de la plupart des dépôts récents. Il
+est plafonné en taille, listé dans le sélecteur de contexte pour qu'on puisse le lire, et la parade
+qui tient est la suivante.
 
 Deuxième parade, indépendante : **l'approbation par action**. Une injection réussie ne peut pas
 écrire un fichier ni lancer une commande sans qu'un humain lise la description et clique.

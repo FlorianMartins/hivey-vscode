@@ -142,6 +142,10 @@ node scripts/evaluate.mjs --from eval/results/<run>.json --table eval/QUALITY.md
 overrides every task's own `timeoutMs` when it is given. `--note "…"`, repeatable, prints a caveat
 above the table.
 
+A check runs in its own process group (outside Windows). At its deadline the whole group is killed, and once its own
+process has exited, whatever it left running is killed two seconds later: a test the agent left with
+a pending promise kept the pipes open and once held a whole run for 2 h 40.
+
 ## The report
 
 `--report <dir>` writes `report.json` and `report.md`: per task and per model, whether it passed,
@@ -183,10 +187,17 @@ honestly.
 
 ## Measuring a setting
 
-Two environment variables let a run use another thinking level or temperature, without changing
-anything for anyone else (unset, the client behaves exactly as usual):
+Three environment variables let a run use another thinking level, temperature or context window,
+without changing anything for anyone else (unset, the client behaves exactly as usual). The harness
+passes its own environment on to the client it starts, so they are set on the `evaluate.mjs` command:
 
-- `HIVEY_CODE_REASONING` — `none`, `low`, `medium` (the default on a self-hosted server) or `high`;
-- `HIVEY_CODE_TEMPERATURE` — a number between 0 and 2 (unset: the server's own).
+- `HIVEY_CODE_REASONING` — `none`, `low`, `medium` (the default on a self-hosted server) or `high`.
+  On a self-hosted llama.cpp server `low` and `medium` also carry a thinking budget per step
+  (1 024 and 8 192 tokens), and `high` none;
+- `HIVEY_CODE_TEMPERATURE` — a number between 0 and 2 (unset: the server's own);
+- `HIVEY_CODE_CONTEXT` — the model's context window, in tokens (4096 or more), for a "full context"
+  run. The terminal client otherwise does not hand the turn a window, so nothing in it ever fills;
+  with it, the turn shortens old tool outputs and summarizes itself mid-task exactly as the panel does,
+  and that is what such a run measures.
 
 Run the same tasks with and without, in parallel so both see the same server load, and compare.
