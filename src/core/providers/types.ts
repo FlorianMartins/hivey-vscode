@@ -84,7 +84,7 @@ export interface Usage {
  * takes an effort word, Anthropic takes a token budget, DeepSeek decides on its own — so the shape
  * the extension speaks is the intent, and each provider translates it.
  */
-export type ReasoningEffort = "none" | "low" | "medium" | "high";
+export type ReasoningEffort = "none" | "low" | "medium" | "high" | "xhigh" | "max";
 
 export interface ChatRequest {
   model: string;
@@ -108,6 +108,8 @@ export const THINKING_BUDGET: Record<ReasoningEffort, number> = {
   low: 2048,
   medium: 8192,
   high: 24576,
+  xhigh: 32768,
+  max: 65536,
 };
 
 export interface ToolSchema {

@@ -53,10 +53,13 @@ import { reasoningSupport } from "../router/reasoning.js";
 //
 //   * a temperature and thinking cannot both be set, so it is sent only with thinking off.
 //
-// Efforts: Bref → "low", Standard → "medium", Approfondi → "xhigh" where the family has it (Opus
-// 4.7+, Sonnet 5+, Haiku 5.5, Fable), "high" on Opus 4.6 / Sonnet 4.6 which stop there. Approfondi
-// is NOT "high" on the newer models because "high" is their DEFAULT (except Opus 5.5 and Haiku 5.5,
-// medium): the deepest level would then have been the same request as sending nothing.
+// Efforts: each panel level is the effort of the same name — Bref "low", Standard "medium",
+// Approfondi "high", Très approfondi "xhigh", Maximum "max" — and the menu offers the ones the family
+// has: all five on Opus 4.7+, Sonnet 5+, Haiku 5.5 and Fable; no "xhigh" on Opus 4.6 / Sonnet 4.6.
+//
+// ⚠️ « anthropic a 4 modes de réflexion mais il y a que les 3 qui sont affichés … afficher les modes de
+// réflexion des modèles de base ». Four panel levels for five efforts: Approfondi was "xhigh", and
+// "high" — the default of most of these models — and "max" could not be asked for at all.
 //
 // `display: "summarized"` is asked wherever adaptive thinking is sent to a family whose default is
 // "omitted" (everything from Opus 4.7 on): the panel shows the thinking, and the default streams
@@ -74,6 +77,8 @@ export interface AnthropicFamily {
   off: "disabled" | "between_tools" | "omit" | "never";
   /** Whether `xhigh` exists on this family. */
   xhigh: boolean;
+  /** Whether `max` exists on this family. */
+  max?: boolean;
   /** temperature / top_p / top_k: "allowed", or refused ("rejected" = any value, "nondefault"). */
   sampling: "allowed" | "rejected" | "nondefault";
   /** Whether thinking text is empty unless `display: "summarized"` is asked for. */
@@ -120,20 +125,20 @@ function familyRules(tier: AnthropicFamily["tier"], v: [number, number]): Anthro
   const budget = { ...base, style: "budget" as const, off: "omit" as const, xhigh: false, sampling: "allowed" as const, displayOmitted: false };
   switch (tier) {
     case "fable":
-      return { ...base, style: "adaptive", off: "never", xhigh: true, sampling: "rejected", displayOmitted: true, defaultEffort: "high" };
+      return { ...base, style: "adaptive", off: "never", xhigh: true, max: true, sampling: "rejected", displayOmitted: true, defaultEffort: "high" };
     case "opus":
-      if (atLeast(v, 5, 5)) return { ...base, style: "adaptive", off: "never", xhigh: true, sampling: "rejected", displayOmitted: true, defaultEffort: "medium" };
-      if (atLeast(v, 5, 0)) return { ...base, style: "adaptive", off: "disabled", xhigh: true, sampling: "rejected", displayOmitted: true, defaultEffort: "high" };
-      if (atLeast(v, 4, 7)) return { ...base, style: "adaptive", off: "disabled", xhigh: true, sampling: "rejected", displayOmitted: true, defaultEffort: "high" };
-      if (atLeast(v, 4, 6)) return { ...base, style: "adaptive", off: "disabled", xhigh: false, sampling: "allowed", displayOmitted: false, defaultEffort: "high" };
+      if (atLeast(v, 5, 5)) return { ...base, style: "adaptive", off: "never", xhigh: true, max: true, sampling: "rejected", displayOmitted: true, defaultEffort: "medium" };
+      if (atLeast(v, 5, 0)) return { ...base, style: "adaptive", off: "disabled", xhigh: true, max: true, sampling: "rejected", displayOmitted: true, defaultEffort: "high" };
+      if (atLeast(v, 4, 7)) return { ...base, style: "adaptive", off: "disabled", xhigh: true, max: true, sampling: "rejected", displayOmitted: true, defaultEffort: "high" };
+      if (atLeast(v, 4, 6)) return { ...base, style: "adaptive", off: "disabled", xhigh: false, max: true, sampling: "allowed", displayOmitted: false, defaultEffort: "high" };
       return budget;
     case "sonnet":
-      if (atLeast(v, 5, 5)) return { ...base, style: "adaptive", off: "between_tools", xhigh: true, sampling: "nondefault", displayOmitted: true, defaultEffort: "high" };
-      if (atLeast(v, 5, 0)) return { ...base, style: "adaptive", off: "disabled", xhigh: true, sampling: "rejected", displayOmitted: true, defaultEffort: "high" };
-      if (atLeast(v, 4, 6)) return { ...base, style: "adaptive", off: "disabled", xhigh: false, sampling: "allowed", displayOmitted: false, defaultEffort: "high" };
+      if (atLeast(v, 5, 5)) return { ...base, style: "adaptive", off: "between_tools", xhigh: true, max: true, sampling: "nondefault", displayOmitted: true, defaultEffort: "high" };
+      if (atLeast(v, 5, 0)) return { ...base, style: "adaptive", off: "disabled", xhigh: true, max: true, sampling: "rejected", displayOmitted: true, defaultEffort: "high" };
+      if (atLeast(v, 4, 6)) return { ...base, style: "adaptive", off: "disabled", xhigh: false, max: true, sampling: "allowed", displayOmitted: false, defaultEffort: "high" };
       return budget;
     case "haiku":
-      if (atLeast(v, 5, 0)) return { ...base, style: "adaptive", off: "disabled", xhigh: true, sampling: "nondefault", displayOmitted: true, defaultEffort: "medium" };
+      if (atLeast(v, 5, 0)) return { ...base, style: "adaptive", off: "disabled", xhigh: true, max: true, sampling: "nondefault", displayOmitted: true, defaultEffort: "medium" };
       return budget;
     default:
       // A Claude id nothing here can read — an alias, a private deployment name. The newest rules are
@@ -147,16 +152,20 @@ export interface AnthropicThinking {
   /** The `thinking` field, when one is sent. */
   thinking?: Record<string, unknown>;
   /** The `output_config.effort`, when one is sent. */
-  effort?: "low" | "medium" | "high" | "xhigh";
+  effort?: "low" | "medium" | "high" | "xhigh" | "max";
   /** Tokens the thinking may take before the answer starts — added to a caller's `max_tokens`. */
   headroom: number;
   /** Whether a temperature may go in the same request. */
   temperature: boolean;
 }
 
-/** The effort a panel level is on this family. */
-function anthropicEffort(f: AnthropicFamily, level: Exclude<ReasoningEffort, "none">): "low" | "medium" | "high" | "xhigh" {
-  if (level === "high") return f.xhigh ? "xhigh" : "high";
+/**
+ * The effort a panel level is on this family: the effort of the same name, or — for a level picked on
+ * another model that this one lacks — the nearest it has below it.
+ */
+function anthropicEffort(f: AnthropicFamily, level: Exclude<ReasoningEffort, "none">): "low" | "medium" | "high" | "xhigh" | "max" {
+  if (level === "max") return f.max ? "max" : f.xhigh ? "xhigh" : "high";
+  if (level === "xhigh") return f.xhigh ? "xhigh" : "high";
   return level;
 }
 
@@ -218,7 +227,9 @@ export function reasoningMenu(provider: string, model: string): ReasoningChoice[
     const f = anthropicFamily(model);
     if (f.style === "none") return undefined;
     if (f.style === "budget") return all.map((c) => (c.id === "none" ? c : { ...c, native: `${THINKING_BUDGET[c.id]} tokens` }));
-    const menu = all
+    // The family's own efforts, all of them — see the header of this section.
+    const own: ReasoningChoice[] = [...all, ...(f.xhigh ? [{ id: "xhigh" as const, native: "xhigh" }] : []), ...(f.max ? [{ id: "max" as const, native: "max" }] : [])];
+    const menu = own
       .filter((c) => c.id !== "none" || f.off !== "never")
       .map((c) => {
         const t = anthropicThinking(model, c.id);
@@ -302,7 +313,7 @@ export function reasoningMenu(provider: string, model: string): ReasoningChoice[
 type Effort = "none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
 const RANK: Effort[] = ["none", "minimal", "low", "medium", "high", "xhigh", "max"];
 const rank = (e: Effort): number => RANK.indexOf(e);
-const LEVEL_ORDER: ReasoningEffort[] = ["none", "low", "medium", "high"];
+const LEVEL_ORDER: ReasoningEffort[] = ["none", "low", "medium", "high", "xhigh", "max"];
 
 export interface ReasoningProfile {
   /** Efforts the model accepts, weakest first. "none" only when thinking can be turned off. */
@@ -365,7 +376,7 @@ export function profileFor(provider: string, model: string): ReasoningProfile | 
       if (lower.startsWith("anthropic/")) {
         const f = anthropicFamily(lower);
         if (f.style === "none") return undefined;
-        const on: Effort[] = f.xhigh ? ["low", "medium", "high", "xhigh"] : ["low", "medium", "high"];
+        const on: Effort[] = ["low", "medium", "high", ...(f.xhigh ? (["xhigh"] as const) : []), ...(f.max ? (["max"] as const) : [])];
         return profile(f.off === "never" ? on : ["none", ...on], f.defaultEffort);
       }
       return reasoningSupport(id) === "no" ? undefined : profile(ALL);
@@ -414,14 +425,21 @@ export function profileFor(provider: string, model: string): ReasoningProfile | 
   }
 }
 
-/** The four panel levels laid onto a profile — see the table above. */
+/**
+ * The panel levels laid onto a profile — see the table above. Approfondi is the model's "high" (its
+ * strongest effort when it has no "high"); "xhigh" and "max", when the model has them, are levels of
+ * their own: « afficher les modes de réflexion des modèles de base ».
+ */
 export function assign(p: ReasoningProfile): Partial<Record<ReasoningEffort, Effort>> {
   const on = p.efforts.filter((e) => e !== "none");
   const out: Partial<Record<ReasoningEffort, Effort>> = {};
   if (p.efforts.includes("none")) out.none = "none";
   if (!on.length) return out;
-  const deep: Effort = on.includes("xhigh") ? "xhigh" : on.includes("high") ? "high" : on[on.length - 1]!;
+  const top = on.filter((e) => e !== "xhigh" && e !== "max");
+  const deep: Effort = on.includes("high") ? "high" : (top[top.length - 1] ?? on[0]!);
   out.high = deep;
+  if (on.includes("xhigh") && deep !== "xhigh") out.xhigh = "xhigh";
+  if (on.includes("max") && deep !== "max") out.max = "max";
   const below = on.filter((e) => rank(e) < rank(deep));
   const brief = below.includes("low") ? "low" : below[0];
   if (brief) {
@@ -458,7 +476,8 @@ export function effortFor(p: ReasoningProfile, level: ReasoningEffort): Effort |
  */
 export function selfHostedEffort(level: ReasoningEffort): string {
   // Bref sends "medium": on Qwen3.8 "low" thinks LONGER (above). What makes Bref brief is its budget —
-  // see `selfHostedThinkingBudget`.
+  // see `selfHostedThinkingBudget`. A cloud's "xhigh" or "max" carried over is the server's deepest.
+  if (level === "xhigh" || level === "max") return "high";
   return level === "low" ? "medium" : level;
 }
 

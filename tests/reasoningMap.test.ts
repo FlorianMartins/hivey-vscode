@@ -8,7 +8,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
-import { anthropicFamily, anthropicThinking, effortFor, profileFor, reasoningMenu } from "../src/core/providers/reasoningMap.js";
+import { anthropicFamily, anthropicThinking, effortFor, profileFor, reasoningMenu, selfHostedThinkingBudget } from "../src/core/providers/reasoningMap.js";
 import { AnthropicProvider } from "../src/core/providers/anthropic.js";
 import { adaptRequest, OpenAICompatibleProvider } from "../src/core/providers/openai.js";
 import { GENERATED_REASONING_EFFORTS } from "../src/core/router/reasoningEfforts.generated.js";
@@ -87,17 +87,17 @@ test("Anthropic: the matrix — each family, each level, exactly the documented 
   // model → [Direct, Bref, Standard, Approfondi] as [thinking, effort, temperature]
   const matrix: Record<string, Array<[unknown, string | undefined, number | undefined]>> = {
     // Thinking cannot be off: Direct is the lowest effort. No sampling parameters at all.
-    "claude-fable-5-1": [[A, "low", undefined], [A, "low", undefined], [A, "medium", undefined], [A, "xhigh", undefined]],
-    "claude-fable-5": [[A, "low", undefined], [A, "low", undefined], [A, "medium", undefined], [A, "xhigh", undefined]],
-    "claude-opus-5-5": [[A, "low", undefined], [A, "low", undefined], [A, "medium", undefined], [A, "xhigh", undefined]],
+    "claude-fable-5-1": [[A, "low", undefined], [A, "low", undefined], [A, "medium", undefined], [A, "high", undefined]],
+    "claude-fable-5": [[A, "low", undefined], [A, "low", undefined], [A, "medium", undefined], [A, "high", undefined]],
+    "claude-opus-5-5": [[A, "low", undefined], [A, "low", undefined], [A, "medium", undefined], [A, "high", undefined]],
     // disabled accepted at effort ≤ high: no effort is sent with it (default high).
-    "claude-opus-5": [[{ type: "disabled" }, undefined, undefined], [A, "low", undefined], [A, "medium", undefined], [A, "xhigh", undefined]],
-    "claude-opus-4-8": [[{ type: "disabled" }, undefined, undefined], [A, "low", undefined], [A, "medium", undefined], [A, "xhigh", undefined]],
-    "claude-opus-4-7": [[{ type: "disabled" }, undefined, undefined], [A, "low", undefined], [A, "medium", undefined], [A, "xhigh", undefined]],
+    "claude-opus-5": [[{ type: "disabled" }, undefined, undefined], [A, "low", undefined], [A, "medium", undefined], [A, "high", undefined]],
+    "claude-opus-4-8": [[{ type: "disabled" }, undefined, undefined], [A, "low", undefined], [A, "medium", undefined], [A, "high", undefined]],
+    "claude-opus-4-7": [[{ type: "disabled" }, undefined, undefined], [A, "low", undefined], [A, "medium", undefined], [A, "high", undefined]],
     // Sonnet 5.5: disabled is a 400, between_tools takes no other field.
-    "claude-sonnet-5-5": [[{ type: "between_tools" }, undefined, undefined], [A, "low", undefined], [A, "medium", undefined], [A, "xhigh", undefined]],
-    "claude-sonnet-5": [[{ type: "disabled" }, undefined, undefined], [A, "low", undefined], [A, "medium", undefined], [A, "xhigh", undefined]],
-    "claude-haiku-5-5": [[{ type: "disabled" }, undefined, undefined], [A, "low", undefined], [A, "medium", undefined], [A, "xhigh", undefined]],
+    "claude-sonnet-5-5": [[{ type: "between_tools" }, undefined, undefined], [A, "low", undefined], [A, "medium", undefined], [A, "high", undefined]],
+    "claude-sonnet-5": [[{ type: "disabled" }, undefined, undefined], [A, "low", undefined], [A, "medium", undefined], [A, "high", undefined]],
+    "claude-haiku-5-5": [[{ type: "disabled" }, undefined, undefined], [A, "low", undefined], [A, "medium", undefined], [A, "high", undefined]],
     // 4.6: adaptive, summarized by default, no xhigh; temperature allowed with thinking off.
     "claude-opus-4-6": [[{ type: "disabled" }, undefined, 0.3], [A46, "low", undefined], [A46, "medium", undefined], [A46, "high", undefined]],
     "claude-sonnet-4-6": [[{ type: "disabled" }, undefined, 0.3], [A46, "low", undefined], [A46, "medium", undefined], [A46, "high", undefined]],
@@ -162,16 +162,21 @@ test("Anthropic: each level is a different request on every adaptive family", ()
 
 test("Anthropic: the menu offers Direct only where thinking can really be turned off", () => {
   const ids = (model: string) => reasoningMenu("anthropic", model)!.map((c) => c.id).join(",");
-  assert.equal(ids("claude-opus-5-5"), "low,medium,high");
-  assert.equal(ids("claude-fable-5-1"), "low,medium,high");
-  assert.equal(ids("claude-fable-5"), "low,medium,high");
-  for (const m of ["claude-opus-5", "claude-opus-4-8", "claude-sonnet-5-5", "claude-sonnet-5", "claude-haiku-5-5", "claude-opus-4-6", "claude-haiku-4-5"]) {
-    assert.equal(ids(m), "none,low,medium,high", m);
+  // « afficher les modes de réflexion des modèles de base »: every effort the family has.
+  assert.equal(ids("claude-opus-5-5"), "low,medium,high,xhigh,max");
+  assert.equal(ids("claude-fable-5-1"), "low,medium,high,xhigh,max");
+  assert.equal(ids("claude-fable-5"), "low,medium,high,xhigh,max");
+  for (const m of ["claude-opus-5", "claude-opus-4-8", "claude-sonnet-5-5", "claude-sonnet-5", "claude-haiku-5-5"]) {
+    assert.equal(ids(m), "none,low,medium,high,xhigh,max", m);
   }
+  assert.equal(ids("claude-opus-4-6"), "none,low,medium,high,max", "4.6 has max, not xhigh");
+  assert.equal(ids("claude-haiku-4-5"), "none,low,medium,high", "a budget model keeps the usual four");
   // The model's own default is marked: medium on Opus 5.5, high on Opus 4.6 (Approfondi there).
   assert.equal(reasoningMenu("anthropic", "claude-opus-5-5")!.find((c) => c.isDefault)?.id, "medium");
   assert.equal(reasoningMenu("anthropic", "claude-opus-4-6")!.find((c) => c.isDefault)?.id, "high");
-  assert.equal(reasoningMenu("anthropic", "claude-opus-4-8")!.find((c) => c.id === "high")?.native, "xhigh");
+  assert.equal(reasoningMenu("anthropic", "claude-opus-4-8")!.find((c) => c.id === "high")?.native, "high");
+  assert.equal(reasoningMenu("anthropic", "claude-opus-4-8")!.find((c) => c.id === "xhigh")?.native, "xhigh");
+  assert.equal(reasoningMenu("anthropic", "claude-opus-4-8")!.find((c) => c.id === "max")?.native, "max");
   assert.equal(reasoningMenu("anthropic", "claude-3-5-haiku-latest"), undefined);
 });
 
@@ -303,15 +308,16 @@ test("OpenRouter: Direct DISABLES thinking (effort none), never just hides it; e
     { reasoning: { effort: "none" } },
     { reasoning: { effort: "low" } },
     { reasoning: { effort: "medium" } },
-    { reasoning: { effort: "xhigh" } },
+    { reasoning: { effort: "high" } },
   ]);
+  assert.deepEqual(await wireBody("openrouter", "openai/gpt-5.5", "xhigh"), { reasoning: { effort: "xhigh" } });
   for (const r of rows) assert.notDeepEqual(r.reasoning, { exclude: true });
 });
 
 test("OpenRouter: a model that cannot stop thinking is never sent none — Direct is its weakest effort, and not on the menu", async () => {
   // anthropic/claude-opus-5.5 and openai/gpt-6.1-sol are `mandatory` in OpenRouter's catalogue.
   assert.deepEqual(await wireBody("openrouter", "anthropic/claude-opus-5.5", "none"), { reasoning: { effort: "low" } });
-  assert.deepEqual(await wireBody("openrouter", "anthropic/claude-opus-5.5", "high"), { reasoning: { effort: "xhigh" } });
+  assert.deepEqual(await wireBody("openrouter", "anthropic/claude-opus-5.5", "high"), { reasoning: { effort: "high" } });
   assert.deepEqual(await wireBody("openrouter", "openai/gpt-6.1-sol", "none"), { reasoning: { effort: "low" } });
   assert.equal(reasoningMenu("openrouter", "anthropic/claude-opus-5.5")!.some((c) => c.id === "none"), false);
   assert.equal(reasoningMenu("openrouter", "anthropic/claude-opus-4.8")!.some((c) => c.id === "none"), true);
@@ -335,7 +341,7 @@ test("OpenAI: reasoning_effort per family; non-reasoning models are never sent t
 });
 
 test("OpenAI: from GPT-5.4, a request with tools is sent effort none — the only one Chat Completions takes with tools", async () => {
-  assert.deepEqual(await wireBody("openai", "gpt-5.5", "high"), { reasoning_effort: "xhigh" }, "without tools the level stands");
+  assert.deepEqual(await wireBody("openai", "gpt-5.5", "xhigh"), { reasoning_effort: "xhigh" }, "without tools the level stands");
   assert.deepEqual(await wireBody("openai", "gpt-5.5", "high", { tools: TOOLS }), { reasoning_effort: "none" });
   assert.deepEqual(reasoningMenu("openai", "gpt-5.5"), [{ id: "none", native: "none" }], "the menu does not pretend");
   assert.notEqual((await wireBody("openai", "gpt-5.2", "high", { tools: TOOLS })).reasoning_effort, "none", "before 5.4, tools and thinking go together");
@@ -355,7 +361,8 @@ test("DeepSeek: thinking switched by its own field, depth by reasoning_effort lo
   assert.deepEqual(await wireBody("deepseek", "deepseek-v4-pro", "none"), { thinking: { type: "disabled" } });
   assert.deepEqual(await wireBody("deepseek", "deepseek-flash", "low"), { thinking: { type: "enabled" }, reasoning_effort: "low" });
   assert.deepEqual(await wireBody("deepseek", "deepseek-flash", "high"), { thinking: { type: "enabled" }, reasoning_effort: "high" });
-  assert.deepEqual(reasoningMenu("deepseek", "deepseek-flash")!.map((c) => c.id), ["none", "low", "high"]);
+  assert.deepEqual(reasoningMenu("deepseek", "deepseek-flash")!.map((c) => c.id), ["none", "low", "high", "max"]);
+  assert.deepEqual(await wireBody("deepseek", "deepseek-flash", "max"), { thinking: { type: "enabled" }, reasoning_effort: "max" });
   assert.deepEqual(await wireBody("deepseek", "deepseek-chat", "high"), {}, "the deprecated aliases take nothing");
 });
 
@@ -365,7 +372,8 @@ test("Mistral, xAI, Groq, Perplexity: only the efforts each model takes", async 
   assert.deepEqual(await wireBody("mistral", "codestral-latest", "high"), {});
   // grok-4.7: low–xhigh, never off.
   assert.equal((await wireBody("xai", "grok-4.7", "none")).reasoning_effort, "low");
-  assert.equal((await wireBody("xai", "grok-4.7", "high")).reasoning_effort, "xhigh");
+  assert.equal((await wireBody("xai", "grok-4.7", "high")).reasoning_effort, "high");
+  assert.equal((await wireBody("xai", "grok-4.7", "xhigh")).reasoning_effort, "xhigh");
   assert.deepEqual(await wireBody("xai", "grok-code-fast-1", "high"), {}, "unknown grok: nothing a 400 could come from");
   assert.equal((await wireBody("groq", "qwen/qwen3.8-27b", "none")).reasoning_effort, "none");
   assert.equal((await wireBody("groq", "openai/gpt-oss-120b", "none")).reasoning_effort, "low");
@@ -424,4 +432,23 @@ test("a server that says the model cannot think gets the question again without 
     thinking: { type: "disabled" },
     messages: [],
   });
+});
+
+test("the model's own efforts beyond Approfondi: sent as named, and only where the model has them", async () => {
+  // Anthropic: xhigh and max as output_config.effort; a level the family lacks falls to the nearest below.
+  assert.equal(anthropicThinking("claude-opus-5-5", "xhigh").effort, "xhigh");
+  assert.equal(anthropicThinking("claude-opus-5-5", "max").effort, "max");
+  assert.equal(anthropicThinking("claude-opus-4-6", "xhigh").effort, "high", "4.6 has no xhigh");
+  assert.equal(anthropicThinking("claude-opus-4-6", "max").effort, "max");
+  assert.equal(anthropicThinking("claude-opus-5-5", "high").effort, "high", "Approfondi is high, the model's own");
+  // The user's own server is untouched: its menu, its words and its budgets.
+  for (const provider of ["local", "openai-compatible"]) {
+    assert.equal(reasoningMenu(provider, "qwen3.8"), undefined, "the template says, not this table");
+    assert.equal((await wireBody(provider, "qwen3.8", "high")).reasoning_effort, "high");
+    assert.equal((await wireBody(provider, "qwen3.8", "xhigh")).reasoning_effort, "high", "a cloud level carried over is the server's deepest");
+    assert.equal((await wireBody(provider, "qwen3.8", "max")).reasoning_effort, "high");
+  }
+  assert.deepEqual(selfHostedThinkingBudget("low").reasoning_budget_tokens, 1024);
+  assert.deepEqual(selfHostedThinkingBudget("medium").reasoning_budget_tokens, 8192);
+  assert.deepEqual(selfHostedThinkingBudget("xhigh"), {});
 });
