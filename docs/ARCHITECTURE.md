@@ -202,7 +202,8 @@ Le client terminal ne connaît pas toujours la fenêtre : il ne passe par ces pa
 
 ### 5quater. Un niveau de réflexion se traduit, il ne s'envoie pas tel quel
 
-`core/providers/reasoningMap.ts`. Direct, Bref, Standard et Approfondi sont des mots du produit ;
+`core/providers/reasoningMap.ts`. Direct, Bref, Standard, Approfondi, Très approfondi et Maximum sont
+des mots du produit — le menu montre, lui, le nom que chaque modèle donne à son niveau (`native`) ;
 chaque fournisseur et chaque famille de modèles attend autre chose (`output_config.effort`, un budget
 en jetons, `reasoning: {effort}`, `enable_thinking`…), et un champ refusé est un 400. Une seule table,
 chaque règle à côté de la documentation du fournisseur. Sur un serveur auto-hébergé, un niveau n'était

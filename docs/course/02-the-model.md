@@ -81,12 +81,16 @@ part — in 51 cases out of 56 it did not **even try** to act.
 - Some models can **reason out loud** before answering: they first produce a draft of their thinking.
   It improves hard answers and it costs tokens. Hivey Code shows each stretch of it as one folded
   **Thinking** line, whose mark pulses while it is being written; a click opens it, rendered as it
-  arrives. The level is chosen in the composer: **Direct** (no thinking), **Brief**, **Standard**,
-  **Deep** — and only the ones the model really has: its server says so when it is yours, its
-  documentation otherwise. Each level really changes the request, whichever the provider: Direct
+  arrives. The level is chosen in the composer, and the menu shows **the model's own levels, under
+  their real names**: `low`, `medium`, `high`, `xhigh`, `max` for Claude Opus, `minimal` to `high` for
+  GPT-5, `low`, `high`, `max` for DeepSeek, the ones Qwen's template announces on your own server, a
+  number of tokens for older Claude models. Only the ones the model really has are offered: its server
+  says so when it is yours, its documentation otherwise. Each one's tooltip says what it amounts to —
+  **Direct** (no thinking), **Brief**, **Standard**, **Deep**, **Very deep**, **Maximum** — and those
+  are the words shown when the model's levels are not known. Each level really changes the request, whichever the provider: Direct
   **turns thinking off** wherever the model allows it; on a model that always thinks (Claude Opus 5.5,
-  Gemini 3, Grok…), Direct is not offered and the lowest level says so. Brief, Standard and Deep ask
-  for a low, medium and high effort (the highest below "max" when the model has one). One exception
+  Gemini 3, Grok…), Direct is not offered and the lowest level says so. Each level is sent under its own
+  name: `high` is `high`, `xhigh` is `xhigh`, `max` is `max`. One exception
   worth knowing: at OpenAI, through Chat Completions, GPT-5.4 and later accept tools only without
   thinking — so a level picked there is sent as Direct during an agent turn. Until you pick one, a
   cloud model receives exactly the request it always did: it thinks at its own default, and the

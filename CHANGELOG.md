@@ -6,6 +6,16 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Ajouté
 
+- **Le menu de réflexion montre les niveaux de chaque modèle, sous leur vrai nom.** « anthropic a 4
+  modes de réflexion mais il y a que les 3 qui sont affichés ». Le panneau avait quatre niveaux pour
+  tous les modèles : sur Claude, Approfondi envoyait `xhigh`, et `high` (le défaut de la plupart des
+  modèles) comme `max` étaient inaccessibles. Le menu propose maintenant tous les niveaux distincts du
+  modèle choisi, nommés comme lui : `low`, `medium`, `high`, `xhigh`, `max` sur Claude Opus 4.7 et
+  suivants, `max` sans `xhigh` sur Opus et Sonnet 4.6, `minimal` sur GPT-5, `low`, `high`, `max` sur
+  DeepSeek, les niveaux qu'annonce le gabarit sur votre serveur. L'infobulle garde le mot du panneau
+  (Bref, Standard, Approfondi, Très approfondi, Maximum). Approfondi envoie désormais `high`, et non
+  plus `xhigh`. **Sur votre serveur, rien ne change** : mêmes mots envoyés, mêmes budgets de
+  réflexion, et Direct coupe toujours la réflexion.
 - **Les règles du projet sont annoncées.** La première fois qu'un fichier de règles (`AGENTS.md`,
   `CLAUDE.md`, `.hiveycode/instructions.md`…) sert dans un dossier, puis chaque fois que son contenu
   change (un `git pull` qui le réécrit), une notification dit lequel est donné au modèle, avec un

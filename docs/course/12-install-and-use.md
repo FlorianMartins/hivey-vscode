@@ -70,7 +70,7 @@ Open a folder containing code, then the **Hivey Code** panel in the right-hand b
   is.
 - **Change mode** (Chat / Plan / Agent) according to what you want to allow
   ([chapter 5](05-the-three-modes-and-tools.md)). Start with **Plan**: it reads and changes nothing.
-- **Choose how much it thinks**: Direct, Brief, Standard or Deep, next to the mode
+- **Choose how much it thinks**, next to the mode: the model's own levels, under their real names
   ([chapter 2](02-the-model.md)). Only the levels the model knows are offered, and each one really
   changes how much it thinks — on your own server, it is a token budget per step; Direct is missing
   on a model that cannot stop thinking.

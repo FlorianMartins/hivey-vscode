@@ -73,7 +73,7 @@ Ouvrez un dossier contenant du code, puis le panneau **Hivey Code** dans la barr
 - **Changez de mode** (Discussion / Plan / Agent) selon ce que vous voulez autoriser
   ([chapitre 5](05-les-trois-modes-et-les-outils.md)). Commencez par **Plan** : il lit et ne modifie
   rien.
-- **Choisissez combien il réfléchit** : Direct, Bref, Standard ou Approfondi, à côté du mode
+- **Choisissez combien il réfléchit**, à côté du mode : les niveaux du modèle, sous leur vrai nom
   ([chapitre 2](02-le-modele.md)). Seuls les niveaux que le modèle connaît sont proposés, et chacun
   change vraiment sa réflexion — sur votre propre serveur, c'est un budget de jetons par étape ;
   Direct manque sur un modèle qui ne peut pas cesser de réfléchir.

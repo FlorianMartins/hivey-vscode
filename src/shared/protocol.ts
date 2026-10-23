@@ -2,7 +2,7 @@
 // sends and the other does not understand is a compile error rather than a silent no-op.
 
 export type Mode = "chat" | "plan" | "agent";
-export type Reasoning = "none" | "low" | "medium" | "high";
+export type Reasoning = "none" | "low" | "medium" | "high" | "xhigh" | "max";
 export type Screen = "chat" | "history" | "models" | "permissions" | "setup";
 
 export interface UiContextItem {

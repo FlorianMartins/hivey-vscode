@@ -84,12 +84,17 @@ et — c'est le plus instructif — dans 51 cas sur 56 il n'a **même pas essay�
   brouillon de réflexion. Ça améliore les réponses difficiles et ça coûte des jetons. Hivey Code
   en montre chaque moment sur une ligne repliée **Réflexion**, dont la pastille pulse pendant qu'il
   s'écrit ; un clic l'ouvre, rendu au fur et à mesure. Le niveau se choisit dans la zone de
-  saisie : **Direct** (aucune réflexion), **Bref**, **Standard**, **Approfondi** — et seulement ceux
-  que le modèle possède vraiment : son serveur le dit quand il est chez vous, sa documentation sinon.
+  saisie, et le menu montre **les niveaux du modèle lui-même, sous leur vrai nom** : `low`, `medium`,
+  `high`, `xhigh`, `max` pour Claude Opus, `minimal` à `high` pour GPT-5, `low`, `high`, `max` pour
+  DeepSeek, ceux qu'annonce le gabarit de Qwen sur votre serveur, un nombre de jetons pour les anciens
+  Claude. Seuls ceux que le modèle possède vraiment sont proposés : son serveur le dit quand il est chez
+  vous, sa documentation sinon. L'infobulle de chacun dit à quoi il correspond — **Direct** (aucune
+  réflexion), **Bref**, **Standard**, **Approfondi**, **Très approfondi**, **Maximum** — et ce sont ces
+  mots qui s'affichent quand les niveaux du modèle ne sont pas connus.
   Chaque niveau change vraiment la requête, d'un fournisseur à l'autre : Direct **coupe** la
   réflexion là où le modèle le permet ; sur un modèle qui réfléchit toujours (Claude Opus 5.5, Gemini
-  3, Grok…), Direct n'est pas proposé et le niveau le plus bas le dit. Bref, Standard et Approfondi
-  demandent un effort faible, moyen et élevé (le plus élevé avant « max » quand le modèle en a un).
+  3, Grok…), Direct n'est pas proposé et le niveau le plus bas le dit. Chaque niveau est envoyé sous
+  son propre nom : `high` est `high`, `xhigh` est `xhigh`, `max` est `max`.
   Exception à connaître : chez OpenAI, en passant par Chat Completions, GPT-5.4 et suivants
   n'acceptent les outils que sans réflexion — un niveau choisi y part donc en Direct pendant un tour
   d'agent. Tant que vous n'avez rien choisi, un modèle dans le cloud reçoit exactement la même requête

@@ -80,7 +80,7 @@ export const THINK_CLOSE = "<<<ANSWER>>>";
  */
 export function promptedThinking(effort: ReasoningEffort): string {
   if (effort === "none") return "";
-  const room = { low: "two or three sentences", medium: "a short paragraph", high: "as long as it takes" }[
+  const room = { low: "two or three sentences", medium: "a short paragraph", high: "as long as it takes", xhigh: "as long as it takes", max: "as long as it takes" }[
     effort
   ];
   return [

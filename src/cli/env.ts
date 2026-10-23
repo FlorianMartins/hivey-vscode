@@ -24,9 +24,9 @@ export const ENV = {
 } as const;
 
 /** The thinking level asked for in the environment, if it is one this client knows. */
-export function reasoningFromEnv(value: string | undefined): "none" | "low" | "medium" | "high" | undefined {
+export function reasoningFromEnv(value: string | undefined): "none" | "low" | "medium" | "high" | "xhigh" | "max" | undefined {
   const v = value?.trim().toLowerCase();
-  return v === "none" || v === "low" || v === "medium" || v === "high" ? v : undefined;
+  return v === "none" || v === "low" || v === "medium" || v === "high" || v === "xhigh" || v === "max" ? v : undefined;
 }
 
 /** The context window asked for in the environment, in tokens — 4096 at least, or nothing. */
