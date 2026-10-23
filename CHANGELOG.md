@@ -13,7 +13,7 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
   modèle choisi, nommés comme lui : `low`, `medium`, `high`, `xhigh`, `max` sur Claude Opus 4.7 et
   suivants, `max` sans `xhigh` sur Opus et Sonnet 4.6, `minimal` sur GPT-5, `low`, `high`, `max` sur
   DeepSeek, les niveaux qu'annonce le gabarit sur votre serveur. L'infobulle garde le mot du panneau
-  (Bref, Standard, Approfondi, Très approfondi, Maximum). Approfondi envoie désormais `high`, et non
+  (Bref, Standard, Approfondi, Extrême, Maximum). Approfondi envoie désormais `high`, et non
   plus `xhigh`. **Sur votre serveur, rien ne change** : mêmes mots envoyés, mêmes budgets de
   réflexion, et Direct coupe toujours la réflexion.
 - **Les règles du projet sont annoncées.** La première fois qu'un fichier de règles (`AGENTS.md`,

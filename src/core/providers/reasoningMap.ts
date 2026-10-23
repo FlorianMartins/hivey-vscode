@@ -54,7 +54,7 @@ import { reasoningSupport } from "../router/reasoning.js";
 //   * a temperature and thinking cannot both be set, so it is sent only with thinking off.
 //
 // Efforts: each panel level is the effort of the same name — Bref "low", Standard "medium",
-// Approfondi "high", Très approfondi "xhigh", Maximum "max" — and the menu offers the ones the family
+// Approfondi "high", Extrême "xhigh", Maximum "max" — and the menu offers the ones the family
 // has: all five on Opus 4.7+, Sonnet 5+, Haiku 5.5 and Fable; no "xhigh" on Opus 4.6 / Sonnet 4.6.
 //
 // ⚠️ « anthropic a 4 modes de réflexion mais il y a que les 3 qui sont affichés … afficher les modes de

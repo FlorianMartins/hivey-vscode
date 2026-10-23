@@ -1346,7 +1346,7 @@ export const FR: Record<string, string> = {
   "(no output)": "(aucune sortie)",
   "Being answered — click to go back to it.": "En cours de réponse — cliquez pour y revenir.",
   "Open the rules": "Ouvrir les règles",
-  "Very deep": "Très approfondi",
+  "Extreme": "Extrême",
   "Maximum": "Maximum",
   "Longer thinking than Deep, for the hardest problems.": "Une réflexion plus longue qu'Approfondi, pour les problèmes les plus durs.",
   "As much thinking as the model can do. Can cost far more.": "Autant de réflexion que le modèle peut en faire. Peut coûter bien plus.",

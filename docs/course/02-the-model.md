@@ -86,7 +86,7 @@ part — in 51 cases out of 56 it did not **even try** to act.
   GPT-5, `low`, `high`, `max` for DeepSeek, the ones Qwen's template announces on your own server, a
   number of tokens for older Claude models. Only the ones the model really has are offered: its server
   says so when it is yours, its documentation otherwise. Each one's tooltip says what it amounts to —
-  **Direct** (no thinking), **Brief**, **Standard**, **Deep**, **Very deep**, **Maximum** — and those
+  **Direct** (no thinking), **Brief**, **Standard**, **Deep**, **Extreme**, **Maximum** — and those
   are the words shown when the model's levels are not known. Each level really changes the request, whichever the provider: Direct
   **turns thinking off** wherever the model allows it; on a model that always thinks (Claude Opus 5.5,
   Gemini 3, Grok…), Direct is not offered and the lowest level says so. Each level is sent under its own

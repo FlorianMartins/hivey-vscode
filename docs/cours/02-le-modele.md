@@ -89,7 +89,7 @@ et — c'est le plus instructif — dans 51 cas sur 56 il n'a **même pas essay�
   DeepSeek, ceux qu'annonce le gabarit de Qwen sur votre serveur, un nombre de jetons pour les anciens
   Claude. Seuls ceux que le modèle possède vraiment sont proposés : son serveur le dit quand il est chez
   vous, sa documentation sinon. L'infobulle de chacun dit à quoi il correspond — **Direct** (aucune
-  réflexion), **Bref**, **Standard**, **Approfondi**, **Très approfondi**, **Maximum** — et ce sont ces
+  réflexion), **Bref**, **Standard**, **Approfondi**, **Extrême**, **Maximum** — et ce sont ces
   mots qui s'affichent quand les niveaux du modèle ne sont pas connus.
   Chaque niveau change vraiment la requête, d'un fournisseur à l'autre : Direct **coupe** la
   réflexion là où le modèle le permet ; sur un modèle qui réfléchit toujours (Claude Opus 5.5, Gemini
