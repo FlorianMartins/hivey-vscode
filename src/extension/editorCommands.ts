@@ -296,16 +296,3 @@ interface GitExtensionApi {
     }>;
   };
 }
-
-/**
- * Quote a path for whichever shell the terminal is running.
- *
- * PowerShell, cmd and every POSIX shell all accept a double-quoted argument; what differs is the
- * escape character inside it. A path containing a double quote is not something any of them handles
- * the same way — and is not something a filesystem should contain — so it is refused rather than
- * mangled.
- */
-function quote(value: string): string {
-  if (value.includes('"')) throw new Error(`Refusing to run a path containing a quote: ${value}`);
-  return `"${value}"`;
-}

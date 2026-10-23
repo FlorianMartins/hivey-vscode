@@ -72,7 +72,8 @@ Open a folder containing code, then the **Hivey Code** panel in the right-hand b
   ([chapter 5](05-the-three-modes-and-tools.md)). Start with **Plan**: it reads and changes nothing.
 - **Choose how much it thinks**: Direct, Brief, Standard or Deep, next to the mode
   ([chapter 2](02-the-model.md)). Only the levels the model knows are offered, and each one really
-  changes how much it thinks; Direct is missing on a model that cannot stop thinking.
+  changes how much it thinks — on your own server, it is a token budget per step; Direct is missing
+  on a model that cannot stop thinking.
 - **Stop** ends the turn at once. On a shared server busy with somebody else, the turn shows "In the
   queue… 12 s" rather than a misleading "thinking…": it is waiting its turn, and there is no longer a
   time limit after which it would be dropped.
@@ -88,7 +89,8 @@ Open a folder containing code, then the **Hivey Code** panel in the right-hand b
   whether it worked, and what the model writes in between as paragraphs. A command no longer brings
   the terminal up: a click on its row shows what it printed. While the turn runs, **your request stays
   pinned** at the top of the conversation once it has scrolled out of sight; a click goes back to it.
-  Hovering over the answer shows when it finished and how long the request took.
+  Hovering over the answer shows when it finished and how long the request took. The time of each of
+  your messages shows next to "You"; a question retried or edited takes the time it was sent again.
 - **After an answer**, the likely next request appears greyed in the composer: **Tab** (or an arrow)
   makes it your text, **Enter** sends it. Setting `hiveyCode.chat.suggestNext`.
 - **`Ctrl+I`** in the editor rewrites the selection in place.

@@ -24,26 +24,19 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
     l'agent lit ce qu'il affiche (`command_output`) et l'arrête (`stop_command`).
   - **Lecture de pages web** (`fetch_url`, demandée avant chaque sortie) : documentation, changelog,
     erreur expliquée en ligne — le contenu principal de la page, code compris.
-- **Le modèle réfléchit et répond dans votre langue, quelle qu'elle soit.** L'espagnol,
-  l'allemand, l'italien, le portugais et le néerlandais étaient lus comme de l'anglais, et la
-  consigne demandait alors de répondre en anglais : ils sont reconnus, et la consigne est aussi
-  écrite dans la langue elle-même. Sur un serveur auto-hébergé, la réflexion est en plus amorcée
-  dans votre langue (« Analysons la situation en détail. La demande porte sur… ») : mesuré sur 60
-  tâches en français, espagnol et allemand, 92 à 98 % de la réflexion et 97 à 100 % des notes sont
-  dans votre langue (contre 0-1 % et 54-86 % sans), et 57 tâches sur 60 réussissent (contre 55).
-  En contrepartie, la réflexion est plus détaillée et un tour prend environ 40 % de temps en plus.
-  L'anglais ne change pas.
+- **Le modèle répond dans votre langue, quelle qu'elle soit.** L'espagnol, l'allemand, l'italien,
+  le portugais et le néerlandais étaient lus comme de l'anglais, et la consigne demandait alors de
+  répondre en anglais : ils sont reconnus, et la consigne est aussi écrite dans la langue elle-même.
+  La langue est celle de votre message (celle de VS Code seulement quand le message ne permet pas de
+  trancher). L'anglais ne change pas. La réflexion, elle, reste dans la langue du modèle : l'amorcer
+  dans la vôtre le faisait tourner en rond sur les longues tâches (voir « L'agent ne tourne plus en
+  rond » plus bas).
 - **Une commande qui échoue dit pourquoi.** « il a toujours des erreurs des commandes node ». Le cas
   le plus fréquent relevé : `npx tsc` sans TypeScript dans le projet télécharge un paquet sans rapport
   nommé `tsc`, et le modèle réessayait dix variantes. Pour ce piège et quelques autres (sous Windows,
   `node -e '…'` et les outils Unix absents de `cmd.exe` ; module ESM/CommonJS ; module introuvable), une
   indication suit la sortie de la commande : la cause et la commande qui marche. Panneau et ligne de
   commande.
-- **La réflexion suit la langue de votre message.** « il bascule des fois en français et d'autres fois
-  en anglais dans le raisonnement ». La règle de langue ne visait que ce que le modèle vous écrit : il
-  réfléchissait en anglais, puis en français, puis de nouveau en anglais. Il réfléchit maintenant dans la
-  langue de votre message (celle de VS Code seulement quand le message ne permet pas de trancher), et
-  une langue demandée dans le message l'emporte, pour la réponse comme pour la réflexion.
 - **La réflexion est mise en forme.** Listes, `code` et gras s'affichent comme dans la réponse au lieu
   du texte brut ; affichage seulement.
 - **Les commandes ne font plus apparaître le terminal.** Par défaut, partout, l'agent lance ses
@@ -88,9 +81,14 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 - **La langue de l'utilisateur tient pour tout le tour.** La règle de langue annoncée en 1.14.2 est
   activée : la consigne système dit dans quelle langue écrire — notes entre deux appels d'outil
-  comprises —, un rappel suit chaque résultat d'outil, et une note qui sort quand même dans l'autre
-  langue est remise dans la bonne par une petite requête de traduction (réflexion coupée). Dans le
-  panneau comme dans la ligne de commande.
+  comprises —, et un rappel suit chaque résultat d'outil. Rien de ce qu'écrit le modèle n'est traduit
+  après coup : le filet de traduction prévu au départ a été retiré (voir « Plus de texte en anglais qui
+  bascule »). Dans le panneau comme dans la ligne de commande.
+- **Ligne de commande : trois réglages pour mesurer.** `HIVEY_CODE_REASONING` (`none`, `low`,
+  `medium`, `high`) et `HIVEY_CODE_TEMPERATURE` (de 0 à 2) fixent le niveau de réflexion et la
+  température d'une exécution ; `HIVEY_CODE_CONTEXT` impose une fenêtre de contexte (4 096 jetons au
+  moins), pour qu'un banc « contexte plein » déclenche le raccourcissement des anciens résultats et le
+  compactage en direct comme dans le panneau. Sans elles, rien ne change.
 - **Le banc d'évaluation passe de 40 à 60 tâches, vingt plus difficiles.** Le modèle 27B en
   réussissait 39 sur 40 : le banc ne pouvait plus montrer de progrès. Les vingt nouvelles tâches
   (TypeScript, JavaScript, Python, Java) sont du travail ordinaire où la correction évidente est
@@ -108,6 +106,15 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 - **Node 20 au minimum pour le client en ligne de commande** ; la CI teste Node 20, 22 et 24 (Windows
   et tâches uniques sur Node 24). Node 18 n'est plus maintenu depuis avril 2025, et sa suite de tests
   prenait 17 minutes, contre moins d'une sur les versions suivantes.
+- **Banc : cinq consignes disent ce que leur vérification exige déjà** (`js-config-rename`,
+  `ts-impossible-state`, `ts-exhaustive-switch`, `ts-cursor-pagination`, `js-todo-cli-long`). Le test
+  caché exigeait un détail que la consigne ne nommait pas — un libellé d'aide, une valeur exacte, pas
+  de branche `default:`, des fichiers à ne pas toucher, l'identifiant affiché : la tâche mesurait du
+  hasard (3 réussites sur 17 exécutions rejouées pour la première, 0 sur 6 pour la dernière). Les
+  tests ne changent pas.
+- **Catalogue des modèles et préréglages Hivey rafraîchis** (au 2026-10-23, par la mise à jour
+  quotidienne). `hivey/smart` confie désormais les corvées à `qwen/qwen3.7-flash` et le travail
+  courant à `mistralai/mistral-large-4-0`.
 
 ### Corrigé
 
@@ -135,12 +142,11 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
   lignes.** Écrite avant ses actions (« Je lis `src/prix.js` pour vérifier… »), elle était redessinée
   après elles et lue comme un commentaire du résultat, dans la taille de la réponse finale et avec un
   point gris. Elle vient maintenant sous « Réflexion », avant les actions, à la taille des lignes
-  d'action, son point dans le bleu du thème. L'avis « Le tour approchait de la fenêtre de contexte… »
-  n'apparaît plus du tout : raccourcir d'anciens résultats est de l'entretien courant.
-- **La phrase du modèle reprend sa place sous « Réflexion ».** Près de la limite du contexte, l'avis
-  « Le tour approchait de la fenêtre de contexte… » s'affichait après chaque étape, juste sous la
-  réflexion, à la place de la phrase où le modèle dit ce qu'il fait. Les avis d'entretien (anciens
-  résultats raccourcis, résumé, serveur occupé) passent maintenant dans l'indicateur d'activité, une
+  d'action, son point dans le bleu du thème.
+- **Plus d'avis « Le tour approchait de la fenêtre de contexte… ».** Près de la limite du contexte,
+  il s'affichait après chaque étape, juste sous la réflexion, à la place de la phrase où le modèle dit
+  ce qu'il fait. Raccourcir d'anciens résultats est de l'entretien courant : l'avis n'apparaît plus du
+  tout. Les autres avis d'entretien (résumé, serveur occupé) passent dans l'indicateur d'activité, une
   seule fois par tâche.
 - **Compactage en direct, comme Claude Code.** Quand le contexte est plein en pleine tâche et que
   raccourcir les vieux résultats ne suffit plus, l'agent résume lui-même le travail fait (la demande
@@ -166,7 +172,9 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
   rien de ce qu'il avait pensé à l'étape précédente — seulement ses appels et leurs résultats — et
   repartait de zéro à chaque action : DeepSeek « s'éparpillait ». Les `reasoning_details`
   d'OpenRouter sont maintenant recueillis et renvoyés tels quels à l'étape suivante, comme OpenRouter
-  le demande ; Claude et les modèles à réflexion chiffrée en profitent aussi.
+  le demande ; Claude et les modèles à réflexion chiffrée en profitent aussi. Banc de 60 tâches avec
+  DeepSeek V4.1 Flash par OpenRouter : 59/60 avant comme après, coût 0,166 $ → 0,141 $ (−15 %),
+  temps cumulé 30 → 26 min (−13 %).
 - **« Réessayer » affiche l'heure du nouvel essai.** La question gardait l'heure où elle avait été
   posée la première fois ; une question modifiée puis renvoyée aussi. Elle prend maintenant l'heure
   où elle est renvoyée.
@@ -198,7 +206,18 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
   fichiers, garde-fou de répétition, sous-agents, `fetch_url`). Captures refaites dans un vrai VS Code.
   Retirés car inutilisés : `a.out`, un `SHA256SUMS` figé sur la 1.14.1 (la CI publie le vrai avec
   chaque build), deux rapports du banc du 3 octobre, `docs/PROMPT-ROADMAP.md` (périmé), 28 captures
-  liées nulle part. Le script de capture n'envoie plus deux fois ses en-têtes.
+  liées nulle part. Le script de capture n'envoie plus deux fois ses en-têtes. Remise à jour ensuite
+  pour les changements ci-dessus : compactage en direct, `AGENTS.md` / `CLAUDE.md`, budgets de
+  réflexion, connexions coupées, marqueur fixé par conversation, Node 20, variables du banc.
+- **Ménage du code, sans changement visible.** Retirés car plus rien ne s'en servait : la dictée côté
+  panneau (`dictate.ts`, déjà absente du paquet), l'ancien résumé repliable des étapes et son style,
+  l'amorce de réflexion (`thinkPrefix`, abandonnée en #71), les restes du client terminal, six exports
+  et une vingtaine d'imports et de variables orphelins, et les chaînes traduites qu'ils étaient seuls à
+  utiliser. 1 340 tests, tous verts.
+- **Ce qui a été mesuré et écarté est consigné** (ADR 0042) : les variantes du journal de contexte
+  après un résumé (journal exact, fichiers épinglés, extraits choisis, appels allégés, carnet de faits,
+  résumé à un moment propre) et le niveau de réflexion « Auto » choisi par probabilité. Aucune ne fait
+  mieux que la mémoire actuelle ; elles ne sont pas intégrées.
 - **L'agent ne tourne plus en rond sur la même réflexion.** Depuis #64, la réflexion du modèle
   auto-hébergé était amorcée à chaque étape par « Analysons la situation en détail. La demande porte
   sur… » : ramené à la demande à chaque fois, il refaisait les mêmes lectures (les trois mêmes
@@ -217,9 +236,10 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
   - **Un sous-agent ne revient plus vide.** Arrivé à sa limite d'étapes sans avoir conclu, il est
     invité, sans outils, à rendre ce qu'il a trouvé (fichiers, lignes, ce qui reste à établir) ;
     l'agent qui l'a envoyé ne refait plus toute l'exploration. Vérifié en réel.
-  - **Le garde-fou contre les répétitions ne vise plus que les vraies boucles** : la même étape de
-    lecture trois fois d'affilée. Compté sur tout le tour, il refusait une relecture légitime plus
-    loin dans une longue tâche, puis arrêtait le tour. Une relecture identique reçoit un renvoi vers la
+  - **Le garde-fou contre les répétitions ne vise plus que les vraies boucles** : le même appel en
+    lecture seule trois fois sans aucun changement entre-temps (voir « L'agent ne tourne plus en
+    rond » plus haut). Compté sur tout le tour, il refusait une relecture légitime plus loin dans une
+    longue tâche, puis arrêtait le tour. Une relecture identique reçoit un renvoi vers la
     copie déjà là.
   - **Un tour arrêté dit où il en est** : ce qui est fait, ce qui bloque, ce qu'il lui faut — au lieu de
     « Arrêté : le modèle répétait le même appel » seul.
@@ -265,9 +285,7 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
   commande. Essais réels : 2 réponses exactes sur 2 à « qu'as-tu lu, modifié, lancé ? », contre 1 sur 2.
 - **Quand le contexte se remplit, les anciennes versions d'un fichier partent en premier.** Une lecture
   d'un fichier relu ou modifié ensuite est retirée avant toute autre sortie, au lieu de garder côte à
-  côte le début de l'ancienne version et la nouvelle. Et une modification ne remet plus à zéro que le
-  compteur de répétitions de ce fichier : relire en boucle les autres fichiers entre deux modifications
-  est de nouveau repéré.
+  côte le début de l'ancienne version et la nouvelle.
 - **`search_text` cherche dans le code.** Dans le panneau, la recherche lisait les 800 premiers fichiers
   venus, `node_modules` et sauvegardes compris, et répondait « aucun résultat » sur du code présent.
   Elle exclut maintenant les mêmes dossiers que la ligne de commande, le `.gitignore` et
@@ -304,8 +322,9 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
     `thinking` + `reasoning_effort`, Qwen par `enable_thinking` + `thinking_budget`. Chez OpenAI, en
     Chat Completions, GPT-5.4 et suivants n'acceptent les outils que sans réflexion : un tour d'agent y
     part en Direct.
-  - **Serveur auto-hébergé et passerelle** : inchangé (Standard par défaut, Direct coupe) ; le mot
-    envoyé pour chaque niveau passe par un point unique, `selfHostedEffort`, que le banc décidera.
+  - **Serveur auto-hébergé et passerelle** : Standard par défaut, Direct coupe ; le mot envoyé pour
+    chaque niveau passe par un point unique, `selfHostedEffort`. Chaque niveau y a depuis un vrai
+    budget de réflexion (voir « Les niveaux de réflexion font enfin une différence » plus haut).
   - Le menu ne propose que les niveaux qui changent vraiment quelque chose pour le modèle choisi, et
     disparaît sur un modèle qu'on ne peut pas régler.
   - Sur un fournisseur cloud, tant qu'aucun niveau n'a été choisi, la requête est exactement celle
@@ -322,7 +341,8 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
   directement, affichée dans un terminal **Hivey Code (commandes)** où Ctrl+C l'arrête ; un délai
   dépassé arrête aussi ce que la commande a lancé (un serveur). Le modèle est prévenu que c'est
   `cmd.exe` (`&&`, `dir`, `type` — pas `ls`, `cat`, `head`). Réglage `hiveyCode.agent.commandRunner`
-  (`auto` par défaut : processus sous Windows, terminal ailleurs).
+  (depuis, `auto` lance les commandes en processus partout : voir « Les commandes ne font plus
+  apparaître le terminal »).
 - **Un nom de fichier mal orthographié est signalé avec le bon.** L'agent avait confondu
   `skinator-page.js` et `skincare-page.js` pendant une douzaine d'étapes : « fichier introuvable » ne
   lui disait jamais lequel existait. `read_file` et `edit_file` répondent maintenant « … did you mean

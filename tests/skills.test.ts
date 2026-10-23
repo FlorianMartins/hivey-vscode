@@ -17,7 +17,7 @@ import {
   skillInvocation,
   toggleSkill,
 } from "../src/core/session/skills.js";
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 test("a skill nobody has switched off is on", () => {

@@ -77,3 +77,10 @@ test("nothing is translated after the fact: a note is kept as the model wrote it
   assert.match(r.text, /C'est fait\./);
   assert.match(seen[0]!.messages[0]!.content, /Language: the user writes in French[\s\S]*Réponds en français/);
 });
+
+test("a sentence for the person before the tools, asked only when the caller says so (self-hosted)", () => {
+  const sys = [{ role: "system", content: "s" }];
+  assert.match(withReplyLanguage(sys, "fr", true)[0]!.content, /one short sentence in French/);
+  assert.doesNotMatch(withReplyLanguage(sys, "fr")[0]!.content, /one short sentence/, "a cloud model: its own settings");
+  assert.doesNotMatch(withReplyLanguage(sys, "fr", true)[0]!.content, /Réfléchis/, "its thinking in its own language");
+});

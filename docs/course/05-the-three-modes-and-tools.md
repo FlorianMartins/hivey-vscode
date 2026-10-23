@@ -56,11 +56,27 @@ again, and a model that insists is stopped — the turn then ends by saying what
 and what it needs. A number in that setting puts a cap back; when it is reached you are told, and you
 can carry on.
 
+Two other runaways are stopped without blocking the turn. **Thinking that goes round in circles** —
+the same passage three times in a row — is cut on the spot, and the model is asked to decide with
+what it has already found. **A reply that on its own fills more than a quarter of the context** is not
+asked for again as it was: the model is told it was lost and has to be split up (a big file in several
+writes); twice at most, then the turn says where it stands instead of stopping in silence.
+
+Commands do not keep you waiting for nothing either. A command silent for 15 seconds that ends on a
+question ("Ok to proceed?", `[Y/n]`, a password) is stopped, and the model is given the question and
+how to answer it on the command line (`--yes`, `-y`…). A finished command comes back at once with its
+real exit code, even when a process it started — a server, a test that never ends — keeps its output
+open: what was left is stopped, and the model knows it. Before, the agent waited until the timeout,
+then tried again with a longer one, for an hour.
+
 Three things you will see along the way:
 
 - **The turn reads in order**, as one timeline: each stretch of thinking is a folded **Thinking**
-  line, each action a compact row, and the text written at that point between them. While it works,
-  when you read it back, and in the conversation's Markdown export.
+  line, each action a compact row, and the text written at that point between them. The sentence in
+  which the model says what it is about to do ("I'm reading `src/price.js` to check…") comes under the
+  thinking, **before** the actions it announces, with a blue dot. Routine housekeeping — old outputs
+  shortened, a summary made, a busy server — shows for a moment in the activity indicator, not in the
+  timeline. While it works, when you read it back, and in the conversation's Markdown export.
 - **The answer stays in your language**, from start to end of the turn, including the short notes
   between two actions, which the model tended to write in English right after reading code. The rule
   is repeated at every step; nothing is translated afterwards. On a self-hosted server the model

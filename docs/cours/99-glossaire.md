@@ -25,7 +25,8 @@ table des matières du projet pour le modèle. → [6](06-le-contexte.md)
 **Commit** — Un instantané du projet, avec un message qui dit pourquoi. → [1](01-le-decor.md)
 
 **Compactage** — Remplacer une conversation trop longue par un résumé que le modèle écrit, sans rien
-effacer à l'écran. Automatique par défaut, aux trois quarts du budget. → [6](06-le-contexte.md)
+effacer à l'écran. Automatique par défaut, aux trois quarts du budget ; quand la fenêtre se remplit en
+pleine tâche, le tour se résume lui-même et continue. → [6](06-le-contexte.md)
 
 **Complétion** — Les propositions pendant la frappe. L'usage le plus fréquent, donc celui qui décide
 de la facture. → [10](10-le-cout.md)
@@ -122,7 +123,9 @@ question. Le modèle **n'apprend rien**. → [7](07-rag-et-memoire.md)
 revendiquée dans ce projet et **n'existait pas**, par une erreur d'arrondi. → [10](10-le-cout.md)
 
 **Réflexion (niveau de)** — Combien le modèle « réfléchit » avant de répondre : Direct (coupée, là
-où le modèle le permet), Bref, Standard, Approfondi. Plus de réflexion, c'est plus de jetons. → [2](02-le-modele.md)
+où le modèle le permet), Bref, Standard, Approfondi. Plus de réflexion, c'est plus de jetons. Sur votre
+propre serveur, chaque niveau est aussi un budget de réflexion par étape : 1 024 jetons pour Bref,
+8 192 pour Standard, sans limite pour Approfondi. → [2](02-le-modele.md)
 
 **SIEM** — Le système où une entreprise centralise ses journaux de sécurité.
 → [9](09-la-confidentialite.md)

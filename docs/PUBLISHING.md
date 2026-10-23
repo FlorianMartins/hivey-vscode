@@ -25,14 +25,15 @@ main reason this is a document rather than a workflow.
 ### Node
 
 `@vscode/vsce@3` requires **Node ≥ 20**. Check with `node -v`; on Node 18 it fails during packaging
-with a syntax error that looks like a bug in the extension and is not.
+with a syntax error that looks like a bug in the extension and is not. The repository itself asks
+for Node 20 at least (`engines` in `package.json`), and CI runs the suite on Node 20, 22 and 24.
 
 ## Every release
 
 ```bash
 npm ci
 npm run typecheck
-npm test                                # 1354 tests (node:test)
+npm test                                # 1340 tests (node:test)
 xvfb-run -a npm run test:integration    # 57 tests, headless, inside a real VS Code
 npm run eval:verify                     # every task's check fails on its untouched fixture
 npm run eval:solutions                  # and passes on its reference solution

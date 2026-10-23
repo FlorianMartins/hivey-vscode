@@ -34,6 +34,12 @@ until it has finished.
 The point is not cosmetic: you can **stop** an answer that was going wrong before it has been fully
 computed, and therefore before you have fully paid for it.
 
+A connection that stays open can also drop: Wi-Fi going down, a VPN, a reloaded window. Hivey Code
+treats a cut in the middle of an answer as an interrupted answer: what had already arrived is kept,
+and the model is asked to carry on where it stopped, instead of an error ("terminated") shown in
+place of the answer. And a connection closed between two requests, which would make the next one
+fail before it even reached the server, is retried once, on a fresh connection.
+
 ## The two languages of models
 
 This is the chapter's important point. There is not one shape of form, there are **two**:

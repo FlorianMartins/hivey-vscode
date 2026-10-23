@@ -784,12 +784,6 @@ function printDiff(path: string, before: string, after: string): void {
   console.log("");
 }
 
-function randomNonce(): string {
-  const bytes = new Uint8Array(16);
-  (globalThis.crypto ?? require("node:crypto").webcrypto).getRandomValues(bytes);
-  return [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
-}
-
 /**
  * One line of JSON per turn, when the evaluation harness asks for it.
  *

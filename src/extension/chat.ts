@@ -36,7 +36,7 @@ import { Permissions, commandPrefix, type PermissionStore, type Rule } from "../
 import { detectLanguage, languageDirective, stablePrompt, turnDirectives } from "../core/prompts.js";
 import { detectUserLanguage } from "../core/userLanguage.js";
 import { MAP_REBUILD_AFTER, structureNote } from "../core/context/structure.js";
-import { costOf, estimateCost, makeLookup, type Price } from "../core/router/pricing.js";
+import { costOf, estimateCost, makeLookup } from "../core/router/pricing.js";
 import { calibrate, observe, prune, type Calibration } from "../core/util/calibrate.js";
 import { acceptsImages, IMAGE_TOKENS, isCatalogued, isImageRefusal, withoutImages } from "../core/models/vision.js";
 import { checkEndpoint } from "../core/providers/endpoint.js";
@@ -126,7 +126,6 @@ import { billsTheUser } from "../core/router/billing.js";
 import { attachmentTokens } from "./budgets.js";
 import { loadPrices } from "./prices.js";
 import { contextBudget, repoMapBudget } from "../core/context/budget.js";
-import { perFileBudget } from "../core/util/tokens.js";
 import { buildTools } from "./tools.js";
 import { McpManager } from "./integrations/mcp.js";
 import { WorkspaceContext, relative } from "./workspace.js";
@@ -5453,44 +5452,6 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         () => resolve("no"),
       );
     });
-  }
-
-  /**
-   * Has this action already been allowed — by a standing rule, or by the auto-approve scope?
-   *
-   * ⚠️⚠️ Extracted because the answer was computed in ONE place and needed in TWO, and the second
-   * place did not ask. `confirmEdit` opened a diff and a notification on every single edit,
-   * unconditionally, with no idea that the user had already said "Always". So the product had two
-   * approval systems that did not know about each other: one that the Always button satisfied, and
-   * one that asked again right behind it.
-   *
-   * That is both of Florian's reports at once — "agent mode does a compare instead of editing" and
-   * "it asks for permission again afterwards if you click always". Neither was
-   * a bug in the permission store, which was right all along; the second asker simply never
-   * consulted it.
-   */
-  private alreadyAllowed(tool: string, args: Record<string, unknown>): boolean {
-    const decision = this.permissions.decide(tool, args);
-    if (decision === "never") return false;
-    if (decision === "always" || decision === "session") return true;
-    const settings = readSettings();
-    const path = pathArgument(args);
-    return autoApprove(
-      {
-        scope: settings.permissions.autoApprove,
-        allowedPaths: settings.permissions.allowedPaths,
-        allowedCommands: settings.permissions.allowedCommands,
-        deniedPaths: settings.permissions.deniedPaths,
-        deniedCommands: settings.permissions.deniedCommands,
-        blockedGlobs: settings.privacy.blockedGlobs,
-      },
-      {
-        tool,
-        ...(path ? { path, insidePath: isInsideWorkspace(path) } : {}),
-        ...(tool === "run_command" ? { command: String(args["command"] ?? "") } : {}),
-      },
-      matchGlob,
-    ).allow;
   }
 
   /**

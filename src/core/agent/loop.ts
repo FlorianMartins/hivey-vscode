@@ -180,12 +180,6 @@ export interface TurnOptions {
    */
   concludeWhenCut?: boolean | "always";
   /**
-   * The first words of the model's thinking, sent as the start of its answer so the thought goes on
-   * in the user's language — only where the server continues a started answer (a self-hosted one).
-   * See `THINK_STARTERS`.
-   */
-  thinkPrefix?: string;
-  /**
    * Where the turn's housekeeping is said — see `maintenance` in `runTurn`. `report` when absent.
    */
   maintenance?: (message: string) => void;
@@ -752,31 +746,8 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
       if (Math.ceil(estimateMessageTokens(working) * tokenRatio) > limit) await compactLive();
     }
     const prepared0 = opts.beforeRequest ? await opts.beforeRequest(working) : working;
-    // The thinking started in the user's language, as the start of the model's answer — sent, never
-    // stored; put back in front of the thought it started, live and in the result. See `thinkPrefix`.
-    //
-    // ⚠️ The first step only. Its words — « …La demande porte sur » — restate the REQUEST: started that
-    // way at every step, the model went back to the request each time instead of on from what it had
-    // just found, thought the same thought again, and ran the same searches again until the window was
-    // full: « il boucle, rempli le contexte en ayant à chaque fois la même réflexion ». The later
-    // steps are told to think in the language (see `withReplyLanguage`) and carry on from there.
-    const thinksInIt = Boolean(opts.thinkPrefix) && opts.reasoning !== "none" && !opts.chore;
-    const prefix = thinksInIt && step === 0 ? opts.thinkPrefix : undefined;
-    const prepared = opts.replyLanguage ? withReplyLanguage(prepared0, opts.replyLanguage, thinksInIt, Boolean(opts.notesBeforeTools)) : prepared0;
-    const outgoing0 = opts.promptCache ? withRollingCacheMark(prepared) : prepared;
-    const outgoing = prefix ? [...outgoing0, { role: "assistant" as const, content: "", reasoning: prefix }] : outgoing0;
-    let thoughtStarted = false;
-    const onDelta: TurnOptions["onDelta"] =
-      prefix && opts.onDelta
-        ? (d) => {
-            if (d.reasoning && !thoughtStarted) {
-              thoughtStarted = true;
-              opts.onDelta!({ ...d, reasoning: `${prefix} ${d.reasoning.replace(/^\s+/, "")}` });
-              return;
-            }
-            opts.onDelta!(d);
-          }
-        : opts.onDelta;
+    const prepared = opts.replyLanguage ? withReplyLanguage(prepared0, opts.replyLanguage, Boolean(opts.notesBeforeTools)) : prepared0;
+    const outgoing = opts.promptCache ? withRollingCacheMark(prepared) : prepared;
     // The step's own stop, for a thinking that loops — see `repeatingTail`. The user's stop still
     // reaches it, and is still told apart: `opts.signal` is what says "cancelled".
     const stepCtl = new AbortController();
@@ -797,7 +768,7 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
           }
         }
       }
-      onDelta?.(d);
+      opts.onDelta?.(d);
     };
     let res: ChatResult;
     try {
@@ -814,7 +785,6 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
         },
         watched,
       );
-      if (prefix && res.reasoning) res = { ...res, reasoning: `${prefix} ${res.reasoning.replace(/^\s+/, "")}` };
     } catch (err) {
       if (opts.signal?.aborted) return done("cancelled");
       if (looped) {

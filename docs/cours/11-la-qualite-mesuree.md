@@ -145,8 +145,9 @@ confiance au tableau :
 
 Il faut une notion pour la suite : l'**intégration continue**. À chaque fois que du code est envoyé
 sur le dépôt, un ordinateur loué à l'heure récupère le projet, l'installe à neuf et exécute tous les
-tests — sur plusieurs systèmes (Linux, Windows) et plusieurs versions du langage. L'intérêt est de ne
-pas dépendre de « ça marche sur ma machine », qui est une phrase et pas une preuve.
+tests — sur plusieurs systèmes (Linux, Windows) et plusieurs versions du langage (aujourd'hui
+Node.js 20, 22 et 24, la 20 étant le minimum). L'intérêt est de ne pas dépendre de « ça marche sur ma
+machine », qui est une phrase et pas une preuve.
 
 Le 2026-10-06, Florian a posé une question très simple : « le CI workflow a toujours plein d'erreurs
 cest normal ? » Il avait raison de la poser. Tous les envois de la semaine étaient **rouges**, pendant

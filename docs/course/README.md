@@ -8,7 +8,7 @@ together — **without assuming you can program**. If you don't know what a "tok
 
 It exists for a precise reason. This project has plenty of technical documentation: a
 [README](https://github.com/FlorianMartins/hivey-vscode/blob/main/README.md), an
-[architecture](../ARCHITECTURE.md), a [threat model](../THREAT-MODEL.md), 41 reasoned decisions. All
+[architecture](../ARCHITECTURE.md), a [threat model](../THREAT-MODEL.md), 42 reasoned decisions. All
 of it is written for somebody who codes. But the questions people actually ask about
 this tool — *does my code go anywhere? what can it do that Copilot can't? how does it really work?* —
 are questions you should be able to answer without knowing how to code, and should be able to

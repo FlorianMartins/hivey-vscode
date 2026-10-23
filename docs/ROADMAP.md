@@ -18,9 +18,10 @@ ici est « non vérifié ».
 ⚠️ **Le support IBM i a été retiré du produit** (langages RPG/CL/DDS/Db2 for i, connexion IBM i,
 ARCAD, outils `ibmi_*`, compétences et tâches `ibmi-` du banc). Les chantiers et versions qui ne
 concernaient qu'IBM i ont été retirés de ce document ; le CHANGELOG garde l'historique. Le banc
-compte désormais **40 tâches** (62 avant le retrait des 22 tâches IBM i) : les mesures sur 56 ou
-62 tâches citées ci-dessous sont des relevés **d'époque**, sur un autre jeu, et ne se comparent pas
-à une série sur le jeu actuel.
+est tombé à 40 tâches avec le retrait des 22 tâches IBM i, puis est passé à **60 tâches** avec vingt
+tâches plus difficiles, décidées par des tests cachés : les mesures sur 40, 56 ou 62 tâches citées
+ci-dessous sont des relevés **d'époque**, sur un autre jeu, et ne se comparent pas à une série sur le
+jeu actuel.
 
 ### Phase 0 — Fondations
 
@@ -28,7 +29,7 @@ compte désormais **40 tâches** (62 avant le retrait des 22 tâches IBM i) : le
 |---|---|---|
 | 0.1 Marqueurs dans les arguments d'outils | fait | **testé** (unitaire, retombe sans le correctif) ; intégration impossible ici — la porte de sortie est sautée en loopback, donc aucun coffre peuplé ; invariant gardé par un test qui lit le source |
 | 0.2 Marqueur coupé entre deux fragments | fait | **testé** (toutes les positions de coupure, fin de flux, arrêt ; retombe sans le correctif) ; câblage gardé par un test qui lit le source |
-| 0.4 Suite de tests sous Node 22 | fait | **non vérifié ici** — seul Node 18 est installé sur cette machine ; la matrice de CI (18, 20, 22 + Windows) l'établira. Invariants gardés par deux tests |
+| 0.4 Suite de tests sous Node 22 | fait | **vérifié par la CI** — matrice Node 20, 22 et 24 sous Linux, plus Node 24 sous Windows, verte sur `main`. Node 20 est désormais le minimum (`engines`), Node 18 n'étant plus maintenu. Invariants gardés par deux tests |
 | 0.5 Des chiffres qui ne peuvent plus vieillir | fait | **testé** — le contrôleur refuse un chiffre faux et le répare (prouvé dans les deux sens) ; son câblage en CI est gardé par un test |
 | 0.6 Mesurer la qualité sur de vrais modèles | fait (harnais) | **testé** — rapport JSON+Markdown prouvé de bout en bout contre un faux serveur de modèle ; les règles « n'invente aucun chiffre » tenues par 9 tests dans `core` ; banc porté à 40 tâches, 40/40 échouent sur la fixture intacte **et** passent sur leur solution (deux portes de CI). ⚠️ **non mesuré** : aucun modèle réel joignable d'ici — les chiffres de qualité restent à produire |
 
@@ -93,19 +94,40 @@ Trois niveaux, jamais mélangés :
 - **Lecture par pages** (testé) : sans plage, `read_file` rend une page de 2 000 lignes et dit comment
   lire la suite.
 - **Compactage automatique** (`context.autoCompact`, activé par défaut ; seuil testé) : aux trois
-  quarts du budget, la conversation est résumée avant l'envoi de la question ; un contexte qui se
-  remplit en pleine tâche est résumé et la tâche reprend. Désactivé : une offre à 70 %, et une
-  question « Résumer et continuer ? » quand le contexte est plein. La reprise après saturation est
-  testée dans un vrai éditeur (étape, refus du serveur, résumé, reprise de la tâche).
+  quarts du budget, la conversation est résumée avant l'envoi de la question. Désactivé : une offre
+  à 70 %, et une question « Résumer et continuer ? » quand le contexte est plein. La reprise après
+  saturation est testée dans un vrai éditeur (étape, refus du serveur, résumé, reprise de la tâche).
+- **Compactage en direct** (testé ; vérifié à la main avec Qwen sur un contexte volontairement
+  réduit) : quand le contexte est plein en pleine tâche et que raccourcir les anciens résultats ne
+  suffit plus, le tour se résume lui-même — demande mot pour mot, fichiers modifiés, commandes, état
+  des erreurs, suite — et continue sans s'arrêter, trois fois au plus ; prompt système et carte
+  intacts. Le résumé part des actions du tour, échecs marqués, et non du seul texte des réponses.
+- **Une réponse qui s'emballe ne bloque plus le tour** (testé) : une réflexion qui répète trois fois
+  le même passage est coupée ; une réponse qui remplit seule plus d'un quart de la fenêtre n'est pas
+  redemandée telle quelle, le modèle est invité à découper.
+- **Les règles du projet** (testé) : `.hiveycode/instructions.md`, sinon `AGENTS.md`, `CLAUDE.md` à
+  la racine, sinon `.github/copilot-instructions.md`, gardées dans le prompt système de chaque tour.
+- **Le cache de llama.cpp tient d'une question à l'autre** (testé) : délimiteur des pièces jointes
+  fixé par conversation, carte gardée quand des fichiers sont créés ou supprimés (listés après
+  l'historique, carte reprise au-delà de 50).
+- **Connexions** (testé) : une connexion réinitialisée avant le premier octet est renvoyée une fois ;
+  une coupure en pleine réponse garde ce qui est arrivé et le modèle reprend.
+- **Commandes** (testé) : une commande muette depuis 15 s qui finit sur une question est arrêtée et
+  le modèle reçoit la question ; une commande finie revient aussitôt même si un processus qu'elle a
+  lancé garde sa sortie ouverte. Le banc tue le groupe de processus d'une vérification au délai.
 - **Quitter une conversation arrête son tour** (testé dans un vrai éditeur) : nouvelle conversation,
   ouvrir une autre conversation ou supprimer celle-ci ; un Stop pendant un résumé annule aussi ce qui
   devait suivre.
 - **La langue de l'utilisateur tenue pour tout le tour** (testé) : une règle dans le prompt système,
-  un rappel après chaque résultat d'outil, et une note écrite dans une autre langue traduite par une
-  petite requête — qui ne part que là où l'envoi est déjà consenti.
+  dans la langue de l'utilisateur aussi, et un rappel après chaque résultat d'outil ; rien n'est
+  traduit après coup. Sur un serveur auto-hébergé, le modèle réfléchit dans sa langue et écrit une
+  phrase dans celle de l'utilisateur avant chaque série d'actions.
 - **Les niveaux de réflexion du modèle** (testé) : sur llama.cpp, le gabarit est interrogé et le menu
   (Direct, Bref, Standard, Approfondi) n'offre que ceux qu'il connaît ; sans choix explicite, un
-  serveur auto-hébergé reçoit Standard, et « Direct » n'envoie aucune réflexion.
+  serveur auto-hébergé reçoit Standard, et « Direct » n'envoie aucune réflexion. Chaque niveau y a un
+  budget de réflexion par étape que llama.cpp fait respecter (Bref 1 024 jetons, Standard 8 192,
+  Approfondi sans limite) ; mesuré, Bref aussi précis qu'avant et 29 % plus rapide. Par OpenRouter,
+  les `reasoning_details` sont renvoyés d'une étape à l'autre.
 - **Indicateur de file d'attente** (testé) : « En file d'attente… », puis « Lecture de la
   conversation… 45 % » sur un serveur qui signale son avancement ; plus aucun délai de 180 s pour la
   première réponse d'un serveur auto-hébergé.
@@ -301,7 +323,7 @@ Trois niveaux, jamais mélangés :
 ### Avant 0.39.0
 
 - Noyau indépendant de l'éditeur : anonymisation, fournisseurs, routeur, budget, complétion, session,
-  carte du dépôt, boucle d'agent. **1354 tests unitaires** plus **57 tests d'intégration dans un vrai
+  carte du dépôt, boucle d'agent. **1340 tests unitaires** plus **57 tests d'intégration dans un vrai
   VS Code**.
 - Barre latérale : conversation, historique, modèles, permissions, configuration ; modes
   discussion / plan / agent ; budget de raisonnement ; contexte explicite.
@@ -324,10 +346,10 @@ Trois niveaux, jamais mélangés :
 - **Publication sur le Marketplace VS Code et Open VSX.** Préparée (`docs/PUBLISHING.md`), en attente
   des jetons d'éditeur — que seul Florian peut créer. En attendant, l'installation se fait par le
   `.vsix` de la release `build`, dont l'empreinte et l'attestation sont publiées.
-- **Qualité mesurée sur le jeu actuel.** Le banc (`eval/`, 40 tâches, `npm run eval`) a tourné
-  contre de vrais modèles, mais sur les anciens jeux de 56 et 62 tâches ; depuis le retrait des
-  tâches IBM i, aucune série complète n'a encore été publiée sur les 40 tâches restantes. Les lignes
-  de `eval/QUALITY.md` le disent.
+- **Qualité publiée sur le jeu actuel.** Le banc (`eval/`, 60 tâches, `npm run eval`) tourne contre
+  de vrais modèles, et le CHANGELOG cite des séries sur les 60 tâches pour justifier des changements ;
+  mais le tableau publié, `eval/QUALITY.md`, n'a encore que des lignes mesurées sur les anciens jeux
+  de 56 et 62 tâches, et il le dit.
 - **Reproductibilité octet pour octet du `.vsix`.** Non promise, et c'est délibéré : un `.vsix` est
   un zip, un zip porte les dates de modification, deux builds du même commit ne donnent donc pas les
   mêmes octets. Ce qui est offert à la place est l'empreinte du fichier réellement publié et une

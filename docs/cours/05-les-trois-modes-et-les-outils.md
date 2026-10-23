@@ -57,11 +57,30 @@ fois sans aucun changement entre-temps n'est pas exécuté, et un modèle qui in
 tour se termine alors en disant ce qui est fait, ce qui bloque et ce qu'il lui faut. Un nombre dans ce
 réglage remet un plafond ; quand il est atteint, on vous le dit et vous pouvez continuer.
 
+Deux autres emballements sont arrêtés sans bloquer le tour. Une **réflexion qui tourne en boucle** —
+le même passage trois fois de suite — est coupée sur-le-champ, et le modèle est invité à trancher avec
+ce qu'il a déjà trouvé. Une **réponse qui remplit à elle seule plus d'un quart du contexte** n'est pas
+redemandée telle quelle : le modèle apprend qu'elle a été perdue et qu'il faut la découper (un gros
+fichier en plusieurs écritures) ; deux fois au plus, puis le tour dit où il en est au lieu de s'arrêter
+en silence.
+
+Les commandes non plus ne font pas attendre pour rien. Une commande muette depuis 15 secondes qui
+finit sur une question (« Ok to proceed? », `[Y/n]`, un mot de passe) est arrêtée, et le modèle reçoit
+la question et la façon d'y répondre sur la ligne de commande (`--yes`, `-y`…). Une commande finie
+revient aussitôt avec son vrai code de retour, même si un processus qu'elle a lancé — un serveur, un
+test qui ne se termine jamais — garde sa sortie ouverte : ce qui restait est arrêté, et le modèle le
+sait. Avant, l'agent attendait jusqu'au délai, puis relançait avec un délai plus long, pendant une
+heure.
+
 Trois choses que vous verrez en route :
 
 - **Le tour se lit dans l'ordre**, comme une frise : chaque moment de réflexion est une ligne repliée
   **Réflexion**, chaque action une ligne compacte, et le texte écrit à ce moment-là entre les deux.
-  Pendant le travail, à la relecture, et dans l'export Markdown de la conversation.
+  La phrase où le modèle annonce ce qu'il va faire (« Je lis `src/prix.js` pour vérifier… ») vient
+  sous la réflexion, **avant** les actions qu'elle annonce, avec un point bleu. L'entretien courant —
+  anciens résultats raccourcis, résumé, serveur occupé — s'affiche un instant dans l'indicateur
+  d'activité, pas dans la frise. Pendant le travail, à la relecture, et dans l'export Markdown de la
+  conversation.
 - **La réponse reste dans votre langue**, du début à la fin du tour, y compris les courtes notes
   entre deux actions, que le modèle avait tendance à écrire en anglais juste après avoir lu du code.
   La consigne est répétée à chaque étape ; rien n'est traduit après coup. Sur un serveur

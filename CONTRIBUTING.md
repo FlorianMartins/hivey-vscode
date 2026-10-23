@@ -2,6 +2,8 @@
 
 ## Démarrer
 
+Node 20 au minimum (la CI teste Node 20, 22 et 24).
+
 ```bash
 npm ci
 npm test            # construit les bundles puis lance la suite

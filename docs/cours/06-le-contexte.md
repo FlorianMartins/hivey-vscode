@@ -21,6 +21,20 @@ C'est l'équivalent d'une table des matières. Le modèle ne sait pas ce que fai
 sait qu'elle existe, dans quel fichier, à quelle ligne. Il peut alors **demander** à lire ce fichier
 ([chapitre 5](05-les-trois-modes-et-les-outils.md)) au lieu de deviner.
 
+## Les règles du projet
+
+Un dépôt peut aussi dire au modèle comment y travailler : « les tests se lancent avec `npm test` »,
+« on n'ajoute pas de bibliothèque », « les messages de commit sont en anglais ». Ces règles s'écrivent
+dans un fichier texte du projet, et Hivey Code lit le premier qu'il trouve, dans cet ordre :
+`.hiveycode/instructions.md` (le sien, prioritaire), puis `AGENTS.md` et `CLAUDE.md` à la racine —
+ceux que la plupart des dépôts écrivent aujourd'hui pour tous les agents de code et pour Claude
+Code —, puis `.github/copilot-instructions.md`. Ils ne s'additionnent pas : le premier qui dit quelque
+chose l'emporte. Son texte est placé dans le prompt système de chaque tour, survit à tous les
+compactages, et une modification compte dès la question suivante.
+
+Ce sont des **consignes**, pas des garanties ([chapitre 5](05-les-trois-modes-et-les-outils.md)) :
+elles orientent le modèle, elles ne lui donnent ni ne lui retirent aucun outil.
+
 ## Ce que vous joignez vous-même
 
 - **Le fichier ouvert**, proposé et envoyé par défaut — la sélection s'il y en a une, le fichier
@@ -85,11 +99,23 @@ et c'est le résumé qui est envoyé à partir de là.
 
 Ça se fait **tout seul** (`hiveyCode.context.autoCompact`, activé par défaut) : arrivée aux trois
 quarts du budget, la conversation est résumée avant l'envoi de la question, qui part juste après le
-résumé. Si le contexte se remplit **en pleine tâche**, ce qui a déjà été fait est noté dans la
-réponse, la conversation est résumée, et la tâche reprend là où elle s'était arrêtée. Un **Stop**
-pendant le résumé annule aussi ce qui devait suivre. Réglage désactivé, on vous **propose** de résumer
-à partir de 70 %, et un contexte plein vous pose la question au lieu d'une erreur. `/compact` le fait
-à la demande.
+résumé. Un **Stop** pendant le résumé annule aussi ce qui devait suivre. Réglage désactivé, on vous
+**propose** de résumer à partir de 70 %, et un contexte plein vous pose la question au lieu d'une
+erreur. `/compact` le fait à la demande.
+
+Si le contexte se remplit **en pleine tâche**, la tâche ne s'arrête pas. Les plus anciens résultats
+d'outils sont d'abord raccourcis (le modèle peut les relire mot pour mot,
+[chapitre 7](07-rag-et-memoire.md)). Si ça ne suffit plus, le tour **se résume lui-même et continue**,
+comme le fait Claude Code : le même modèle, sans outils ni réflexion, écrit le compte rendu du travail
+— la demande mot pour mot, les fichiers modifiés, les commandes lancées, l'état des erreurs, la
+suite — et le tour repart de ce compte rendu. Ce qui ne change jamais reste tel quel : le prompt
+système, les règles du projet et la carte du dépôt, c'est-à-dire le début de la requête, celui que
+garde le cache (plus bas). Trois fois au plus par tour ; au-delà, ce qui a déjà été fait est noté dans
+la réponse, la conversation est résumée, et la tâche reprend là où elle s'était arrêtée.
+
+Dans tous les cas, le résumé part de ce que l'agent a **fait**, pas seulement de ce qu'il a écrit :
+il reçoit la liste des actions, échecs marqués, et dit où en sont les erreurs. Avant, un fichier
+modifié ou une commande lancée n'y figurait que si la réponse le mentionnait.
 
 Deux choses à savoir :
 
@@ -112,6 +138,15 @@ D'où une règle du projet qui ressemble à un détail et n'en est pas un : **le
 actif**. Y ajouter « juste une ligne sur le fichier ouvert » casse la correspondance et fait payer
 plein tarif tout le reste de la conversation. Cette règle est tenue par un test qui envoie deux tours
 avec un fichier différent ouvert et compare le premier message **octet par octet**.
+
+Votre propre serveur suit la même mécanique, sans facture mais pas sans effet : llama.cpp ne relit une
+requête qu'à partir du premier caractère qui change, et relire toute une conversation prend du temps à
+chaque question. Deux choses changeaient ce début à presque chaque tour, et ne le changent plus. Le
+marqueur qui encadre les fichiers joints est fixé une fois par conversation, au lieu d'être tiré à
+nouveau à chaque tour. Et la carte du dépôt n'est plus refaite dès qu'un fichier est créé ou supprimé
+— ce que l'agent fait lui-même presque à chaque tour : elle est gardée, et les fichiers créés ou
+supprimés depuis sont listés après l'historique. Au-delà de 50 changements, ou à la demande, elle est
+refaite ; les dépendances et la sortie de build (`node_modules`, `dist`…) ne comptent pas.
 
 ## Dans Hivey Code
 

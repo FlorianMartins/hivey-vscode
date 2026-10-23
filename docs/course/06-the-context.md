@@ -21,6 +21,19 @@ It is the equivalent of a table of contents. The model does not know what `calcu
 knows it exists, in which file, at which line. It can then **ask** to read that file
 ([chapter 5](05-the-three-modes-and-tools.md)) instead of guessing.
 
+## The project's rules
+
+A repository can also tell the model how to work in it: "tests run with `npm test`", "no new
+libraries", "commit messages are in English". These rules are written in a text file of the project,
+and Hivey Code reads the first one it finds, in this order: `.hiveycode/instructions.md` (its own,
+which comes first), then `AGENTS.md` and `CLAUDE.md` at the root — the ones most repositories write
+today for every coding agent and for Claude Code —, then `.github/copilot-instructions.md`. They are
+not added together: the first that says something wins. Its text is placed in the system prompt of
+every turn, survives every compaction, and an edit counts from the next question.
+
+They are **instructions**, not guarantees ([chapter 5](05-the-three-modes-and-tools.md)): they steer
+the model, they neither give it nor take away any tool.
+
 ## What you attach yourself
 
 - **The open file**, offered and sent by default — the selection if there is one, the whole file
@@ -82,11 +95,23 @@ exchange, and it is the summary that is sent from then on.
 
 It happens **by itself** (`hiveyCode.context.autoCompact`, on by default): at three quarters of the
 budget, the conversation is summarised before the question is sent, and the question goes right after
-the summary. If the context fills up **in the middle of a task**, what has already been done is noted
-in the answer, the conversation is summarised, and the task picks up where it stopped. A **Stop**
-during the summary also cancels what was going to follow. With the setting off, you are **offered** a
-summary from 70%, and a full context asks you a question instead of failing. `/compact` does it on
-demand.
+the summary. A **Stop** during the summary also cancels what was going to follow. With the setting
+off, you are **offered** a summary from 70%, and a full context asks you a question instead of
+failing. `/compact` does it on demand.
+
+If the context fills up **in the middle of a task**, the task does not stop. The oldest tool outputs
+are shortened first (the model can read them again word for word, [chapter 7](07-rag-and-memory.md)).
+If that is no longer enough, the turn **summarises itself and carries on**, as Claude Code does: the
+same model, without tools or thinking, writes the record of the work — the request word for word, the
+files changed, the commands run, the state of the errors, what comes next — and the turn goes on from
+that record. What never changes stays as it is: the system prompt, the project's rules and the
+repository map, that is, the start of the request, the part the cache keeps (below). Three times at
+most per turn; beyond that, what has already been done is noted in the answer, the conversation is
+summarised, and the task picks up where it stopped.
+
+Either way, the summary starts from what the agent **did**, not only from what it wrote: it is given
+the list of actions, failures marked, and says where the errors stand. Before, a changed file or a
+command run was in it only if the answer happened to mention it.
 
 Two things to know:
 
@@ -108,6 +133,15 @@ Hence a project rule that looks like a detail and is not one: **the start of the
 Adding "just one line about the open file" to it breaks the match and makes you pay full price for all
 the rest of the conversation. The rule is held by a test that sends two turns with a different file
 open and compares the first message **byte by byte**.
+
+Your own server follows the same mechanics, with no bill but not without effect: llama.cpp re-reads a
+request only from the first character that changes, and re-reading a whole conversation takes time on
+every question. Two things changed that opening on almost every turn, and no longer do. The marker
+that frames attached files is set once per conversation, instead of being drawn again every turn. And
+the repository map is no longer rebuilt as soon as a file is created or deleted — which the agent
+itself does on almost every turn: it is kept, and the files created or deleted since are listed after
+the history. Past 50 changes, or on request, it is rebuilt; dependencies and build output
+(`node_modules`, `dist`…) do not count.
 
 ## In Hivey Code
 

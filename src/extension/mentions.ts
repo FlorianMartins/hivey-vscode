@@ -27,14 +27,6 @@ import { relative } from "./workspace.js";
 import { gitChangesSummary } from "./integrations/git.js";
 import { perFileBudget } from "../core/util/tokens.js";
 
-/**
- * The fallback for a mention whose size nobody else bounds.
- *
- * Every use of it now prefers `deps.attachmentTokens`, which follows the model and the number of
- * attachments. It stays as the floor for the paths that have no deps to ask.
- */
-const MAX_TOKENS = 4000;
-
 export interface ResolveDeps {
   workspace: WorkspaceContext;
   settings: Settings;

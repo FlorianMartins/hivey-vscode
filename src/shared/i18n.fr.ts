@@ -616,8 +616,6 @@ export const FR: Record<string, string> = {
   "what is selected in the editor": "ce qui est sélectionné dans l’éditeur",
   "what is selected in the terminal": "ce qui est sélectionné dans le terminal",
   "write the commit message": "écrire le message de commit",
-  "No repository rules file.": "Aucun fichier de règles du dépôt.",
-  "Rules from {0} are applied.": "Les règles de {0} sont appliquées.",
   "Conversation": "Conversation",
   "All settings": "Tous les réglages",
   "Choose a model": "Choisir un modèle",
@@ -774,8 +772,6 @@ export const FR: Record<string, string> = {
     "Dicter",
   "Listening… press again to stop.":
     "Écoute… appuyez à nouveau pour arrêter.",
-  "No microphone was found.":
-    "Aucun micro n’a été trouvé.",
   "Nothing was heard.":
     "Rien n’a été entendu.",
   "Send this recording of your voice to {0}?":
@@ -784,31 +780,16 @@ export const FR: Record<string, string> = {
     "Arrêter et transcrire (Échap annule)",
   "That recording is too long. Keep it under a couple of minutes.":
     "Cet enregistrement est trop long. Restez sous les deux minutes.",
-  "That was too short to transcribe.":
-    "C’était trop court pour être transcrit.",
   "The dictation command did not finish in time.":
     "La commande de dictée n’a pas fini à temps.",
   "The dictation command failed.":
     "La commande de dictée a échoué.",
-  "The microphone could not be opened: {0}":
-    "Le micro n’a pas pu être ouvert : {0}",
-  "The recording could not be read.":
-    "L’enregistrement n’a pas pu être lu.",
-  "This editor does not give the panel a microphone.":
-    "Cet éditeur ne donne pas de micro au panneau.",
   "Transcribing…":
     "Transcription…",
   "The transcriber answered HTTP {0}.":
     "Le transcripteur a répondu HTTP {0}.",
   "hiveyCode.dictation.endpoint is not an address.":
     "hiveyCode.dictation.endpoint n’est pas une adresse.",
-  "{0} edits": "{0} modifications",
-  "1 edit": "1 modification",
-  "1 command": "1 commande",
-  "1 read": "1 lecture",
-  "1 step": "1 étape",
-  "{0} commands": "{0} commandes",
-  "{0} reads": "{0} lectures",
   "Connect": "Connecter",
   "Dictate — needs a transcriber. Click to set one up.":
     "Dicter — il faut un transcripteur. Cliquez pour en configurer un.",
@@ -1115,8 +1096,6 @@ export const FR: Record<string, string> = {
   "The transcriber is not installed.": "Le transcripteur n'est pas installé.",
   "Your voice is then turned into words here, by whisper.cpp. Nothing is sent anywhere, ever, and it costs nothing.":
     "Votre voix est alors transformée en mots ici même, par whisper.cpp. Rien n'est envoyé nulle part, jamais, et cela ne coûte rien.",
-  "VS Code does not give an extension's panel the microphone — the editor decides this, and there is no setting for it. Dictation has to record outside the panel; see hiveyCode.dictation.":
-    "VS Code n'accorde pas le micro au panneau d'une extension — c'est l'éditeur qui en décide, et aucun réglage ne l'ouvre. La dictée doit enregistrer hors du panneau ; voir hiveyCode.dictation.",
   "The recorder could not be started: {0}": "L'enregistreur n'a pas pu démarrer : {0}",
   "The recording failed: {0}": "L'enregistrement a échoué : {0}",
   "Install a recorder? {0}": "Installer un enregistreur ? {0}",

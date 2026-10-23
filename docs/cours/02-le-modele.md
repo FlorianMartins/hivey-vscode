@@ -96,10 +96,18 @@ et — c'est le plus instructif — dans 51 cas sur 56 il n'a **même pas essay�
   qu'avant : il réfléchit à son propre réglage par défaut, et le bouton l'indique (« Défaut du
   modèle »). Sur votre propre serveur, un niveau
   que personne n'a choisi vaut **Standard** : laissé à lui-même, un modèle comme Qwen réfléchit à son
-  maximum, même pour une petite tâche. La réflexion n'est jamais renvoyée au modèle d'une question à
+  maximum, même pour une petite tâche. Sur ce serveur, chaque niveau est en plus un vrai **budget de
+  réflexion** par étape, que le serveur fait respecter en refermant lui-même la réflexion quand il est
+  dépensé : **Bref** 1 024 jetons, **Standard** 8 192 (il n'arrête que les emballements),
+  **Approfondi** sans limite, **Direct** sans réflexion. Avant, un niveau n'y était qu'un mot
+  (« sois bref ») que le modèle cessait de suivre dès qu'un problème devenait difficile, d'où des
+  réflexions sans fin ; mesuré, Bref est aussi précis qu'avant et 29 % plus rapide. Les modèles cloud
+  gardent leurs propres réglages. La réflexion n'est jamais renvoyée au modèle d'une question à
   l'autre ; l'exception est le tour d'agent, où chaque étape retrouve la réflexion des étapes
-  précédentes pour ne pas tout recommencer — sur un serveur auto-hébergé, et sous la forme signée
-  que demandent Claude et DeepSeek.
+  précédentes pour ne pas tout recommencer — sur un serveur auto-hébergé, sous la forme signée que
+  demandent Claude et DeepSeek, et par OpenRouter, qui demande qu'on lui rende la sienne telle quelle.
+  Sans elle, un modèle comme DeepSeek repartait de zéro à chaque action ; mesuré, la rendre coûte 15 %
+  de moins et prend 13 % de temps en moins.
 
 ## Dans Hivey Code
 

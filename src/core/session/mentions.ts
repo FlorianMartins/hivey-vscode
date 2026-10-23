@@ -84,8 +84,6 @@ const PARTICIPANTS: Record<string, Participant> = {
  */
 const MENTION = /(^|\s)#([a-zA-Z][\w-]*)(?::((?:"[^"]*")|(?:\([^)]*\))|(?:[^\s]+)))?/g;
 
-const PARTICIPANT = /(^|\s)@([a-zA-Z][\w-]*)/g;
-
 export function parsePrompt(input: string): ParsedPrompt {
   const mentions: Mention[] = [];
   MENTION.lastIndex = 0;

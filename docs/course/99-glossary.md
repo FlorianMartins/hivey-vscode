@@ -22,7 +22,8 @@ Required` means one of the three, and raising a limit does nothing about a balan
 **Commit** — A snapshot of the project, with a message saying why. → [1](01-the-stage.md)
 
 **Compacting** — Replacing an over-long conversation with a summary the model writes, erasing nothing on
-screen. Automatic by default, at three quarters of the budget. → [6](06-the-context.md)
+screen. Automatic by default, at three quarters of the budget; when the window fills in the middle of
+a task, the turn summarises itself and carries on. → [6](06-the-context.md)
 
 **Completion** — The suggestions as you type. The most frequent use, so the one that decides the bill.
 → [10](10-the-cost.md)
@@ -129,7 +130,9 @@ stop it before having paid for all of it. → [4](04-how-we-talk-to-it.md)
 **Terminal** — The area where you type commands, one per line. → [1](01-the-stage.md)
 
 **Thinking level** — How much the model "thinks" before answering: Direct (off, where the model
-allows it), Brief, Standard, Deep. More thinking means more tokens. → [2](02-the-model.md)
+allows it), Brief, Standard, Deep. More thinking means more tokens. On your own server, each level is
+also a thinking budget per step: 1,024 tokens for Brief, 8,192 for Standard, no limit for Deep.
+→ [2](02-the-model.md)
 
 **Token** — The unit a model reads and produces; about 100 tokens to 75 words. It is the billing unit and
 the limit unit. → [2](02-the-model.md)

@@ -137,8 +137,9 @@ They are unusual and worth knowing, because they are the reason to trust the tab
 
 One more notion is needed: **continuous integration**. Every time code is sent to the repository, a
 computer rented by the hour fetches the project, installs it from scratch and runs every test — on
-several operating systems (Linux, Windows) and several versions of the language. The point is not to
-depend on "it works on my machine", which is a sentence rather than a proof.
+several operating systems (Linux, Windows) and several versions of the language (today Node.js 20, 22
+and 24, 20 being the minimum). The point is not to depend on "it works on my machine", which is a
+sentence rather than a proof.
 
 On 2026-10-06, Florian asked a very simple question: "the CI workflow still has lots of errors, is
 that normal?" He was right to ask. Every push that week was **red**, while all 1,308 tests passed

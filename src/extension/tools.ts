@@ -12,7 +12,7 @@
 import { pageForModel } from "../core/web/page.js";
 import { request } from "../core/util/http.js";
 import * as vscode from "vscode";
-import { describeSlice, sliceLines } from "../core/fs/slice.js";
+import { sliceLines } from "../core/fs/slice.js";
 import { cmdMultiLineProblem } from "../core/terminal/cmdLines.js";
 import { isBinaryFile, readBinary } from "../core/fs/binary.js";
 import { readWhole } from "../core/fs/outline.js";
@@ -26,7 +26,6 @@ import { parsePlan, planSummary, PLAN_TOOL_DESCRIPTION, type Plan } from "../cor
 import { NOTE_ASIDE_TOOL, type Notice } from "../core/session/notices.js";
 import { editProblems } from "../core/agent/afterEdit.js";
 import type { Tool, ToolResult } from "../core/agent/loop.js";
-import { headToTokens } from "../core/util/tokens.js";
 import { EgressGate } from "./egress.js";
 import type { Settings } from "./config.js";
 import { relative } from "./workspace.js";
@@ -76,12 +75,6 @@ async function rootGitignore(): Promise<string> {
   } catch {
     return "";
   }
-}
-
-function root(): vscode.Uri {
-  const folder = vscode.workspace.workspaceFolders?.[0];
-  if (!folder) throw new Error("No folder is open.");
-  return folder.uri;
 }
 
 /**
