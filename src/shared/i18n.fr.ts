@@ -1345,4 +1345,7 @@ export const FR: Record<string, string> = {
   "Thinking": "Réflexion",
   "(no output)": "(aucune sortie)",
   "Being answered — click to go back to it.": "En cours de réponse — cliquez pour y revenir.",
+  "Open the rules": "Ouvrir les règles",
+  "Project rules read from {0}: they are given to the model with every request.": "Règles du projet lues depuis {0} : elles sont données au modèle à chaque demande.",
+  "The project rules in {0} changed: the model now gets the new version.": "Les règles du projet dans {0} ont changé : le modèle reçoit maintenant la nouvelle version.",
 };

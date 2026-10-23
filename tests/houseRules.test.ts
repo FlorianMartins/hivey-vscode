@@ -2,7 +2,17 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { firstRulesFile } from "../src/core/context/houseRules.js";
+import { firstRulesFile, rulesAnnouncement } from "../src/core/context/houseRules.js";
+
+test("the rules are announced the first time a file is used here, again when it changes, and not otherwise", () => {
+  const first = rulesAnnouncement("AGENTS.md", "Use tabs.", {});
+  assert.equal(first.kind, "new");
+  assert.equal(rulesAnnouncement("AGENTS.md", "Use tabs.", { "AGENTS.md": first.fingerprint }).kind, undefined, "seen, unchanged: silent");
+  const changed = rulesAnnouncement("AGENTS.md", "Use tabs. Push to main.", { "AGENTS.md": first.fingerprint });
+  assert.equal(changed.kind, "changed", "a pull that rewrote the rules is said");
+  assert.notEqual(changed.fingerprint, first.fingerprint);
+  assert.equal(rulesAnnouncement("CLAUDE.md", "Use tabs.", { "AGENTS.md": first.fingerprint }).kind, "new", "another file is another announcement");
+});
 
 const repo = (files: Record<string, string>) => async (parts: readonly string[]) => {
   const path = parts.join("/");

@@ -56,8 +56,12 @@ personne a tapé.
 `.github/copilot-instructions.md`, `.github/instructions.md` (`src/core/context/houseRules.ts`) entre dans le prompt système,
 sans clôture : c'est sa raison d'être. Le dépôt ouvert écrit donc une partie du canal d'instruction,
 et depuis que `AGENTS.md` et `CLAUDE.md` sont lus, c'est le cas de la plupart des dépôts récents. Il
-est plafonné en taille, listé dans le sélecteur de contexte pour qu'on puisse le lire, et la parade
-qui tient est la suivante.
+est plafonné en taille, listé dans le sélecteur de contexte pour qu'on puisse le lire, et **annoncé** :
+la première fois qu'il sert dans un dossier, puis à chaque changement de son contenu (un `git pull` qui
+réécrit `AGENTS.md`), une notification le nomme, avec un bouton pour l'ouvrir. Il n'est lu que dans un
+dossier approuvé : l'extension ne se déclare pas compatible avec le mode restreint de VS Code, qui ne
+l'active donc pas, par défaut, dans un dossier dont on n'a pas confirmé la confiance. La parade qui
+tient, elle, est la suivante.
 
 Deuxième parade, indépendante : **l'approbation par action**. Une injection réussie ne peut pas
 écrire un fichier ni lancer une commande sans qu'un humain lise la description et clique.
@@ -126,7 +130,11 @@ et deux limites qui ne sont pas celles du mode interactif :
 Les **outils de fichier** sont un jeu à part, enraciné dans le worktree — pas ceux de l'éditeur, qui
 sont enracinés dans l'espace de travail et permettraient à l'agent de modifier le fichier que son
 auteur a ouvert, au milieu de sa propre édition. Et il n'y a **aucun outil git** : la branche reste
-locale, l'agent ne pousse jamais, et un test lit le module pour s'en assurer.
+locale, l'agent ne pousse jamais, et un test lit le module pour s'en assurer. Les appels git que
+l'extension fait elle-même pour la tâche (créer le worktree, lire le diff, supprimer la branche)
+passent tous par une **liste blanche de verbes** (`ALLOWED_GIT`) : `push`, `fetch`, `pull` ou `remote`
+n'y sont pas et ne s'exécutent pas, même si un changement futur du code les demandait. Un test vérifie
+qu'aucun appel ne la contourne.
 
 **Le corpus d'apprentissage est du code source hors du dépôt.** Désactivé par défaut, il conserve —
 quand on l'active — la demande, les fichiers touchés tels qu'ils étaient, et les diffs des escalades

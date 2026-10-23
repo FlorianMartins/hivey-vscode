@@ -29,7 +29,9 @@ and Hivey Code reads the first one it finds, in this order: `.hiveycode/instruct
 which comes first), then `AGENTS.md` and `CLAUDE.md` at the root — the ones most repositories write
 today for every coding agent and for Claude Code —, then `.github/copilot-instructions.md`. They are
 not added together: the first that says something wins. Its text is placed in the system prompt of
-every turn, survives every compaction, and an edit counts from the next question.
+every turn, survives every compaction, and an edit counts from the next question. The first time a
+rules file is used in a folder, and again each time it changes (after a `git pull`, for example), a
+notification names it, with a button to open it: you always know what the model is given.
 
 They are **instructions**, not guarantees ([chapter 5](05-the-three-modes-and-tools.md)): they steer
 the model, they neither give it nor take away any tool.
