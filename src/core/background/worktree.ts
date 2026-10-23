@@ -50,6 +50,11 @@ export function removeWorktreeArgv(path: string): string[] {
   return ["worktree", "remove", "--force", path];
 }
 
+/** Deleting the task's branch, when its author discards it. Local only: the branch was never pushed. */
+export function deleteBranchArgv(branch: string): string[] {
+  return ["branch", "-D", branch];
+}
+
 /** What changed, as a diff against the branch point. The report a person reads when they come back. */
 export function diffArgv(): string[] {
   return ["diff", "HEAD", "--stat"];
@@ -64,9 +69,11 @@ export function patchArgv(): string[] {
  * Everything git is allowed to be asked to do from a background task.
  *
  * An allow-list, and the reason is the same as plan mode's: a new git call is powerless until it is
- * named here, and `push` is not here and is not going to be.
+ * named here, and `push` is not here and is not going to be. Enforced where every background git call
+ * goes through (`git` in extension/background.ts) — written and tested, it was applied nowhere until
+ * then, and `branch` (the discard) was missing from it.
  */
-export const ALLOWED_GIT = new Set(["worktree", "diff", "status", "add", "commit", "stash", "rev-parse"]);
+export const ALLOWED_GIT = new Set(["worktree", "branch", "diff", "status", "add", "commit", "stash", "rev-parse"]);
 
 export function gitAllowed(argv: string[]): boolean {
   const verb = argv[0] ?? "";

@@ -19,7 +19,8 @@
 import * as vscode from "vscode";
 import { estimateTokens } from "../core/util/tokens.js";
 import { scaledTokens } from "../core/context/scale.js";
-import { firstRulesFile, RULES_FILES } from "../core/context/houseRules.js";
+import { firstRulesFile, RULES_FILES, rulesAnnouncement } from "../core/context/houseRules.js";
+import { t } from "../shared/i18n.js";
 
 const MAX_TOKENS = 1200;
 
@@ -94,6 +95,29 @@ export async function instructionFiles(): Promise<string[]> {
     }
   }
   return found;
+}
+
+const RULES_SEEN_KEY = "hiveyCode.rulesSeen";
+
+/**
+ * Say, once per folder and again when it changes, which rules file the model is being given — see
+ * `rulesAnnouncement`. Never in the way of the turn: the message does not wait for an answer.
+ */
+export async function announceRules(state: vscode.Memento): Promise<void> {
+  const found = await readInstructions();
+  if (!found) return;
+  const seen = state.get<Record<string, string>>(RULES_SEEN_KEY, {});
+  const { kind, fingerprint } = rulesAnnouncement(found.path, found.text, seen);
+  if (!kind) return;
+  await state.update(RULES_SEEN_KEY, { ...seen, [found.path]: fingerprint });
+  const open = t("Open the rules");
+  const said =
+    kind === "new"
+      ? t("Project rules read from {0}: they are given to the model with every request.", found.path)
+      : t("The project rules in {0} changed: the model now gets the new version.", found.path);
+  const answer = await vscode.window.showInformationMessage(said, open);
+  const folder = vscode.workspace.workspaceFolders?.[0];
+  if (answer === open && folder) await vscode.window.showTextDocument(vscode.Uri.joinPath(folder.uri, ...found.path.split("/")));
 }
 
 export async function instructionsPrompt(): Promise<string> {

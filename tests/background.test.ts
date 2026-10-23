@@ -22,6 +22,7 @@ import {
   ALLOWED_GIT,
   branchName,
   createWorktreeArgv,
+  deleteBranchArgv,
   diffArgv,
   gitAllowed,
   patchArgv,
@@ -143,6 +144,18 @@ test("the agent never pushes, and that is enforced by an allow-list", () => {
   assert.equal(/"push"/.test(code), false, "a push appears in the code");
 });
 
+test("the allow-list is applied: every background git call goes through it, and every call it makes is on it", () => {
+  // Written and tested, the allow-list was applied nowhere: the extension called `run("git", …)`
+  // directly, and the discard (`branch -D`) was not even on the list.
+  const ext = readFileSync(join("src", "extension", "background.ts"), "utf8");
+  assert.equal(/run\(\s*"git"/.test(ext.replace(/function git\([^]*?\n}\n/, "")), false, "a git call bypasses the allow-list");
+  assert.match(ext, /if \(!gitAllowed\(args\)\)/);
+  for (const argv of [createWorktreeArgv("/tmp/wt", "hivey/x"), patchArgv(), diffArgv(), removeWorktreeArgv("/tmp/wt"), deleteBranchArgv("hivey/x")]) {
+    assert.equal(gitAllowed(argv), true, `${argv.join(" ")} would be refused`);
+  }
+  assert.deepEqual(deleteBranchArgv("hivey/x"), ["branch", "-D", "hivey/x"]);
+});
+
 test("the diff is against the branch point, which is what a reader wants", () => {
   assert.deepEqual(diffArgv(), ["diff", "HEAD", "--stat"]);
   assert.deepEqual(patchArgv(), ["diff", "HEAD"]);
@@ -246,7 +259,7 @@ test("the absence of an engine is said BEFORE the task starts", () => {
   // Somebody who learns this twenty minutes in has lost twenty minutes.
   const code = readFileSync(join("src", "extension", "background.ts"), "utf8");
   const atStart = code.indexOf("const engine = await engineAvailable();");
-  const atRun = code.indexOf("const created = await run(\"git\", createWorktreeArgv");
+  const atRun = code.indexOf("const created = await git(createWorktreeArgv");
   assert.ok(atStart > 0 && atStart < atRun, "the engine is checked after the work has begun");
   assert.match(code, /will not be able to run any command/);
 });

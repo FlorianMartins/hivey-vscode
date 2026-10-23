@@ -6,6 +6,11 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Ajouté
 
+- **Les règles du projet sont annoncées.** La première fois qu'un fichier de règles (`AGENTS.md`,
+  `CLAUDE.md`, `.hiveycode/instructions.md`…) sert dans un dossier, puis chaque fois que son contenu
+  change (un `git pull` qui le réécrit), une notification dit lequel est donné au modèle, avec un
+  bouton « Ouvrir les règles ». Ces règles entrent dans le prompt système : vous voyez ce que le
+  modèle reçoit, surtout dans un dépôt cloné.
 - **`AGENTS.md` et `CLAUDE.md` sont lus.** Les règles du projet écrites pour les agents de code (à la
   racine) sont gardées dans le prompt système de chaque tour, à travers tous les compactages, comme
   `.hiveycode/instructions.md` (qui reste prioritaire) et `.github/copilot-instructions.md`.
@@ -118,6 +123,11 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **Les tâches de fond ne peuvent lancer que les commandes git prévues.** La liste des verbes git
+  permis (`worktree`, `branch`, `diff`, `status`, `add`, `commit`, `stash`, `rev-parse`) était écrite
+  et testée, mais appliquée nulle part : les appels git de l'extension la contournaient. Ils passent
+  tous par elle désormais, et `push`, `fetch`, `pull` ou `remote` ne s'exécutent pas. `branch`, qui
+  manquait, y est ajouté : sans lui, « Supprimer la branche » aurait cessé de marcher.
 - **Plus de blocage d'une heure sur des tests qui ne se terminent pas.** Une commande finie mais qui
   laissait tourner un processus (un test qui ne finit jamais, un serveur lancé en arrière-plan) gardait
   sa sortie ouverte : l'agent attendait jusqu'au délai, se faisait dire « délai dépassé », relançait

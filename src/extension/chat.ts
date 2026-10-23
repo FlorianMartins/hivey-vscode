@@ -79,7 +79,7 @@ import type { Episode } from "../core/corpus/corpus.js";
 import { hiveyLabel, hiveyModel, isHivey } from "../core/router/hivey.js";
 import { parsePrompt, participantDirective, type MentionKind, type Participant } from "../core/session/mentions.js";
 import { resolveMentions } from "./mentions.js";
-import { instructionFiles, instructionsPrompt } from "./instructions.js";
+import { announceRules, instructionFiles, instructionsPrompt } from "./instructions.js";
 import { buildDefinitionTools, createDefinition, definitionUri, DefinitionStore, type SubAgentRun } from "./definitions.js";
 import { skillsPrompt } from "../core/agent/definitions.js";
 import { autoApprove } from "../core/agent/autoApprove.js";
@@ -4181,6 +4181,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     // The repository's own rules, if it has any. They sit in the cacheable prefix, which is where
     // text that is identical on every turn belongs.
     const houseRules = await instructionsPrompt();
+    // Which rules file that is, said the first time and when it changes — see `announceRules`.
+    void announceRules(this.ctx.workspaceState).catch(() => undefined);
     // The knowledge base's table of contents, and only that. It sits in the cacheable prefix with
     // the house rules because it is the same kind of text: identical from one turn to the next, and
     // about the work rather than about the question.

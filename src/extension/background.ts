@@ -27,7 +27,7 @@ import {
   type Engine,
   type SandboxLimits,
 } from "../core/background/sandbox.js";
-import { branchName, createWorktreeArgv, patchArgv, removeWorktreeArgv } from "../core/background/worktree.js";
+import { branchName, createWorktreeArgv, deleteBranchArgv, gitAllowed, patchArgv, removeWorktreeArgv } from "../core/background/worktree.js";
 import { verifyTurn } from "../core/router/outcome.js";
 import { makeProvider } from "../core/providers/index.js";
 import { promptForMode } from "../core/session/modes.js";
@@ -57,6 +57,15 @@ function run(file: string, args: string[], cwd: string, timeoutMs = 60_000): Pro
       resolve({ code: err ? ((err as { code?: number }).code ?? 1) : 0, out });
     });
   });
+}
+
+/**
+ * Every git call of a background task, through the allow-list — see `ALLOWED_GIT`. A verb not on it
+ * does not run: it fails like a git error, so the caller's own handling applies.
+ */
+function git(args: string[], cwd: string): Promise<{ code: number; out: string }> {
+  if (!gitAllowed(args)) return Promise.resolve({ code: 1, out: `git ${args[0] ?? ""} is not allowed from a background task` });
+  return run("git", args, cwd);
 }
 
 async function engineAvailable(): Promise<Engine | undefined> {
@@ -224,7 +233,7 @@ export class Background {
 
     const branch = branchName(task);
     const worktree = await mkdtemp(join(tmpdir(), "hivey-task-"));
-    const created = await run("git", createWorktreeArgv(worktree, branch), root.uri.fsPath);
+    const created = await git(createWorktreeArgv(worktree, branch), root.uri.fsPath);
     if (created.code !== 0) {
       void vscode.window.showErrorMessage(t("Could not create the worktree: {0}", created.out.split("\n")[0] ?? ""));
       await rm(worktree, { recursive: true, force: true });
@@ -317,7 +326,7 @@ export class Background {
    * what somebody wants to read at four o'clock.
    */
   private async finish(entry: BackgroundTask, root: string): Promise<void> {
-    const patch = await run("git", patchArgv(), entry.worktree);
+    const patch = await git(patchArgv(), entry.worktree);
     const changed = patch.out.trim();
     const label =
       entry.state === "done"
@@ -335,8 +344,8 @@ export class Background {
       await vscode.window.showTextDocument(doc, { preview: true });
     }
     if (answer === t("Discard the branch")) {
-      await run("git", removeWorktreeArgv(entry.worktree), root);
-      await run("git", ["branch", "-D", entry.branch], root);
+      await git(removeWorktreeArgv(entry.worktree), root);
+      await git(deleteBranchArgv(entry.branch), root);
       this.tasks.delete(entry.id);
       this.onChange();
     }

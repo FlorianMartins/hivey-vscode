@@ -30,7 +30,9 @@ dans un fichier texte du projet, et Hivey Code lit le premier qu'il trouve, dans
 ceux que la plupart des dépôts écrivent aujourd'hui pour tous les agents de code et pour Claude
 Code —, puis `.github/copilot-instructions.md`. Ils ne s'additionnent pas : le premier qui dit quelque
 chose l'emporte. Son texte est placé dans le prompt système de chaque tour, survit à tous les
-compactages, et une modification compte dès la question suivante.
+compactages, et une modification compte dès la question suivante. La première fois qu'un fichier de
+règles sert dans un dossier, puis chaque fois qu'il change (après un `git pull` par exemple), une
+notification dit lequel, avec un bouton pour l'ouvrir : vous savez toujours ce que le modèle reçoit.
 
 Ce sont des **consignes**, pas des garanties ([chapitre 5](05-les-trois-modes-et-les-outils.md)) :
 elles orientent le modèle, elles ne lui donnent ni ne lui retirent aucun outil.
