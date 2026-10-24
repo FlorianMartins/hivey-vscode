@@ -81,13 +81,12 @@ part — in 51 cases out of 56 it did not **even try** to act.
 - Some models can **reason out loud** before answering: they first produce a draft of their thinking.
   It improves hard answers and it costs tokens. Hivey Code shows each stretch of it as one folded
   **Thinking** line, whose mark pulses while it is being written; a click opens it, rendered as it
-  arrives. The level is chosen in the composer, and the menu shows **the model's own levels, under
-  their real names**: `low`, `medium`, `high`, `xhigh`, `max` for Claude Opus, `minimal` to `high` for
-  GPT-5, `low`, `high`, `max` for DeepSeek, the ones Qwen's template announces on your own server, a
-  number of tokens for older Claude models. Only the ones the model really has are offered: its server
-  says so when it is yours, its documentation otherwise. Each one's tooltip says what it amounts to —
-  **Direct** (no thinking), **Brief**, **Standard**, **Deep**, **Extreme**, **Maximum** — and those
-  are the words shown when the model's levels are not known. Each level really changes the request, whichever the provider: Direct
+  arrives. The level is chosen in the composer, with the same names for every model: **Direct** (no
+  thinking), **Low**, **Medium**, **High**, **Advanced**, **Maximum**. Each model shows only the ones
+  its own levels fill: all six on Claude Opus 4.7 and later (`low` to `max`), Direct, Low, High and
+  Maximum on DeepSeek, Direct and High on Mistral, the ones Qwen's template announces on your own
+  server. Its server says so when it is yours, its documentation otherwise. The tooltip gives the
+  model's own name for the level (`xhigh`, `between_tools`, `2048 tokens`…). Each level really changes the request, whichever the provider: Direct
   **turns thinking off** wherever the model allows it; on a model that always thinks (Claude Opus 5.5,
   Gemini 3, Grok…), Direct is not offered and the lowest level says so. Each level is sent under its own
   name: `high` is `high`, `xhigh` is `xhigh`, `max` is `max`. One exception
@@ -95,12 +94,12 @@ part — in 51 cases out of 56 it did not **even try** to act.
   thinking — so a level picked there is sent as Direct during an agent turn. Until you pick one, a
   cloud model receives exactly the request it always did: it thinks at its own default, and the
   button says so ("Model default"). On your own server, a
-  level nobody chose means **Standard**: left to itself, a model like Qwen thinks at its maximum, even
+  level nobody chose means **Medium**: left to itself, a model like Qwen thinks at its maximum, even
   for a small task. On that server each level is also a real **thinking budget** per step, which the
-  server enforces by closing the thought itself once it is spent: **Brief** 1,024 tokens, **Standard**
-  8,192 (it only stops runaways), **Deep** no limit, **Direct** no thinking. A level used to be only a
+  server enforces by closing the thought itself once it is spent: **Low** 1,024 tokens, **Medium**
+  8,192 (it only stops runaways), **High** no limit, **Direct** no thinking. A level used to be only a
   word there ("keep it brief") that the model stopped following as soon as a problem got hard, hence
-  endless thoughts; measured, Brief is as accurate as before and 29% faster. Cloud models keep their
+  endless thoughts; measured, Low is as accurate as before and 29% faster. Cloud models keep their
   own settings. The thinking is never sent back to the model from one question to the next; the
   exception is within one agent turn, where each step gets the earlier steps' thinking back so it does
   not start over — on a self-hosted server, in the signed form Claude and DeepSeek ask for, and through

@@ -6,6 +6,15 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Ajouté
 
+- **Les mêmes noms de réflexion pour tous les modèles : Direct, Faible, Moyen, Élevé, Avancé,
+  Maximum.** « repasser sur les noms de base … garder la même base pour ne pas perdre les
+  utilisateurs ». Le menu ne montre plus le nom de chaque fournisseur, mais six noms fixes, et chaque
+  modèle n'affiche que ceux que ses propres niveaux remplissent : les six sur Claude Opus 4.7 et
+  suivants, Direct, Faible, Élevé et Maximum sur DeepSeek, Direct et Élevé sur Mistral, Direct, Faible,
+  Moyen et Élevé sur Qwen auto-hébergé. Le nom propre du modèle (`xhigh`, `between_tools`, `2048
+  tokens`…) est dans l'infobulle. Bref devient Faible, Standard Moyen, Approfondi Élevé, Extrême Avancé ;
+  aucune requête ne change.
+
 - **Le menu de réflexion montre les niveaux de chaque modèle, sous leur vrai nom.** « anthropic a 4
   modes de réflexion mais il y a que les 3 qui sont affichés ». Le panneau avait quatre niveaux pour
   tous les modèles : sur Claude, Approfondi envoyait `xhigh`, et `high` (le défaut de la plupart des

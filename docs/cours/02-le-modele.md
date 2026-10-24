@@ -84,13 +84,12 @@ et — c'est le plus instructif — dans 51 cas sur 56 il n'a **même pas essay�
   brouillon de réflexion. Ça améliore les réponses difficiles et ça coûte des jetons. Hivey Code
   en montre chaque moment sur une ligne repliée **Réflexion**, dont la pastille pulse pendant qu'il
   s'écrit ; un clic l'ouvre, rendu au fur et à mesure. Le niveau se choisit dans la zone de
-  saisie, et le menu montre **les niveaux du modèle lui-même, sous leur vrai nom** : `low`, `medium`,
-  `high`, `xhigh`, `max` pour Claude Opus, `minimal` à `high` pour GPT-5, `low`, `high`, `max` pour
-  DeepSeek, ceux qu'annonce le gabarit de Qwen sur votre serveur, un nombre de jetons pour les anciens
-  Claude. Seuls ceux que le modèle possède vraiment sont proposés : son serveur le dit quand il est chez
-  vous, sa documentation sinon. L'infobulle de chacun dit à quoi il correspond — **Direct** (aucune
-  réflexion), **Bref**, **Standard**, **Approfondi**, **Extrême**, **Maximum** — et ce sont ces
-  mots qui s'affichent quand les niveaux du modèle ne sont pas connus.
+  saisie, avec les mêmes noms pour tous les modèles : **Direct** (aucune réflexion), **Faible**,
+  **Moyen**, **Élevé**, **Avancé**, **Maximum**. Chaque modèle ne montre que ceux que ses propres
+  niveaux remplissent : les six pour Claude Opus 4.7 et suivants (`low` à `max`), Direct, Faible,
+  Élevé et Maximum pour DeepSeek, Direct et Élevé pour Mistral, ceux qu'annonce le gabarit de Qwen sur
+  votre serveur. Son serveur le dit quand il est chez vous, sa documentation sinon. L'infobulle donne le
+  nom que le modèle lui-même donne au niveau (`xhigh`, `between_tools`, `2048 tokens`…).
   Chaque niveau change vraiment la requête, d'un fournisseur à l'autre : Direct **coupe** la
   réflexion là où le modèle le permet ; sur un modèle qui réfléchit toujours (Claude Opus 5.5, Gemini
   3, Grok…), Direct n'est pas proposé et le niveau le plus bas le dit. Chaque niveau est envoyé sous
@@ -100,13 +99,13 @@ et — c'est le plus instructif — dans 51 cas sur 56 il n'a **même pas essay�
   d'agent. Tant que vous n'avez rien choisi, un modèle dans le cloud reçoit exactement la même requête
   qu'avant : il réfléchit à son propre réglage par défaut, et le bouton l'indique (« Défaut du
   modèle »). Sur votre propre serveur, un niveau
-  que personne n'a choisi vaut **Standard** : laissé à lui-même, un modèle comme Qwen réfléchit à son
+  que personne n'a choisi vaut **Moyen** : laissé à lui-même, un modèle comme Qwen réfléchit à son
   maximum, même pour une petite tâche. Sur ce serveur, chaque niveau est en plus un vrai **budget de
   réflexion** par étape, que le serveur fait respecter en refermant lui-même la réflexion quand il est
-  dépensé : **Bref** 1 024 jetons, **Standard** 8 192 (il n'arrête que les emballements),
-  **Approfondi** sans limite, **Direct** sans réflexion. Avant, un niveau n'y était qu'un mot
+  dépensé : **Faible** 1 024 jetons, **Moyen** 8 192 (il n'arrête que les emballements),
+  **Élevé** sans limite, **Direct** sans réflexion. Avant, un niveau n'y était qu'un mot
   (« sois bref ») que le modèle cessait de suivre dès qu'un problème devenait difficile, d'où des
-  réflexions sans fin ; mesuré, Bref est aussi précis qu'avant et 29 % plus rapide. Les modèles cloud
+  réflexions sans fin ; mesuré, Faible est aussi précis qu'avant et 29 % plus rapide. Les modèles cloud
   gardent leurs propres réglages. La réflexion n'est jamais renvoyée au modèle d'une question à
   l'autre ; l'exception est le tour d'agent, où chaque étape retrouve la réflexion des étapes
   précédentes pour ne pas tout recommencer — sur un serveur auto-hébergé, sous la forme signée que

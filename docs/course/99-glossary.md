@@ -130,8 +130,9 @@ stop it before having paid for all of it. → [4](04-how-we-talk-to-it.md)
 **Terminal** — The area where you type commands, one per line. → [1](01-the-stage.md)
 
 **Thinking level** — How much the model "thinks" before answering: Direct (off, where the model
-allows it), Brief, Standard, Deep. More thinking means more tokens. On your own server, each level is
-also a thinking budget per step: 1,024 tokens for Brief, 8,192 for Standard, no limit for Deep.
+allows it), Low, Medium, High, Advanced, Maximum — the ones the model has. More thinking means more
+tokens. On your own server, each level is also a thinking budget per step: 1,024 tokens for Low, 8,192
+for Medium, no limit for High.
 → [2](02-the-model.md)
 
 **Token** — The unit a model reads and produces; about 100 tokens to 75 words. It is the billing unit and
