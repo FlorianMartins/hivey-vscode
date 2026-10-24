@@ -202,14 +202,15 @@ Le client terminal ne connaît pas toujours la fenêtre : il ne passe par ces pa
 
 ### 5quater. Un niveau de réflexion se traduit, il ne s'envoie pas tel quel
 
-`core/providers/reasoningMap.ts`. Direct, Bref, Standard, Approfondi, Extrême et Maximum sont
-des mots du produit — le menu montre, lui, le nom que chaque modèle donne à son niveau (`native`) ;
+`core/providers/reasoningMap.ts`. Direct, Faible, Moyen, Élevé, Avancé et Maximum sont
+des mots du produit, les mêmes pour tous les modèles — l'infobulle donne le nom que chaque modèle
+donne à son niveau (`native`) ;
 chaque fournisseur et chaque famille de modèles attend autre chose (`output_config.effort`, un budget
 en jetons, `reasoning: {effort}`, `enable_thinking`…), et un champ refusé est un 400. Une seule table,
 chaque règle à côté de la documentation du fournisseur. Sur un serveur auto-hébergé, un niveau n'était
 qu'un mot dans le gabarit, que le modèle cessait de suivre sur un problème difficile : chaque niveau y
 porte maintenant un budget de réflexion par étape que llama.cpp fait respecter
-(`selfHostedThinkingBudget` : 1 024 jetons pour Bref, 8 192 pour Standard, aucun pour Approfondi).
+(`selfHostedThinkingBudget` : 1 024 jetons pour Faible, 8 192 pour Moyen, aucun pour Élevé).
 
 Ce que le modèle a pensé à une étape lui est rendu à la suivante, dans le format que chaque API
 exige : `reasoning_content` pour le serveur auto-hébergé et DeepSeek, blocs signés pour Anthropic,

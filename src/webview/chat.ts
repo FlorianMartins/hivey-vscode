@@ -30,13 +30,17 @@ const MODES: Array<{ id: Mode; label: string; hint: string }> = [
   { id: "agent", label: t("Agent"), hint: t("Reads, edits, proposes commands — with your approval.") },
 ];
 
+// ⚠️ « repasser sur les noms de base pour la réflexion (Direct, Faible, Moyen, Élevé, Avancé, Maximum)
+// … adapter au nombre de modes de raisonnement des modèles des fournisseurs mais garder la même base
+// pour ne pas perdre les utilisateurs ». One set of six names for every model; a model shows the ones
+// its own levels fill, and its own name for each is said in the hint.
 const REASONING: Array<{ id: Reasoning; label: string; hint: string }> = [
   { id: "none", label: t("Direct"), hint: t("No thinking budget. Fastest, cheapest.") },
-  { id: "low", label: t("Brief"), hint: t("A few hundred tokens of thinking.") },
-  { id: "medium", label: t("Standard"), hint: t("For diagnosis and design work.") },
-  { id: "high", label: t("Deep"), hint: t("For genuinely hard problems. Costs the most.") },
+  { id: "low", label: t("Low"), hint: t("A few hundred tokens of thinking.") },
+  { id: "medium", label: t("Medium"), hint: t("For diagnosis and design work.") },
+  { id: "high", label: t("High"), hint: t("For genuinely hard problems.") },
   // Only on a model that has them — see `reasoningMenu`: never in the usual four.
-  { id: "xhigh", label: t("Extreme"), hint: t("Longer thinking than Deep, for the hardest problems.") },
+  { id: "xhigh", label: t("Advanced"), hint: t("Longer thinking than High, for the hardest problems.") },
   { id: "max", label: t("Maximum"), hint: t("As much thinking as the model can do. Can cost far more.") },
 ];
 /** The menu when nothing says which levels the model has. */
@@ -2306,11 +2310,10 @@ function reasoningButton(state: UiState, deps: ChatDeps): HTMLElement {
         // OpenAI's Chat Completions from GPT-5.4: tools only without thinking — Direct is all there is.
         if (levels.length === 1 && r.id === "none") hint = `${hint} ${t("Through this API, this model cannot think while it uses tools.")}`;
         if (own.isDefault) hint = `${hint} ${t("The model's own default.")}`;
-        // ⚠️ « il faut que ce soit les vrais noms de tous les modèles … chaque modèle a ses propres
-        // niveaux de réflexion avec son propre naming ». The label is the model's own name for the level
-        // — "xhigh", "max", "minimal", "between_tools", "2048 tokens" — and the panel's word, which says
-        // what it is for, goes in the hint. Our four words stay only where the model's levels are unknown.
-        return { ...r, label: own.native || r.label, hint: `${r.label} — ${hint}` };
+        // The panel's name on the button, the same for every model (see `REASONING`); the model's own name
+        // for the level — "xhigh", "minimal", "between_tools", "2048 tokens" — in the hint.
+        if (own.native && own.native !== "none") hint = `${hint} ${t("Sent to the model as “{0}”.", own.native)}`;
+        return { ...r, hint };
       })
     : USUAL_REASONING;
   // Nothing picked, on a cloud: the request carries no thinking field and the model thinks at its
