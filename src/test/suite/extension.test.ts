@@ -328,6 +328,15 @@ suite("Hivey Code", () => {
       const ended = await Promise.race([turn.then(() => "ended"), delay(4000).then(() => "still running")]);
       assert.equal(ended, "ended", "the turn was aborted but never finished");
 
+      // « le mode de raisonnement continue malgré le stop (Hivey Code réfléchit…) »: the last state the
+      // panel got must not still show the answer as being written — nothing sends another one after
+      // a stopped turn unwinds, so a mark left in it keeps « thinking… » on screen for ever.
+      assert.equal(
+        await vscode.commands.executeCommand<boolean>("hiveyCode.answerInFlightShown"),
+        false,
+        "the panel was left showing the stopped answer as still being written",
+      );
+
       // And the connection is gone, not merely ignored: an abort that leaves the model generating
       // is still being paid for on a metered endpoint, and still holding the GPU on a local one.
       for (let i = 0; i < 40 && stub.open() > 0; i++) await delay(50);

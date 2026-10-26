@@ -1587,8 +1587,12 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
   // could stop every question without a word: the cap was checked before sending, the refusal was
   // posted as a message the next rebuild destroyed, and the one number that explained it was never
   // on screen. Anything that can end a turn has to be readable before it does.
+  //
+  // ⚠️ Only where the model in use bills. « une conversation faite uniquement avec le gateway affiche
+  // un prix » — the day's spend was OpenRouter's, from another conversation, and the cap it is set
+  // against is never checked for the gateway or the user's own server (see `billsTheUser`).
   const { spentTodayUsd, dailyUsd } = state.budget;
-  if (dailyUsd > 0 && spentTodayUsd >= dailyUsd * 0.6) {
+  if (state.billed && dailyUsd > 0 && spentTodayUsd >= dailyUsd * 0.6) {
     meter.append(el("span", "composer-sep", "\u2022"));
     const day = el("span", `composer-cost${spentTodayUsd >= dailyUsd ? " over" : " near"}`);
     day.textContent = t("{0} of {1} today", formatCost(spentTodayUsd), formatCost(dailyUsd));

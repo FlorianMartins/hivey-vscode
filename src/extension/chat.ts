@@ -754,7 +754,17 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     };
   }
 
+  /**
+   * Whether the last state the panel received still showed an answer being written — what keeps its
+   * « réfléchit… » on screen. A command, so the stop can be tested end to end.
+   */
+  panelShowsAnswerInFlight(): boolean {
+    return this.sentInFlight;
+  }
+  private sentInFlight = false;
+
   private sendState(): void {
+    this.sentInFlight = this.streamingEntryId !== undefined;
     const s = readSettings();
     const baseUrl = safeUrl(s, s.chat.provider);
     const stored = this.history();
@@ -2234,6 +2244,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     // comes next: every callback on the turn checks the signal before posting, and the cleanup only
     // runs if the turn it belongs to is still the current one.
     this.turn = undefined;
+    // ⚠️ « quand il a stoppé une requête, le mode de raisonnement continue malgré le stop (Hivey Code
+    // réfléchit…) ». The model had stopped — the server's log shows the task cancelled the same
+    // second — but the answer was still marked in flight in the state sent here, and the turn's own
+    // cleanup, which clears the mark, no longer sends a state once it is not the current turn. So the
+    // panel kept the live turn and its "thinking…" for ever. Closed here, before the state goes out.
+    this.closeStreamingAnswer();
     this.settle();
     this.post({ type: "status", text: t("Stopped.") });
     this.post({ type: "turnEnd" });
@@ -4510,6 +4526,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     let overflowed = false;
     /** The window filled in the middle of the task: summarize, then carry on. See `continueAfterCompact`. */
     let saturated = false;
+    /** This turn's own answer — see the `finally`, which must not close a later turn's. */
+    let ownAnswerId: string | undefined;
     try {
       const provider = await providerFor(settings, this.keys, providerId);
 
@@ -4607,6 +4625,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       // Named so the panel can leave it to the live turn. Cleared in the `finally`, whatever
       // happened — an answer that stays marked as in flight is an answer nothing ever draws.
       this.streamingEntryId = answer.id;
+      ownAnswerId = answer.id;
       let streamed = "";
       let thought = "";
       // A marker arrives split across packets — `⟨EMA` then `IL_1⟩` — and neither half matches the
@@ -5169,9 +5188,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       // nothing ever draws — a silent, permanent blank.
       // The answer is added, empty, when the turn starts, so its time was the question's time. Its
       // time is when it ended — finished, failed or stopped.
-      const ended = this.session.entries.find((e) => e.id === this.streamingEntryId);
-      if (ended) ended.at = Date.now();
-      this.streamingEntryId = undefined;
+      // Only this turn's own answer: a stop has closed it already (see `stopTurn`), and the question
+      // asked right after may have opened the next one, which is not this turn's to close.
+      if (ownAnswerId && this.streamingEntryId === ownAnswerId) this.closeStreamingAnswer();
       this.checkpointFor = undefined;
       // Old checkpoints give up their file contents here rather than at write time: the cap is
       // about what is STORED, and this is the moment just before the conversation is stored.
@@ -5679,6 +5698,17 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
   /** The answer a turn is writing right now, which the panel leaves to the live turn to draw. */
   private streamingEntryId: string | undefined;
+
+  /**
+   * The answer in flight is over — finished, failed or stopped: no longer marked as being written, so
+   * the panel draws it as the record it is. Its time is when it ended (it was added, empty, at the
+   * question's time).
+   */
+  private closeStreamingAnswer(): void {
+    const ended = this.session.entries.find((e) => e.id === this.streamingEntryId);
+    if (ended) ended.at = Date.now();
+    this.streamingEntryId = undefined;
+  }
 
   /** Prompt tokens sent, and how many of them the provider served from its cache, this session. */
   private cacheSeen = { prompt: 0, cached: 0 };
