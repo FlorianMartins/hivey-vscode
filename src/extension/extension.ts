@@ -240,6 +240,8 @@ export function activate(context: vscode.ExtensionContext): void {
     // Returns whether a turn was actually stopped, so a test can tell "stopped it" from "nothing
     // was running" — the two cases behind "the stop button does nothing".
     vscode.commands.registerCommand("hiveyCode.stopAnswer", () => chat.stopTurn()),
+    // Internal, for the integration test of a stop: is the panel still told an answer is in flight?
+    vscode.commands.registerCommand("hiveyCode.answerInFlightShown", () => chat.panelShowsAnswerInFlight()),
     // What the composer does with a message typed during a turn — a command too, so it can be tested.
     vscode.commands.registerCommand("hiveyCode.steerAnswer", (text: string) => chat.steer(text)),
 

@@ -142,6 +142,17 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **Après un Stop, « Hivey Code réfléchit… » ne reste plus affiché.** « quand il a stoppé une
+  requête, le mode de raisonnement continue malgré le stop ». Le modèle, lui, s'arrêtait bien : le
+  journal de la passerelle montre la tâche annulée à la seconde même, sans un jeton de plus. Mais la
+  réponse arrêtée restait marquée « en cours » dans ce que recevait le panneau, qui gardait sa ligne
+  « réfléchit… » jusqu'à la question suivante, comme si la réflexion continuait. Elle est close au
+  moment du Stop, et un morceau de réponse arrivé après ne recrée plus de réponse en cours.
+- **Plus de prix affiché dans une conversation sur la passerelle ou votre serveur.** « une
+  conversation faite uniquement avec le gateway affiche un prix ». C'était la dépense du jour face au
+  plafond quotidien (« X $ sur Y $ aujourd'hui »), due à OpenRouter dans une autre conversation, et
+  affichée quel que soit le modèle choisi — alors que ce plafond ne s'applique jamais à la passerelle
+  ni à votre serveur. Elle ne s'affiche plus que sur un fournisseur qui facture.
 - **Les tâches de fond ne peuvent lancer que les commandes git prévues.** La liste des verbes git
   permis (`worktree`, `branch`, `diff`, `status`, `add`, `commit`, `stash`, `rev-parse`) était écrite
   et testée, mais appliquée nulle part : les appels git de l'extension la contournaient. Ils passent

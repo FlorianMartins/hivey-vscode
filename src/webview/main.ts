@@ -958,11 +958,15 @@ window.addEventListener("message", (event: MessageEvent<ToPanel>) => {
       refreshJumpButton();
       break;
     case "delta":
+      // Only into a turn, as for "status": a late piece of a stopped answer must not invent a turn
+      // that sits there « réfléchit… » after the stop.
+      if (!live && !isStreaming()) break;
       // No scroll here: the text is not on screen yet. It is released frame by frame by the typing
       // animation, and each of those frames follows the end itself — see `following`.
       ensureLive().appendText(m.text);
       break;
     case "reasoning":
+      if (!live && !isStreaming()) break;
       ensureLive().appendReasoning(m.text);
       break;
     case "plan":
