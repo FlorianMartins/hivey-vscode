@@ -142,6 +142,11 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **Changer de fournisseur change aussi le modèle : plus d'erreur 404.** « si on est encore sur le
+  modèle gateway alors qu'on a sélectionné OpenRouter ». Seul le fournisseur changeait : le modèle de la
+  passerelle (`qwen-27b`) partait chez OpenRouter, qui ne le connaît pas. Chaque fournisseur retrouve
+  maintenant le dernier modèle utilisé avec lui ; la première fois, le modèle actuel s'il le sert,
+  sinon le premier de sa liste. Le modèle retenu s'affiche un instant dans la barre d'état.
 - **« En file d'attente » seulement quand le serveur est vraiment occupé.** « le modèle n'est utilisé
   par personne et dit en file d'attente ». Avant de lire une longue conversation, le serveur la prépare
   (découpage en jetons, mise de côté de la conversation précédente) : mesuré sur le serveur libre,

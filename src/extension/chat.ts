@@ -43,6 +43,7 @@ import { checkEndpoint } from "../core/providers/endpoint.js";
 import { handoverNote, selfCheckMessage, verifyTurn, type TurnStep } from "../core/router/outcome.js";
 import { unifiedDiff } from "../core/text/diff.js";
 import { escalationTarget, route, type Route } from "../core/router/route.js";
+import { modelForProvider } from "../core/router/providerModel.js";
 import { describeFallback, fallbackChain, isContextOverflow, isRetryable } from "../core/router/fallback.js";
 import type { Provider } from "../core/providers/index.js";
 import { Session, renderEntry, type ContextItem, type Entry, type SessionData } from "../core/session/session.js";
@@ -139,6 +140,8 @@ import { stepText } from "../shared/stepText.js";
 import { SegmentBuilder } from "../core/session/segments.js";
 
 const HISTORY_KEY = "hiveyCode.sessions";
+/** The model last used with each provider — see `followProvider`. */
+const MODEL_BY_PROVIDER_KEY = "hiveyCode.modelByProvider";
 const PERMISSIONS_KEY = "hiveyCode.permissions";
 /** Set once the user has been through the first-run screen, or dismissed it. */
 const SETUP_SEEN_KEY = "hiveyCode.setupSeen";
@@ -1307,10 +1310,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             }
             if (answer !== keep) break;
           }
+          // The model goes with the provider — see `followProvider`.
+          const before = readSettings().chat;
+          this.rememberModel(before.provider, before.model);
           await config.update("chat.provider", m.provider, writeTarget());
           await this.refreshSetup();
-          void this.loadModels(true);
+          await this.followProvider(m.provider);
           this.sendState();
+          // Its list may not be in yet, or may be stale: once it is, the model is checked again.
+          void this.loadModels(true).then(() => this.followProvider(m.provider));
           break;
         }
         case "restoreCheckpoint":
@@ -1357,6 +1365,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         }
         case "setModel": {
           const config = vscode.workspace.getConfiguration(SECTION);
+          this.rememberModel(m.provider ?? readSettings().chat.provider, m.model);
           await config.update("chat.model", m.model, writeTarget());
           if (m.provider && m.provider !== readSettings().chat.provider) {
             await config.update("chat.provider", m.provider, writeTarget());
@@ -1881,6 +1890,31 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const changed = servedSetChanged(this.ownSeen, now);
     this.ownSeen = now;
     if (changed) await this.loadModels();
+  }
+
+  /** The model last used with each provider — see `followProvider`. */
+  private rememberModel(provider: string, model: string): void {
+    if (!provider || !model) return;
+    const all = this.ctx.globalState.get<Record<string, string>>(MODEL_BY_PROVIDER_KEY, {});
+    if (all[provider] === model) return;
+    void this.ctx.globalState.update(MODEL_BY_PROVIDER_KEY, { ...all, [provider]: model });
+  }
+
+  /**
+   * Once a provider is chosen, a model it serves — its own last one, the current one if it has it,
+   * else the first it lists — so the next question does not go out with another provider's model.
+   * See `modelForProvider`. Nothing is changed when the provider is no longer the one chosen.
+   */
+  private async followProvider(provider: string): Promise<void> {
+    const s = readSettings();
+    if (s.chat.provider !== provider) return;
+    const remembered = this.ctx.globalState.get<Record<string, string>>(MODEL_BY_PROVIDER_KEY, {});
+    const next = modelForProvider(provider, s.chat.model, remembered, this.models);
+    if (!next || next === s.chat.model) return;
+    await vscode.workspace.getConfiguration(SECTION).update("chat.model", next, writeTarget());
+    this.models = this.models.map((x) => ({ ...x, current: x.id === next }));
+    void vscode.window.setStatusBarMessage(t("Hivey Code: model {0}", next), 4000);
+    this.sendState();
   }
 
   private async loadModels(force = false): Promise<void> {
