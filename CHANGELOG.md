@@ -142,6 +142,12 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **« En file d'attente » seulement quand le serveur est vraiment occupé.** « le modèle n'est utilisé
+  par personne et dit en file d'attente ». Avant de lire une longue conversation, le serveur la prépare
+  (découpage en jetons, mise de côté de la conversation précédente) : mesuré sur le serveur libre,
+  2 à 3 s pour 61 000 jetons, sans aucune nouvelle pendant ce temps — et l'extension appelait ce
+  silence une file d'attente dès 1,5 s. Elle dit maintenant « En attente du serveur » jusqu'à 8 s, et
+  « En file d'attente » au-delà, là où il s'agit d'attendre la réponse de quelqu'un d'autre.
 - **Après un Stop, « Hivey Code réfléchit… » ne reste plus affiché.** « quand il a stoppé une
   requête, le mode de raisonnement continue malgré le stop ». Le modèle, lui, s'arrêtait bien : le
   journal de la passerelle montre la tâche annulée à la seconde même, sans un jeton de plus. Mais la

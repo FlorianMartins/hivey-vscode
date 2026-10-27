@@ -19,6 +19,16 @@ export type Progress = NonNullable<ChatDelta["progress"]>;
 export const QUIET_MS = 1500;
 /** A prompt with fewer tokens than this left to read is read too fast to be worth a percentage. */
 export const QUIET_TOKENS = 1500;
+/**
+ * How long a silence must last before it is called a queue.
+ *
+ * ⚠️ « le modèle n'est utilisé par personne et dit en file d'attente ». Not every silence is a queue:
+ * before its first word of progress the server tokenizes the prompt and moves the slot's previous
+ * conversation to RAM. Measured on the idle server (Qwen3.8, llama.cpp, 2 slots): a new 61k-token
+ * conversation 2.1–2.7 s, a 29k one 1.35 s — then progress at once, `time_ms: 0`. A queue proper is
+ * somebody else's turn, which is tens of seconds. Until then the wait is only "waiting for the server".
+ */
+export const QUEUE_MS = 8000;
 
 export interface WaitState {
   /** Milliseconds since the request left. */
@@ -46,7 +56,7 @@ export function waitLabel(s: WaitState): WaitLabel {
   }
   if (s.elapsedMs < QUIET_MS) return { kind: "none" };
   const seconds = Math.floor(s.elapsedMs / 1000);
-  return s.serverReportsProgress ? { kind: "queued", seconds } : { kind: "waiting", seconds };
+  return s.serverReportsProgress && s.elapsedMs >= QUEUE_MS ? { kind: "queued", seconds } : { kind: "waiting", seconds };
 }
 
 /**

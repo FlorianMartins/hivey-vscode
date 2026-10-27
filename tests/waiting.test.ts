@@ -9,7 +9,11 @@ import { waitLabel, WaitWatch, type WaitLabel } from "../src/core/agent/waiting.
 test("a short wait says nothing, a long one says what it is", () => {
   const base = { serverReportsProgress: true, started: false };
   assert.deepEqual(waitLabel({ ...base, elapsedMs: 800 }), { kind: "none" }, "no flicker on every step");
-  assert.deepEqual(waitLabel({ ...base, elapsedMs: 4200 }), { kind: "queued", seconds: 4 }, "silence on a progress server is the queue");
+  // « le modèle n'est utilisé par personne et dit en file d'attente »: an idle server takes 2–3 s to
+  // prepare a long new conversation before its first progress. That is not a queue.
+  assert.deepEqual(waitLabel({ ...base, elapsedMs: 2700 }), { kind: "waiting", seconds: 2 }, "preparing is not queueing");
+  assert.deepEqual(waitLabel({ ...base, elapsedMs: 7900 }), { kind: "waiting", seconds: 7 });
+  assert.deepEqual(waitLabel({ ...base, elapsedMs: 9200 }), { kind: "queued", seconds: 9 }, "a long silence on a progress server is the queue");
   assert.deepEqual(
     waitLabel({ ...base, serverReportsProgress: false, elapsedMs: 4200 }),
     { kind: "waiting", seconds: 4 },
