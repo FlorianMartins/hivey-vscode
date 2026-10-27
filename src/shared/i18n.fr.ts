@@ -119,6 +119,7 @@ export const FR: Record<string, string> = {
   "Hivey Code: {0} is excluded by the privacy policy and will not be attached.": "Hivey Code : {0} est exclu par la politique de confidentialité et ne sera pas joint.",
   "Got it": "Compris",
   "Hivey Code: {0} models": "Hivey Code : {0} modèles",
+  "Hivey Code: model {0}": "Hivey Code : modèle {0}",
   "In .hiveycode/ — committed, and your team gets it too": "Dans .hiveycode/ — versionné, et votre équipe l’a aussi",
   "In ~/.hiveycode/ — yours, in every project you open": "Dans ~/.hiveycode/ — à vous, dans tous vos projets",
   "Inline completion and the chores run locally by construction: they never appear here, whatever their volume. This table counts only what was deliberately sent to a paid provider.": "La complétion inline et les corvées tournent en local par construction : elles n'apparaissent jamais ici, quel que soit leur volume. Ce tableau ne compte que ce qui a été délibérément envoyé à un fournisseur payant.",
