@@ -208,7 +208,19 @@ export class OpenAICompatibleProvider implements Provider {
       model: req.model,
       stream: true,
       messages: req.messages.map((m, index) => {
-        if (m.role === "tool") return { role: "tool", tool_call_id: m.toolCallId, content: m.content };
+        if (m.role === "tool") {
+          // ⚠️ The marker too. In an agent turn the LAST message — where the rolling mark goes (see
+          // `withRollingCacheMark`) — is nearly always a tool result, and this branch returned before
+          // the marker was ever placed: only the fixed prefix was cached, and every step paid the whole
+          // conversation again. Measured through OpenRouter on Claude: marked here, the next request
+          // reads all 23 k tokens back from the cache, at a tenth of the price.
+          const cacheTool = (this.opts.promptCache === true || claudeThroughOpenRouter(this.id, req.model)) && this.id === "openrouter" && marks.has(index);
+          return {
+            role: "tool",
+            tool_call_id: m.toolCallId,
+            content: cacheTool ? [{ type: "text", text: m.content, cache_control: { type: "ephemeral" } }] : m.content,
+          };
+        }
         // The thinking behind an earlier step, back to the model that had it — see `ChatMessage.reasoning`.
         // DeepSeek too: with tools and thinking on, it REQUIRES it back on every later request (a 400
         // otherwise — https://api-docs.deepseek.com/guides/thinking_mode).
@@ -238,7 +250,7 @@ export class OpenAICompatibleProvider implements Provider {
         // whole transcript on EVERY request. That is what this extension's own cost report was
         // showing and nobody could see why: the marker existed, and only the native Anthropic
         // client ever emitted it. OpenAI's and DeepSeek's caches are automatic and ignore the field.
-        const cache = this.opts.promptCache === true && this.id === "openrouter" && marks.has(index);
+        const cache = (this.opts.promptCache === true || claudeThroughOpenRouter(this.id, req.model)) && this.id === "openrouter" && marks.has(index);
         if (m.images?.length || cache) {
           const text: Record<string, unknown> = { type: "text", text: m.content };
           if (cache) text["cache_control"] = { type: "ephemeral" };
@@ -783,6 +795,19 @@ export function contextWindowOf(entry: unknown): number {
     if (Number.isFinite(n) && n > 0) return Math.floor(n);
   }
   return 0;
+}
+
+/**
+ * A Claude model reached through OpenRouter: its prompt cache is asked for whatever the setting says.
+ *
+ * ⚠️ « une requête avec 13 100 jetons sur Sonnet 5.5 lui a coûté 1,50 $ ». Anthropic's cache is not
+ * automatic — only marked prefixes are cached — and `hiveyCode.chat.promptCache` is off by default,
+ * because the array form of `content` the marker needs is not handled alike by every model behind
+ * OpenRouter. For Claude it is the documented form: off, every step of an agent turn paid the whole
+ * conversation again at the full input price. The setting still turns the marker on for the others.
+ */
+export function claudeThroughOpenRouter(provider: string, model: string): boolean {
+  return provider === "openrouter" && /^~?anthropic\//.test(model);
 }
 
 /**

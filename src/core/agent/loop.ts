@@ -680,7 +680,10 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
 
   const working: ChatMessage[] = [...opts.messages];
   const trace: TurnResult["trace"] = [];
-  const usage: Usage = { promptTokens: 0, completionTokens: 0, cachedTokens: 0, costUsd: 0 };
+  // No `costUsd` until a provider reports one. Started at 0, it read as « the provider said: free »,
+  // and `costOf` takes a reported cost over the price list — so every provider that does not report
+  // its cost (Anthropic, OpenAI, DeepSeek… direct) showed $0 and was counted against no budget.
+  const usage: Usage = { promptTokens: 0, completionTokens: 0, cachedTokens: 0 };
   let text = "";
   let reasoning = "";
   /** Set by the last response that ran out of output budget. See `TurnResult.truncated`. */
@@ -1151,6 +1154,7 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
       usage.promptTokens += res.usage.promptTokens;
       usage.completionTokens += res.usage.completionTokens;
       usage.cachedTokens += res.usage.cachedTokens;
+      if (typeof res.usage.costUsd === "number") usage.costUsd = (usage.costUsd ?? 0) + res.usage.costUsd;
       summary = res.text.trim();
     } catch {
       return false;
@@ -1179,6 +1183,7 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
         usage.promptTokens += res.usage.promptTokens;
         usage.completionTokens += res.usage.completionTokens;
         usage.cachedTokens += res.usage.cachedTokens;
+        if (typeof res.usage.costUsd === "number") usage.costUsd = (usage.costUsd ?? 0) + res.usage.costUsd;
         const said = opts.afterResponse ? opts.afterResponse(res.text) : res.text;
         text = text.trim() && said.trim() ? `${text}\n\n${said}` : text || said;
       } catch {

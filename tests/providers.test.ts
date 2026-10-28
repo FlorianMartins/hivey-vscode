@@ -7,7 +7,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { AddressInfo } from "node:net";
-import { contextWindowOf, OpenAICompatibleProvider } from "../src/core/providers/openai.js";
+import { claudeThroughOpenRouter, contextWindowOf, OpenAICompatibleProvider } from "../src/core/providers/openai.js";
 import { AnthropicProvider } from "../src/core/providers/anthropic.js";
 import { HttpError } from "../src/core/util/http.js";
 
@@ -705,12 +705,17 @@ test("an authentication or balance failure names the provider that actually answ
 // the extension actually sends and diffing it against the version that worked. This test is that
 // diff, kept.
 
-test("by default every message content is a plain string, on every provider", async () => {
-  for (const id of ["openrouter", "openai", "anthropic-compatible", "local"]) {
+test("by default every message content is a plain string, on every provider — Claude through OpenRouter aside", async () => {
+  for (const [id, model] of [
+    ["openrouter", "openai/gpt-5.5"],
+    ["openai", "anthropic/claude-opus-5"],
+    ["anthropic-compatible", "anthropic/claude-opus-5"],
+    ["local", "anthropic/claude-opus-5"],
+  ] as const) {
     const s = await serve((_req, res) => sse(res, [{ choices: [{ delta: { content: "ok" } }] }]));
     const p = new OpenAICompatibleProvider({ id, baseUrl: s.url, apiKey: "k", isLocal: id === "local" });
     await p.chat({
-      model: "anthropic/claude-opus-5",
+      model,
       messages: [
         { role: "system", content: "rules", cacheable: true },
         { role: "user", content: "map", cacheable: true },
@@ -727,6 +732,41 @@ test("by default every message content is a plain string, on every provider", as
       );
     }
   }
+});
+
+test("a Claude model through OpenRouter gets its prompt cache without the setting — only on the marked messages", async () => {
+  // « une requête avec 13 100 jetons sur Sonnet 5.5 lui a coûté 1,50 $ »: without the marker, every
+  // step of an agent turn paid the whole conversation again at the full input price.
+  const s = await serve((_req, res) => sse(res, [{ choices: [{ delta: { content: "ok" } }] }]));
+  const p = new OpenAICompatibleProvider({ id: "openrouter", baseUrl: s.url, apiKey: "k", isLocal: false });
+  await p.chat({
+    model: "anthropic/claude-sonnet-5.5",
+    messages: [
+      { role: "system", content: "rules", cacheable: true },
+      { role: "user", content: "question" },
+    ],
+  });
+  await s.close();
+  const [system, user] = s.requests[0]!.body.messages;
+  assert.deepEqual(system.content, [{ type: "text", text: "rules", cache_control: { type: "ephemeral" } }]);
+  assert.equal(user.content, "question", "an unmarked message keeps its plain shape");
+  // And the rolling mark of an agent step, which lands on a TOOL result: there it was dropped, and
+  // only the fixed prefix was cached.
+  const t = await serve((_req, res) => sse(res, [{ choices: [{ delta: { content: "ok" } }] }]));
+  const q = new OpenAICompatibleProvider({ id: "openrouter", baseUrl: t.url, apiKey: "k", isLocal: false });
+  await q.chat({
+    model: "anthropic/claude-sonnet-5.5",
+    messages: [
+      { role: "user", content: "read a" },
+      { role: "assistant", content: "", toolCalls: [{ id: "c1", name: "read_file", args: "{}" }] },
+      { role: "tool", toolCallId: "c1", content: "the file", cacheable: true },
+    ],
+  });
+  await t.close();
+  assert.deepEqual(t.requests[0]!.body.messages[2].content, [{ type: "text", text: "the file", cache_control: { type: "ephemeral" } }]);
+  assert.equal(claudeThroughOpenRouter("openrouter", "~anthropic/claude-sonnet-latest"), true);
+  assert.equal(claudeThroughOpenRouter("openrouter", "openai/gpt-5.5"), false);
+  assert.equal(claudeThroughOpenRouter("anthropic", "claude-sonnet-5-5"), false, "the native client has its own");
 });
 
 test("an image is still the one thing that forces the array form, asked for or not", async () => {

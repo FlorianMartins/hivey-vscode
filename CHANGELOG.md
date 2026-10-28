@@ -142,6 +142,28 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **Claude via OpenRouter coûte beaucoup moins cher en mode Agent : son cache est enfin utilisé.**
+  « une requête avec 13 100 jetons sur Sonnet 5.5 lui a coûté 1,50 $ ». Le prix affiché était juste
+  (vérifié sur une vraie requête : OpenRouter facture exactement le tarif du catalogue) ; c'est le
+  montant qui ne l'était pas. Le cache d'Anthropic ne s'applique qu'aux parties marquées, et il était
+  désactivé par défaut via OpenRouter — et, même activé, son marqueur ne se posait jamais sur les
+  résultats d'outils, là où il tombe à chaque étape d'un agent : toute la conversation était repayée à
+  chaque étape. Il est maintenant actif pour les modèles Claude via OpenRouter (préréglages Hivey
+  compris) et posé aussi sur les résultats d'outils. Mesuré : une requête relue depuis le cache coûte
+  12 fois moins ; sur 8 tâches d'agent courtes, −18 % de dépense réelle, à réussite égale (60/60
+  contre 59/60 sur les 60 tâches). Plus la conversation est longue, plus l'économie grandit.
+- **Le coût des fournisseurs directs n'est plus affiché à 0 $.** Anthropic, OpenAI, DeepSeek… en direct
+  n'annoncent pas leur coût, et la boucle de l'agent faisait comme s'ils avaient annoncé 0 : leurs
+  réponses ne montraient aucun prix et ne comptaient pas dans le plafond quotidien. Le coût est
+  maintenant calculé d'après le catalogue, résumé et conclusion du tour compris ; le détail des jetons
+  d'une réponse inclut aussi ceux de ses sous-agents, dont le coût était déjà dans le prix.
+- **La fenêtre des données sensibles propose de nouveau tous ses choix.** « il y a juste "Envoyer
+  (marqueurs en place)", il n'y a plus d'autres possibilités ». Les sous-agents, le résumé de la
+  conversation et la comparaison entre modèles ne disaient pas à quelle conversation ils
+  appartenaient : la fenêtre perdait alors « Toujours envoyer (cette conversation) » et oubliait ce qui
+  avait déjà été accepté, si bien qu'elle revenait avec un seul bouton à chaque étape d'un sous-agent.
+  Toutes les requêtes nomment maintenant leur conversation (c'est imposé par le code). Le masquage
+  lui-même n'avait pas changé : les données sont toujours remplacées par des marqueurs avant l'envoi.
 - **Changer de fournisseur change aussi le modèle : plus d'erreur 404.** « si on est encore sur le
   modèle gateway alors qu'on a sélectionné OpenRouter ». Seul le fournisseur changeait : le modèle de la
   passerelle (`qwen-27b`) partait chez OpenRouter, qui ne le connaît pas. Chaque fournisseur retrouve
