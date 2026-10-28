@@ -26,7 +26,7 @@ import { callSignature, safeArgs } from "../core/agent/callSignature.js";
 import { catalogueWindow } from "../core/router/window.js";
 import { contextBudget, repoMapBudget } from "../core/context/budget.js";
 import { isProviderRefusal, refusalKind } from "../core/providers/refusal.js";
-import { claudeThroughOpenRouter } from "../core/providers/openai.js";
+import { needsCacheMarks } from "../core/providers/cache.js";
 import { BUILTIN_AGENTS, parseDefinition, type AgentDefinition } from "../core/agent/definitions.js";
 import {
   BUILTIN_SKILLS,
@@ -461,7 +461,7 @@ async function main(): Promise<void> {
             model: cfg.model,
             messages: prepared,
             tools: toolsForMode(sub, mode),
-            ...(claudeThroughOpenRouter(provider.id, cfg.model) ? { promptCache: true } : {}),
+            ...(needsCacheMarks(provider.id, cfg.model) ? { promptCache: true } : {}),
             maxSteps: definition.maxSteps ?? DEFAULT_AGENT_STEPS,
             // Stopped before it wrote anything, it is asked for what it found — see `concludeWhenCut`.
             concludeWhenCut: true,
@@ -516,7 +516,7 @@ async function main(): Promise<void> {
         model: cfg.model,
         messages: outgoing,
         // Claude through OpenRouter: its prompt cache, as in the panel — see `claudeThroughOpenRouter`.
-        ...(claudeThroughOpenRouter(provider.id, cfg.model) ? { promptCache: true } : {}),
+        ...(needsCacheMarks(provider.id, cfg.model) ? { promptCache: true } : {}),
         tools,
         signal: ctl.signal,
         ...(contextOverride ? { contextWindow: contextOverride } : {}),
