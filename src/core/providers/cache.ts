@@ -22,3 +22,17 @@ export const MAX_CACHE_MARKS = 4;
 export function keepCacheMarks(candidates: number[], max = MAX_CACHE_MARKS): Set<number> {
   return new Set(candidates.slice(-max));
 }
+
+/**
+ * Whether a request to this provider and model needs cache marks to be cached at all — so the agent
+ * loop places its rolling mark (see `withRollingCacheMark`) whatever `hiveyCode.chat.promptCache` says.
+ *
+ * Anthropic's cache applies only to the prefixes a request marks; OpenAI, DeepSeek, Gemini, Grok and
+ * Kimi cache a repeated prefix on their own and need nothing. ⚠️ Without the mark, every step of an
+ * agent turn paid the whole conversation again: measured through OpenRouter, a request read back from
+ * the cache costs a tenth (0.00024 $ against 0.0029 $ for 23 k tokens). Both doors to Claude: the
+ * native API, and OpenRouter (see `claudeThroughOpenRouter`).
+ */
+export function needsCacheMarks(provider: string, model: string): boolean {
+  return provider === "anthropic" || (provider === "openrouter" && /^~?anthropic\//.test(model));
+}

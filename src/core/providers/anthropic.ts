@@ -66,7 +66,11 @@ export class AnthropicProvider implements Provider {
       stream: true,
       messages: rest.map((m, index) => {
         if (m.role === "tool") {
-          return { role: "user", content: [{ type: "tool_result", tool_use_id: m.toolCallId, content: m.content }] };
+          // ⚠️ The mark too: in an agent turn the rolling one lands on a tool result, and without it only
+          // the fixed prefix was cached — every step paid the whole conversation again.
+          const result: Record<string, unknown> = { type: "tool_result", tool_use_id: m.toolCallId, content: m.content };
+          if (marks.has(system.length + index)) result["cache_control"] = { type: "ephemeral" };
+          return { role: "user", content: [result] };
         }
         // Signed thinking blocks first, as the API returned them — see `ChatMessage.thinkingBlocks`.
         const thought = m.role === "assistant" ? (m.thinkingBlocks ?? []) : [];

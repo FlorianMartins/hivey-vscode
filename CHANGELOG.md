@@ -142,6 +142,13 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **Le cache de Claude marche aussi avec une clé Anthropic directe, en mode Agent.** Le client Anthropic
+  avait les deux mêmes défauts que le passage par OpenRouter : le marqueur de cache n'était jamais posé
+  sur les résultats d'outils, et la boucle de l'agent ne posait son marqueur glissant que si le réglage
+  `hiveyCode.chat.promptCache` était activé. Seul le début fixe (consignes, carte du dépôt) était mis
+  en cache, et chaque étape repayait la conversation. Les deux sont corrigés. Les autres fournisseurs
+  (OpenAI, DeepSeek, Gemini, Grok, Kimi) mettent en cache d'eux-mêmes un début de requête répété, sans
+  marqueur.
 - **Claude via OpenRouter coûte beaucoup moins cher en mode Agent : son cache est enfin utilisé.**
   « une requête avec 13 100 jetons sur Sonnet 5.5 lui a coûté 1,50 $ ». Le prix affiché était juste
   (vérifié sur une vraie requête : OpenRouter facture exactement le tarif du catalogue) ; c'est le

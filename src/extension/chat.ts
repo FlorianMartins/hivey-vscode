@@ -40,7 +40,7 @@ import { costOf, estimateCost, makeLookup } from "../core/router/pricing.js";
 import { calibrate, observe, prune, type Calibration } from "../core/util/calibrate.js";
 import { acceptsImages, IMAGE_TOKENS, isCatalogued, isImageRefusal, withoutImages } from "../core/models/vision.js";
 import { checkEndpoint } from "../core/providers/endpoint.js";
-import { claudeThroughOpenRouter } from "../core/providers/openai.js";
+import { needsCacheMarks } from "../core/providers/cache.js";
 import { handoverNote, selfCheckMessage, verifyTurn, type TurnStep } from "../core/router/outcome.js";
 import { unifiedDiff } from "../core/text/diff.js";
 import { escalationTarget, route, type Route } from "../core/router/route.js";
@@ -2059,7 +2059,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       recall: this.recallFor(this.session.id),
       ...(run.signal ? { signal: run.signal } : {}),
       // A sub-agent is a full agent turn too: the same cache — see `claudeThroughOpenRouter`.
-      ...(env.settings.chat.promptCache || claudeThroughOpenRouter(env.providerId, model) ? { promptCache: true } : {}),
+      ...(env.settings.chat.promptCache || needsCacheMarks(env.providerId, model) ? { promptCache: true } : {}),
       approve: (req) => this.askApproval(req),
       beforeRequest: async (msgs) => {
         if (env.isLocal) return msgs;
@@ -4871,7 +4871,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         afterResponse: (t) => vault.restore(t),
         restoreArgs: (t) => vault.restore(t),
         onUsage: (info) => this.noteUsage(info),
-        ...(settings.chat.promptCache || claudeThroughOpenRouter(useProvider.id, useModel) ? { promptCache: true } : {}),
+        ...(settings.chat.promptCache || needsCacheMarks(useProvider.id, useModel) ? { promptCache: true } : {}),
         });
 
       let result: Awaited<ReturnType<typeof runTurn>>;

@@ -9,6 +9,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { AddressInfo } from "node:net";
 import { claudeThroughOpenRouter, contextWindowOf, OpenAICompatibleProvider } from "../src/core/providers/openai.js";
 import { AnthropicProvider } from "../src/core/providers/anthropic.js";
+import { needsCacheMarks } from "../src/core/providers/cache.js";
 import { HttpError } from "../src/core/util/http.js";
 
 type Handler = (req: IncomingMessage, res: ServerResponse, body: string) => void;
@@ -255,6 +256,30 @@ test("Anthropic: the stable prefix is marked for the prompt cache", async () => 
   assert.equal(sent.messages[1].content[0].cache_control, undefined, "the volatile tail must not break the cache");
   assert.equal(r.text, "ok");
   assert.equal(r.usage.cachedTokens, 900);
+
+  // The rolling mark of an agent step lands on a tool result: it was dropped there, and only the
+  // fixed prefix was cached.
+  const t = await serve((_req, res) => {
+    res.writeHead(200, { "Content-Type": "text/event-stream" });
+    res.end();
+  });
+  await new AnthropicProvider({ baseUrl: t.url, apiKey: "k" })
+    .chat({
+      model: "claude-sonnet-5-5",
+      messages: [
+        { role: "user", content: "read a" },
+        { role: "assistant", content: "", toolCalls: [{ id: "c1", name: "read_file", args: "{}" }] },
+        { role: "tool", toolCallId: "c1", content: "the file", cacheable: true },
+      ],
+    })
+    .catch(() => undefined);
+  await t.close();
+  assert.deepEqual(t.requests[0]!.body.messages[2].content[0].cache_control, { type: "ephemeral" });
+  // And the loop is told to place that mark for both doors to Claude, whatever the setting says.
+  assert.equal(needsCacheMarks("anthropic", "claude-sonnet-5-5"), true);
+  assert.equal(needsCacheMarks("openrouter", "anthropic/claude-sonnet-5.5"), true);
+  assert.equal(needsCacheMarks("openrouter", "openai/gpt-5.5"), false, "OpenAI caches on its own");
+  assert.equal(needsCacheMarks("deepseek", "deepseek-v4.1-flash"), false);
   assert.equal(r.usage.completionTokens, 5);
 });
 
