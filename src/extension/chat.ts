@@ -40,6 +40,7 @@ import { costOf, estimateCost, makeLookup } from "../core/router/pricing.js";
 import { calibrate, observe, prune, type Calibration } from "../core/util/calibrate.js";
 import { acceptsImages, IMAGE_TOKENS, isCatalogued, isImageRefusal, withoutImages } from "../core/models/vision.js";
 import { checkEndpoint } from "../core/providers/endpoint.js";
+import { claudeThroughOpenRouter } from "../core/providers/openai.js";
 import { handoverNote, selfCheckMessage, verifyTurn, type TurnStep } from "../core/router/outcome.js";
 import { unifiedDiff } from "../core/text/diff.js";
 import { escalationTarget, route, type Route } from "../core/router/route.js";
@@ -2057,6 +2058,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       ...(this.modelWindow(env.settings) ? { contextWindow: this.modelWindow(env.settings) } : {}),
       recall: this.recallFor(this.session.id),
       ...(run.signal ? { signal: run.signal } : {}),
+      // A sub-agent is a full agent turn too: the same cache — see `claudeThroughOpenRouter`.
+      ...(env.settings.chat.promptCache || claudeThroughOpenRouter(env.providerId, model) ? { promptCache: true } : {}),
       approve: (req) => this.askApproval(req),
       beforeRequest: async (msgs) => {
         if (env.isLocal) return msgs;
@@ -2083,6 +2086,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     if (!env.isLocal) {
       const cost = costOf(result.usage, this.priceLookup(model));
       this.delegatedCostUsd += cost.usd;
+      this.delegatedUsage.promptTokens += result.usage.promptTokens;
+      this.delegatedUsage.completionTokens += result.usage.completionTokens;
+      this.delegatedUsage.cachedTokens += result.usage.cachedTokens;
       this.gate.record(
         {
           at: Date.now(),
@@ -4220,6 +4226,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     }
     this.plan = undefined;
     this.delegatedCostUsd = 0;
+    this.delegatedUsage = { promptTokens: 0, completionTokens: 0, cachedTokens: 0 };
     this.turn?.abort();
     const ctl = new AbortController();
     this.turn = ctl;
@@ -4864,7 +4871,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         afterResponse: (t) => vault.restore(t),
         restoreArgs: (t) => vault.restore(t),
         onUsage: (info) => this.noteUsage(info),
-        ...(settings.chat.promptCache ? { promptCache: true } : {}),
+        ...(settings.chat.promptCache || claudeThroughOpenRouter(useProvider.id, useModel) ? { promptCache: true } : {}),
         });
 
       let result: Awaited<ReturnType<typeof runTurn>>;
@@ -5030,10 +5037,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         if (notices.length) answer.notices = notices;
       }
       answer.usdCost = 0;
+      // With what its sub-agents sent and received: their cost is in the answer's price, so their
+      // tokens are in its breakdown — « 13 100 tokens for $1.50 » was a price for more than it showed.
       answer.usage = {
-        promptTokens: result.usage.promptTokens,
-        completionTokens: result.usage.completionTokens,
-        cachedTokens: result.usage.cachedTokens,
+        promptTokens: result.usage.promptTokens + this.delegatedUsage.promptTokens,
+        completionTokens: result.usage.completionTokens + this.delegatedUsage.completionTokens,
+        cachedTokens: result.usage.cachedTokens + this.delegatedUsage.cachedTokens,
       };
       if (thought) answer.reasoning = thought;
       if (steps.length) answer.steps = steps;
@@ -5729,6 +5738,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
   /** What sub-agents spent during the turn in progress, to be added to the answer that ordered it. */
   private delegatedCostUsd = 0;
+  /** And their tokens, for the answer's breakdown. */
+  private delegatedUsage = { promptTokens: 0, completionTokens: 0, cachedTokens: 0 };
 
   /** The answer a turn is writing right now, which the panel leaves to the live turn to draw. */
   private streamingEntryId: string | undefined;
