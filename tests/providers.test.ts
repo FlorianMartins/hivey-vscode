@@ -750,6 +750,20 @@ test("a Claude model through OpenRouter gets its prompt cache without the settin
   const [system, user] = s.requests[0]!.body.messages;
   assert.deepEqual(system.content, [{ type: "text", text: "rules", cache_control: { type: "ephemeral" } }]);
   assert.equal(user.content, "question", "an unmarked message keeps its plain shape");
+  // And the rolling mark of an agent step, which lands on a TOOL result: there it was dropped, and
+  // only the fixed prefix was cached.
+  const t = await serve((_req, res) => sse(res, [{ choices: [{ delta: { content: "ok" } }] }]));
+  const q = new OpenAICompatibleProvider({ id: "openrouter", baseUrl: t.url, apiKey: "k", isLocal: false });
+  await q.chat({
+    model: "anthropic/claude-sonnet-5.5",
+    messages: [
+      { role: "user", content: "read a" },
+      { role: "assistant", content: "", toolCalls: [{ id: "c1", name: "read_file", args: "{}" }] },
+      { role: "tool", toolCallId: "c1", content: "the file", cacheable: true },
+    ],
+  });
+  await t.close();
+  assert.deepEqual(t.requests[0]!.body.messages[2].content, [{ type: "text", text: "the file", cache_control: { type: "ephemeral" } }]);
   assert.equal(claudeThroughOpenRouter("openrouter", "~anthropic/claude-sonnet-latest"), true);
   assert.equal(claudeThroughOpenRouter("openrouter", "openai/gpt-5.5"), false);
   assert.equal(claudeThroughOpenRouter("anthropic", "claude-sonnet-5-5"), false, "the native client has its own");
