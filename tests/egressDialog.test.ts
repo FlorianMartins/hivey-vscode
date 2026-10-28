@@ -24,9 +24,14 @@ test("asked for credentials anywhere, and for a person's or a company's data fro
 test("asked once per value per conversation, or never again with \"Always send\"", () => {
   // « la fenêtre se déclenche tout le temps »: asked at every step of an agent turn.
   assert.match(dialog, /!accepted\.has\(f\.value\)/);
-  assert.match(dialog, /!\(conversation && this\.secretsAllowed\.has\(conversation\)\)/);
+  assert.match(dialog, /!this\.secretsAllowed\.has\(conversation\)/);
   assert.match(dialog, /t\("Always send \(this conversation\)"\)/);
-  // The agent turn names its conversation, on its first request and on every step after.
+  // EVERY request names its conversation — the turn and its steps, and also the sub-agents, the
+  // summary and the model comparison. « il n'y a plus que "Envoyer (marqueurs en place)" »: those
+  // three did not, and the window lost "Always send" and its memory of what was accepted.
   const chat = readFileSync("src/extension/chat.ts", "utf8");
-  assert.equal(chat.match(/gate\.prepare\([^)]*conversation: this\.session\.id/g)?.length, 2);
+  const calls = chat.match(/gate\.prepare\(/g)?.length ?? 0;
+  assert.ok(calls >= 6);
+  assert.equal(chat.match(/gate\.prepare\([^)]*conversation: this\.session\.id/g)?.length, calls, "a request that does not name its conversation");
+  assert.match(egress, /isLocal: boolean; conversation: string \}/, "and the type requires it");
 });

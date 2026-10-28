@@ -142,6 +142,13 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **La fenêtre des données sensibles propose de nouveau tous ses choix.** « il y a juste "Envoyer
+  (marqueurs en place)", il n'y a plus d'autres possibilités ». Les sous-agents, le résumé de la
+  conversation et la comparaison entre modèles ne disaient pas à quelle conversation ils
+  appartenaient : la fenêtre perdait alors « Toujours envoyer (cette conversation) » et oubliait ce qui
+  avait déjà été accepté, si bien qu'elle revenait avec un seul bouton à chaque étape d'un sous-agent.
+  Toutes les requêtes nomment maintenant leur conversation (c'est imposé par le code). Le masquage
+  lui-même n'avait pas changé : les données sont toujours remplacées par des marqueurs avant l'envoi.
 - **Changer de fournisseur change aussi le modèle : plus d'erreur 404.** « si on est encore sur le
   modèle gateway alors qu'on a sélectionné OpenRouter ». Seul le fournisseur changeait : le modèle de la
   passerelle (`qwen-27b`) partait chez OpenRouter, qui ne le connaît pas. Chaque fournisseur retrouve

@@ -2038,7 +2038,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       : await this.gate.prepare(
           messages,
           env.settings,
-          { provider: env.providerId, model, baseUrl: env.baseUrl, isLocal: env.isLocal },
+          { provider: env.providerId, model, baseUrl: env.baseUrl, isLocal: env.isLocal, conversation: this.session.id },
           env.vault,
         );
     if (!prepared) return t("Refused: the sub-agent's request was not sent.");
@@ -2063,7 +2063,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         const again = await this.gate.prepare(
           msgs,
           env.settings,
-          { provider: env.providerId, model, baseUrl: env.baseUrl, isLocal: env.isLocal },
+          { provider: env.providerId, model, baseUrl: env.baseUrl, isLocal: env.isLocal, conversation: this.session.id },
           env.vault,
         );
         if (!again) throw new Error(t("Request refused: the rest of the turn was not sent."));
@@ -3986,7 +3986,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         { role: "system" as const, content: compactBrief(), cacheable: true },
         { role: "user" as const, content: transcript },
       ];
-      const prepared = await this.gate.prepare(messages, settings, { provider: providerId, model, baseUrl, isLocal }, vault);
+      const prepared = await this.gate.prepare(messages, settings, { provider: providerId, model, baseUrl, isLocal, conversation: this.session.id }, vault);
       if (!prepared) {
         this.post({ type: "status", text: t("Request cancelled.") });
         return false;
@@ -5456,7 +5456,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       ];
       const prepared = isLocal
         ? { messages: outgoing }
-        : await this.gate.prepare(outgoing, settings, { provider, model, baseUrl, isLocal }, vault);
+        : await this.gate.prepare(outgoing, settings, { provider, model, baseUrl, isLocal, conversation: this.session.id }, vault);
       if (!prepared) {
         entry.error = t("Not sent.");
         return;

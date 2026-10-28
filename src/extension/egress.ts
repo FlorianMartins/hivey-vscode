@@ -142,7 +142,11 @@ export class EgressGate {
   async prepare(
     messages: ChatMessage[],
     settings: Settings,
-    target: { provider: string; model: string; baseUrl: string; isLocal: boolean; conversation?: string },
+    // The conversation is REQUIRED. « il n'y a plus que "Envoyer (marqueurs en place)" » — left out by
+    // the sub-agents, the summary and the model comparison, it took away "Always send (this
+    // conversation)" and the memory of what was already accepted, so the window came back with one
+    // button at every step of a sub-agent.
+    target: { provider: string; model: string; baseUrl: string; isLocal: boolean; conversation: string },
     vault = new Vault(),
   ): Promise<PreparedRequest | undefined> {
     // Local endpoints skip the whole gate: redacting text that never leaves the machine costs
@@ -165,12 +169,12 @@ export class EgressGate {
     // the same values stay in the history. A value once accepted in a conversation is not asked about
     // again there; "Always send" accepts everything for the rest of it.
     const conversation = target.conversation;
-    const accepted = conversation ? (this.acceptedValues.get(conversation) ?? new Set<string>()) : new Set<string>();
+    const accepted = this.acceptedValues.get(conversation) ?? new Set<string>();
     const asked = findings
       .map((f) => ({ f, place: placeOf(messages, f) }))
       .filter(({ f, place }) => f.kind === "secret" || (WARNED.has(f.kind) && place.from !== "typed"))
       .filter(({ f }) => !accepted.has(f.value));
-    if (asked.length && !(conversation && this.secretsAllowed.has(conversation))) {
+    if (asked.length && !this.secretsAllowed.has(conversation)) {
       const always = t("Always send (this conversation)");
       const lines = asked.slice(0, MAX_LISTED).map(({ f, place }) => `• ${whereWords(place)} — ${kindWords(f)} (${masked(f.value)})`);
       if (asked.length > MAX_LISTED) lines.push(t("… and {0} more", asked.length - MAX_LISTED));
@@ -179,14 +183,12 @@ export class EgressGate {
         // No "Cancel" of our own: a modal dialog already has one, and the window showed two.
         { modal: true, detail: lines.join("\n") },
         t("Send (markers in place)"),
-        ...(conversation ? [always] : []),
+        always,
       );
-      if (proceed === always && conversation) this.secretsAllowed.add(conversation);
+      if (proceed === always) this.secretsAllowed.add(conversation);
       else if (proceed !== t("Send (markers in place)")) return undefined;
-      if (conversation) {
-        for (const { f } of asked) accepted.add(f.value);
-        this.acceptedValues.set(conversation, accepted);
-      }
+      for (const { f } of asked) accepted.add(f.value);
+      this.acceptedValues.set(conversation, accepted);
     }
 
     const estimatedTokens = estimateMessageTokens(redacted);
