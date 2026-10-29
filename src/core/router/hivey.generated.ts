@@ -7,7 +7,7 @@
 //
 // The rules live in src/core/router/curate.ts, with their tests. Read them there before doubting a row.
 
-export const HIVEY_GENERATED_AT = "2026-10-27";
+export const HIVEY_GENERATED_AT = "2026-10-29";
 
 /**
  * Roles where a dearer preset resolved to the same model as a cheaper one, on the day this ran.
@@ -28,7 +28,7 @@ export const HIVEY_ROUTING: Record<string, Record<string, string>> = {
     "completion": "cohere/north-mini-code:free"
   },
   "hivey/smart": {
-    "chore": "qwen/qwen3.7-flash",
+    "chore": "z-ai/glm-5.3-flash",
     "everyday": "openai/gpt-6.1-terra-pro",
     "deep": "moonshotai/kimi-k3.1-pro",
     "completion": "poolside/laguna-s-2.1"
