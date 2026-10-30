@@ -6,6 +6,14 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Ajouté
 
+- **OpenRouter prend d'abord l'hébergeur le plus rapide.** « DeepSeek V4.1 Flash a mis 45 min pour
+  faire une tâche cette nuit ». Plus de quarante hébergeurs servent ce modèle sur OpenRouter, à des prix
+  jusqu'à quinze fois différents, et OpenRouter penche par défaut vers le moins cher — souvent le plus
+  lent, et le premier saturé la nuit. Chaque requête lui demande maintenant le plus rapide d'abord.
+  Mesuré avec DeepSeek V4.1 Flash : 60/60 tâches de part et d'autre, 4 % plus rapide sur les 60 et
+  6 % sur 8 tâches longues, pour une dépense réelle identique (0,057 $ contre 0,058 $). Réglage
+  `hiveyCode.chat.openRouterSort` : le plus rapide (défaut), la première réponse la plus rapide, le moins
+  cher, ou laisser OpenRouter choisir comme avant.
 - **Les mêmes noms de réflexion pour tous les modèles : Direct, Faible, Moyen, Élevé, Avancé,
   Maximum.** « repasser sur les noms de base … garder la même base pour ne pas perdre les
   utilisateurs ». Le menu ne montre plus le nom de chaque fournisseur, mais six noms fixes, et chaque

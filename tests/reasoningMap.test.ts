@@ -278,6 +278,8 @@ test("unpicked, OpenAI / OpenRouter / Gemini and the other clouds: main's body, 
           ...(tools ? { tools: [{ type: "function", function: { name: "read_file", description: "read", parameters: { type: "object" } } }] } : {}),
           stream_options: { include_usage: true },
           ...(provider === "openrouter" ? { usage: { include: true } } : {}),
+          // The fastest host first — see `OpenRouterSort`. Not a reasoning field.
+          ...(provider === "openrouter" ? { provider: { sort: "throughput" } } : {}),
         },
         `${provider} ${model}`,
       );

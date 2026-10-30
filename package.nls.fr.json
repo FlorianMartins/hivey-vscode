@@ -171,5 +171,10 @@
   "config.appearance.hivey": "Les surfaces et accents propres à Hivey : ambre sur une base froide et peu contrastée. L’éditeur garde la couleur de fond de la fenêtre, et un thème clair conserve l’apparence de l’éditeur.",
   "config.mcp.servers.type": "stdio lance un programme sur cette machine ; http parle à un serveur.",
   "config.mcp.servers.command": "Le programme à lancer (stdio).",
-  "config.mcp.servers.url": "L'adresse du serveur (http)."
+  "config.mcp.servers.url": "L'adresse du serveur (http).",
+  "config.chat.openRouterSort": "L'hébergeur auquel OpenRouter envoie une requête quand un modèle en a plusieurs. Beaucoup de modèles sont servis par des dizaines d'hébergeurs, à des prix jusqu'à quinze fois différents, et les moins chers sont souvent les plus lents.",
+  "config.chat.openRouterSort.throughput": "Le plus rapide d'abord (le plus de jetons par seconde). Par défaut.",
+  "config.chat.openRouterSort.latency": "Celui qui commence à répondre le plus tôt.",
+  "config.chat.openRouterSort.price": "Le moins cher d'abord — plus lent, parfois beaucoup plus.",
+  "config.chat.openRouterSort.default": "Laisser OpenRouter choisir, comme avant (il penche vers le moins cher)."
 }

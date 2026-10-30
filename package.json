@@ -1359,6 +1359,23 @@
             "default": true,
             "markdownDescription": "%config.chat.suggestNext%"
           },
+          "hiveyCode.chat.openRouterSort": {
+            "type": "string",
+            "enum": [
+              "throughput",
+              "latency",
+              "price",
+              "default"
+            ],
+            "default": "throughput",
+            "markdownDescription": "%config.chat.openRouterSort%",
+            "enumDescriptions": [
+              "%config.chat.openRouterSort.throughput%",
+              "%config.chat.openRouterSort.latency%",
+              "%config.chat.openRouterSort.price%",
+              "%config.chat.openRouterSort.default%"
+            ]
+          },
           "hiveyCode.chat.promptCache": {
             "type": "boolean",
             "default": false,
