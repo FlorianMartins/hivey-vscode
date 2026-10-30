@@ -150,6 +150,11 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **La dictée envoie son audio sous son vrai format.** Tous les enregistreurs que l'extension lance
+  (ffmpeg, parecord, arecord, sox, et l'enregistreur de Windows) produisent du WAV, mais le fichier
+  partait encore nommé `speech.webm` et déclaré `audio/webm` — un reste de l'ancien enregistrement par
+  le panneau. Un transcripteur local recevait un `.webm` qui contenait du WAV, et un service en ligne un
+  envoi dont le type déclaré n'était pas le contenu. C'est maintenant `speech.wav`, `audio/wav`.
 - **Chaque modèle garde son propre niveau de réflexion.** « il faut que le modèle prenne par défaut son
   mode de raisonnement et ne force pas un niveau — et que si on change de mode de raisonnement, il
   applique bien le mode choisi ». Le niveau était unique pour tous les modèles : un « Maximum » choisi

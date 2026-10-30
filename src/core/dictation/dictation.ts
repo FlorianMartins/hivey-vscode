@@ -170,9 +170,17 @@ export function recogniserLanguage(settings: DictationSettings, uiLanguage: stri
   return base && base !== "auto" ? base : undefined;
 }
 
-/** What the audio is written as. `webm/opus` is what every Chromium `MediaRecorder` produces. */
-export const AUDIO_EXTENSION = "webm";
-export const AUDIO_MIME = "audio/webm";
+/**
+ * What the audio is written and sent as: WAV, which every recorder the extension runs produces (see
+ * capture.ts — ffmpeg, parecord, arecord, sox, and MCI in PCM on Windows).
+ *
+ * ⚠️ It said `webm`, left from when the panel recorded through a `MediaRecorder`. The bytes had been
+ * WAV ever since, and went out named `speech.webm` / `audio/webm`: a local transcriber was handed a
+ * `.webm` file holding a WAV, and a hosted one a body whose declared type was not its content — a
+ * service that trusts the name over the bytes refuses it or decodes it wrongly.
+ */
+export const AUDIO_EXTENSION = "wav";
+export const AUDIO_MIME = "audio/wav";
 
 export interface LocalCommandProblem {
   message: string;

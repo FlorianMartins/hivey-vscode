@@ -65,6 +65,9 @@ test("the multipart body carries the model, the audio and a boundary that matche
   assert.match(text, /name="model"\r\n\r\nwhisper-1/);
   assert.match(text, /name="language"\r\n\r\nfr/);
   assert.match(text, new RegExp(`Content-Type: ${AUDIO_MIME}`));
+  // WAV, named and declared as such: every recorder produces WAV, and it went out as `speech.webm`.
+  assert.equal(AUDIO_MIME, "audio/wav");
+  assert.match(text, /filename="speech\.wav"\r\nContent-Type: audio\/wav/);
   // The audio bytes survive unmangled — the reason this is assembled by hand rather than encoded.
   assert.ok(body.includes(250) && body.includes(251), "the raw bytes must not have been re-encoded");
 });
