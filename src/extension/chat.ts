@@ -4374,7 +4374,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const structureChanged = ambient && this.frozenMap ? this.workspace.changesSince(this.frozenMapAt) : undefined;
     const directives = turnDirectives({
       ...(this.participant ? { participant: participantDirective(this.participant) } : {}),
-      language: languageDirective(detectUserLanguage(lastQuestion, language())),
+      // Firm on the user's own server, light on a cloud model — see `languageDirective`.
+      language: languageDirective(detectUserLanguage(lastQuestion, language()), isSelfHostedProvider(isHivey(settings.chat.model) ? "openrouter" : settings.chat.provider)),
       // Files created or deleted since the map — see `structureNote`.
       ...(structureChanged ? { structure: structureNote(structureChanged) } : {}),
     });
@@ -4728,6 +4729,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         // Its thinking in its own language, a sentence for the person in theirs — self-hosted only: a
         // cloud model keeps its own settings. See `NOTE_BEFORE_TOOLS`.
         notesBeforeTools: isSelfHostedProvider(providerId),
+        firmLanguage: isSelfHostedProvider(providerId),
         recall: this.recallFor(this.session.id),
         // What the person typed since the last step, read now — and recorded where it was read, so
         // the saved turn and the next turns show the correction in its place. See `steer`.

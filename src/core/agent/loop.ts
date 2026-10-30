@@ -186,6 +186,12 @@ export interface TurnOptions {
   /** A sentence for the person before each set of tool calls, in their language — see `NOTE_BEFORE_TOOLS`. Self-hosted models only. */
   notesBeforeTools?: boolean;
   /**
+   * The firm reply-language rule and its reminder after each tool result — see `withReplyLanguage`.
+   * Self-hosted models only: a cloud model follows the user's language by itself, and read the
+   * reminder as being forced. Without it, `replyLanguage` changes nothing in the request.
+   */
+  firmLanguage?: boolean;
+  /**
    * What the person typed while the turn was running, handed over and forgotten by the caller.
    * Asked before every request: the messages go in after the last tool results, so the model reads
    * them at its next step without the turn being stopped. Asked again when the model has just
@@ -749,7 +755,7 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
       if (Math.ceil(estimateMessageTokens(working) * tokenRatio) > limit) await compactLive();
     }
     const prepared0 = opts.beforeRequest ? await opts.beforeRequest(working) : working;
-    const prepared = opts.replyLanguage ? withReplyLanguage(prepared0, opts.replyLanguage, Boolean(opts.notesBeforeTools)) : prepared0;
+    const prepared = opts.replyLanguage && opts.firmLanguage ? withReplyLanguage(prepared0, opts.replyLanguage, Boolean(opts.notesBeforeTools)) : prepared0;
     const outgoing = opts.promptCache ? withRollingCacheMark(prepared) : prepared;
     // The step's own stop, for a thinking that loops — see `repeatingTail`. The user's stop still
     // reaches it, and is still told apart: `opts.signal` is what says "cancelled".

@@ -301,9 +301,18 @@ export function steerMessage(texts: string[]): string {
   );
 }
 
-/** Restated after the transcript every turn, where a model reads it last. */
-export function languageDirective(lang: UserLang): string {
+/**
+ * Restated after the transcript every turn, where a model reads it last.
+ *
+ * ⚠️ Firm only for a self-hosted model. « le modèle indique qu'il est forcé de répondre en français, ce
+ * qui fait conflit avec les modèles de base — on avait mis cette règle car Qwen3.8 en local avait
+ * tendance à répondre en anglais ». A cloud model follows the user's language on its own; told in
+ * three places that every sentence must be French, it said it was being forced to. It gets one plain
+ * sentence, which still settles the language when the question is short and the code around it English.
+ */
+export function languageDirective(lang: UserLang, firm = true): string {
   const name = LANG_NAMES[lang];
+  if (!firm) return `The user writes in ${name}: reply in ${name}, unless they ask for another language.`;
   return (
     `Reply language: ${name}. Write every sentence of your reply in ${name} — explanations, plans, summaries, ` +
     `questions and notices — including after reading code, logs or tool output in another language. ` +

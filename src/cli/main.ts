@@ -543,6 +543,7 @@ async function main(): Promise<void> {
         replyLanguage: detectUserLanguage(text, language()),
         // Its thinking in its own language, a sentence for the person in theirs — self-hosted only.
         notesBeforeTools: isSelfHostedProvider(cfg.provider),
+        firmLanguage: isSelfHostedProvider(cfg.provider),
         // The same one self-check the panel does, by the same rule: it changed files and ran
         // nothing, so finish it before saying it is done.
         selfCheck: (trace) =>

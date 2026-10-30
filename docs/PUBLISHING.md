@@ -33,7 +33,7 @@ for Node 20 at least (`engines` in `package.json`), and CI runs the suite on Nod
 ```bash
 npm ci
 npm run typecheck
-npm test                                # 1348 tests (node:test)
+npm test                                # 1349 tests (node:test)
 xvfb-run -a npm run test:integration    # 57 tests, headless, inside a real VS Code
 npm run eval:verify                     # every task's check fails on its untouched fixture
 npm run eval:solutions                  # and passes on its reference solution
