@@ -6,7 +6,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { withReplyLanguage } from "../src/core/prompts.js";
+import { languageDirective, withReplyLanguage } from "../src/core/prompts.js";
 import { runTurn, type Tool } from "../src/core/agent/loop.js";
 import type { ChatRequest, ChatResult, Provider } from "../src/core/providers/types.js";
 
@@ -72,10 +72,40 @@ test("nothing is translated after the fact: a note is kept as the model wrote it
     messages: [{ role: "system", content: "sys" }, { role: "user", content: "Retire le bandeau." }],
     tools: [read],
     replyLanguage: "fr",
+    firmLanguage: true,
   });
   assert.equal(seen.length, 2, "two steps, and no translation request between them");
   assert.match(r.text, /C'est fait\./);
   assert.match(seen[0]!.messages[0]!.content, /Language: the user writes in French[\s\S]*Réponds en français/);
+});
+
+test("a cloud model gets no firm rule and no reminder in its tool results — only one plain sentence", async () => {
+  // « le modèle indique qu'il est forcé de répondre en français, ce qui fait conflit avec les modèles
+  // de base ». The firm rule and the reminder after each tool result were written for Qwen3.8.
+  const seen: ChatRequest[] = [];
+  let n = 0;
+  const provider: Provider = {
+    id: "openrouter",
+    baseUrl: "http://127.0.0.1:1/v1",
+    isLocal: false,
+    async chat(req) {
+      seen.push({ ...req, messages: req.messages.map((m) => ({ ...m })) });
+      n++;
+      const usage = { promptTokens: 1, completionTokens: 1, cachedTokens: 0 };
+      return n === 1
+        ? { text: "", reasoning: "", toolCalls: [{ id: "c1", name: "read_file", args: "{}" }], usage, stopReason: "tool_calls" }
+        : { text: "C'est fait.", reasoning: "", toolCalls: [], usage, stopReason: "stop" };
+    },
+    async listModels() {
+      return [];
+    },
+  };
+  const read = { schema: { name: "read_file", description: "", parameters: { type: "object", properties: {} } }, approval: () => false, run: async () => ({ content: "file" }) } as Tool;
+  await runTurn({ provider, model: "m", messages: [{ role: "system", content: "sys" }, { role: "user", content: "Retire le bandeau." }], tools: [read], replyLanguage: "fr" });
+  const sent = seen[1]!.messages.map((m) => m.content).join("\n");
+  assert.doesNotMatch(sent, /Every sentence you write|Reply language:|Réponds en français/);
+  assert.equal(languageDirective("fr", false), "The user writes in French: reply in French, unless they ask for another language.");
+  assert.match(languageDirective("fr"), /Write every sentence of your reply in French/, "firm on the user's own server");
 });
 
 test("a sentence for the person before the tools, asked only when the caller says so (self-hosted)", () => {
