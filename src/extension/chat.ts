@@ -82,12 +82,12 @@ import { hiveyLabel, hiveyModel, isHivey } from "../core/router/hivey.js";
 import { parsePrompt, participantDirective, type MentionKind, type Participant } from "../core/session/mentions.js";
 import { resolveMentions } from "./mentions.js";
 import { announceRules, instructionFiles, instructionsPrompt } from "./instructions.js";
-import { buildDefinitionTools, createDefinition, definitionUri, DefinitionStore, type SubAgentRun } from "./definitions.js";
+import { buildDefinitionTools, createDefinition, DefinitionStore, type SubAgentRun } from "./definitions.js";
 import { skillsPrompt } from "../core/agent/definitions.js";
 import { autoApprove } from "../core/agent/autoApprove.js";
 import { matchGlob } from "../core/util/glob.js";
 import { discoverLocal, rankModels, suggestPull } from "../core/providers/discover.js";
-import { endpointSettingKey, REMOTE_VENDORS, vendor, type ProviderId } from "../core/providers/vendors.js";
+import { REMOTE_VENDORS, vendor, type ProviderId } from "../core/providers/vendors.js";
 import { request } from "../core/util/http.js";
 import { estimateTokens } from "../core/util/tokens.js";
 import { isLocalEndpoint, streamingRestorer, Vault } from "../core/redaction/index.js";
@@ -852,7 +852,6 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           // The button exists wherever dictation can be MADE to work, not only where it already does:
           // the one thing it can always do is offer to install a transcriber.
           ...(mode === "off" && !offerable ? {} : { dictation: true }),
-          ...(mode === "whisper" || (mode === "off" && offerable) ? { dictationWav: true } : {}),
         };
       })(),
       budget: { spentTodayUsd: this.gate.budget.spentToday(), dailyUsd: s.budget.dailyUsd },
@@ -1130,9 +1129,6 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           this.sendState();
           break;
 
-        case "newSession":
-          this.newSession();
-          break;
         case "openScreen":
           this.screen = m.screen;
           this.sendState();
@@ -1242,44 +1238,6 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           this.sendState();
           break;
 
-        case "setSkillGroups": {
-          const config = vscode.workspace.getConfiguration(SECTION);
-          // One write, not one per skill: choosing "Web and SQL" is a single decision, and a
-          // settings file that churned forty times while the user clicked chips would be a settings
-          // file that fights its own change listener.
-          // The families, not the individual skills. Choosing "Rust" must not also undo the four
-          // skills you had switched off inside Python last week: the two lists answer different
-          // questions and are stored separately for that reason.
-          await config.update(
-            "skills.groups",
-            normalizeGroups(m.groups as SkillGroup[]),
-            vscode.ConfigurationTarget.Global,
-          );
-          this.sendState();
-          break;
-        }
-        case "setSkillEnabled": {
-          const config = vscode.workspace.getConfiguration(SECTION);
-          const next = toggleSkill(readSettings().skills.disabled, m.name, m.enabled);
-          // Global rather than workspace: which skills a person wants offered is a preference about
-          // them, not about the repository they happen to have open. And `writeTarget()` would put
-          // it in the workspace when one exists, so someone switching a skill off would find it
-          // back on in the next project.
-          await config.update("skills.disabled", next, vscode.ConfigurationTarget.Global);
-          this.sendState();
-          break;
-        }
-        case "openSkill": {
-          const uri = definitionUri(m.source);
-          if (uri) await vscode.window.showTextDocument(uri);
-          break;
-        }
-        case "shareSkills":
-          await this.shareSkills();
-          break;
-        case "newSkill":
-          await vscode.commands.executeCommand("hiveyCode.newSkill");
-          break;
         case "openContextPicker":
           await this.contextPicker();
           break;
@@ -1324,9 +1282,6 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         }
         case "restoreCheckpoint":
           await this.restoreCheckpoint(m.id);
-          break;
-        case "dictate":
-          await this.transcribe(m.audio, m.ms);
           break;
         case "startDictation":
           await this.startDictation();
@@ -1556,27 +1511,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           this.permissions.clearSession();
           this.sendState();
           break;
-        case "openEgress":
-          await vscode.commands.executeCommand("hiveyCode.showEgress");
-          break;
-        case "openCosts":
-          await vscode.commands.executeCommand("hiveyCode.showCosts");
-          break;
         case "probeLocal":
           await this.probeLocal();
           break;
-
-        case "saveKey": {
-          const provider = m.provider as Parameters<Keys["store"]>[0];
-          await this.keys.store(provider, m.key);
-          // Storing a key is only half the intent: someone who pastes an OpenRouter key wants to
-          // use OpenRouter, and leaving the provider on `local` would make the key look ignored.
-          const config = vscode.workspace.getConfiguration(SECTION);
-          await config.update("chat.provider", provider, vscode.ConfigurationTarget.Global);
-          await this.refreshSetup();
-          void this.loadModels(true);
-          break;
-        }
 
         case "saveProvider": {
           // Both, or neither. See the protocol note: two separate saves is two chances to leave half
@@ -1659,54 +1596,6 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           }
           await this.probeLocal();
           void this.loadModels(true);
-          break;
-        }
-
-        case "setEndpoint": {
-          // The moment it is typed is the only moment the person who can fix it is looking. A host
-          // with no scheme is completed rather than refused — `api.openai.com/v1` has exactly one
-          // plausible reading — and anything else is rejected with its reason, here, instead of
-          // becoming "Invalid URL" on every question from now on.
-          const checked = checkEndpoint(m.url);
-          // A key pasted into the address field is not a mistake to report, it is an intention to
-          // carry out: the person meant to give this provider their key. Stored where keys go, and
-          // said afterwards — see `recoverMisplacedKeys` for the same decision in the settings.
-          if (checked.credential) {
-            await this.keys.store(m.provider as ProviderId, m.url.trim());
-            void vscode.window.showInformationMessage(t("That is a key, not an address — saved as the key."));
-            await this.refreshSetup();
-            void this.loadModels(true);
-            break;
-          }
-          if (!checked.url) {
-            void vscode.window.showWarningMessage(checked.problem ?? t("That address cannot be used."));
-            break;
-          }
-          if (checked.repaired) {
-            void vscode.window.showInformationMessage(t("Saved as {0}.", checked.url));
-          }
-          const config = vscode.workspace.getConfiguration(SECTION);
-          // The manifest spells `openai-compatible` differently from the provider id, because a
-          // hyphen is not a legal settings key segment. The vendor table owns that translation.
-          const provider = m.provider as ProviderId;
-          const key = endpointSettingKey(provider);
-          await config.update(key, checked.url, vscode.ConfigurationTarget.Global);
-
-          // Typing a gateway's address IS choosing the gateway.
-          //
-          // Saving a key switched the provider — "somebody who pastes an OpenRouter key wants to use
-          // OpenRouter" — and saving an address did not. Which left the one vendor that may need no
-          // key at all with no way to be selected: the user filled in their proxy's address, the
-          // composer went on saying "Local", and the models the proxy serves never appeared. "When I
-          // click on gateway it shows local."
-          //
-          // Only for a vendor whose address has no default. Editing OpenAI's base URL for an Azure
-          // deployment is a change of address, not a change of mind about which provider to use.
-          if (vendor(provider)?.needsUrl && readSettings().chat.provider !== provider) {
-            await config.update("chat.provider", provider, vscode.ConfigurationTarget.Global);
-            void this.loadModels(true);
-          }
-          await this.refreshSetup();
           break;
         }
 

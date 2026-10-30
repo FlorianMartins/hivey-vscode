@@ -414,11 +414,6 @@ export function normalizeGroups(groups: SkillGroup[]): SkillGroup[] {
   return SKILL_GROUPS.map((g) => g.id).filter((id) => kept.has(id));
 }
 
-/** The skills a policy actually offers, in catalogue order. */
-export function enabledSkills(policy: SkillPolicy): BuiltinSkill[] {
-  return BUILTIN_SKILLS.filter((s) => isSkillEnabled(s.name, policy));
-}
-
 /**
  * What the workspace looks like it is made of.
  *

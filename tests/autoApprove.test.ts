@@ -7,7 +7,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { autoApprove, commandContains, commandMatches, describeScope, type AutoApprovePolicy } from "../src/core/agent/autoApprove.js";
+import { autoApprove, commandContains, commandMatches, type AutoApprovePolicy } from "../src/core/agent/autoApprove.js";
 import { matchGlob } from "../src/core/util/glob.js";
 
 const match = (path: string, glob: string) => matchGlob(path, glob);
@@ -81,7 +81,6 @@ test("switching approvals off allows the ordinary things, and says so plainly", 
   assert.equal(write.allow, true);
   assert.match(write.because!, /switched off/);
   assert.equal(autoApprove(p, { tool: "run_command", command: "anything" }, match).allow, true);
-  assert.match(describeScope("all"), /anywhere on this machine/);
 });
 
 // ── Explicit allowances ──────────────────────────────────────────────────────────────────────
@@ -136,12 +135,6 @@ test("leading whitespace does not smuggle a command past the check", () => {
 });
 
 // ── What the user is told ────────────────────────────────────────────────────────────────────
-
-test("every scope describes itself, and only one of them sounds safe", () => {
-  assert.match(describeScope("off"), /asked for/);
-  assert.match(describeScope("workspace"), /inside the open folder/);
-  assert.match(describeScope("all"), /without asking/);
-});
 
 test("an allowed decision always says why, since it replaces a dialog the user would have read", () => {
   const decisions = [

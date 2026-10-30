@@ -397,14 +397,11 @@ body {
   flex: 0 0 auto;
   min-height: 34px;
 }
-.topbar-left,
-.topbar-right {
+.topbar-left {
   display: flex;
   align-items: center;
   gap: var(--sp-1);
   min-width: 0;
-}
-.topbar-left {
   flex: 1 1 auto;
 }
 .topbar-title {
@@ -1176,15 +1173,6 @@ pre.code {
   font-size: var(--fs-meta);
   color: var(--muted);
 }
-.welcome-tips {
-  margin: 0;
-  padding-left: var(--sp-5);
-  color: var(--muted);
-  font-size: var(--fs-meta);
-}
-.welcome-tips li {
-  margin-bottom: var(--sp-1);
-}
 
 /* ── Chips ───────────────────────────────────────────────────────────────────────────────── */
 
@@ -1483,10 +1471,6 @@ pre.code {
   color: var(--vscode-foreground);
   border-color: var(--vscode-focusBorder);
   background: var(--hover);
-}
-.sort-label {
-  font-size: var(--fs-meta);
-  color: var(--muted);
 }
 .sort-select {
   font-family: inherit;
@@ -1947,9 +1931,6 @@ pre.code {
   font-family: var(--vscode-editor-font-family);
   font-variant-numeric: tabular-nums;
 }
-.ci-sep {
-  color: var(--muted);
-}
 .combo-empty {
   padding: var(--sp-4) var(--sp-3);
   color: var(--muted);
@@ -2347,7 +2328,6 @@ pre.code {
   font-size: var(--fs-meta);
   color: var(--muted);
 }
-.setup-row,
 .setup-links,
 .setup-card-foot,
 .setup-foot {
@@ -2538,18 +2518,6 @@ pre.code {
 }
 .perm-list-count.allowed {
   color: var(--muted);
-}
-
-/* The context meter sits above the box, right-aligned: a number you glance at, not a control you
-   operate. Inside the toolbar it sat between the model name and the send button and competed with
-   both for the same few pixels. */
-/* Above the box and outside its border, on the panel background: a reading about the conversation
-   rather than a control of the message being written. */
-.composer-meter {
-  display: flex;
-  justify-content: flex-end;
-  padding: 0 0 var(--sp-1);
-  min-height: 14px;
 }
 
 /* An egress card is about what leaves the machine rather than about what the agent may do, so its
@@ -3014,11 +2982,6 @@ pre.code {
   }
 }
 
-/* The context gauge: how full, next to how much. */
-.composer-meter {
-  align-items: center;
-  gap: var(--sp-2);
-}
 /* ── How full the context is ──────────────────────────────────────────────────────────────────
  *
  * Fourteen pixels where there were ninety. The row under the composer has to hold the provider, the
@@ -3195,10 +3158,6 @@ pre.code {
  * switch that keeps the menu open — switching several off in a row is the normal case, and a menu
  * that closed after each would have to be reopened four times to make one decision.
  */
-.skills-menu {
-  max-height: 60vh;
-  overflow-y: auto;
-}
 .skill-row {
   display: flex;
   align-items: flex-start;
@@ -3239,17 +3198,6 @@ pre.code {
 }
 .skill-row.required {
   cursor: default;
-}
-.skill-tag {
-  font-size: var(--fs-meta);
-  color: var(--muted);
-  align-self: center;
-}
-.skill-open {
-  opacity: 0;
-}
-.skill-row:hover .skill-open {
-  opacity: 1;
 }
 /* No badge on the skills button.
  *
@@ -3306,7 +3254,6 @@ pre.code {
 /* Every other scrolling surface in the panel gets the same treatment, so the rail is not merely
    moved from the transcript to the menus. */
 .menu-list,
-.skills-menu,
 .combo-list,
 .md-table-wrap,
 pre.code {
@@ -3827,65 +3774,6 @@ pre.code code {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-/* ── What are you working on? ─────────────────────────────────────────────────────────────────
- *
- * The one question a new conversation asks, answered locally. Chips because every option is then
- * visible without opening anything, and because several families at once is the normal case.
- */
-.welcome-groups {
-  margin: var(--sp-4) 0 var(--sp-2);
-  padding: var(--sp-3);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--surface);
-}
-.welcome-groups-head {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin-bottom: var(--sp-2);
-}
-.welcome-groups-title {
-  font-size: var(--fs-control);
-  font-weight: 600;
-}
-.welcome-groups-hint {
-  font-size: var(--fs-meta);
-  color: var(--muted);
-}
-.welcome-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--sp-1);
-}
-.welcome-chip {
-  font-family: inherit;
-  font-size: var(--fs-meta);
-  padding: 2px var(--sp-2);
-  border-radius: 999px;
-  border: 1px solid var(--border-strong);
-  background: transparent;
-  color: var(--muted);
-  cursor: pointer;
-}
-.welcome-chip:hover {
-  background: var(--hover);
-  color: var(--vscode-foreground);
-}
-/* Chosen: filled, in the accent the workbench already uses for a selected thing. */
-.welcome-chip.on {
-  background: color-mix(in srgb, var(--vscode-textLink-foreground, var(--vscode-focusBorder)) 20%, transparent);
-  border-color: color-mix(in srgb, var(--vscode-textLink-foreground, var(--vscode-focusBorder)) 55%, transparent);
-  color: var(--vscode-foreground);
-}
-/* Suggested but not chosen: outlined in the accent, so the guess is visible as a guess rather than
-   applied silently. Someone who agrees clicks it; someone who does not, ignores it. */
-.welcome-chip.suggested:not(.on) {
-  border-style: dashed;
-  border-color: color-mix(in srgb, var(--vscode-textLink-foreground, var(--vscode-focusBorder)) 45%, transparent);
-  color: var(--vscode-foreground);
 }
 
 /* The strip the "latest" button lives in: always there, empty when the button is not needed. Its

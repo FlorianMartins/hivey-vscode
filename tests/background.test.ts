@@ -23,7 +23,6 @@ import {
   branchName,
   createWorktreeArgv,
   deleteBranchArgv,
-  diffArgv,
   gitAllowed,
   patchArgv,
   removeWorktreeArgv,
@@ -150,14 +149,13 @@ test("the allow-list is applied: every background git call goes through it, and 
   const ext = readFileSync(join("src", "extension", "background.ts"), "utf8");
   assert.equal(/run\(\s*"git"/.test(ext.replace(/function git\([^]*?\n}\n/, "")), false, "a git call bypasses the allow-list");
   assert.match(ext, /if \(!gitAllowed\(args\)\)/);
-  for (const argv of [createWorktreeArgv("/tmp/wt", "hivey/x"), patchArgv(), diffArgv(), removeWorktreeArgv("/tmp/wt"), deleteBranchArgv("hivey/x")]) {
+  for (const argv of [createWorktreeArgv("/tmp/wt", "hivey/x"), patchArgv(), removeWorktreeArgv("/tmp/wt"), deleteBranchArgv("hivey/x")]) {
     assert.equal(gitAllowed(argv), true, `${argv.join(" ")} would be refused`);
   }
   assert.deepEqual(deleteBranchArgv("hivey/x"), ["branch", "-D", "hivey/x"]);
 });
 
 test("the diff is against the branch point, which is what a reader wants", () => {
-  assert.deepEqual(diffArgv(), ["diff", "HEAD", "--stat"]);
   assert.deepEqual(patchArgv(), ["diff", "HEAD"]);
   assert.deepEqual(removeWorktreeArgv("/tmp/wt"), ["worktree", "remove", "--force", "/tmp/wt"]);
 });

@@ -64,9 +64,9 @@ test("every string the source translates has a French entry", () => {
   for (const file of walk("src")) {
     if (!file.endsWith(".ts")) continue;
     if (file.includes("i18n")) continue;
-    const source = readFileSync(file, "utf8");
+    // Comments taken out: a `t("…")` quoted in one is not a string the interface shows.
+    const source = withoutComments(readFileSync(file, "utf8"));
     // `t("…")`, but not `test(`, `.get(`, `import(` — the boundary matters more than it looks.
-    //
     for (const key of translatedIn([source])) keys.add(key);
   }
 
@@ -88,7 +88,8 @@ test("the table does not translate strings that no longer exist", () => {
   // joined, see above), or present in the source as a literal. Anything else cannot be reached,
   // because a key must match exactly — there is no way to build one at runtime.
   const files = walk("src").filter((f) => f.endsWith(".ts") && !f.includes("i18n"));
-  const sources = files.map((f) => readFileSync(f, "utf8"));
+  // Without their comments, or a key quoted in a note about its own removal stays "used" for ever.
+  const sources = files.map((f) => withoutComments(readFileSync(f, "utf8")));
   const source = sources.join("\n");
   // A string handed to `en()` is reachable too: it is kept English for the model, and shown through
   // a variable where the person sees it — a typed skill's body is translated with `t(match.prompt)`.
@@ -118,6 +119,97 @@ function translatedIn(sources: string[], fn: "t" | "en" = "t"): Set<string> {
         .replace(/\\n/g, "\n");
       if (key.trim()) out.add(key);
     }
+  }
+  return out;
+}
+
+/**
+ * The source with its comments taken out, strings and regular expressions left exactly as they are.
+ *
+ * ⚠️ Without this, a key quoted in a comment counted as used: "Paid only" and "Systems" survived as
+ * entries for text the product no longer says, because the comment explaining their removal quoted
+ * them. A line-based strip is not enough — `"https://…"` contains `//`, and a regex can contain a
+ * quote — so this walks the code the way a tokenizer would: string, template, regex, comment.
+ */
+function withoutComments(source: string): string {
+  const n = source.length;
+  let out = "";
+  let i = 0;
+  // Brace depths at which a `${` was opened: the `}` that brings the depth back resumes the template.
+  const templates: number[] = [];
+  let depth = 0;
+  // The last significant character of code, which decides whether a `/` starts a regex.
+  let prev = -1;
+  const KEYWORDS = new Set(["return", "typeof", "case", "in", "of", "delete", "void", "throw", "new", "else", "do", "yield", "await"]);
+  const regexMayStart = (): boolean => {
+    if (prev < 0) return true;
+    const c = source[prev]!;
+    if (/[\w$]/.test(c)) {
+      let k = prev;
+      while (k > 0 && /[\w$]/.test(source[k - 1]!)) k--;
+      return KEYWORDS.has(source.slice(k, prev + 1));
+    }
+    return !")]\"'`".includes(c);
+  };
+  // From just after a backtick or a `}` that closes `${…}`: to the closing backtick or the next `${`.
+  const template = (from: number): number => {
+    let k = from;
+    while (k < n) {
+      if (source[k] === "\\") k += 2;
+      else if (source[k] === "`") return k + 1;
+      else if (source[k] === "$" && source[k + 1] === "{") {
+        templates.push(depth);
+        return k + 2;
+      } else k++;
+    }
+    return n;
+  };
+  while (i < n) {
+    const c = source[i]!;
+    const d = source[i + 1];
+    if (c === "/" && d === "/") {
+      const end = source.indexOf("\n", i);
+      i = end < 0 ? n : end;
+      continue;
+    }
+    if (c === "/" && d === "*") {
+      const end = source.indexOf("*/", i + 2);
+      i = end < 0 ? n : end + 2;
+      out += " ";
+      continue;
+    }
+    let j = i + 1;
+    if (c === '"' || c === "'") {
+      while (j < n && source[j] !== c && source[j] !== "\n") j += source[j] === "\\" ? 2 : 1;
+      j = Math.min(j + 1, n);
+    } else if (c === "`") {
+      j = template(i + 1);
+    } else if (c === "}" && templates.length && templates[templates.length - 1] === depth) {
+      templates.pop();
+      j = template(i + 1);
+    } else if (c === "/" && regexMayStart()) {
+      let inClass = false;
+      let k = i + 1;
+      while (k < n && source[k] !== "\n" && (inClass || source[k] !== "/")) {
+        if (source[k] === "\\") k++;
+        else if (source[k] === "[") inClass = true;
+        else if (source[k] === "]") inClass = false;
+        k++;
+      }
+      // An unterminated one was a division after all.
+      if (source[k] === "/") {
+        k++;
+        while (k < n && /\w/.test(source[k]!)) k++;
+        j = k;
+      }
+    } else if (c === "{") {
+      depth++;
+    } else if (c === "}") {
+      depth--;
+    }
+    out += source.slice(i, j);
+    if (!/\s/.test(c)) prev = j - 1;
+    i = j;
   }
   return out;
 }

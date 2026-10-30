@@ -7,11 +7,10 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { changedLines, diffLines, unifiedDiff, changeSize, describeChangeSize } from "../src/core/text/diff.js";
+import { diffLines, unifiedDiff, changeSize, describeChangeSize } from "../src/core/text/diff.js";
 
 test("identical texts produce nothing at all", () => {
   assert.equal(unifiedDiff("a.ts", "one\ntwo\n", "one\ntwo\n"), "");
-  assert.equal(changedLines("same", "same"), 0);
 });
 
 test("a one-line change names the line it changed", () => {

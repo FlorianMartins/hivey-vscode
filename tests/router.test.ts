@@ -7,7 +7,7 @@ import { SHIPPED_LIMITS, Budget, MemorySpendStore } from "../src/core/router/bud
 import { costOf, estimateCost, makeLookup } from "../src/core/router/pricing.js";
 import { GENERATED_PRICES } from "../src/core/router/catalog.generated.js";
 import { readFileSync } from "node:fs";
-import { HIVEY_VARIANTS, hiveyModels } from "../src/core/router/hivey.js";
+import { HIVEY_VARIANTS, hiveyRoles } from "../src/core/router/hivey.js";
 import { HIVEY_ROUTING } from "../src/core/router/hivey.generated.js";
 import { estimateTokens } from "../src/core/util/tokens.js";
 
@@ -157,7 +157,7 @@ test("the shipped per-request cap clears an ordinary agent turn on every model t
   const price = makeLookup(GENERATED_PRICES);
 
   for (const variant of HIVEY_VARIANTS) {
-    for (const model of hiveyModels(variant.id)) {
+    for (const { model } of hiveyRoles(variant.id)) {
       const verdict = budget.check(estimateCost(ORDINARY_AGENT_PROMPT_TOKENS, price(model)));
       assert.ok(
         verdict.ok,
@@ -192,7 +192,7 @@ test("the size question is off by default, and still catches the accident when i
   const price = makeLookup(GENERATED_PRICES);
   // A free endpoint costs nothing however much is sent to it, so there is nothing for a spending cap
   // to say about one. The accident this guard exists for is the same prompt on a model that bills.
-  const dearestRouted = HIVEY_VARIANTS.flatMap((v) => hiveyModels(v.id))
+  const dearestRouted = HIVEY_VARIANTS.flatMap((v) => hiveyRoles(v.id).map((r) => r.model))
     .map((m) => price(m))
     .filter((p): p is NonNullable<typeof p> => !!p && p.in > 0)
     .sort((a, b) => b.in + 0.25 * b.out - (a.in + 0.25 * a.out))[0]!;

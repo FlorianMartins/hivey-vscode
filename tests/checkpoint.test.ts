@@ -7,7 +7,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  canRestore,
   capture,
   describeRestore,
   MAX_CHECKPOINT_BYTES,
@@ -16,7 +15,6 @@ import {
   trimCheckpoints,
   turnBoundary,
   type FileSnapshot,
-  restoreIsComplete,
   transcriptPieces,
 } from "../src/core/session/checkpoint.js";
 
@@ -93,12 +91,6 @@ test("trimming leaves a short conversation alone", () => {
   assert.deepEqual(trimCheckpoints(entries, 5), entries);
 });
 
-test("an entry with no files offers no way back", () => {
-  assert.equal(canRestore({ id: "a", role: "user" }), false);
-  assert.equal(canRestore({ id: "a", role: "user", checkpoint: [] }), false);
-  assert.equal(canRestore({ id: "a", role: "user", checkpoint: [{ path: "f.ts" }] }), true);
-});
-
 // ── Saying what will happen ──────────────────────────────────────────────────────────────────
 
 test("the description separates files put back from files deleted", () => {
@@ -148,13 +140,6 @@ test("a restore that leaves a command's work behind says so", () => {
 test("no commands, no sentence about commands", () => {
   const said = describeRestore([{ path: "a.ts", before: "x" }], false, WORDS, 0);
   assert.equal(/commands/.test(said), false);
-});
-
-test("restoreIsComplete is false as soon as anything was left out", () => {
-  // The two holes are different and either one is enough to make a rollback partial.
-  assert.equal(restoreIsComplete({ id: "1", role: "user" }), true);
-  assert.equal(restoreIsComplete({ id: "1", role: "user", checkpointPartial: true }), false);
-  assert.equal(restoreIsComplete({ id: "1", role: "user", checkpointCommands: 1 }), false);
 });
 
 test("the transcript draws a restore above the FIRST question", () => {

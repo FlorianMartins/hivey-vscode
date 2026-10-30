@@ -6,7 +6,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { handoverNote, turnChangedSomething, verifyTurn, type TurnStep } from "../src/core/router/outcome.js";
+import { handoverNote, verifyTurn, type TurnStep } from "../src/core/router/outcome.js";
 
 const ok = (tool: string, call?: string, summary = "fine"): TurnStep => ({ tool, ok: true, summary, ...(call ? { call } : {}) });
 const bad = (tool: string, call?: string, summary = "boom"): TurnStep => ({ tool, ok: false, summary, ...(call ? { call } : {}) });
@@ -82,12 +82,6 @@ test("three failures spread across different calls are not being stuck", () => {
     bad("edit_file", "src/c.ts"),
   ]);
   assert.equal(verdict.kind, "none", verdict.why);
-});
-
-test("whether anything was actually changed is a separate question", () => {
-  assert.equal(turnChangedSomething([ok("read_file", "a.ts")]), false);
-  assert.equal(turnChangedSomething([bad("edit_file", "a.ts")]), false, "a refused edit changed nothing");
-  assert.equal(turnChangedSomething([ok("edit_file", "a.ts")]), true);
 });
 
 test("the hand-over note carries the failure, the diff, and the warning that the change is on disk", () => {

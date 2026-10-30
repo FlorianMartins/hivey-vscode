@@ -184,11 +184,6 @@ function repeatedFailure(steps: TurnStep[]): Verdict | undefined {
   return undefined;
 }
 
-/** True when the turn changed something, so an unverified failure has consequences on disk. */
-export function turnChangedSomething(steps: TurnStep[]): boolean {
-  return steps.some((s) => MUTATORS.has(s.tool) && s.ok);
-}
-
 export interface HandoverInput {
   verdict: Verdict;
   /** Unified diffs of what the failed attempt changed, one per file. */

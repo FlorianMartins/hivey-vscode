@@ -117,16 +117,6 @@ function unquote(value: string): string {
   return value;
 }
 
-/** Every participant, for the menu and the completion list. */
-export function participants(): Array<{ id: Participant; label: string; hint: string }> {
-  return [
-    { id: "workspace", label: "@workspace", hint: "the repository: search it, read it, answer from it" },
-    { id: "editor", label: "@editor", hint: "the file on screen and the editor's own state" },
-    { id: "terminal", label: "@terminal", hint: "the last command and what it printed" },
-    { id: "git", label: "@git", hint: "the working tree, the history, the blame" },
-  ];
-}
-
 /**
  * What a participant adds to the system prompt.
  *
@@ -169,21 +159,6 @@ export function describeMention(mention: Mention): string {
     case "symbol":
       return mention.argument ?? "symbol";
   }
-}
-
-/** Suggestions for the `#` completion list, in the order they are most often wanted. */
-export function mentionSuggestions(): Array<{ token: string; hint: string }> {
-  return [
-    { token: "#file:", hint: "a file by path" },
-    { token: "#selection", hint: "what is selected in the editor" },
-    { token: "#editor", hint: "the whole active file" },
-    { token: "#openFiles", hint: "every file open in a tab" },
-    { token: "#codebase", hint: "the repository map" },
-    { token: "#changes", hint: "the uncommitted diff" },
-    { token: "#problems", hint: "the errors and warnings reported by the language server" },
-    { token: "#terminal", hint: "the last terminal command and its output" },
-    { token: "#sym:", hint: "a symbol by name, and where it is used" },
-  ];
 }
 
 export interface Suggestion {

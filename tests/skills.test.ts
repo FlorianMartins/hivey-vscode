@@ -10,7 +10,6 @@ import {
   familiesInPlay,
   groupsForPaths,
   languageIdForPath,
-  enabledSkills,
   isSkillEnabled,
   normalizeGroups,
   SKILL_GROUPS,
@@ -19,6 +18,10 @@ import {
 } from "../src/core/session/skills.js";
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+
+/** The skills a policy actually offers, in catalogue order — what the composer filters on. */
+const enabledSkills = (policy: Parameters<typeof isSkillEnabled>[1]) =>
+  BUILTIN_SKILLS.filter((s) => isSkillEnabled(s.name, policy));
 
 test("a skill nobody has switched off is on", () => {
   assert.equal(isSkillEnabled("/tests", []), true);
