@@ -180,8 +180,10 @@ const HISTORY_MAX = 100;
 
 interface Prefs {
   mode: Mode;
-  reasoning: Reasoning;
-  /** The effort was picked in the panel, rather than left at the default. See `effectiveReasoning`. */
+  /** The level picked for each model, by `windowKey` — see `reasoningByModel`. */
+  reasoningByModel?: Record<string, Reasoning>;
+  /** Before levels were per model: one level for every model. Read once, for the model in use then. */
+  reasoning?: Reasoning;
   reasoningChosen?: boolean;
 }
 
@@ -509,8 +511,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this.calibration = ctx.globalState.get<Calibration>(CALIBRATION_KEY) ?? {};
     const prefs = ctx.globalState.get<Prefs>(PREFS_KEY);
     this.session.mode = prefs?.mode ?? "agent";
-    this.reasoning = prefs?.reasoning ?? "none";
-    this.reasoningChosen = prefs?.reasoningChosen === true;
+    this.reasoningByModel = { ...(prefs?.reasoningByModel ?? {}) };
+    // A level picked before levels were per model belongs to the model in use then, and only to it.
+    if (!prefs?.reasoningByModel && prefs?.reasoningChosen && prefs.reasoning) {
+      this.reasoningByModel[this.windowKey(readSettings())] = prefs.reasoning;
+    }
   }
 
   /**
@@ -572,8 +577,24 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this.sendState();
   }
 
-  private reasoning: Reasoning = "none";
-  private reasoningChosen = false;
+  /**
+   * The thinking level picked for each model, by address and model (`windowKey`).
+   *
+   * ⚠️ « il faut que le modèle prenne par défaut son mode de raisonnement et ne force pas un niveau » —
+   * « et que si on change de mode de raisonnement, il applique bien le mode choisi ». One level for every
+   * model meant a « Maximum » picked on Claude was sent to DeepSeek, whose `max` exists too. Now a model
+   * nobody picked a level for thinks at its own default (a cloud one gets no thinking field at all — see
+   * `cloudDefault`), and a level picked for a model is the one that model gets.
+   */
+  private reasoningByModel: Record<string, Reasoning> = {};
+  /** The level picked for the model in use; "none" when none was. */
+  private get reasoning(): Reasoning {
+    return this.reasoningByModel[this.windowKey(readSettings())] ?? "none";
+  }
+  /** Whether a level was picked for the model in use. */
+  private get reasoningChosen(): boolean {
+    return this.windowKey(readSettings()) in this.reasoningByModel;
+  }
 
   /**
    * The levels the selected model really has: what its own server said when it is self-hosted (see
@@ -931,8 +952,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private savePrefs(): void {
     void this.ctx.globalState.update(PREFS_KEY, {
       mode: this.session.mode,
-      reasoning: this.reasoning,
-      ...(this.reasoningChosen ? { reasoningChosen: true } : {}),
+      reasoningByModel: this.reasoningByModel,
     } satisfies Prefs);
   }
 
@@ -1308,8 +1328,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           this.sendState();
           break;
         case "setReasoning":
-          this.reasoning = m.reasoning;
-          this.reasoningChosen = true;
+          // For this model only — see `reasoningByModel`.
+          this.reasoningByModel[this.windowKey(readSettings())] = m.reasoning;
           this.savePrefs();
           this.sendState();
           break;

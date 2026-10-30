@@ -142,6 +142,13 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **Chaque modèle garde son propre niveau de réflexion.** « il faut que le modèle prenne par défaut son
+  mode de raisonnement et ne force pas un niveau — et que si on change de mode de raisonnement, il
+  applique bien le mode choisi ». Le niveau était unique pour tous les modèles : un « Maximum » choisi
+  sur Claude partait tel quel vers DeepSeek, qui a aussi un `max`. Le niveau est maintenant retenu par
+  modèle. Un modèle pour lequel vous n'avez rien choisi réfléchit à son propre défaut — un modèle cloud
+  ne reçoit alors aucun réglage de réflexion — et le niveau choisi pour un modèle est celui qu'il reçoit.
+  Le niveau choisi avant cette version reste attaché au modèle utilisé à ce moment-là, et à lui seul.
 - **Deuxième ménage du code, sans changement visible.** Retirés car plus rien ne s'en servait : une
   vingtaine de styles qu'aucun élément ne porte plus, onze messages du panneau vers l'extension que le
   panneau n'envoie jamais (et leur traitement), un message dans l'autre sens que rien n'envoie, les
