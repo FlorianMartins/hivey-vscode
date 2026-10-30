@@ -4,7 +4,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { calibrate, describeCalibration, factorFor, observe, prune, MAX_FACTOR, MIN_FACTOR } from "../src/core/util/calibrate.js";
+import { calibrate, factorFor, observe, prune, MAX_FACTOR, MIN_FACTOR } from "../src/core/util/calibrate.js";
 import { estimateMessageTokens } from "../src/core/util/tokens.js";
 
 test("an unmeasured model is left exactly as estimated", () => {
@@ -73,14 +73,6 @@ test("the factor can never leave the band, whatever happens", () => {
 test("an unchanged table is returned as the same object, so nothing is written for nothing", () => {
   const table = observe({}, "qwen", { estimated: 1000, actual: 1100 });
   assert.equal(observe(table, "qwen", { estimated: 5, actual: 5 }), table);
-});
-
-test("the label says nothing until it knows something", () => {
-  let table = observe({}, "qwen", { estimated: 1000, actual: 1300 });
-  assert.equal(describeCalibration(table, "qwen"), undefined, "one sample is not a claim");
-  for (let i = 0; i < 5; i++) table = observe(table, "qwen", { estimated: 1000, actual: 1300 });
-  assert.match(describeCalibration(table, "qwen")!, /calibrated on 6 requests/);
-  assert.match(describeCalibration(table, "qwen")!, /\+30%/, "six identical samples of 1.3 should read as exactly +30%");
 });
 
 test("the table cannot grow for ever", () => {

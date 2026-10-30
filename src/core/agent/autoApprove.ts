@@ -163,16 +163,3 @@ export function commandContains(command: string, prefix: string): boolean {
   }
   return false;
 }
-
-/** A short description of the policy, for the interface. */
-export function describeScope(scope: ApprovalScope): string {
-  switch (scope) {
-    case "all":
-      return "Every action runs without asking, anywhere on this machine.";
-    case "workspace":
-      return "Changes inside the open folder run without asking. Commands, and anything outside it, are still asked.";
-    case "off":
-    default:
-      return "Every change is asked for.";
-  }
-}

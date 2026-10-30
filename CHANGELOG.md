@@ -142,6 +142,14 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **Deuxième ménage du code, sans changement visible.** Retirés car plus rien ne s'en servait : une
+  vingtaine de styles qu'aucun élément ne porte plus, onze messages du panneau vers l'extension que le
+  panneau n'envoie jamais (et leur traitement), un message dans l'autre sens que rien n'envoie, les
+  restes de l'ancien enregistrement de la dictée par le panneau (la dictée elle-même reste), douze
+  fonctions que seuls leurs propres tests appelaient, deux scripts npm et six traductions mortes. Le
+  test des traductions inutilisées ne se laisse plus tromper par une chaîne citée dans un commentaire.
+  `.gitattributes` et `.gitleaks.toml` restent : le premier garde les fins de ligne identiques sous
+  Windows, le second sert au contrôle des secrets de la CI. 1 341 tests et 59 tests d'intégration verts.
 - **Les modèles cloud ne se disent plus « forcés » de répondre en français.** « le modèle indique qu'il
   est forcé de répondre en français, ce qui fait conflit avec les modèles de base ». La règle de langue
   la plus ferme — « chaque phrase en français », redite en français, plus un rappel collé à la fin de

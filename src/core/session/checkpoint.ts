@@ -116,11 +116,6 @@ export function trimCheckpoints<T extends CheckpointBearer>(entries: T[], keep =
   });
 }
 
-/** Whether an entry offers a way back. */
-export function canRestore(entry: CheckpointBearer): boolean {
-  return Boolean(entry.checkpoint?.length);
-}
-
 /**
  * What restoring this checkpoint will do, in the user's terms.
  *
@@ -147,11 +142,6 @@ export function describeRestore(
   // has no snapshots at all, and that is precisely the case where saying nothing is worst.
   if (commands > 0) lines.push(words.commands(commands));
   return lines.join(" ");
-}
-
-/** Whether restoring this entry leaves known changes behind. */
-export function restoreIsComplete(entry: CheckpointBearer): boolean {
-  return !entry.checkpointPartial && !entry.checkpointCommands;
 }
 
 /**

@@ -435,16 +435,6 @@ export interface UiState {
    */
   dictation?: boolean;
   /**
-   * Record a WAV rather than WebM, because the transcriber runs here.
-   *
-   * ⚠️ whisper.cpp decodes WAV, FLAC and MP3 — not the Opus-in-WebM every `MediaRecorder` produces.
-   * The services accept both, which is why nothing had ever had to carry this distinction. It is also
-   * true when NOTHING is installed yet but something can be: the recording is made before the
-   * question "shall I install one?" is answered, and recording the wrong format would mean losing the
-   * sentence somebody just spoke.
-   */
-  dictationWav?: boolean;
-  /**
    * The width below which the panel stops rearranging itself and scrolls sideways instead.
    *
    * ⚠️⚠️ Sent in the state because it CANNOT be written as a style attribute, and for a whole release
@@ -468,7 +458,6 @@ export type ToExtension =
   /** Typed while a turn runs: read by the model at its next step, the turn is not stopped. */
   | { type: "steer"; text: string }
   | { type: "stop" }
-  | { type: "newSession" }
   | { type: "renameSession"; title: string }
   | { type: "openScreen"; screen: Screen }
   | { type: "openSession"; id: string }
@@ -478,19 +467,12 @@ export type ToExtension =
   | { type: "deleteSession"; id: string }
   /** Replace the conversation so far with a summary the model writes. */
   | { type: "compact" }
-  | { type: "setSkillEnabled"; name: string; enabled: boolean }
-  /** Choose the families in play — everything else is switched off in one write. */
-  | { type: "setSkillGroups"; groups: string[] }
   /** Start the guided setup for a specialized conversation. */
   | { type: "startWizard" }
   /** Answer the step on screen. `value` is a mode, a list of families, or a list of skills. */
   | { type: "wizardAnswer"; step: "mode" | "family" | "skills"; value: string[] }
   | { type: "wizardBack" }
   | { type: "wizardCancel" }
-  /** Put the repository's skills where a colleague can be given them. */
-  | { type: "shareSkills" }
-  | { type: "openSkill"; source: string }
-  | { type: "newSkill" }
   /** Open the editor's own picker for adding context — a native quick pick, not a webview menu. */
   | { type: "openContextPicker" }
   /** Open the editor's own picker for switching skills on and off. */
@@ -498,14 +480,6 @@ export type ToExtension =
   | { type: "setProvider"; provider: string }
   /** Put the files back as they were before this question, and rewind the conversation to it. */
   | { type: "restoreCheckpoint"; id: string }
-  /**
-   * A recording to transcribe, as base64.
-   *
-   * Base64 rather than a transferable: `postMessage` from a webview goes through VS Code's own
-   * serialisation, which does not carry an `ArrayBuffer` intact. A few seconds of Opus is tens of
-   * kilobytes, so the third it costs to encode is not worth a second channel.
-   */
-  | { type: "dictate"; audio: string; ms: number }
   /**
    * Record using a program on the machine, because the panel is not allowed a microphone.
    *
@@ -583,8 +557,6 @@ export type ToExtension =
   /** Add to, or remove from, one of the four path/command lists. */
   | { type: "addPolicyEntry"; list: PolicyList }
   | { type: "removePolicyEntry"; list: PolicyList; value: string }
-  | { type: "openEgress" }
-  | { type: "openCosts" }
   /**
    * The settings page. With `key`, filtered to that one setting.
    *
@@ -599,8 +571,6 @@ export type ToExtension =
   | { type: "copy"; text: string }
   // ── First run ──────────────────────────────────────────────────────────────────────────────
   | { type: "probeLocal" }
-  /** The key never travels back to the panel; it goes straight to the OS keychain. */
-  | { type: "saveKey"; provider: string; key: string }
   /**
    * The address AND the key, together, checked once.
    *
@@ -611,7 +581,6 @@ export type ToExtension =
    */
   | { type: "saveProvider"; provider: string; url?: string; key: string }
   | { type: "clearKey"; provider: string }
-  | { type: "setEndpoint"; provider: string; url: string }
   /** Declare a model server on this machine or this network, and probe it. */
   | { type: "addServer"; name: string; url: string }
   | { type: "useLocal"; baseUrl: string; model: string }
@@ -637,17 +606,6 @@ export type ToPanel =
   /** What the person typed during the turn, drawn inside it; `taken` once the model has read it. */
   | { type: "interjection"; text: string }
   | { type: "interjectionTaken" }
-  | {
-      type: "approval";
-      id: string;
-      tool: string;
-      description: string;
-      command?: string;
-      /** Which answers to offer. Defaults to all four; egress consent has no "this session". */
-      choices?: Array<"once" | "session" | "always" | "no">;
-      /** Extra lines under the question — what was pseudonymized, what it will cost. */
-      detail?: string[];
-    }
   | { type: "error"; message: string }
   /** Opens the model picker from outside the panel — the command palette, a keybinding. */
   | { type: "openModelPicker" }

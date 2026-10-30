@@ -119,12 +119,6 @@ export function hiveyModel(model: string, role: HiveyRole): string {
   return HIVEY_ROUTING["hivey/free"]?.everyday ?? model;
 }
 
-/** Every model a preset can reach, for the parts of the interface that price or explain it. */
-export function hiveyModels(model: string): string[] {
-  const table = HIVEY_ROUTING[hiveyVariant(model)] ?? {};
-  return [...new Set(Object.values(table))];
-}
-
 export const HIVEY_ROLES: HiveyRole[] = ["chore", "everyday", "deep", "completion"];
 
 /**

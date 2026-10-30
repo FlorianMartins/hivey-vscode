@@ -22,7 +22,33 @@ import {
 import { readTar } from "../src/core/archive/tar.js";
 import { chooseDevice, howToRecord, isDeviceError, parseDevices, recordArgv, recorders, windowsRecorderScript } from "../src/core/dictation/capture.js";
 import { gzipSync } from "node:zlib";
-import { describeWav, encodeWav, SPEECH_SAMPLE_RATE, WAV_HEADER_BYTES } from "../src/core/dictation/wav.js";
+import { describeWav, WAV_HEADER_BYTES } from "../src/core/dictation/wav.js";
+
+/**
+ * A mono 16-bit PCM WAV of `frames` silent frames — the shape the recorders on the machine write.
+ * Built here rather than in the product, which only ever reads one.
+ */
+function silentWav(frames: number, rate = 16_000): Uint8Array {
+  const out = new Uint8Array(WAV_HEADER_BYTES + frames * 2);
+  const view = new DataView(out.buffer);
+  const ascii = (at: number, text: string) => {
+    for (let i = 0; i < text.length; i++) view.setUint8(at + i, text.charCodeAt(i));
+  };
+  ascii(0, "RIFF");
+  view.setUint32(4, 36 + frames * 2, true);
+  ascii(8, "WAVE");
+  ascii(12, "fmt ");
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true); // uncompressed PCM
+  view.setUint16(22, 1, true); // one channel
+  view.setUint32(24, rate, true);
+  view.setUint32(28, rate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  ascii(36, "data");
+  view.setUint32(40, frames * 2, true);
+  return out;
+}
 
 test("each machine is offered the archive built for it", () => {
   assert.equal(whisperAsset({ platform: "linux", arch: "x64" }), "whisper-bin-ubuntu-x64.tar.gz");
@@ -162,47 +188,6 @@ test("the tar reader unpacks a release, and refuses what it should not follow", 
   }
 });
 
-test("a WAV is forty-four bytes of header and then the samples", () => {
-  // ⚠️ This exists because whisper.cpp decodes WAV, FLAC and MP3 — and `MediaRecorder` produces Opus
-  // in WebM, which is none of them. The remote services accept the WebM happily, so nothing upstream
-  // had ever had to care; a local transcriber is the first consumer that does.
-  const wav = encodeWav([Float32Array.from([0, 1, -1, 0.5])], SPEECH_SAMPLE_RATE);
-  const view = new DataView(wav.buffer);
-  const tag = (at: number) => String.fromCharCode(...wav.slice(at, at + 4));
-  assert.equal(wav.length, WAV_HEADER_BYTES + 4 * 2);
-  assert.equal(tag(0), "RIFF");
-  assert.equal(tag(8), "WAVE");
-  assert.equal(tag(12), "fmt ");
-  assert.equal(tag(36), "data");
-  assert.equal(view.getUint32(4, true), 36 + 8, "the RIFF size counts everything after itself");
-  assert.equal(view.getUint16(20, true), 1, "not uncompressed PCM");
-  assert.equal(view.getUint16(22, true), 1, "not mono");
-  assert.equal(view.getUint32(24, true), 16_000);
-  assert.equal(view.getUint32(28, true), 32_000, "bytes per second is rate × channels × 2");
-  assert.equal(view.getUint16(34, true), 16);
-  assert.equal(view.getUint32(40, true), 8, "the data size is not the sample count × 2");
-  // The samples themselves, at both ends of the range.
-  assert.equal(view.getInt16(44, true), 0);
-  assert.equal(view.getInt16(46, true), 32767);
-  assert.equal(view.getInt16(48, true), -32768);
-});
-
-test("⚠️ a sample past the limit is clamped, not wrapped", () => {
-  // Scaling an out-of-range float wraps it: 1.2 becomes a large negative number, which is a loud
-  // click. A recording made with the gain up is full of them, and a transcriber hears every one.
-  const wav = encodeWav([Float32Array.from([1.5, -1.5])], 16_000);
-  const view = new DataView(wav.buffer);
-  assert.equal(view.getInt16(44, true), 32767);
-  assert.equal(view.getInt16(46, true), -32768);
-});
-
-test("several chunks make one file", () => {
-  // A recording arrives in whatever pieces the audio callback produced; the file is one.
-  const one = encodeWav([Float32Array.from([0.25, 0.5, 0.75])], 16_000);
-  const many = encodeWav([Float32Array.from([0.25]), Float32Array.from([0.5, 0.75])], 16_000);
-  assert.deepEqual([...one], [...many]);
-});
-
 // ── Recording, from outside the panel ────────────────────────────────────────────────────────────
 
 test("⚠️ every recorder writes 16 kHz mono, because that is what a speech model reads", () => {
@@ -300,11 +285,11 @@ test("⚠️ a recording is looked at before a transcriber is blamed for it", ()
   assert.equal(describeWav(new Uint8Array(8)).why, "that file is not a recording");
   assert.equal(describeWav(new TextEncoder().encode("not a wav at all, really")).why, "that file is not a recording");
   // A header with no frames is what an input device that opened and captured nothing leaves behind.
-  assert.equal(describeWav(encodeWav([], 16_000)).why, "nothing was recorded");
+  assert.equal(describeWav(silentWav(0)).why, "nothing was recorded");
   // A tenth of a second is below anything anybody meant to say.
-  assert.equal(describeWav(encodeWav([new Float32Array(800)], 16_000)).why, "the recording is empty");
+  assert.equal(describeWav(silentWav(800)).why, "the recording is empty");
 
-  const good = describeWav(encodeWav([new Float32Array(16_000)], 16_000));
+  const good = describeWav(silentWav(16_000));
   assert.equal(good.ok, true);
   assert.equal(good.rate, 16_000);
   assert.equal(good.channels, 1);
@@ -316,7 +301,7 @@ test("a recording cut short is read as far as it goes", () => {
   // A recorder that was interrupted leaves a `data` size larger than the bytes on disk. Trusting the
   // declared size would read past the end; refusing the file would throw away a sentence that is
   // perfectly transcribable.
-  const whole = encodeWav([new Float32Array(16_000)], 16_000);
+  const whole = silentWav(16_000);
   const cut = whole.slice(0, whole.length - 8_000);
   const facts = describeWav(cut);
   assert.equal(facts.ok, true, facts.why);

@@ -4,7 +4,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { scaledChars, scaledTokens, setActiveWindow, getActiveWindow } from "../src/core/context/scale.js";
+import { scaledChars, scaledTokens, setActiveWindow } from "../src/core/context/scale.js";
 import { maxOutputFromRefusal } from "../src/core/providers/anthropic.js";
 
 test("a cap is a share of the selected model's window, never below its old figure", () => {
@@ -17,7 +17,7 @@ test("a cap is a share of the selected model's window, never below its old figur
   setActiveWindow(8000);
   assert.equal(scaledTokens(5000, 0.15), 5000, "a small window never goes below the old figure");
   setActiveWindow(Number.NaN);
-  assert.equal(getActiveWindow(), 0);
+  assert.equal(scaledTokens(1200, 0.05), 1200, "a window that is not a number is an unknown one");
 });
 
 test("the output limit is read from the API's own refusal", () => {

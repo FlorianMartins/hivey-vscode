@@ -93,15 +93,6 @@ export function observe(table: Calibration, model: string, sample: Sample): Cali
   };
 }
 
-/** What the panel says about it: an honest label, or nothing when nothing has been learned yet. */
-export function describeCalibration(table: Calibration, model: string): string | undefined {
-  const entry = table[model];
-  if (!entry || entry.samples < 3) return undefined;
-  const percent = Math.round((entry.factor - 1) * 100);
-  if (Math.abs(percent) < 3) return `token estimate calibrated on ${entry.samples} requests (accurate)`;
-  return `token estimate calibrated on ${entry.samples} requests (${percent > 0 ? "+" : ""}${percent}%)`;
-}
-
 /** Drop models nobody uses any more, so the stored table cannot grow without bound. */
 export function prune(table: Calibration, keep = 40): Calibration {
   const entries = Object.entries(table);

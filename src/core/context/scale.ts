@@ -19,10 +19,6 @@ export function setActiveWindow(tokens: number): void {
   activeWindow = Number.isFinite(tokens) && tokens > 0 ? Math.floor(tokens) : 0;
 }
 
-export function getActiveWindow(): number {
-  return activeWindow;
-}
-
 /** A cap in TOKENS: `share` of the window, never below `floor`. */
 export function scaledTokens(floor: number, share: number, window = activeWindow): number {
   return Math.max(floor, Math.floor(window * share));

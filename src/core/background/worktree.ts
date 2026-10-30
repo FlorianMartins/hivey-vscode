@@ -55,11 +55,6 @@ export function deleteBranchArgv(branch: string): string[] {
   return ["branch", "-D", branch];
 }
 
-/** What changed, as a diff against the branch point. The report a person reads when they come back. */
-export function diffArgv(): string[] {
-  return ["diff", "HEAD", "--stat"];
-}
-
 /** The full patch, for the editor to open. */
 export function patchArgv(): string[] {
   return ["diff", "HEAD"];

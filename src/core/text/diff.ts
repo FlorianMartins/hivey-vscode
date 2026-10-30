@@ -167,11 +167,6 @@ export function unifiedDiff(path: string, before: string, after: string, opts: U
   return text;
 }
 
-/** How much a change actually changed, for deciding whether it is worth describing at all. */
-export function changedLines(before: string, after: string): number {
-  return diffLines(before, after).filter((c) => c.op !== "same").length;
-}
-
 /**
  * Lines added and removed, for the question that asks whether to apply a change.
  *

@@ -11,7 +11,6 @@ import assert from "node:assert/strict";
 import {
   hiveyLabel,
   hiveyModel,
-  hiveyModels,
   hiveyRoles,
   HIVEY_ROLES,
   hiveyRole,
@@ -139,7 +138,7 @@ test("a preset is named by its name, and knows every model it can reach", () => 
   assert.equal(hiveyLabel("hivey"), "Hivey Smart");
   assert.equal(hiveyLabel("hivey/smart"), "Hivey Pro");
   assert.equal(hiveyLabel("hivey/free"), "Hivey Free");
-  const reachable = hiveyModels("hivey");
+  const reachable = [...new Set(hiveyRoles("hivey").map((r) => r.model))];
   assert.ok(reachable.length >= 2, "a preset that reaches one model is not a routing");
   assert.ok(reachable.every((id) => GENERATED_PRICES[id]));
 });

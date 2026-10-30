@@ -11,10 +11,8 @@ import assert from "node:assert/strict";
 import {
   applySuggestion,
   describeMention,
-  mentionSuggestions,
   parsePrompt,
   participantDirective,
-  participants,
   suggestionsFor,
 } from "../src/core/session/mentions.js";
 
@@ -100,9 +98,9 @@ test("a participant and mentions coexist", () => {
 });
 
 test("the participants exist and each says where to look first", () => {
-  const ids = participants().map((p) => p.id);
+  // The four the composer offers (see `PARTICIPANTS` in webview/chat.ts), each read back as itself.
   for (const expected of ["workspace", "editor", "terminal", "git"]) {
-    assert.ok(ids.includes(expected as never), `${expected} is missing`);
+    assert.equal(parsePrompt(`@${expected} where?`).participant, expected, `${expected} is missing`);
   }
   assert.match(participantDirective("git"), /never push/i, "the one thing the agent must not decide on its own");
 });
@@ -117,14 +115,14 @@ test("every mention can be described for the context strip", () => {
 });
 
 test("the suggestion list covers what the parser accepts", () => {
-  const suggested = mentionSuggestions().map((s) => s.token.replace(/[:#]/g, ""));
-  // A suggestion the parser rejects would be a trap: the user types what was offered and nothing
-  // happens. Each suggested token is parsed back, with a plausible argument where one is needed.
-  for (const entry of mentionSuggestions()) {
-    const probe = entry.token.endsWith(":") ? `${entry.token}x` : entry.token;
-    assert.equal(parsePrompt(probe).mentions.length, 1, `${entry.token} is offered but not parsed`);
+  // The tokens the composer offers (see `MENTIONS` in webview/chat.ts). A suggestion the parser
+  // rejects would be a trap: the user types what was offered and nothing happens. Each one is parsed
+  // back, with a plausible argument where one is needed.
+  const offered = ["#file:", "#selection", "#editor", "#openFiles", "#codebase", "#changes", "#problems", "#terminal", "#sym:"];
+  for (const token of offered) {
+    const probe = token.endsWith(":") ? `${token}x` : token;
+    assert.equal(parsePrompt(probe).mentions.length, 1, `${token} is offered but not parsed`);
   }
-  assert.ok(suggested.includes("selection"));
 });
 
 // ── The completion list under the composer ───────────────────────────────────────────────────
