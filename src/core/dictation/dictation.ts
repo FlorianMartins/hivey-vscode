@@ -298,6 +298,26 @@ export function cleanTranscript(raw: string): string {
   }
   // Recognisers emit `[BLANK_AUDIO]`, `(silence)`, `[inaudible]` for nothing at all. A question made
   // of those is worse than an empty one, because it looks deliberate.
-  if (/^[([][^)\]]*[)\]]$/.test(text) && /blank|silence|inaudible|music|noise/i.test(text)) return "";
+  //
+  // ⚠️ « souvent il y a des bruits de fond et il les note ». In French, whisper.cpp writes the room as
+  // `*musique*`, `[Musique]`, `[bruits de la salle]` — measured on noise with no voice in it — and the
+  // test above knew only the English words, and only an answer that was nothing else. An annotation —
+  // bracketed, starred or in parentheses — that names a sound goes, wherever it is; one that does not,
+  // like a dictated « [important] », stays.
+  const sound = (part: string): string => (NOISE_WORDS.test(part) ? " " : part);
+  text = text
+    .replace(/\[[^\]]*\]/g, sound)
+    .replace(/\*[^*\n]+\*/g, sound)
+    .replace(/\([^)]*\)/g, sound)
+    .replace(/\s+/g, " ")
+    .trim();
+  // Subtitle credits from the films the model learned on — never dictated, a known invention on quiet audio.
+  if (/sous-titr|amara\.org|subtitles by|untertitel/i.test(text) && text.length < 160) return "";
+  // Nothing left but punctuation: `...`, `.`, `-`.
+  if (!/[\p{L}\p{N}]/u.test(text)) return "";
   return text;
 }
+
+/** What a recogniser calls a sound that is not speech, in the languages the interface speaks. */
+const NOISE_WORDS =
+  /blank|silence|inaudible|music|noise|applause|laughter|musique|bruit|applaudissement|rire|m[uú]sica|ruido|aplauso|musik|geräusch|applaus|lachen|musica|rumore|applauso|risate/i;

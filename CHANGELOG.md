@@ -158,6 +158,14 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **La dictée n'écrit plus le bruit de fond.** « souvent il y a des bruits de fond et il les note ». Sur
+  du bruit sans voix, Whisper invente : mesuré en français, `*musique*`, `[bruits de la salle]`, et sans
+  indice de langue `1/2 %, 1/2 %` ou une phrase en coréen. Deux corrections : un enregistrement où
+  aucune voix n'a été entendue n'est plus transcrit (« Rien n'a été entendu ») — vérifié sur les vrais
+  enregistrements : les trois bruits seuls écartés, les six avec de la parole transcrits, même dans un
+  bruit fort — et les annotations de bruit sont retirées dans toutes les langues, seules ou autour
+  d'une phrase (une parenthèse ou un « [important] » dictés restent). Pas de filtre anti-bruit sur le
+  son : mesuré avec le Whisper de l'extension, il faisait perdre des mots (3 % d'erreurs au lieu de 2 %).
 - **La dictée envoie son audio sous son vrai format.** Tous les enregistreurs que l'extension lance
   (ffmpeg, parecord, arecord, sox, et l'enregistreur de Windows) produisent du WAV, mais le fichier
   partait encore nommé `speech.webm` et déclaré `audio/webm` — un reste de l'ancien enregistrement par

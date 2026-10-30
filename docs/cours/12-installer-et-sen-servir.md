@@ -144,6 +144,14 @@ qu'une voix ait été entendue — vous pouvez prendre le temps de réfléchir �
 (un ventilateur, un portable) est appris d'abord. `hiveyCode.dictation.stopOnSilence` le désactive.
 L'enregistreur de secours de Windows n'écrit son fichier qu'à la fin : là, appuyez de nouveau.
 
+**Le bruit de fond n'est pas écrit.** Sur du bruit sans voix, un transcripteur invente : Whisper écrit
+« *musique* », « [bruits de la salle] », parfois une phrase entière. Un enregistrement où aucune voix
+n'a été entendue n'est donc pas transcrit du tout (« Rien n'a été entendu »), et ces annotations de
+bruit sont retirées de ce qui revient, dans toutes les langues. Il n'y a en revanche pas de filtre
+anti-bruit sur le son lui-même : mesuré, Whisper comprend déjà la parole dans le bruit, et un filtre
+lui faisait au contraire perdre des mots (3 % d'erreurs au lieu de 2 %, et une erreur sur un
+enregistrement propre qui n'en avait aucune).
+
 **Plusieurs micros ?** Sous Windows avec ffmpeg, il n'existe pas d'entrée « par défaut » sur laquelle
 se rabattre : il faut nommer le périphérique. Avec une seule entrée, elle est prise d'office ; avec
 plusieurs et aucune choisie, le premier appui sur le micro demande laquelle, et s'en souvient.
