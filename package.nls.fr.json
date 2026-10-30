@@ -176,5 +176,7 @@
   "config.chat.openRouterSort.throughput": "Le plus rapide d'abord (le plus de jetons par seconde). Par défaut.",
   "config.chat.openRouterSort.latency": "Celui qui commence à répondre le plus tôt.",
   "config.chat.openRouterSort.price": "Le moins cher d'abord — plus lent, parfois beaucoup plus.",
-  "config.chat.openRouterSort.default": "Laisser OpenRouter choisir, comme avant (il penche vers le moins cher)."
+  "config.chat.openRouterSort.default": "Laisser OpenRouter choisir, comme avant (il penche vers le moins cher).",
+  "config.dictation.stopOnSilence": "Terminer la dictée d'elle-même quand vous avez parlé puis cessé de parler. Rien ne s'arrête avant qu'une voix ait été entendue, et le bruit de la pièce est appris d'abord. Pas avec un enregistreur qui n'écrit son fichier qu'à la fin (celui de secours sous Windows) : appuyez de nouveau sur le micro.",
+  "config.dictation.silenceSeconds": "Combien de temps le silence après la parole doit durer avant que la dictée se termine, en secondes."
 }

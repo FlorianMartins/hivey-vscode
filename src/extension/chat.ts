@@ -26,6 +26,7 @@ import {
   localCommand,
   transcriptionBody,
 } from "../core/dictation/dictation.js";
+import { SilenceDetector } from "../core/dictation/silence.js";
 import { checkCredentials, normalizeBaseUrl } from "../core/providers/credentials.js";
 import { callSignature, safeArgs } from "../core/agent/callSignature.js";
 import { knowledgeAmbient } from "./knowledge.js";
@@ -3396,6 +3397,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       // A recorder that only writes when it stops, which is the Windows one, sends nothing and the
       // ring keeps its resting size: a bar that never moves beats one that invents a voice.
       let read = 44;
+      // Ended on its own once the person has spoken and then stopped — see `SilenceDetector`.
+      const dictation = readSettings().dictation;
+      const silence = dictation.stopOnSilence ? new SilenceDetector({ silenceMs: dictation.silenceSeconds * 1000 }) : undefined;
       const level = setInterval(() => {
         try {
           const fd = openSync(wav, "r");
@@ -3419,6 +3423,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             // silence and a voice was invisible, which is the whole thing this is for.
             const open = Math.pow(rms, 0.25);
             this.post({ type: "dictationLevel", level: Math.max(0, Math.min(1, (open - 0.2) / 0.55)) });
+            if (silence?.push(rms, Date.now()) && this.recording?.level === level) void this.stopDictation(false);
           } finally {
             closeSync(fd);
           }

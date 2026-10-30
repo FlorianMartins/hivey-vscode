@@ -6,6 +6,14 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Ajouté
 
+- **La dictée s'arrête d'elle-même quand vous cessez de parler.** « et le mode silence — il détecte la
+  fin quand l'utilisateur arrête de parler ». Il fallait appuyer de nouveau sur le micro. Le bruit de la
+  pièce est appris dans le premier demi-seconde, une voix est ce qui le dépasse nettement, et une fois
+  une voix entendue, 1,5 s de silence termine l'enregistrement (`hiveyCode.dictation.silenceSeconds`,
+  `hiveyCode.dictation.stopOnSilence` pour le désactiver). Rien ne s'arrête avant qu'une voix ait été
+  entendue, et une courte pause au milieu d'une phrase ne coupe pas. Vérifié sur un enregistrement :
+  voix finie à 3,0 s, arrêt à 4,7 s. Pas avec l'enregistreur de secours de Windows, qui n'écrit son
+  fichier qu'à la fin.
 - **OpenRouter prend d'abord l'hébergeur le plus rapide.** « DeepSeek V4.1 Flash a mis 45 min pour
   faire une tâche cette nuit ». Plus de quarante hébergeurs servent ce modèle sur OpenRouter, à des prix
   jusqu'à quinze fois différents, et OpenRouter penche par défaut vers le moins cher — souvent le plus
