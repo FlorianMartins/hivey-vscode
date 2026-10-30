@@ -16,6 +16,7 @@ import { t } from "../shared/i18n.js";
 import { DEFAULT_WHISPER_MODEL } from "../core/dictation/local.js";
 import { DEFAULT_GROUPS, type SkillGroup, type SkillPolicy } from "../core/session/skills.js";
 import { makeProvider, type Provider, type ProviderId } from "../core/providers/index.js";
+import type { OpenRouterSort } from "../core/providers/openai.js";
 import { defaultEndpoints, endpointSettingKey, REMOTE_VENDORS, vendor } from "../core/providers/vendors.js";
 import { isLocalEndpoint, isSelfHostedProvider } from "../core/redaction/index.js";
 import { checkEndpoint, describeMissingEndpoint, describeUnusableEndpoint, looksLikeApiKey } from "../core/providers/endpoint.js";
@@ -38,6 +39,8 @@ export interface Settings {
     maxOutputTokens: number;
     /** Ask for Anthropic's prompt cache through OpenRouter. Off: it changes the request's shape. */
     promptCache: boolean;
+    /** How OpenRouter picks a model's host — see `OpenRouterSort`. */
+    openRouterSort: OpenRouterSort;
     /** Suggest the next request in the empty composer after each answer. See core/session/nextStep.ts. */
     suggestNext: boolean;
   };
@@ -245,6 +248,7 @@ function readSettingsRaw(scope?: vscode.Uri): Settings {
       provider: c.get<ProviderId>("chat.provider", "local"),
       model: c.get<string>("chat.model", "qwen2.5-coder:7b"),
       promptCache: c.get<boolean>("chat.promptCache", false),
+      openRouterSort: c.get<OpenRouterSort>("chat.openRouterSort", "throughput"),
       suggestNext: c.get<boolean>("chat.suggestNext", true),
       maxOutputTokens: Math.max(0, Math.floor(c.get<number>("chat.maxOutputTokens", 0) || 0)),
     },
@@ -573,5 +577,5 @@ export async function providerFor(s: Settings, keys: Keys, id: ProviderId): Prom
   if (!local && !apiKey && !vendor(id)?.needsUrl) {
     throw new Error(t("No API key stored for “{0}”. Run “Hivey Code: Store a provider key”.", id));
   }
-  return makeProvider({ id, baseUrl, apiKey, ...(s.chat.promptCache ? { promptCache: true } : {}) });
+  return makeProvider({ id, baseUrl, apiKey, ...(s.chat.promptCache ? { promptCache: true } : {}), openRouterSort: s.chat.openRouterSort });
 }

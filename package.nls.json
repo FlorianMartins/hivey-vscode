@@ -171,5 +171,10 @@
   "config.appearance.hivey": "Hivey's own surfaces and accents: amber on a cool, low-contrast base. The editor still owns the window's background colour, and a light theme keeps the editor's appearance.",
   "config.mcp.servers.type": "stdio runs a program locally; http talks to a server.",
   "config.mcp.servers.command": "The program to run (stdio).",
-  "config.mcp.servers.url": "The server URL (http)."
+  "config.mcp.servers.url": "The server URL (http).",
+  "config.chat.openRouterSort": "Which host OpenRouter sends a request to when a model has several. Many models are served by dozens of hosts, at prices up to fifteen times apart, and the cheapest are often the slowest.",
+  "config.chat.openRouterSort.throughput": "The fastest host first (the most tokens per second). The default.",
+  "config.chat.openRouterSort.latency": "The host that starts answering soonest.",
+  "config.chat.openRouterSort.price": "The cheapest host first — slower, sometimes much slower.",
+  "config.chat.openRouterSort.default": "Let OpenRouter choose, as before (it leans to the cheapest)."
 }

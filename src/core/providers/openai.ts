@@ -49,7 +49,22 @@ export interface OpenAIProviderOptions {
    * does not stay is it being on for everybody by default.
    */
   promptCache?: boolean;
+  /**
+   * How OpenRouter picks the host of a model — see `OpenRouterSort`. Throughput when absent.
+   */
+  openRouterSort?: OpenRouterSort;
 }
+
+/**
+ * Which host OpenRouter sends a request to, when a model has several.
+ *
+ * ⚠️ « DeepSeek V4.1 Flash a mis 45 min pour faire une tâche » — through OpenRouter. Forty-odd hosts
+ * serve that model, at prices one to fifteen times apart, and OpenRouter's own default leans to the
+ * cheapest, which is often the slowest. "throughput" asks for the fastest first; "latency" for the
+ * quickest first token; "price" for the cheapest; "default" leaves the choice to OpenRouter, as before.
+ * https://openrouter.ai/docs/features/provider-routing
+ */
+export type OpenRouterSort = "throughput" | "latency" | "price" | "default";
 
 const trimSlash = (u: string) => u.replace(/\/+$/, "");
 
@@ -299,6 +314,9 @@ export class OpenAICompatibleProvider implements Provider {
     // Ask for the accounting. OpenAI-compatible servers that do not know the field ignore it.
     body["stream_options"] = { include_usage: true };
     if (this.id === "openrouter") body["usage"] = { include: true };
+    // The fastest host first, unless told otherwise — see `OpenRouterSort`.
+    const sort = this.opts.openRouterSort ?? "throughput";
+    if (this.id === "openrouter" && sort !== "default") body["provider"] = { sort };
 
     const res = await this.post(body, req.signal);
     if (!res.ok || !res.body) throw new Error(await describeHttpError(res, this.id));

@@ -3,7 +3,7 @@
 
 import { isLocalEndpoint } from "../redaction/index.js";
 import { AnthropicProvider } from "./anthropic.js";
-import { OpenAICompatibleProvider } from "./openai.js";
+import { OpenAICompatibleProvider, type OpenRouterSort } from "./openai.js";
 import type { Provider } from "./types.js";
 import { vendor, type ProviderId } from "./vendors.js";
 
@@ -18,6 +18,8 @@ export interface ProviderConfig {
   apiKey?: string;
   /** Ask for Anthropic's prompt cache through OpenRouter. See `OpenAIProviderOptions.promptCache`. */
   promptCache?: boolean;
+  /** How OpenRouter picks a model's host. See `OpenRouterSort`. */
+  openRouterSort?: OpenRouterSort;
 }
 
 export const ATTRIBUTION = {
@@ -42,5 +44,6 @@ export function makeProvider(cfg: ProviderConfig): Provider {
     referer: ATTRIBUTION.referer,
     title: ATTRIBUTION.title,
     ...(cfg.promptCache ? { promptCache: true } : {}),
+    ...(cfg.openRouterSort ? { openRouterSort: cfg.openRouterSort } : {}),
   });
 }
