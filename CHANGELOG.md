@@ -142,6 +142,14 @@ Notable changes, newest first. Dates are the day the work landed on `main`.
 
 ### Corrigé
 
+- **Les modèles cloud ne se disent plus « forcés » de répondre en français.** « le modèle indique qu'il
+  est forcé de répondre en français, ce qui fait conflit avec les modèles de base ». La règle de langue
+  la plus ferme — « chaque phrase en français », redite en français, plus un rappel collé à la fin de
+  chaque résultat d'outil — avait été écrite pour Qwen auto-hébergé, qui repassait à l'anglais, mais
+  s'appliquait à tous les modèles. Elle ne vaut plus que pour votre serveur et la passerelle. Un modèle
+  cloud reçoit une seule phrase simple (« l'utilisateur écrit en français : réponds en français, sauf
+  s'il demande une autre langue »). Mesuré : 60/60 tâches en français de part et d'autre (Claude via
+  OpenRouter), et des réponses toujours entièrement en français.
 - **Le cache de Claude marche aussi avec une clé Anthropic directe, en mode Agent.** Le client Anthropic
   avait les deux mêmes défauts que le passage par OpenRouter : le marqueur de cache n'était jamais posé
   sur les résultats d'outils, et la boucle de l'agent ne posait son marqueur glissant que si le réglage
