@@ -44,6 +44,19 @@ export class SilenceDetector {
   }
 
   /**
+   * Whether the recording held no voice at all, as far as can be told: enough readings came in to
+   * know the room, and none of them was a voice. False when too little was read to say — a recorder
+   * that only writes its file at the end sends nothing, and its recording must still be transcribed.
+   *
+   * ⚠️ Noise with no voice in it is where the recogniser invents: measured with whisper.cpp in French,
+   * `*musique*`, `[bruits de la salle]`, and with no language hint `1/2 %, 1/2 %` or a sentence in Korean.
+   * A recording known to hold no voice is not sent to it at all.
+   */
+  get heardNothing(): boolean {
+    return this.readings > LEARN_READINGS + 2 && !this.heard;
+  }
+
+  /**
    * One reading, taken at `at` (milliseconds). True when the recording should stop now: a voice was
    * heard, and it has been quiet for `silenceMs` since.
    */

@@ -89,7 +89,7 @@ that does leave is **reversibly pseudonymized** first.
 | **What this machine learned stays here** | Optional, off by default. When a local model fails and a remote one succeeds **with a check at green**, the episode is kept locally: the request, the files as they were, both diffs, and the command that decided. It exports as `eval/tasks` fixtures or as a JSONL conversation set for fine-tuning a local model. **Nothing leaves** — there is no network call in that code, and a test reads the source to refuse one. |
 | **Finance** | Seven skills for code where the arithmetic is the requirement: half-away-from-zero against half-to-even, money without floats, T+1/T+2 settlement with holidays as a **parameter**, market hours in the exchange's own timezone, ISIN/LEI/BIC check digits, FIX BodyLength and CheckSum, amortisation schedules whose parts sum to the whole. Each one is backed by an evaluation task that fails before it is applied. |
 | **Your theme** | By default every color in the panel is one of the editor's own variables. Not one hex value — [the same model list under a light theme](https://raw.githubusercontent.com/FlorianMartins/hivey-vscode/main/docs/images/passerelle.light.png), captured by the same script. It follows a theme change immediately, high contrast included. `hiveyCode.appearance: "hivey"` swaps in Hivey's own surfaces and amber accent; a light theme keeps the editor's. |
-| **Dictation** | Speak instead of typing; off until configured. The transcript lands in the composer, never in a sent question. Local first — a Whisper transcriber the extension can install on this machine (`hiveyCode.dictation.localModel`), or your own command (`hiveyCode.dictation.command`) — and a remote `/audio/transcriptions` endpoint only if you set one, behind the same consent card as an image, because a voice cannot be pseudonymized. *Hivey Code: Choose a microphone* picks the input. |
+| **Dictation** | Speak instead of typing; off until configured. The transcript lands in the composer, never in a sent question. Local first — a Whisper transcriber the extension can install on this machine (`hiveyCode.dictation.localModel`), or your own command (`hiveyCode.dictation.command`) — and a remote `/audio/transcriptions` endpoint only if you set one, behind the same consent card as an image, because a voice cannot be pseudonymized. *Hivey Code: Choose a microphone* picks the input. It stops on its own once you have spoken and then stopped (`hiveyCode.dictation.stopOnSilence`, `silenceSeconds`), and background noise is not written down: a recording with no voice is not transcribed, and the recogniser's noise annotations (`*music*`, `[room noise]`, in every language) are removed — no noise filter on the sound, which measured worse with Whisper. |
 
 ## How the cost tends to zero
 
@@ -512,7 +512,7 @@ Those documents are currently written in French; translations are welcome.
 ## Development
 
 ```bash
-npm test                   # builds the bundles, then 1347 tests (node:test)
+npm test                   # builds the bundles, then 1348 tests (node:test)
 npm run test:integration   # loads the extension into a real VS Code (57 tests, headless)
 npm run eval:verify        # every evaluation task must fail before a model touches it
 node scripts/screenshots.mjs  # retakes the README's images from that same editor

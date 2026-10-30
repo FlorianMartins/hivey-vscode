@@ -136,6 +136,13 @@ can take your time to think — and the room's own noise (a fan, a laptop) is le
 `hiveyCode.dictation.stopOnSilence` turns it off. The Windows fallback recorder only writes its file at
 the end: press again there.
 
+**Background noise is not written down.** On noise with no voice in it, a recogniser invents: Whisper
+writes "*music*", "[room noise]", sometimes a whole sentence. So a recording in which no voice was heard
+is not transcribed at all ("Nothing was heard"), and those noise annotations are removed from what comes
+back, in every language. There is, however, no noise filter on the sound itself: measured, Whisper
+already understands speech in noise, and a filter made it lose words instead (3 % errors instead of 2 %,
+and one error on a clean recording that had none).
+
 **Several microphones?** On Windows with ffmpeg, there is no "default" input to fall back on — the
 recorder has to be told a device by name. With one input it simply uses it; with several and none
 chosen, the first press of the microphone asks which one, and remembers. **Hivey Code: Choose a

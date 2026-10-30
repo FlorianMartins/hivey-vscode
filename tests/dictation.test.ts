@@ -102,6 +102,14 @@ test("silence produces nothing, not a question made of a placeholder", () => {
   assert.equal(cleanTranscript("   \n  "), "");
   // A real bracketed phrase is kept: only the recognisers' own placeholders go.
   assert.equal(cleanTranscript("[important] revois ce fichier"), "[important] revois ce fichier");
+  // « souvent il y a des bruits de fond et il les note » — what whisper.cpp wrote, measured on noise
+  // with no voice, in French: every one of them goes, alone or around a sentence.
+  for (const noise of ["*musique*", "[Musique]", "[bruits de la salle]", "(applaudissements)", "...", "-"]) {
+    assert.equal(cleanTranscript(noise), "", noise);
+  }
+  assert.equal(cleanTranscript("[Musique] Ajoute un test. *bruit*"), "Ajoute un test.");
+  assert.equal(cleanTranscript("Sous-titres réalisés par la communauté d'Amara.org"), "");
+  assert.equal(cleanTranscript("Garde la valeur (par défaut) telle quelle."), "Garde la valeur (par défaut) telle quelle.", "a dictated parenthesis stays");
 });
 
 // ── Where a recording may go, and under whose name ───────────────────────────────────────────────

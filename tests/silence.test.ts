@@ -36,3 +36,15 @@ test("a noisy room: its noise is learned, and a voice above it still counts", ()
   assert.ok(at !== undefined, "the voice over the fan was not heard, or the fan was taken for a voice");
   assert.equal(run(repeat(0.03, 100)), undefined, "the fan alone is not a voice");
 });
+
+test("a recording with no voice in it is known as such — and one with too little read is not judged", () => {
+  // Noise with no voice is where the recogniser invents (`*musique*`, `[bruits de la salle]`).
+  const quiet = new SilenceDetector({ silenceMs: 1500 });
+  for (let i = 0; i < 40; i++) quiet.push(0.004, i * 120);
+  assert.equal(quiet.heardNothing, true);
+  const spoken = new SilenceDetector({ silenceMs: 1500 });
+  [...repeat(0.004, 6), ...repeat(0.08, 10), ...repeat(0.004, 10)].forEach((r, i) => spoken.push(r, i * 120));
+  assert.equal(spoken.heardNothing, false);
+  // A recorder that writes its file only at the end sent nothing: transcribe it as before.
+  assert.equal(new SilenceDetector({ silenceMs: 1500 }).heardNothing, false);
+});

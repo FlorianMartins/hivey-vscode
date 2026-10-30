@@ -3294,7 +3294,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
   /** The recording in progress, if any. One at a time: a second microphone is a second voice. */
   private recording:
-    | { stop: () => Promise<string>; cancel: () => void; dir: string; started: number; level: ReturnType<typeof setInterval> }
+    | { stop: () => Promise<string>; cancel: () => void; dir: string; started: number; level: ReturnType<typeof setInterval>; voice: SilenceDetector }
     | undefined;
 
   /**
@@ -3399,7 +3399,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       let read = 44;
       // Ended on its own once the person has spoken and then stopped — see `SilenceDetector`.
       const dictation = readSettings().dictation;
-      const silence = dictation.stopOnSilence ? new SilenceDetector({ silenceMs: dictation.silenceSeconds * 1000 }) : undefined;
+      // Always listened to — it also says when nothing was said (see `heardNothing`); it ends the
+      // recording only when that is asked for.
+      const voice = new SilenceDetector({ silenceMs: dictation.silenceSeconds * 1000 });
       const level = setInterval(() => {
         try {
           const fd = openSync(wav, "r");
@@ -3423,7 +3425,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             // silence and a voice was invisible, which is the whole thing this is for.
             const open = Math.pow(rms, 0.25);
             this.post({ type: "dictationLevel", level: Math.max(0, Math.min(1, (open - 0.2) / 0.55)) });
-            if (silence?.push(rms, Date.now()) && this.recording?.level === level) void this.stopDictation(false);
+            if (voice.push(rms, Date.now()) && dictation.stopOnSilence && this.recording?.level === level) void this.stopDictation(false);
           } finally {
             closeSync(fd);
           }
@@ -3431,7 +3433,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           /* the file is not there yet, or is being written — the next tick will do */
         }
       }, 120);
-      this.recording = { ...run, dir, started: Date.now(), level };
+      this.recording = { ...run, dir, started: Date.now(), level, voice };
       // Whether the edge can follow the voice at all. A recorder that writes its file once, at the
       // end, sends nothing to follow — and a ring left flat is indistinguishable from a broken one, so
       // the panel is told to breathe instead of to pretend.
@@ -3469,6 +3471,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     }
     try {
       const wav = await run.stop();
+      // No voice in it: nothing to transcribe, and noise is where the recogniser invents — see
+      // `SilenceDetector.heardNothing`.
+      if (run.voice.heardNothing) {
+        await fsp.rm(run.dir, { recursive: true, force: true });
+        this.post({ type: "dictationFailed", why: t("Nothing was heard.") });
+        return;
+      }
       const audio = await fsp.readFile(wav);
       // ⚠️ LOOKED AT before it is handed on. A broken recording used to reach whisper.cpp and the
       // person got ITS error — `failed to read the frames of the audio data (Invalid argument)`
