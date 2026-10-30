@@ -138,6 +138,12 @@ reconnaisseur se trompe, et une question dictée qui s'enverrait d'elle-même se
 personne n'a relue. Échap pendant l'enregistrement jette tout : changer d'avis au milieu d'une phrase
 n'est pas une demande de transcription.
 
+**Inutile d'appuyer pour terminer** : la dictée s'arrête d'elle-même quand vous avez parlé puis cessé
+de parler, après 1,5 s de silence (`hiveyCode.dictation.silenceSeconds`). Rien ne s'arrête avant
+qu'une voix ait été entendue — vous pouvez prendre le temps de réfléchir —, et le bruit de la pièce
+(un ventilateur, un portable) est appris d'abord. `hiveyCode.dictation.stopOnSilence` le désactive.
+L'enregistreur de secours de Windows n'écrit son fichier qu'à la fin : là, appuyez de nouveau.
+
 **Plusieurs micros ?** Sous Windows avec ffmpeg, il n'existe pas d'entrée « par défaut » sur laquelle
 se rabattre : il faut nommer le périphérique. Avec une seule entrée, elle est prise d'office ; avec
 plusieurs et aucune choisie, le premier appui sur le micro demande laquelle, et s'en souvient.

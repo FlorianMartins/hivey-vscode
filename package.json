@@ -1985,6 +1985,18 @@
             "default": "",
             "markdownDescription": "%config.dictation.device%"
           },
+          "hiveyCode.dictation.stopOnSilence": {
+            "type": "boolean",
+            "default": true,
+            "markdownDescription": "%config.dictation.stopOnSilence%"
+          },
+          "hiveyCode.dictation.silenceSeconds": {
+            "type": "number",
+            "default": 1.5,
+            "minimum": 0.5,
+            "maximum": 10,
+            "markdownDescription": "%config.dictation.silenceSeconds%"
+          },
           "hiveyCode.dictation.recordCommand": {
             "type": "string",
             "default": "",

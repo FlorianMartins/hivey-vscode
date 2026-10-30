@@ -130,6 +130,12 @@ and for all.
 a dictated question that sent itself would be a question nobody proof-read. Escape while recording
 throws it away: changing your mind mid-sentence is not a request to transcribe.
 
+**No need to press to finish**: dictation ends on its own once you have spoken and then stopped, after
+1.5 s of quiet (`hiveyCode.dictation.silenceSeconds`). Nothing ends before a voice has been heard — you
+can take your time to think — and the room's own noise (a fan, a laptop) is learned first.
+`hiveyCode.dictation.stopOnSilence` turns it off. The Windows fallback recorder only writes its file at
+the end: press again there.
+
 **Several microphones?** On Windows with ffmpeg, there is no "default" input to fall back on — the
 recorder has to be told a device by name. With one input it simply uses it; with several and none
 chosen, the first press of the microphone asks which one, and remembers. **Hivey Code: Choose a

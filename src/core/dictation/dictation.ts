@@ -61,6 +61,10 @@ export interface DictationSettings {
    * and what comes back is a file with no sound in it. Chosen with `Hivey Code: Choose a microphone`.
    */
   device: string;
+  /** End the dictation once the person has spoken and then stopped — see `SilenceDetector`. */
+  stopOnSilence: boolean;
+  /** The quiet after speech that ends it, in seconds. */
+  silenceSeconds: number;
 }
 
 /**

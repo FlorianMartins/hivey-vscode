@@ -176,5 +176,7 @@
   "config.chat.openRouterSort.throughput": "The fastest host first (the most tokens per second). The default.",
   "config.chat.openRouterSort.latency": "The host that starts answering soonest.",
   "config.chat.openRouterSort.price": "The cheapest host first — slower, sometimes much slower.",
-  "config.chat.openRouterSort.default": "Let OpenRouter choose, as before (it leans to the cheapest)."
+  "config.chat.openRouterSort.default": "Let OpenRouter choose, as before (it leans to the cheapest).",
+  "config.dictation.stopOnSilence": "End the dictation on its own once you have spoken and then stopped. Nothing ends before a voice has been heard, and the room's own noise is learned first. Not with a recorder that only writes its file at the end (the Windows fallback): press the microphone again there.",
+  "config.dictation.silenceSeconds": "How long the quiet after speech must last before the dictation ends, in seconds."
 }
