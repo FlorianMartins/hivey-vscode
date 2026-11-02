@@ -7,7 +7,7 @@
 
 import type { Price } from "./pricing.js";
 
-export const GENERATED_AT = "2026-11-01";
+export const GENERATED_AT = "2026-11-02";
 
 export type ModelRow = [string, string, string, number, number, number, number];
 
@@ -18,7 +18,7 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["~anthropic/claude-sonnet-latest","Claude Sonnet Latest","~anthropic",1000000,2,10,0.1],
   ["~deepseek/deepseek-flash-latest","DeepSeek Flash Latest","~deepseek",1048576,0.035,0.5,0.005],
   ["~deepseek/deepseek-pro-latest","DeepSeek Pro Latest","~deepseek",1048576,0.1035,8,0.1],
-  ["~deepseek/deepseek-v4-flash-latest","DeepSeek V4 Flash Latest","~deepseek",1048576,0.0434,0.3,0.035],
+  ["~deepseek/deepseek-v4-flash-latest","DeepSeek V4 Flash Latest","~deepseek",1048576,0.059,0.3,0.035],
   ["~google/gemini-flash-latest","Gemini Flash Latest","~google",1048576,0.75,3.75,0.075],
   ["~google/gemini-pro-latest","Gemini Pro Latest","~google",1048576,2,10,0.1],
   ["~moonshotai/kimi-latest","Kimi Latest","~moonshotai",1048576,0.1495,7.15,0.0748],
@@ -29,7 +29,7 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["~openai/gpt-terra-latest","GPT Terra Latest","~openai",1050000,1,5,0.05],
   ["~unbiased/pareto-latest","Pareto Latest","~unbiased",1048576,0.8,3.2,0.03],
   ["~x-ai/grok-latest","Grok Latest","~x-ai",500000,2,6,0.5],
-  ["~z-ai/glm-flash-latest","GLM Flash Latest","~z-ai",1048576,0.0088,0.1821,0.0088],
+  ["~z-ai/glm-flash-latest","GLM Flash Latest","~z-ai",1048576,0.0285,0.0923,0.0285],
   ["~z-ai/glm-latest","GLM Latest","~z-ai",1048576,0.0699,1.4,0.0689],
   ["aion-labs/aion-2.0","Aion-2.0","aion-labs",131072,0.8,1.6,0.2],
   ["aion-labs/aion-3.0","Aion-3.0","aion-labs",131072,3,6,0.75],
@@ -100,7 +100,7 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["deepseek/deepseek-v4-pro","DeepSeek V4 Pro 0423","deepseek",1048576,1.6,3.2,0.135],
   ["deepseek/deepseek-v4-pro-0813","DeepSeek V4 Pro 0813","deepseek",1048576,0.115,4,0.11],
   ["deepseek/deepseek-v4.1-flash","DeepSeek V4.1 Flash","deepseek",1048576,0.045,0.5,0.006],
-  ["deepseek/deepseek-v4.1-flash-1017","DeepSeek V4.1 Flash 1017","deepseek",1048576,0.15,0.6,0.003],
+  ["deepseek/deepseek-v4.1-flash-1017","DeepSeek V4.1 Flash 1017","deepseek",1048576,0.3,1.2,0.006],
   ["deepseek/deepseek-v4.1-flash:batch","DeepSeek V4.1 Flash (batch)","deepseek",1048576,0.05,0.15,0.004],
   ["dots-studio/dots-3-note-preview:free","Dots3-Note Preview (free)","dots-studio",512000,0,0,0],
   ["elorian/glimpse","Glimpse","elorian",262144,0.6,3,0.06],
@@ -140,7 +140,7 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["google/gemma-3-12b-it","Gemma 3 12B","google",131072,0.05,0.15,0],
   ["google/gemma-3-27b-it","Gemma 3 27B","google",131072,0.08,0.35,0.04],
   ["google/gemma-3-4b-it","Gemma 3 4B","google",131072,0.05,0.1,0],
-  ["google/gemma-4-26b-a4b-it","Gemma 4 26B A4B ","google",262144,0.0675,0.225,0.0375],
+  ["google/gemma-4-26b-a4b-it","Gemma 4 26B A4B ","google",262144,0.038,0.114,0.019],
   ["google/gemma-4-26b-a4b-it:free","Gemma 4 26B A4B  (free)","google",262144,0,0,0],
   ["google/gemma-4-31b-it","Gemma 4 31B","google",262144,0.2,0.4,0],
   ["google/gemma-4-31b-it:free","Gemma 4 31B (free)","google",262144,0,0,0],
@@ -162,7 +162,7 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["meta-llama/llama-3.1-70b-instruct","Llama 3.1 70B Instruct","meta-llama",131072,0.4,0.4,0],
   ["meta-llama/llama-3.1-8b-instruct","Llama 3.1 8B Instruct","meta-llama",131072,0.05,0.08,0.025],
   ["meta-llama/llama-3.2-1b-instruct","Llama 3.2 1B Instruct","meta-llama",60000,0.027,0.201,0],
-  ["meta-llama/llama-3.2-3b-instruct","Llama 3.2 3B Instruct","meta-llama",131072,0.05,0.33,0],
+  ["meta-llama/llama-3.2-3b-instruct","Llama 3.2 3B Instruct","meta-llama",131072,0.0509,0.335,0],
   ["meta-llama/llama-3.3-70b-instruct","Llama 3.3 70B Instruct","meta-llama",131072,0.1,0.32,0],
   ["meta-llama/llama-4-maverick","Llama 4 Maverick","meta-llama",524288,0.1875,0.6525,0.05],
   ["meta-llama/llama-4-scout","Llama 4 Scout","meta-llama",1310720,0.1,0.3,0],
@@ -323,7 +323,7 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["openai/gpt-audio","GPT Audio","openai",128000,2.5,10,0],
   ["openai/gpt-audio-mini","GPT Audio Mini","openai",128000,0.6,2.4,0],
   ["openai/gpt-chat-latest","GPT Chat Latest","openai",400000,5,30,0.5],
-  ["openai/gpt-oss-120b","gpt-oss-120b","openai",131072,0.022,0.082,0],
+  ["openai/gpt-oss-120b","gpt-oss-120b","openai",131072,0.022,0.08,0.019],
   ["openai/gpt-oss-120b:batch","gpt-oss-120b (batch)","openai",131072,0.0296,0.136,0],
   ["openai/gpt-oss-20b","gpt-oss-20b","openai",131072,0.03,0.13,0.03],
   ["openai/gpt-oss-20b:batch","gpt-oss-20b (batch)","openai",131072,0.024,0.112,0],
@@ -447,8 +447,8 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["z-ai/glm-5-turbo","GLM 5 Turbo","z-ai",202752,1.2,4,0.24],
   ["z-ai/glm-5.1","GLM 5.1","z-ai",204800,1.4,4.4,0.26],
   ["z-ai/glm-5.2","GLM 5.2","z-ai",1048576,0.006,6.8,0.005],
-  ["z-ai/glm-5.3","GLM 5.3","z-ai",1048576,0.0699,1.4,0.0689],
-  ["z-ai/glm-5.3-flash","GLM 5.3 Flash","z-ai",1048576,0.0088,0.1821,0.0088],
+  ["z-ai/glm-5.3","GLM 5.3","z-ai",1048576,0.08,3.6,0.076],
+  ["z-ai/glm-5.3-flash","GLM 5.3 Flash","z-ai",1048576,0.0285,0.0923,0.0285],
   ["z-ai/glm-5.3-flash:batch","GLM 5.3 Flash (batch)","z-ai",1048576,0.05,0.18,0.01],
   ["z-ai/glm-5.3-flashx","GLM 5.3 FlashX","z-ai",1048576,0.37,1.25,0.09],
   ["z-ai/glm-5.3-prime","GLM 5.3 Prime","z-ai",1000000,2.8,8.8,0.56],
