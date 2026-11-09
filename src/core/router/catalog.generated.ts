@@ -7,7 +7,7 @@
 
 import type { Price } from "./pricing.js";
 
-export const GENERATED_AT = "2026-11-08";
+export const GENERATED_AT = "2026-11-09";
 
 export type ModelRow = [string, string, string, number, number, number, number];
 
@@ -21,7 +21,7 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["~deepseek/deepseek-v4-flash-latest","DeepSeek V4 Flash Latest","~deepseek",1048576,0.0434,0.3,0.035],
   ["~google/gemini-flash-latest","Gemini Flash Latest","~google",1048576,0.75,3.75,0.075],
   ["~google/gemini-pro-latest","Gemini Pro Latest","~google",1048576,2,10,0.1],
-  ["~moonshotai/kimi-latest","Kimi Latest","~moonshotai",1048576,0.1824,10.5448,0.18],
+  ["~moonshotai/kimi-latest","Kimi Latest","~moonshotai",1048576,0.1539,10.1489,0.15],
   ["~openai/gpt-astra-latest","GPT Astra Latest","~openai",1050000,10,50,1],
   ["~openai/gpt-luna-latest","GPT Luna Latest","~openai",1050000,0.1,0.5,0.01],
   ["~openai/gpt-mini-latest","GPT Mini Latest","~openai",400000,0.75,4.5,0.075],
@@ -98,8 +98,8 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["deepseek/deepseek-v4-flash-0731","DeepSeek V4 Flash 0731","deepseek",1048576,0.0434,0.3,0.035],
   ["deepseek/deepseek-v4-flash-0731:batch","DeepSeek V4 Flash 0731 (batch)","deepseek",1048576,0.048,0.144,0.012],
   ["deepseek/deepseek-v4-flash-vision-exp","DeepSeek V4 Flash Vision Exp","deepseek",1048576,0.44,1.32,0.014],
-  ["deepseek/deepseek-v4-pro","DeepSeek V4 Pro 0423","deepseek",1048576,0.3833,0.7666,0.0319],
-  ["deepseek/deepseek-v4-pro-0813","DeepSeek V4 Pro 0813","deepseek",1048576,0.111,4.44,0.101],
+  ["deepseek/deepseek-v4-pro","DeepSeek V4 Pro 0423","deepseek",1048576,0.9553,1.9105,0.0796],
+  ["deepseek/deepseek-v4-pro-0813","DeepSeek V4 Pro 0813","deepseek",1048576,0.111,4.44,0.097],
   ["deepseek/deepseek-v4.1-flash","DeepSeek V4.1 Flash","deepseek",1048576,0.051,0.567,0.018],
   ["deepseek/deepseek-v4.1-flash-1017","DeepSeek V4.1 Flash 1017","deepseek",1048576,0.006,0.5,0.005],
   ["deepseek/deepseek-v4.1-flash-1017:batch","DeepSeek V4.1 Flash 1017 (batch)","deepseek",1048576,0.011,0.2,0.002],
@@ -142,9 +142,9 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["google/gemini-omni-1.2-flash","Gemini Omni 1.2 Flash","google",131072,1.5,9,0],
   ["google/gemma-2-27b-it","Gemma 2 27B","google",8192,0.65,0.65,0],
   ["google/gemma-3-12b-it","Gemma 3 12B","google",131072,0.05,0.15,0],
-  ["google/gemma-3-27b-it","Gemma 3 27B","google",131072,0.08,0.35,0.04],
+  ["google/gemma-3-27b-it","Gemma 3 27B","google",131072,0.08,0.45,0.04],
   ["google/gemma-3-4b-it","Gemma 3 4B","google",131072,0.05,0.1,0],
-  ["google/gemma-4-26b-a4b-it","Gemma 4 26B A4B ","google",262144,0.0675,0.225,0.0375],
+  ["google/gemma-4-26b-a4b-it","Gemma 4 26B A4B ","google",262144,0.09,0.3,0.05],
   ["google/gemma-4-26b-a4b-it:free","Gemma 4 26B A4B  (free)","google",262144,0,0,0],
   ["google/gemma-4-31b-it","Gemma 4 31B","google",262144,0.2,0.4,0],
   ["google/gemma-4-31b-it:free","Gemma 4 31B (free)","google",262144,0,0,0],
@@ -164,7 +164,7 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["mancer/weaver","Weaver (alpha)","mancer",8000,0.4,0.75,0.4],
   ["meituan/longcat-2.0","LongCat 2.0","meituan",1048756,0.3,1.2,0.006],
   ["meta-llama/llama-3.1-70b-instruct","Llama 3.1 70B Instruct","meta-llama",131072,0.72,0.72,0],
-  ["meta-llama/llama-3.1-8b-instruct","Llama 3.1 8B Instruct","meta-llama",131072,0.05,0.08,0.025],
+  ["meta-llama/llama-3.1-8b-instruct","Llama 3.1 8B Instruct","meta-llama",131072,0.02,0.04,0],
   ["meta-llama/llama-3.2-1b-instruct","Llama 3.2 1B Instruct","meta-llama",60000,0.027,0.201,0],
   ["meta-llama/llama-3.2-3b-instruct","Llama 3.2 3B Instruct","meta-llama",131072,0.05,0.33,0],
   ["meta-llama/llama-3.3-70b-instruct","Llama 3.3 70B Instruct","meta-llama",131072,0.59,0.79,0.295],
@@ -217,7 +217,7 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["moonshotai/kimi-k2.6","Kimi K2.6","moonshotai",262144,0.65,3.41,0.15],
   ["moonshotai/kimi-k2.7-code","Kimi K2.7 Code","moonshotai",262144,0.6,3.5,0.16],
   ["moonshotai/kimi-k3","Kimi K3","moonshotai",1048576,0.192,16,0.182],
-  ["moonshotai/kimi-k3:batch","Kimi K3 (batch)","moonshotai",1048576,1.084,6,0.267],
+  ["moonshotai/kimi-k3:batch","Kimi K3 (batch)","moonshotai",1048576,0.917,6,0.226],
   ["moonshotai/kimi-k3.1-pro","Kimi K3.1 Pro","moonshotai",1048576,2,10,0.2],
   ["morph/morph-v3-fast","Morph V3 Fast","morph",262144,0.8,1.2,0],
   ["morph/morph-v3-fast:batch","Morph V3 Fast (batch)","morph",81920,0.4,0.6,0],
@@ -326,7 +326,7 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["openai/gpt-chat-latest","GPT Chat Latest","openai",400000,5,30,0.5],
   ["openai/gpt-oss-120b","gpt-oss-120b","openai",131072,0.15,0.6,0.075],
   ["openai/gpt-oss-120b:batch","gpt-oss-120b (batch)","openai",131072,0.0296,0.136,0],
-  ["openai/gpt-oss-20b","gpt-oss-20b","openai",131072,0.03,0.13,0.03],
+  ["openai/gpt-oss-20b","gpt-oss-20b","openai",131072,0.018,0.09,0.009],
   ["openai/gpt-oss-20b:batch","gpt-oss-20b (batch)","openai",131072,0.024,0.112,0],
   ["openai/gpt-oss-safeguard-20b","gpt-oss-safeguard-20b","openai",131072,0.075,0.3,0.0375],
   ["openai/o3","o3","openai",200000,2,8,0.5],
@@ -367,7 +367,7 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["qwen/qwen3.5-122b-a10b","Qwen3.5-122B-A10B","qwen",262144,0.26,2.08,0],
   ["qwen/qwen3.5-27b","Qwen3.5-27B","qwen",262144,0.26,2.6,0],
   ["qwen/qwen3.5-35b-a3b","Qwen3.5-35B-A3B","qwen",262144,0.14,1,0.05],
-  ["qwen/qwen3.5-397b-a17b","Qwen3.5 397B A17B","qwen",262144,0.5,3.6,0.3],
+  ["qwen/qwen3.5-397b-a17b","Qwen3.5 397B A17B","qwen",262144,0.6,3.6,0.12],
   ["qwen/qwen3.5-9b","Qwen3.5-9B","qwen",262144,0.17,0.25,0],
   ["qwen/qwen3.5-flash-02-23","Qwen3.5-Flash","qwen",1000000,0.065,0.26,0],
   ["qwen/qwen3.5-plus-02-15","Qwen3.5 Plus 2026-02-15","qwen",1000000,0.26,1.56,0],
@@ -452,14 +452,14 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["z-ai/glm-5-turbo","GLM 5 Turbo","z-ai",202752,1.2,4,0.24],
   ["z-ai/glm-5.1","GLM 5.1","z-ai",204800,1.4,4.4,0.26],
   ["z-ai/glm-5.2","GLM 5.2","z-ai",1048576,0.006,6.8,0.005],
-  ["z-ai/glm-5.2:batch","GLM 5.2 (batch)","z-ai",1048576,0.37,1.5,0.125],
+  ["z-ai/glm-5.2:batch","GLM 5.2 (batch)","z-ai",1048576,0.623,1.271,0.21],
   ["z-ai/glm-5.3","GLM 5.3","z-ai",1048576,0.0699,1.4,0.0689],
   ["z-ai/glm-5.3-flash","GLM 5.3 Flash","z-ai",1048576,0.0335,0.083,0.03],
   ["z-ai/glm-5.3-flash:batch","GLM 5.3 Flash (batch)","z-ai",1048576,0.05,0.18,0.01],
   ["z-ai/glm-5.3-flashx","GLM 5.3 FlashX","z-ai",1048576,0.37,1.25,0.075],
   ["z-ai/glm-5.3-flashx-legal","GLM 5.3 FlashX Legal","z-ai",1048576,0.37,1.25,0.075],
   ["z-ai/glm-5.3-prime","GLM 5.3 Prime","z-ai",1000000,2.8,8.8,0.56],
-  ["z-ai/glm-5.3:batch","GLM 5.3 (batch)","z-ai",1048576,0.37,1.5,0.125],
+  ["z-ai/glm-5.3:batch","GLM 5.3 (batch)","z-ai",1048576,0.45,2,0.1],
   ["z-ai/glm-5v-turbo","GLM 5V Turbo","z-ai",202752,1.2,4,0.24],
 ];
 
