@@ -7,7 +7,7 @@
 
 import type { Price } from "./pricing.js";
 
-export const GENERATED_AT = "2026-11-21";
+export const GENERATED_AT = "2026-11-22";
 
 export type ModelRow = [string, string, string, number, number, number, number];
 
@@ -21,7 +21,7 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["~deepseek/deepseek-v4-flash-latest","DeepSeek V4 Flash Latest","~deepseek",1048576,0.044,0.132,0.0014],
   ["~google/gemini-flash-latest","Gemini Flash Latest","~google",1048576,1.5,7.5,0.075],
   ["~google/gemini-pro-latest","Gemini Pro Latest","~google",1048576,2,10,0.1],
-  ["~moonshotai/kimi-latest","Kimi Latest","~moonshotai",1048576,0.1805,11.0055,0.18],
+  ["~moonshotai/kimi-latest","Kimi Latest","~moonshotai",1048576,0.1824,11.0055,0.18],
   ["~openai/gpt-astra-latest","GPT Astra Latest","~openai",1050000,8,40,0.4],
   ["~openai/gpt-luna-latest","GPT Luna Latest","~openai",1050000,0.1,0.5,0.01],
   ["~openai/gpt-mini-latest","GPT Mini Latest","~openai",400000,0.75,4.5,0.075],
@@ -148,12 +148,12 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["google/gemma-2-27b-it","Gemma 2 27B","google",8192,0.65,0.65,0],
   ["google/gemma-3-12b-it","Gemma 3 12B","google",131072,0.05,0.15,0],
   ["google/gemma-3-27b-it","Gemma 3 27B","google",131072,0.08,0.45,0.04],
-  ["google/gemma-3-4b-it","Gemma 3 4B","google",131072,0.05,0.1,0],
+  ["google/gemma-3-4b-it","Gemma 3 4B","google",131072,0.04,0.05,0.02],
   ["google/gemma-4-26b-a4b-it","Gemma 4 26B A4B ","google",262144,0.0675,0.225,0.0375],
   ["google/gemma-4-26b-a4b-it:free","Gemma 4 26B A4B  (free)","google",262144,0,0,0],
   ["google/gemma-4-31b-it","Gemma 4 31B","google",262144,0.2,0.4,0],
   ["google/gemma-4-31b-it:free","Gemma 4 31B (free)","google",262144,0,0,0],
-  ["gryphe/mythomax-l2-13b","MythoMax 13B","gryphe",8192,0.08,0.11,0],
+  ["gryphe/mythomax-l2-13b","MythoMax 13B","gryphe",8192,0.3,0.5,0.2],
   ["ibm-granite/granite-4.2-8b","Granite 4.2 8B","ibm-granite",131072,0.06,0.15,0.015],
   ["inclusionai/ling-3.0-flash","Ling 3.0 Flash","inclusionai",262144,0.021,0.063,0.0042],
   ["inclusionai/ling-3.0-flash-vl","Ling 3.0 Flash VL","inclusionai",131072,0.06,0.18,0.012],
@@ -349,7 +349,7 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["openai/o3-pro","o3 Pro","openai",200000,20,80,0],
   ["openai/o3:batch","o3 (batch)","openai",200000,1,4,0.25],
   ["openai/o4-mini:batch","o4 Mini (batch)","openai",200000,0.55,2.2,0.1375],
-  ["particle-ai/particle-1","Particle-1","particle-ai",1048576,0.07,0.5,0.006],
+  ["particle-ai/particle-1","Particle-1","particle-ai",1048576,0.07,0.5,0.03],
   ["particle-ai/particle-1:free","Particle-1 (free)","particle-ai",1048576,0,0,0],
   ["perceptron/perceptron-mk1","Perceptron Mk1","perceptron",32768,0.15,1.5,0],
   ["perceptron/perceptron-mk1.5","Perceptron Mk1.5","perceptron",36864,0.15,1.5,0],
@@ -379,7 +379,7 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["qwen/qwen3-vl-30b-a3b-instruct","Qwen3 VL 30B A3B Instruct","qwen",262144,0.15,0.6,0],
   ["qwen/qwen3-vl-8b-instruct","Qwen3 VL 8B Instruct","qwen",262144,0.25,0.75,0.12],
   ["qwen/qwen3.5-122b-a10b","Qwen3.5-122B-A10B","qwen",262144,0.26,2.08,0],
-  ["qwen/qwen3.5-27b","Qwen3.5-27B","qwen",262144,0.195,1.56,0],
+  ["qwen/qwen3.5-27b","Qwen3.5-27B","qwen",262144,0.26,2.6,0],
   ["qwen/qwen3.5-35b-a3b","Qwen3.5-35B-A3B","qwen",262144,0.14,1,0.05],
   ["qwen/qwen3.5-397b-a17b","Qwen3.5 397B A17B","qwen",262144,0.45,3,0.22],
   ["qwen/qwen3.5-9b","Qwen3.5-9B","qwen",262144,0.17,0.25,0],
@@ -395,7 +395,7 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["qwen/qwen3.7-plus","Qwen3.7 Plus","qwen",1000000,0.32,1.28,0.064],
   ["qwen/qwen3.7-plus:batch","Qwen3.7 Plus (batch)","qwen",262144,0.23,0.92,0],
   ["qwen/qwen3.8-2.4t-a95b","Qwen3.8 2.4T A95B","qwen",1048576,2,6,0.25],
-  ["qwen/qwen3.8-27b","Qwen3.8 27B","qwen",1024000,0.06,1.96,0.059],
+  ["qwen/qwen3.8-27b","Qwen3.8 27B","qwen",1024000,0.035,1.5,0.0175],
   ["qwen/qwen3.8-27b:batch","Qwen3.8 27B (batch)","qwen",262144,0.16,2,0.04],
   ["qwen/qwen3.8-flash","Qwen3.8 Flash","qwen",1000000,0.15,0.47,0.016],
   ["qwen/qwen3.8-max-0902","Qwen3.8 Max (0902)","qwen",1000000,2,6,0.25],
@@ -424,7 +424,7 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["tencent/hy-mt2-1.8b","Hy-MT2-1.8B","tencent",8192,0.044,0.177,0],
   ["tencent/hy-mt2-30b-a3b","Hy-MT2-30B-A3B","tencent",8192,0.074,0.295,0],
   ["tencent/hy-mt2-7b","Hy-MT2-7B","tencent",8192,0.074,0.295,0],
-  ["tencent/hy3","Hy3","tencent",262144,0.132,0.528,0.033],
+  ["tencent/hy3","Hy3","tencent",262144,0.14,0.58,0.035],
   ["tencent/hy4","Hy4","tencent",1048576,0.417,1.2505,0.021],
   ["tencent/hy4-flash","Hy4 flash","tencent",1048576,0.035,0.1405,0.0015],
   ["tencent/hy4-preview","Hy4 preview","tencent",1048576,0.834,2.501,0.042],
@@ -432,7 +432,7 @@ export const GENERATED_MODELS: ModelRow[] = [
   ["thedrummer/skyfall-36b-v2","Skyfall 36B V2","thedrummer",32768,0.55,0.8,0.25],
   ["thedrummer/unslopnemo-12b","UnslopNemo 12B","thedrummer",1024000,0.4,0.4,0],
   ["thinkingmachines/inkling","Inkling","thinkingmachines",524288,1,4.05,0.17],
-  ["thinkingmachines/inkling-2-mini","Inkling 2 Mini","thinkingmachines",1048576,0.1,0.4,0.02],
+  ["thinkingmachines/inkling-2-mini","Inkling 2 Mini","thinkingmachines",1048576,0.075,0.3,0.015],
   ["thinkingmachines/inkling-2-small","Inkling 2 Small","thinkingmachines",1048576,0.3,1,0.03],
   ["thinkingmachines/inkling-small","Inkling Small","thinkingmachines",524288,0.45,1.2,0.1],
   ["thinkingmachines/inkling-small:batch","Inkling Small (batch)","thinkingmachines",524288,0.36,0.96,0.08],
